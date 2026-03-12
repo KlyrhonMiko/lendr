@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlmodel import Session
+
 from core.database import get_session
 from core.deps import get_current_user
-from systems.inventory.services.user_service import UserService
-from systems.inventory.schemas.user_schemas import UserCreate, UserRead, UserUpdate
+from core.schemas import GenericResponse, PaginationMeta, create_success_response
 from systems.inventory.models.user import User
-from core.schemas import GenericResponse, create_success_response, PaginationMeta
+from systems.inventory.schemas.user_schemas import UserCreate, UserRead, UserUpdate
+from systems.inventory.services.user_service import UserService
 
 router = APIRouter()
 user_service = UserService()

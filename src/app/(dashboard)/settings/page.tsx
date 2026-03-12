@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { Settings, Plus, Search, Edit2, Loader2, AlertCircle, X, Shield, Sliders } from 'lucide-react';
-import { api } from '@/lib/api';
+import { settingsApi } from './api';
+import { toast } from "sonner";
 
 interface SystemSetting {
   key: string;
@@ -34,7 +35,7 @@ export default function SettingsPage() {
   const fetchSettings = async () => {
     setLoading(true);
     try {
-      const res = await api.get<SystemSetting[]>('/config');
+      const res = await settingsApi.list(); // Simplified call
       setSettings(res.data);
     } catch (err: any) {
       setError(err.message || 'Failed to fetch settings');
@@ -66,20 +67,23 @@ export default function SettingsPage() {
     setIsModalOpen(true);
   };
 
-  const handleSave = async (e: React.FormEvent) => {
+const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     try {
       if (editingKey) {
-        // Backend PATCH /{key} only takes { value } based on schema
-        await api.patch(`/config/${editingKey}`, { value: formData.value });
+        await settingsApi.update(editingKey, formData.value);
+        toast.success("System setting updated"); // Added this
       } else {
-        await api.post('/config', formData);
+        await settingsApi.create(formData);
+        toast.success("New configuration added"); // Added this
       }
       resetForm();
       fetchSettings();
     } catch (err: any) {
-      setError(err.message || 'Failed to save setting');
+      const msg = err.message || 'Failed to save setting';
+      setError(msg);
+      toast.error(msg); // Added this
     }
   };
 

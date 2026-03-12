@@ -1,9 +1,12 @@
 from datetime import datetime
 from uuid import UUID
-from sqlmodel import Field
-from core.base_model import BaseModel
+
 from sqlalchemy import Index, text
+from sqlmodel import Field
+
+from core.base_model import BaseModel
 from utils.time_utils import get_now_manila
+
 
 class BorrowRequest(BaseModel, table=True):
     __tablename__ = "borrow_requests"

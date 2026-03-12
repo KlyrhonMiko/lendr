@@ -1,9 +1,8 @@
-import re
 import random
+import re
 import string
 
 from sqlalchemy import Index, text
-
 from sqlmodel import Field, SQLModel
 
 from core.base_model import BaseModel

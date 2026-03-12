@@ -1,6 +1,8 @@
-from pathlib import Path
 import os
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 def _find_env_file(names=(".env.local", ".env")) -> str | None:
     start = Path(__file__).resolve()

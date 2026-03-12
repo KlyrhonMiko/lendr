@@ -1,11 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlmodel import Session
+
 from core.database import get_session
 from core.deps import get_current_user
-from systems.inventory.services.borrow_request_service import BorrowService
-from systems.inventory.schemas.borrow_request_schemas import BorrowRequestCreate, BorrowRequestRead
+from core.schemas import GenericResponse, PaginationMeta, create_success_response
 from systems.inventory.models.user import User
-from core.schemas import GenericResponse, create_success_response, PaginationMeta
+from systems.inventory.schemas.borrow_request_schemas import (
+    BorrowRequestBatchCreate,
+    BorrowRequestCreate,
+    BorrowRequestRead,
+)
+from systems.inventory.services.borrow_request_service import BorrowService
 
 router = APIRouter()
 borrow_service = BorrowService()
@@ -24,6 +29,19 @@ async def create_request(
     try:
         borrow_req = borrow_service.create_request(session, request_data)
         return create_success_response(data=borrow_req, message="Borrow request created", request=request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/batch", response_model=GenericResponse[list[BorrowRequestRead]], status_code=201, responses={400: {"model": GenericResponse}, 401: {"model": GenericResponse}})
+async def create_batch_requests(
+    request_data: BorrowRequestBatchCreate,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        borrow_reqs = borrow_service.create_batch_requests(session, request_data)
+        return create_success_response(data=borrow_reqs, message=f"{len(borrow_reqs)} borrow requests created", request=request)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

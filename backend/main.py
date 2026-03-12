@@ -1,14 +1,18 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+
 from core.schemas import GenericResponse, create_error_response
+from systems.inventory.routers.auth import router as auth
+from systems.inventory.routers.borrowing import router as borrowing
+from systems.inventory.routers.configuration import router as config
 from systems.inventory.routers.inventory import router as inventory
 from systems.inventory.routers.users import router as users
-from systems.inventory.routers.borrowing import router as borrowing
-from systems.inventory.routers.auth import router as auth
-from systems.inventory.routers.configuration import router as config
+from systems.inventory.routers.dashboard import router as dashboard
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -16,6 +20,14 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Lendr Unified API", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Global Exception Handlers
 @app.exception_handler(HTTPException)
@@ -54,6 +66,7 @@ app.include_router(auth, prefix="/api/auth", tags=["Auth"])
 app.include_router(users, prefix="/api/users", tags=["Users"])
 app.include_router(inventory, prefix="/api/inventory", tags=["Inventory"])
 app.include_router(borrowing, prefix="/api/borrowing", tags=["Borrowing"])
+app.include_router(dashboard, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(config, prefix="/api/config", tags=["Configuration"])
 
 

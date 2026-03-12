@@ -8,7 +8,8 @@ import {
   ArrowRight, ArrowLeft, Loader2, AlertCircle,
   Briefcase, UserCircle
 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { registerApi } from './api';
+import { toast } from "sonner";
 
 const ROLES = [
   { value: 'accountant', label: 'Accountant' },
@@ -61,16 +62,19 @@ export default function RegisterPage() {
     setError(null);
 
     try {
-      // Exclude confirmPassword and match UserCreate schema
       const { confirmPassword, ...submitData } = formData;
-      await api.post('/users/register', submitData);
-      router.push('/login?registered=true');
+      await registerApi.register(submitData);
+      toast.success("Account created successfully! Redirecting..."); // Added this
+      router.push('/login');
     } catch (err: any) {
-      setError(err.message || 'Registration failed. Please try again.');
+      const msg = err.message || 'Registration failed';
+      setError(msg);
+      toast.error(msg); // Added this
     } finally {
       setIsLoading(false);
     }
   };
+
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">

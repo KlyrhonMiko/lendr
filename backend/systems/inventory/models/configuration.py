@@ -1,5 +1,7 @@
 from sqlmodel import Field
+
 from core.base_model import BaseModel
+
 
 class SystemSetting(BaseModel, table=True):
     __tablename__ = "system_settings"

@@ -1,8 +1,11 @@
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
+
 from pydantic import BaseModel, Field, field_serializer
+
 from utils.time_utils import format_datetime
+
 
 class BorrowRequestBase(BaseModel):
     qty_requested: Optional[int] = Field(default=None, gt=0)
@@ -44,3 +47,12 @@ class BorrowRequestRelease(BaseModel):
 
 class BorrowRequestReturn(BaseModel):
     notes: Optional[str] = Field(default=None, max_length=500)
+
+class BatchItem(BaseModel):
+    item_id: str
+    qty_requested: int
+
+class BorrowRequestBatchCreate(BaseModel):
+    borrower_id: str
+    items: list[BatchItem]
+    notes: Optional[str] = None

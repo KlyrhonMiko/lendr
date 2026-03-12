@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { History, Search, CheckCircle2, AlertCircle, Clock, XCircle, Plus, Loader2, Info } from 'lucide-react';
-import { api } from '@/lib/api';
+import { borrowApi, BorrowRequest } from './api';
+import { inventoryApi } from '../inventory/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from "sonner";
 
 interface BorrowRecord {
   borrow_id: string;
@@ -31,15 +33,7 @@ export default function BorrowsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('ALL');
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  // New Request Form State
-  const [formData, setFormData] = useState({
-    item_id: '',
-    qty_requested: 1,
-    notes: '',
-  });
 
   useEffect(() => {
     fetchInitialData();
@@ -49,8 +43,8 @@ export default function BorrowsPage() {
     setLoading(true);
     try {
       const [recordsRes, itemsRes] = await Promise.all([
-        api.get<BorrowRecord[]>('/borrowing/requests'),
-        api.get<InventoryItem[]>('/inventory/items'),
+        borrowApi.list(),
+        inventoryApi.list(),
       ]);
       setRecords(recordsRes.data);
       setItems(itemsRes.data.filter(i => i.available_qty > 0));
@@ -61,25 +55,16 @@ export default function BorrowsPage() {
     }
   };
 
-  const handleCreateRequest = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    try {
-      await api.post('/borrowing/requests', formData);
-      setIsModalOpen(false);
-      setFormData({ item_id: '', qty_requested: 1, notes: '' });
-      fetchInitialData();
-    } catch (err: any) {
-      setError(err.message || 'Failed to create request');
-    }
-  };
 
   const handleAction = async (action: 'approve' | 'release' | 'return', borrowId: string) => {
     try {
-      await api.post(`/borrowing/requests/${borrowId}/${action}`);
+      await borrowApi[action](borrowId);
+      toast.success(`Request successfully ${action}ed`);
       fetchInitialData();
     } catch (err: any) {
-      setError(err.message || `Failed to ${action} request`);
+      const msg = err.message || `Failed to ${action} request`;
+      setError(msg);
+      toast.error(msg);
     }
   };
 
@@ -97,13 +82,6 @@ export default function BorrowsPage() {
           <h1 className="text-4xl font-bold font-heading mb-2">Borrowing Management</h1>
           <p className="text-muted-foreground text-lg">Manage equipment requests and tracking.</p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="px-6 py-2.5 bg-indigo-500 text-white font-semibold rounded-full hover:bg-indigo-600 transition-all flex items-center gap-2 shadow-lg shadow-indigo-500/25"
-        >
-          <Plus className="w-4 h-4" />
-          Request a Borrow
-        </button>
       </div>
 
       {error && (
@@ -237,65 +215,6 @@ export default function BorrowsPage() {
         </div>
       </div>
 
-      {/* New Request Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-md bg-card border border-border rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-6 border-b border-border/50">
-              <h2 className="text-xl font-bold font-heading">Request a Borrow</h2>
-            </div>
-            <form onSubmit={handleCreateRequest} className="p-6 space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-semibold">Select Equipment</label>
-                <select
-                  required
-                  value={formData.item_id}
-                  onChange={(e) => setFormData({ ...formData, item_id: e.target.value })}
-                  className="w-full h-11 px-4 rounded-xl bg-input/30 border border-border focus:ring-2 focus:ring-indigo-500/30 transition-all font-medium"
-                >
-                  <option value="">Select an item...</option>
-                  {items.map(item => (
-                    <option key={item.item_id} value={item.item_id}>
-                      {item.name} ({item.available_qty} available)
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-semibold">Quantity</label>
-                <input
-                  required
-                  type="number"
-                  min="1"
-                  value={formData.qty_requested}
-                  onChange={(e) => setFormData({ ...formData, qty_requested: parseInt(e.target.value) || 1 })}
-                  className="w-full h-11 px-4 rounded-xl bg-input/30 border border-border focus:ring-2 focus:ring-indigo-500/30 transition-all font-medium"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-semibold">Notes (Optional)</label>
-                <textarea
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className="w-full h-24 p-4 rounded-xl bg-input/30 border border-border focus:ring-2 focus:ring-indigo-500/30 transition-all font-medium resize-none"
-                  placeholder="Why do you need this?"
-                />
-              </div>
-
-              <div className="pt-4 flex gap-3">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-3 rounded-xl font-semibold bg-secondary hover:bg-secondary/80 transition-colors">
-                  Cancel
-                </button>
-                <button type="submit" className="flex-1 py-3 rounded-xl font-semibold bg-indigo-500 text-white hover:bg-indigo-600 shadow-lg shadow-indigo-500/25 transition-colors">
-                  Submit Request
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

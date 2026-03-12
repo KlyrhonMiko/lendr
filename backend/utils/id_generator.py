@@ -1,5 +1,7 @@
 from typing import Type, TypeVar
+
 from sqlmodel import Session, select
+
 from core.base_model import BaseModel
 
 ModelType = TypeVar("ModelType", bound=BaseModel)

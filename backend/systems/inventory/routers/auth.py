@@ -1,15 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.security import OAuth2PasswordRequestForm
-from sqlmodel import Session
 from datetime import timedelta
 
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.security import OAuth2PasswordRequestForm
+from sqlmodel import Session
+
+from core.config import settings
 from core.database import get_session
 from core.deps import get_current_user
-from systems.inventory.services.auth_service import AuthService
-from systems.inventory.schemas.user_schemas import Token, UserRead
-from systems.inventory.models.user import User
 from core.schemas import GenericResponse, create_success_response
-from core.config import settings
+from systems.inventory.models.user import User
+from systems.inventory.schemas.user_schemas import Token, UserRead
+from systems.inventory.services.auth_service import AuthService
 
 router = APIRouter()
 auth_service = AuthService()
