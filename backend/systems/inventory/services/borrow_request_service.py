@@ -1,16 +1,18 @@
 from uuid import UUID
-from sqlmodel import Session
+
 from fastapi import HTTPException
-from utils.time_utils import get_now_manila
+from sqlmodel import Session
+
 from core.base_service import BaseService
 from systems.inventory.models.borrow_request import BorrowRequest
-from systems.inventory.schemas.borrow_request_schemas import (
-    BorrowRequestCreate, 
-    BorrowRequestUpdate
-)
 from systems.inventory.models.user import User
+from systems.inventory.schemas.borrow_request_schemas import (
+    BorrowRequestCreate,
+    BorrowRequestUpdate,
+)
 from systems.inventory.services.inventory_service import InventoryService
 from systems.inventory.services.user_service import UserService
+from utils.time_utils import get_now_manila
 
 _DEFAULT_STATUSES = ["pending", "approved", "released", "returned"]
 
@@ -22,7 +24,9 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
 
     def _get_workflow(self, session: Session) -> list[str]:
         """Returns status names in pipeline order from config, falling back to defaults."""
-        from systems.inventory.services.configuration_service import ConfigurationService
+        from systems.inventory.services.configuration_service import (
+            ConfigurationService,
+        )
         settings = ConfigurationService().get_by_category(session, "borrow_status")
         if not settings:
             return _DEFAULT_STATUSES

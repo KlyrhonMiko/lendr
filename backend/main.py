@@ -1,14 +1,16 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+
 from core.schemas import GenericResponse, create_error_response
+from systems.inventory.routers.auth import router as auth
+from systems.inventory.routers.borrowing import router as borrowing
+from systems.inventory.routers.configuration import router as config
 from systems.inventory.routers.inventory import router as inventory
 from systems.inventory.routers.users import router as users
-from systems.inventory.routers.borrowing import router as borrowing
-from systems.inventory.routers.auth import router as auth
-from systems.inventory.routers.configuration import router as config
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

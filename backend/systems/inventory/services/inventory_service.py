@@ -1,7 +1,12 @@
 from sqlmodel import Session
+
 from core.base_service import BaseService
 from systems.inventory.models.inventory import InventoryItem
-from systems.inventory.schemas.inventory_schemas import InventoryItemCreate, InventoryItemUpdate
+from systems.inventory.schemas.inventory_schemas import (
+    InventoryItemCreate,
+    InventoryItemUpdate,
+)
+
 
 class InventoryService(BaseService[InventoryItem, InventoryItemCreate, InventoryItemUpdate]):
     def __init__(self):
@@ -38,7 +43,9 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         return item
 
     def get_item_status(self, session: Session, item: InventoryItem) -> str:
-        from systems.inventory.services.configuration_service import ConfigurationService
+        from systems.inventory.services.configuration_service import (
+            ConfigurationService,
+        )
         config_service = ConfigurationService()
 
         status_settings = config_service.get_by_category(session, "inventory_status")

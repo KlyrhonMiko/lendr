@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any, Union
+
 from jose import jwt
 from passlib.context import CryptContext
+
 from core.config import settings
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")

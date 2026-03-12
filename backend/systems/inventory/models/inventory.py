@@ -1,5 +1,4 @@
 from sqlalchemy import Index, text
-
 from sqlmodel import Field
 
 from core.base_model import BaseModel

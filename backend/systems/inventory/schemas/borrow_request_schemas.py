@@ -1,8 +1,11 @@
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
+
 from pydantic import BaseModel, Field, field_serializer
+
 from utils.time_utils import format_datetime
+
 
 class BorrowRequestBase(BaseModel):
     qty_requested: Optional[int] = Field(default=None, gt=0)

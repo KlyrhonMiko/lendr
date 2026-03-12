@@ -1,9 +1,12 @@
 from datetime import timedelta
 from typing import Optional
+
 from sqlmodel import Session, select
+
 from systems.inventory.models.user import User
 from systems.inventory.services.user_service import UserService
 from utils.security import verify_password
+
 
 class AuthService:
     def __init__(self):

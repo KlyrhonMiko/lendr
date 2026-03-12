@@ -1,10 +1,12 @@
 from sqlmodel import Session
+
 from core.base_service import BaseService
 from systems.inventory.models.user import User
 from systems.inventory.schemas.user_schemas import UserCreate, UserUpdate
+from utils.id_generator import get_next_sequence
 from utils.security import get_password_hash
 from utils.time_utils import get_now_manila
-from utils.id_generator import get_next_sequence
+
 
 class UserService(BaseService[User, UserCreate, UserUpdate]):
     def __init__(self):

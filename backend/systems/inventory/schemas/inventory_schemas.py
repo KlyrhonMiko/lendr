@@ -1,5 +1,7 @@
 from typing import Optional
+
 from pydantic import BaseModel, Field
+
 
 class InventoryItemBase(BaseModel):
     name: Optional[str] = Field(default=None, max_length=255)

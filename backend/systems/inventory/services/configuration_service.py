@@ -1,6 +1,8 @@
 from sqlmodel import Session, select
+
 from core.base_service import BaseService
 from systems.inventory.models.configuration import SystemSetting
+
 
 class ConfigurationService(BaseService[SystemSetting, None, None]):
     def __init__(self):

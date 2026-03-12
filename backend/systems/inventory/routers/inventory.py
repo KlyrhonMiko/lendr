@@ -1,11 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlmodel import Session
+
 from core.database import get_session
 from core.deps import get_current_user
-from systems.inventory.services.inventory_service import InventoryService
-from systems.inventory.schemas.inventory_schemas import InventoryItemCreate, InventoryItemRead, InventoryItemUpdate
+from core.schemas import GenericResponse, PaginationMeta, create_success_response
 from systems.inventory.models.user import User
-from core.schemas import GenericResponse, create_success_response, PaginationMeta
+from systems.inventory.schemas.inventory_schemas import (
+    InventoryItemCreate,
+    InventoryItemRead,
+    InventoryItemUpdate,
+)
+from systems.inventory.services.inventory_service import InventoryService
 
 router = APIRouter()
 inventory_service = InventoryService()
