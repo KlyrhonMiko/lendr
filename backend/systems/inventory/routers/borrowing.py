@@ -1,9 +1,17 @@
+from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlmodel import Session
 from core.database import get_session
 from core.schemas import SuccessResponse, PaginationMeta, create_success_response
 from systems.inventory.services.borrow_request_service import BorrowService
-from systems.inventory.schemas.borrow_request_schemas import BorrowRequestCreate, BorrowRequestUpdate, BorrowRequestRead
+from systems.inventory.schemas.borrow_request_schemas import (
+    BorrowRequestCreate, 
+    BorrowRequestUpdate, 
+    BorrowRequestRead,
+    BorrowRequestApprove,
+    BorrowRequestRelease,
+    BorrowRequestReturn
+)
 
 router = APIRouter()
 borrow_service = BorrowService()
@@ -64,3 +72,34 @@ async def restore_request(borrow_id: str, request: Request, session: Session = D
         raise HTTPException(status_code=400, detail="Borrow request is not deleted")
     restored_request = borrow_service.restore(session, db_request)
     return create_success_response(message="Borrow request restored successfully", data=restored_request, request=request)
+
+@router.post("/requests/{borrow_id}/approve", response_model=SuccessResponse[BorrowRequestRead])
+async def approve_request(borrow_id: str, data: BorrowRequestApprove, request: Request, session: Session = Depends(get_session)):
+    dummy_admin_id = UUID("00000000-0000-0000-0000-000000000000")
+    
+    updated_request = borrow_service.approve_request(session, borrow_id, dummy_admin_id, data)
+    return create_success_response(
+        message="Borrow request approved",
+        data=updated_request,
+        request=request
+    )
+
+@router.post("/requests/{borrow_id}/release", response_model=SuccessResponse[BorrowRequestRead])
+async def release_request(borrow_id: str, data: BorrowRequestRelease, request: Request, session: Session = Depends(get_session)):
+    dummy_admin_id = UUID("00000000-0000-0000-0000-000000000000")
+    
+    updated_request = borrow_service.release_request(session, borrow_id, dummy_admin_id, data)
+    return create_success_response(
+        message="Items released and inventory updated",
+        data=updated_request,
+        request=request
+    )
+
+@router.post("/requests/{borrow_id}/return", response_model=SuccessResponse[BorrowRequestRead])
+async def return_request(borrow_id: str, data: BorrowRequestReturn, request: Request, session: Session = Depends(get_session)):
+    updated_request = borrow_service.return_request(session, borrow_id, data)
+    return create_success_response(
+        message="Items returned and inventory updated",
+        data=updated_request,
+        request=request
+    )

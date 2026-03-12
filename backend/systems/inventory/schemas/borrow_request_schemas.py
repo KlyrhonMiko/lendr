@@ -35,3 +35,11 @@ class BorrowRequestRead(BorrowRequestBase):
     class Config:
         from_attributes = True
 
+class BorrowRequestApprove(BaseModel):
+    notes: Optional[str] = Field(default=None, max_length=500)
+
+class BorrowRequestRelease(BaseModel):
+    notes: Optional[str] = Field(default=None, max_length=500)
+
+class BorrowRequestReturn(BaseModel):
+    notes: Optional[str] = Field(default=None, max_length=500)
