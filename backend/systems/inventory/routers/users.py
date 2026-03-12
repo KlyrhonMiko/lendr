@@ -1,27 +1,27 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlmodel import Session
 from core.database import get_session
-from core.schemas import SuccessResponse, PaginationMeta, create_success_response
+from core.deps import get_current_user
 from systems.inventory.services.user_service import UserService
-from systems.inventory.schemas.user_schemas import UserCreate, UserUpdate, UserRead
-from core.deps import get_current_user 
-from systems.inventory.models.user import User  
+from systems.inventory.schemas.user_schemas import UserCreate, UserRead, UserUpdate
+from systems.inventory.models.user import User
+from core.schemas import GenericResponse, create_success_response, PaginationMeta
 
 router = APIRouter()
 user_service = UserService()
 
-@router.post("/register", response_model=SuccessResponse[UserRead], status_code=201)
-async def register_user(user_data: UserCreate, request: Request, session: Session = Depends(get_session)):
+@router.post("/register", response_model=GenericResponse[UserRead], status_code=201, responses={400: {"model": GenericResponse}})
+async def register_user(
+    user_data: UserCreate, 
+    request: Request,
+    session: Session = Depends(get_session)
+):
     user = user_service.create(session, user_data)
-    return create_success_response(
-        message="User registered successfully",
-        data=user,
-        request=request
-    )
+    return create_success_response(data=user, message="User registered successfully", request=request)
 
-@router.get("/users", response_model=SuccessResponse[list[UserRead]])
+@router.get("", response_model=GenericResponse[list[UserRead]], responses={401: {"model": GenericResponse}})
 async def list_users(
-    request: Request, 
+    request: Request,
     skip: int = 0, 
     limit: int = 100, 
     session: Session = Depends(get_session),
@@ -29,15 +29,15 @@ async def list_users(
 ):
     users, total = user_service.get_all(session, skip=skip, limit=limit)
     return create_success_response(
-        data=users,
+        data=users, 
         meta=PaginationMeta(total=total, limit=limit, offset=skip),
         request=request
     )
 
-@router.get("/users/{user_id}", response_model=SuccessResponse[UserRead])
+@router.get("/{user_id}", response_model=GenericResponse[UserRead], responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}})
 async def get_user(
     user_id: str, 
-    request: Request, 
+    request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
@@ -46,49 +46,42 @@ async def get_user(
         raise HTTPException(status_code=404, detail="User not found")
     return create_success_response(data=user, request=request)
 
-@router.patch("/users/{user_id}", response_model=SuccessResponse[UserRead])
+@router.patch("/{user_id}", response_model=GenericResponse[UserRead], responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}})
 async def update_user(
     user_id: str, 
     user_data: UserUpdate, 
-    request: Request, 
+    request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    db_user = user_service.get(session, user_id)
-    if not db_user:
+    user = user_service.get(session, user_id)
+    if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    updated_user = user_service.update(session, db_user, user_data)
-    return create_success_response(
-        message="User updated successfully",
-        data=updated_user,
-        request=request
-    )
+    updated_user = user_service.update(session, user, user_data)
+    return create_success_response(data=updated_user, message="User updated successfully", request=request)
 
-@router.delete("/users/{user_id}", response_model=SuccessResponse[None], status_code=200)
+@router.delete("/{user_id}", response_model=GenericResponse[UserRead], responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}})
 async def delete_user(
     user_id: str, 
-    request: Request, 
+    request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    db_user = user_service.get(session, user_id)
-    if not db_user:
+    user = user_service.get(session, user_id)
+    if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    user_service.delete(session, db_user)
-    return create_success_response(message="User deleted successfully", data=None, request=request)
+    deleted_user = user_service.delete(session, user)
+    return create_success_response(data=deleted_user, message="User deleted successfully", request=request)
 
-@router.post("/users/{user_id}/restore", response_model=SuccessResponse[UserRead])
+@router.post("/{user_id}/restore", response_model=GenericResponse[UserRead], responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}})
 async def restore_user(
     user_id: str, 
-    request: Request, 
+    request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    db_user = user_service.get(session, user_id, include_deleted=True)
-
-    if not db_user:
+    user = user_service.get(session, user_id, include_deleted=True)
+    if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    if not db_user.is_deleted:
-        raise HTTPException(status_code=400, detail="User is not deleted")
-    restored_user = user_service.restore(session, db_user)
-    return create_success_response(message="User restored successfully", data=restored_user, request=request)
+    restored_user = user_service.restore(session, user)
+    return create_success_response(data=restored_user, message="User restored successfully", request=request)

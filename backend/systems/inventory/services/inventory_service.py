@@ -36,3 +36,27 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         session.commit()
         session.refresh(item)
         return item
+
+    def get_item_status(self, session: Session, item: InventoryItem) -> str:
+        from systems.inventory.services.configuration_service import ConfigurationService
+        config_service = ConfigurationService()
+
+        status_settings = config_service.get_by_category(session, "inventory_status")
+
+        if not status_settings:
+            # Hardcoded fallback if no statuses have been configured yet
+            if item.available_qty <= 0:
+                return "OUT_OF_STOCK"
+            elif item.available_qty <= 5:
+                return "LOW_STOCK"
+            else:
+                return "HEALTHY"
+
+        # Sort by threshold ascending, return the first status where qty <= threshold
+        sorted_statuses = sorted(status_settings, key=lambda s: int(s.value))
+        for setting in sorted_statuses:
+            if item.available_qty <= int(setting.value):
+                return setting.key
+
+        # qty exceeds all defined thresholds — use the last (highest) status
+        return sorted_statuses[-1].key

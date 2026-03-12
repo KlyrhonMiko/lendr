@@ -1,4 +1,3 @@
-from typing import Generator
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt
@@ -38,6 +37,4 @@ def get_current_user(
     user = user_service.get(session, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    if user.is_deleted:
-        raise HTTPException(status_code=400, detail="Inactive user")
     return user

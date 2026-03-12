@@ -1,43 +1,35 @@
-from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlmodel import Session
 from core.database import get_session
-from core.schemas import SuccessResponse, PaginationMeta, create_success_response
+from core.deps import get_current_user
 from systems.inventory.services.borrow_request_service import BorrowService
-from systems.inventory.schemas.borrow_request_schemas import (
-    BorrowRequestCreate, 
-    BorrowRequestUpdate, 
-    BorrowRequestRead,
-    BorrowRequestApprove,
-    BorrowRequestRelease,
-    BorrowRequestReturn
-)
-from core.deps import get_current_user 
-from systems.inventory.models.user import User  
+from systems.inventory.schemas.borrow_request_schemas import BorrowRequestCreate, BorrowRequestRead
+from systems.inventory.models.user import User
+from core.schemas import GenericResponse, create_success_response, PaginationMeta
 
 router = APIRouter()
 borrow_service = BorrowService()
 
-@router.post("/requests", response_model=SuccessResponse[BorrowRequestRead], status_code=201)
+@router.post("/requests", response_model=GenericResponse[BorrowRequestRead], status_code=201, responses={400: {"model": GenericResponse}, 401: {"model": GenericResponse}})
 async def create_request(
-    request_data: BorrowRequestCreate, 
-    request: Request, 
-    session: Session = Depends(get_session), 
+    request_data: BorrowRequestCreate,
+    request: Request,
+    session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
+    # Set borrower_id to current_user if not provided
     if not request_data.borrower_id:
         request_data.borrower_id = current_user.user_id
-    
-    borrow_request = borrow_service.create(session, request_data)
-    return create_success_response(
-        message="Borrow request created successfully",
-        data=borrow_request,
-        request=request
-    )
+        
+    try:
+        borrow_req = borrow_service.create_request(session, request_data)
+        return create_success_response(data=borrow_req, message="Borrow request created", request=request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/requests", response_model=SuccessResponse[list[BorrowRequestRead]])
+@router.get("/requests", response_model=GenericResponse[list[BorrowRequestRead]], responses={401: {"model": GenericResponse}})
 async def list_requests(
-    request: Request, 
+    request: Request,
     skip: int = 0, 
     limit: int = 100, 
     session: Session = Depends(get_session),
@@ -45,111 +37,46 @@ async def list_requests(
 ):
     requests, total = borrow_service.get_all(session, skip=skip, limit=limit)
     return create_success_response(
-        data=requests,
+        data=requests, 
         meta=PaginationMeta(total=total, limit=limit, offset=skip),
         request=request
     )
 
-@router.get("/requests/{borrow_id}", response_model=SuccessResponse[BorrowRequestRead])
-async def get_request(
-    borrow_id: str, 
-    request: Request, 
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
-):
-    borrow_request = borrow_service.get(session, borrow_id)
-    if not borrow_request:
-        raise HTTPException(status_code=404, detail="Borrow request not found")
-    return create_success_response(data=borrow_request, request=request)
-
-@router.patch("/requests/{borrow_id}", response_model=SuccessResponse[BorrowRequestRead])
-async def update_request(
-    borrow_id: str, 
-    request_data: BorrowRequestUpdate, 
-    request: Request, 
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
-):
-    db_request = borrow_service.get(session, borrow_id)
-    if not db_request:
-        raise HTTPException(status_code=404, detail="Borrow request not found")
-    updated_request = borrow_service.update(session, db_request, request_data)
-    return create_success_response(
-        message="Borrow request updated successfully",
-        data=updated_request,
-        request=request
-    )
-
-@router.delete("/requests/{borrow_id}", response_model=SuccessResponse[None], status_code=200)
-async def delete_request(
-    borrow_id: str, 
-    request: Request, 
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
-):
-    db_request = borrow_service.get(session, borrow_id)
-    if not db_request:
-        raise HTTPException(status_code=404, detail="Borrow request not found")
-    borrow_service.delete(session, db_request)
-    return create_success_response(message="Borrow request deleted successfully", data=None, request=request)
-
-@router.post("/requests/{borrow_id}/restore", response_model=SuccessResponse[BorrowRequestRead])
-async def restore_request(
-    borrow_id: str, 
-    request: Request, 
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
-):
-    db_request = borrow_service.get(session, borrow_id, include_deleted=True)
-
-    if not db_request:
-        raise HTTPException(status_code=404, detail="Borrow request not found")
-    if not db_request.is_deleted:
-        raise HTTPException(status_code=400, detail="Borrow request is not deleted")
-    restored_request = borrow_service.restore(session, db_request)
-    return create_success_response(message="Borrow request restored successfully", data=restored_request, request=request)
-
-@router.post("/requests/{borrow_id}/approve", response_model=SuccessResponse[BorrowRequestRead])
+@router.post("/requests/{request_id}/approve", response_model=GenericResponse[BorrowRequestRead], responses={404: {"model": GenericResponse}, 400: {"model": GenericResponse}, 401: {"model": GenericResponse}})
 async def approve_request(
-    borrow_id: str, 
-    data: BorrowRequestApprove, 
-    request: Request, 
-    session: Session = Depends(get_session), 
-    current_user: User = Depends(get_current_user)
-):
-    updated_request = borrow_service.approve_request(session, borrow_id, current_user.id, data)
-    return create_success_response(
-        message="Borrow request approved",
-        data=updated_request,
-        request=request
-    )
-
-@router.post("/requests/{borrow_id}/release", response_model=SuccessResponse[BorrowRequestRead])
-async def release_request(
-    borrow_id: str, 
-    data: BorrowRequestRelease, 
-    request: Request, 
-    session: Session = Depends(get_session), 
-    current_user: User = Depends(get_current_user)
-):
-    updated_request = borrow_service.release_request(session, borrow_id, current_user.id, data)
-    return create_success_response(
-        message="Items released and inventory updated",
-        data=updated_request,
-        request=request
-    )
-
-@router.post("/requests/{borrow_id}/return", response_model=SuccessResponse[BorrowRequestRead])
-async def return_request(
-    borrow_id: str, 
-    data: BorrowRequestReturn, 
-    request: Request, 
+    request_id: str, 
+    request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    updated_request = borrow_service.return_request(session, borrow_id, data)
-    return create_success_response(
-        message="Items returned and inventory updated",
-        data=updated_request,
-        request=request
-    )
+    try:
+        updated_req = borrow_service.approve_request(session, request_id, current_user.id)
+        return create_success_response(data=updated_req, message="Request approved", request=request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/requests/{request_id}/release", response_model=GenericResponse[BorrowRequestRead], responses={404: {"model": GenericResponse}, 400: {"model": GenericResponse}, 401: {"model": GenericResponse}})
+async def release_request(
+    request_id: str, 
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        updated_req = borrow_service.release_request(session, request_id, current_user.id)
+        return create_success_response(data=updated_req, message="Request released", request=request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/requests/{request_id}/return", response_model=GenericResponse[BorrowRequestRead], responses={404: {"model": GenericResponse}, 400: {"model": GenericResponse}, 401: {"model": GenericResponse}})
+async def return_request(
+    request_id: str, 
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        updated_req = borrow_service.return_request(session, request_id)
+        return create_success_response(data=updated_req, message="Request returned", request=request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

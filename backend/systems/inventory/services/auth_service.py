@@ -1,3 +1,4 @@
+from datetime import timedelta
 from typing import Optional
 from sqlmodel import Session, select
 from systems.inventory.models.user import User
@@ -8,7 +9,7 @@ class AuthService:
     def __init__(self):
         self.user_service = UserService()
 
-    def authenticate(self, session: Session, username_or_email: str, password: str) -> Optional[User]:
+    def authenticate_user(self, session: Session, username_or_email: str, password: str) -> Optional[User]:
         statement = select(User).where(
             (User.username == username_or_email) | (User.email == username_or_email)
         ).where(User.is_deleted.is_(False))
@@ -22,5 +23,9 @@ class AuthService:
             return None
             
         return user
+
+    def create_access_token(self, data: dict, expires_delta: Optional[timedelta] = None):
+        from utils.security import create_access_token as create_jwt
+        return create_jwt(data["sub"]) # Current implementation uses user_id/sub
 
 auth_service = AuthService()

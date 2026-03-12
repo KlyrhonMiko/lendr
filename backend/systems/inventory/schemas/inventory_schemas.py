@@ -20,5 +20,9 @@ class InventoryItemUpdate(InventoryItemBase):
 
 class InventoryItemRead(InventoryItemBase):
     item_id: str
+    status_condition: Optional[str] = None
+    
     class Config:
         from_attributes = True
+
+
