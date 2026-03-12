@@ -10,8 +10,9 @@ class BorrowRequestBase(BaseModel):
 
 class BorrowRequestCreate(BorrowRequestBase):
     item_id: str = Field(..., max_length=50)
-    borrower_id: str
+    borrower_id: Optional[str] = None
     qty_requested: int = Field(..., gt=0)
+
 
 class BorrowRequestUpdate(BorrowRequestBase):
     status: Optional[str] = Field(default=None, max_length=50)

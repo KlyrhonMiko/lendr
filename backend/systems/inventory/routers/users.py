@@ -4,6 +4,8 @@ from core.database import get_session
 from core.schemas import SuccessResponse, PaginationMeta, create_success_response
 from systems.inventory.services.user_service import UserService
 from systems.inventory.schemas.user_schemas import UserCreate, UserUpdate, UserRead
+from core.deps import get_current_user 
+from systems.inventory.models.user import User  
 
 router = APIRouter()
 user_service = UserService()
@@ -18,7 +20,13 @@ async def register_user(user_data: UserCreate, request: Request, session: Sessio
     )
 
 @router.get("/users", response_model=SuccessResponse[list[UserRead]])
-async def list_users(request: Request, skip: int = 0, limit: int = 100, session: Session = Depends(get_session)):
+async def list_users(
+    request: Request, 
+    skip: int = 0, 
+    limit: int = 100, 
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
     users, total = user_service.get_all(session, skip=skip, limit=limit)
     return create_success_response(
         data=users,
@@ -27,14 +35,25 @@ async def list_users(request: Request, skip: int = 0, limit: int = 100, session:
     )
 
 @router.get("/users/{user_id}", response_model=SuccessResponse[UserRead])
-async def get_user(user_id: str, request: Request, session: Session = Depends(get_session)):
+async def get_user(
+    user_id: str, 
+    request: Request, 
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
     user = user_service.get(session, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return create_success_response(data=user, request=request)
 
 @router.patch("/users/{user_id}", response_model=SuccessResponse[UserRead])
-async def update_user(user_id: str, user_data: UserUpdate, request: Request, session: Session = Depends(get_session)):
+async def update_user(
+    user_id: str, 
+    user_data: UserUpdate, 
+    request: Request, 
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
     db_user = user_service.get(session, user_id)
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -46,7 +65,12 @@ async def update_user(user_id: str, user_data: UserUpdate, request: Request, ses
     )
 
 @router.delete("/users/{user_id}", response_model=SuccessResponse[None], status_code=200)
-async def delete_user(user_id: str, request: Request, session: Session = Depends(get_session)):
+async def delete_user(
+    user_id: str, 
+    request: Request, 
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
     db_user = user_service.get(session, user_id)
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -54,7 +78,12 @@ async def delete_user(user_id: str, request: Request, session: Session = Depends
     return create_success_response(message="User deleted successfully", data=None, request=request)
 
 @router.post("/users/{user_id}/restore", response_model=SuccessResponse[UserRead])
-async def restore_user(user_id: str, request: Request, session: Session = Depends(get_session)):
+async def restore_user(
+    user_id: str, 
+    request: Request, 
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
     db_user = user_service.get(session, user_id, include_deleted=True)
 
     if not db_user:

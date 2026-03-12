@@ -7,7 +7,7 @@ from core.schemas import ErrorResponse
 from systems.inventory.routers.inventory import router as inventory
 from systems.inventory.routers.users import router as users
 from systems.inventory.routers.borrowing import router as borrowing
-
+from systems.inventory.routers.auth import router as auth
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -61,6 +61,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 app.include_router(inventory, prefix="/api/inventory", tags=["Inventory"])
 app.include_router(users, prefix="/api/users", tags=["Users"])
 app.include_router(borrowing, prefix="/api/borrowing", tags=["Borrowing"])
+app.include_router(auth, prefix="/api/auth", tags=["Auth"])
 
 
 @app.get("/")

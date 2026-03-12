@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     APP_PORT: int = 5000
     DEBUG: bool = False
 
+    SECRET_KEY: str
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+
 settings = Settings()
 if not settings.DATABASE_URL:
     raise RuntimeError("DATABASE_URL is required — set it in the environment or .env(.local) file.")

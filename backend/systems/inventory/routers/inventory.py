@@ -8,24 +8,23 @@ from systems.inventory.schemas.inventory_schemas import (
     InventoryItemUpdate,
     InventoryItemRead,
 )
+from core.deps import get_current_user 
+from systems.inventory.models.user import User  
 
 router = APIRouter()
 inventory_service = InventoryService()
 
-
-@router.post(
-    "/items", response_model=SuccessResponse[InventoryItemRead], status_code=201
-)
+@router.post("/items", response_model=SuccessResponse[InventoryItemRead], status_code=201)
 async def create_item(
     item_data: InventoryItemCreate,
     request: Request,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
 ):
     item = inventory_service.create(session, item_data)
     return create_success_response(
         message="Item created successfully", data=item, request=request
     )
-
 
 @router.get("/items", response_model=SuccessResponse[list[InventoryItemRead]])
 async def list_items(
@@ -33,6 +32,7 @@ async def list_items(
     skip: int = 0,
     limit: int = 100,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
 ):
     items, total = inventory_service.get_all(session, skip=skip, limit=limit)
     return create_success_response(
@@ -41,16 +41,17 @@ async def list_items(
         request=request,
     )
 
-
 @router.get("/items/{item_id}", response_model=SuccessResponse[InventoryItemRead])
 async def get_item(
-    item_id: str, request: Request, session: Session = Depends(get_session)
+    item_id: str, 
+    request: Request, 
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
 ):
     item = inventory_service.get(session, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
     return create_success_response(data=item, request=request)
-
 
 @router.patch("/items/{item_id}", response_model=SuccessResponse[InventoryItemRead])
 async def update_item(
@@ -58,6 +59,7 @@ async def update_item(
     item_data: InventoryItemUpdate,
     request: Request,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
 ):
     db_item = inventory_service.get(session, item_id)
     if not db_item:
@@ -67,12 +69,12 @@ async def update_item(
         message="Item updated successfully", data=updated_item, request=request
     )
 
-
-@router.delete(
-    "/items/{item_id}", response_model=SuccessResponse[None], status_code=200
-)
+@router.delete("/items/{item_id}", response_model=SuccessResponse[None], status_code=200)
 async def delete_item(
-    item_id: str, request: Request, session: Session = Depends(get_session)
+    item_id: str, 
+    request: Request, 
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
 ):
     db_item = inventory_service.get(session, item_id)
     if not db_item:
@@ -82,12 +84,12 @@ async def delete_item(
         message="Item deleted successfully", data=None, request=request
     )
 
-
-@router.post(
-    "/items/{item_id}/restore", response_model=SuccessResponse[InventoryItemRead]
-)
+@router.post("/items/{item_id}/restore", response_model=SuccessResponse[InventoryItemRead])
 async def restore_item(
-    item_id: str, request: Request, session: Session = Depends(get_session)
+    item_id: str, 
+    request: Request, 
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
 ):
     db_item = inventory_service.get(session, item_id, include_deleted=True)
 
