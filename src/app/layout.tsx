@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
-import { Sidebar } from "../components/Sidebar";
-import { Header } from "../components/Header";
+
+import { AuthProvider } from "@/contexts/AuthContext";
 
 const inter = Inter({
   variable: "--font-sans",
@@ -29,15 +29,9 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${jakarta.variable} antialiased selection:bg-indigo-500/30 font-sans`}
       >
-        <div className="flex min-h-screen bg-background w-full">
-          <Sidebar />
-          <div className="flex w-full flex-col pl-64 min-h-screen">
-            <Header />
-            <main className="flex-1 p-8">
-              {children}
-            </main>
-          </div>
-        </div>
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );
