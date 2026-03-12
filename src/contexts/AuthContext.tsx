@@ -18,15 +18,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshUser = async () => {
     if (!auth.isAuthenticated()) {
-      setUser({
-        id: 'guest-id',
-        user_id: 'GUEST-001',
-        username: 'guest_user',
-        email: 'guest@example.com',
-        first_name: 'Guest',
-        last_name: 'User',
-        role: 'admin'
-      });
+      setUser(null);
       setLoading(false);
       return;
     }
