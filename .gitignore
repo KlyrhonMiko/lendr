@@ -32,6 +32,17 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+.env.local
+
+# local/runtime artifacts
+/.logs
+/.tests
+/.todo
+
+# backend-specific local artifacts
+backend/.logs
+backend/.tests
+backend/.todo
 
 # vercel
 .vercel
