@@ -13,12 +13,22 @@ services:
     volumes:
       - lendr_pgdata:/var/lib/postgresql/data
 
+  adminer:
+    image: adminer:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile.backend
     env_file:
       - .env.local
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-lendr}
     volumes:
       - ./backend:/app
     ports:
