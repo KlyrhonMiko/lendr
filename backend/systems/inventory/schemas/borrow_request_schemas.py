@@ -47,3 +47,12 @@ class BorrowRequestRelease(BaseModel):
 
 class BorrowRequestReturn(BaseModel):
     notes: Optional[str] = Field(default=None, max_length=500)
+
+class BatchItem(BaseModel):
+    item_id: str
+    qty_requested: int
+
+class BorrowRequestBatchCreate(BaseModel):
+    borrower_id: str
+    items: list[BatchItem]
+    notes: Optional[str] = None

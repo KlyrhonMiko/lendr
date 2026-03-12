@@ -4,8 +4,9 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { KeyRound, User, Loader2, ArrowRight, AlertCircle } from 'lucide-react';
-import { api } from '@/lib/api';
 import { auth } from '@/lib/auth';
+import { loginApi } from './api';
+import { toast } from "sonner";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -19,15 +20,19 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const data = await api.login(formData);
+      const data = await loginApi.login(formData);
       auth.setToken(data.access_token);
+      toast.success("Welcome back! Logging you in..."); // Added this
       router.push('/');
     } catch (err: any) {
-      setError(err.message || 'Invalid username or password');
+      const msg = err.message || 'Invalid username or password';
+      setError(msg);
+      toast.error(msg); // Added this
     } finally {
       setIsLoading(false);
     }
   };
+
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">

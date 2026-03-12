@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { Package, Plus, Search, Edit2, Trash2, X, AlertCircle, Loader2 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { inventoryApi, InventoryItem } from './api';
+import { toast } from "sonner";
 
 interface Equipment {
   item_id: string;
@@ -15,11 +16,11 @@ interface Equipment {
 }
 
 export default function InventoryPage() {
-  const [items, setItems] = useState<Equipment[]>([]);
+  const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<Equipment | null>(null);
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [error, setError] = useState<string | null>(null);
   
   // Form State
@@ -38,7 +39,7 @@ export default function InventoryPage() {
   const fetchEquipment = async () => {
     setLoading(true);
     try {
-      const res = await api.get<Equipment[]>('/inventory/items');
+      const res = await inventoryApi.list(); // Simplified
       setItems(res.data);
     } catch (error: any) {
       setError(error.message || 'Failed to fetch inventory');
@@ -60,7 +61,7 @@ export default function InventoryPage() {
     setError(null);
   };
 
-  const openEditModal = (item: Equipment) => {
+  const openEditModal = (item: InventoryItem) => {
     setEditingItem(item);
     setFormData({
       name: item.name,
@@ -77,24 +78,32 @@ export default function InventoryPage() {
     setError(null);
     try {
       if (editingItem) {
-        await api.patch(`/inventory/items/${editingItem.item_id}`, formData);
+        await inventoryApi.update(editingItem.item_id, formData);
+        toast.success("Equipment updated successfully");
       } else {
-        await api.post('/inventory/items', formData);
+        await inventoryApi.create(formData);
+        toast.success("New equipment added to catalog");
       }
       resetForm();
       fetchEquipment();
     } catch (err: any) {
-      setError(err.message || 'Failed to save equipment');
+      const msg = err.message || 'Failed to save equipment';
+      setError(msg);
+      toast.error(msg);
     }
   };
+
 
   const handleDelete = async (itemId: string) => {
     if (!confirm('Are you sure you want to delete this equipment?')) return;
     try {
-      await api.delete(`/inventory/items/${itemId}`);
+      await inventoryApi.delete(itemId);
+      toast.success("Item removed from inventory");
       fetchEquipment();
     } catch (err: any) {
-      setError(err.message || 'Failed to delete');
+      const msg = err.message || 'Failed to delete';
+      setError(msg);
+      toast.error(msg);
     }
   };
 
