@@ -39,17 +39,18 @@ services:
 
   frontend:
     build:
-      context: .
+      context: ./frontend
       dockerfile: Dockerfile.frontend
     env_file:
       - .env.local
     volumes:
-      - ./:/usr/src/app
+      - ./frontend:/usr/src/app
       - /usr/src/app/node_modules
     ports:
       - "3000:3000"
     depends_on:
       - backend
+
 
 volumes:
   lendr_pgdata:
