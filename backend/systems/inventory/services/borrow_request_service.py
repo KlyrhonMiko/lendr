@@ -13,6 +13,7 @@ from systems.inventory.models.warehouse_approval import WarehouseApproval
 from systems.inventory.schemas.borrow_request_schemas import BorrowRequestRead
 from systems.inventory.services.inventory_service import InventoryService
 from systems.inventory.services.user_service import UserService
+from systems.inventory.services.audit_service import audit_service
 from utils.id_generator import get_next_sequence
 from utils.time_utils import get_now_manila
 
@@ -80,6 +81,15 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
             event_type="created",
             note=schema.notes
         )
+
+        audit_service.log_action(
+            db=session,
+            entity_type="borrow",
+            entity_id=db_obj.borrow_id,
+            action="create",
+            after=db_obj.model_dump(mode="json"),
+            actor_id=None, # Wire later
+        )
         session.add(event)
         
         session.commit()
@@ -102,6 +112,15 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
             borrow_id=db_request.borrow_id,
             event_type="approved",
             actor_id=admin_id
+        )
+
+        audit_service.log_action(
+            db=session,
+            entity_type="borrow",
+            entity_id=db_request.borrow_id,
+            action="approve",
+            after=db_request.model_dump(mode="json"),
+            actor_id=None, # Wire later
         )
         session.add(event)
         
@@ -128,6 +147,15 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
             borrow_id=db_request.borrow_id,
             event_type="released",
             actor_id=admin_id
+        )
+
+        audit_service.log_action(
+            db=session,
+            entity_type="borrow",
+            entity_id=db_request.borrow_id,
+            action="release",
+            after=db_request.model_dump(mode="json"),
+            actor_id=None, # Wire later
         )
         session.add(event)
 
@@ -159,6 +187,15 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         event = BorrowRequestEvent(
             borrow_id=db_request.borrow_id,
             event_type="returned"
+        )
+
+        audit_service.log_action(
+            db=session,
+            entity_type="borrow",
+            entity_id=db_request.borrow_id,
+            action="return",
+            after=db_request.model_dump(mode="json"),
+            actor_id=None, # Wire later
         )
         session.add(event)
 
@@ -211,6 +248,14 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
             event_type="sent_to_warehouse",
             actor_id=actor_id
         )
+        audit_service.log_action(
+            db=session,
+            entity_type="borrow",
+            entity_id=db_request.borrow_id,
+            action="warehouse_send",
+            after=db_request.model_dump(mode="json"),
+            actor_id=None, # Wire later
+        )
         session.add(event)
         session.add(db_request)
         session.commit()
@@ -239,6 +284,14 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
             event_type="warehouse_approved",
             actor_id=admin_id,
             note=remarks
+        )
+        audit_service.log_action(
+            db=session,
+            entity_type="borrow",
+            entity_id=db_request.borrow_id,
+            action="warehouse_approve",
+            after=db_request.model_dump(mode="json"),
+            actor_id=None, # Wire later
         )
         
         session.add(approval)

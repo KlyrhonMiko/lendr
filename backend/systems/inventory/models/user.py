@@ -31,7 +31,10 @@ class User(BaseModel, table=True):
 
     username: str = Field(index=True, max_length=50)
     hashed_password: str = Field(max_length=255)
+
     role: str = Field(max_length=50)
+    employee_id: str | None = Field(default=None, index=True, max_length=50)
+    shift_type: str = Field(default="day", max_length=20) # "day" or "night"
 
     __table_args__ = (
         Index(
@@ -43,6 +46,12 @@ class User(BaseModel, table=True):
         Index(
             "ix_user_email_active",
             "email",
+            unique=True,
+            postgresql_where=text("is_deleted IS FALSE"),
+        ),
+        Index(
+            "ix_user_employee_id_active",
+            "employee_id",
             unique=True,
             postgresql_where=text("is_deleted IS FALSE"),
         ),

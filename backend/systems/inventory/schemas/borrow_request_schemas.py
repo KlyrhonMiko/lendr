@@ -14,11 +14,15 @@ class BorrowRequestBase(BaseModel):
 class BorrowRequestCreate(BorrowRequestBase):
     item_id: str = Field(..., max_length=50)
     borrower_id: Optional[str] = None
+
     qty_requested: int = Field(..., gt=0)
     due_at: Optional[datetime] = None
+
     team_name: Optional[str] = None
+    involved_people: Optional[list[dict]] = Field(default=None)
     store_name: Optional[str] = None
     location_name: Optional[str] = None
+
     is_emergency: bool = False
 
 class BorrowRequestUpdate(BorrowRequestBase):
@@ -53,6 +57,7 @@ class BorrowRequestRead(BorrowRequestBase):
     store_name: Optional[str] = None
     location_name: Optional[str] = None
     is_emergency: bool = False
+    involved_people: Optional[list[dict]] = None
     approval_channel: str = "standard"
     events: list[BorrowRequestEventRead] = []
 

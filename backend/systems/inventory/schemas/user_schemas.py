@@ -13,6 +13,8 @@ class UserBase(BaseModel):
 
     username: Optional[str] = Field(default=None, max_length=50)
     role: Optional[str] = Field(default=None, max_length=50)
+    employee_id: Optional[str] = Field(default=None, max_length=50)
+    shift_type: str = Field(default="day", max_length=20)
 
 class UserCreate(UserBase):
     username: str = Field(..., max_length=50)

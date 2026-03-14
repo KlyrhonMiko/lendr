@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import Index, text
+from sqlalchemy import Index, text, Column, JSON
 from sqlmodel import Field, Relationship
 
 from core.base_model import BaseModel
@@ -31,11 +31,13 @@ class BorrowRequest(BaseModel, table=True):
     team_name: str | None = Field(default=None, max_length=100)
     store_name: str | None = Field(default=None, max_length=100)
     location_name: str | None = Field(default=None, max_length=100)
+
     is_emergency: bool = Field(default=False)
     approval_channel: str = Field(default="standard", max_length=50)
 
-    events: list["BorrowRequestEvent"] = Relationship(back_populates="borrow_request")
+    involved_people: list[dict] | None = Field(default=None, sa_column=Column(JSON))
 
+    events: list["BorrowRequestEvent"] = Relationship(back_populates="borrow_request")
 
     __table_args__ = (
         Index(
@@ -43,7 +45,8 @@ class BorrowRequest(BaseModel, table=True):
             "borrower_id",
             "item_id",
             unique=True,
-            postgresql_where=text("status IN ('pending', 'approved', 'released') AND is_deleted IS FALSE"),
+            postgresql_where=text(
+                "status IN ('pending', 'approved', 'released') AND is_deleted IS FALSE"
+            ),
         ),
     )
-

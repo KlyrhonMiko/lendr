@@ -8,12 +8,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from core.schemas import GenericResponse, create_error_response
 from systems.inventory.routers.auth import router as auth
 from systems.inventory.routers.borrowing import router as borrowing
-from systems.inventory.routers.configuration import router as config
+from systems.inventory.routers.requested_items import router as requested_items
 from systems.inventory.routers.inventory import router as inventory
 from systems.inventory.routers.users import router as users
 from systems.inventory.routers.dashboard import router as dashboard
-from systems.inventory.routers.requested_items import router as requested_items
-
+from systems.inventory.routers.audit_log import router as audit_log
+from systems.inventory.routers.configuration import router as config
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -69,6 +69,7 @@ app.include_router(inventory, prefix="/api/inventory", tags=["Inventory"])
 app.include_router(borrowing, prefix="/api/borrowing", tags=["Borrowing"])
 app.include_router(requested_items, prefix="/api/requested-items", tags=["Requested Items"])
 app.include_router(dashboard, prefix="/api/dashboard", tags=["Dashboard"])
+app.include_router(audit_log, prefix="/api/audit_log", tags=["Audit Logs"])
 app.include_router(config, prefix="/api/config", tags=["Configuration"])
 
 
