@@ -1,4 +1,4 @@
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from core.base_service import BaseService
 from systems.inventory.models.inventory import InventoryItem
@@ -6,7 +6,9 @@ from systems.inventory.schemas.inventory_schemas import (
     InventoryItemCreate,
     InventoryItemUpdate,
 )
-
+from systems.inventory.models.inventory_movement import InventoryMovement
+from systems.inventory.models.inventory_unit import InventoryUnit
+from systems.inventory.models.inventory_movement import InventoryMovement
 
 class InventoryService(BaseService[InventoryItem, InventoryItemCreate, InventoryItemUpdate]):
     def __init__(self):
@@ -21,26 +23,43 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
 
         return super().create(session, schema, prefix="ITEM")
 
-    def adjust_stock(self, session: Session, item_id: str, quantity: int) -> InventoryItem:
-        item = self.get(session, item_id)
-        if not item:
-            from fastapi import HTTPException
-            raise HTTPException(status_code=404, detail=f"Item {item_id} not found")
+    def adjust_stock(
+        self, 
+        session: Session, 
+        item_id: str, 
+        qty_change: int, 
+        movement_type: str = "manual_adjustment",
+        reference_id: str | None = None,
+        note: str | None = None
+    ) -> InventoryItem:
+        db_obj = self.get(session, item_id)
+        if not db_obj:
+            raise ValueError(f"Item {item_id} not found")
 
-        new_available = item.available_qty + quantity
+        # Update quantities
+        db_obj.available_qty += qty_change
         
-        if new_available < 0:
-            from fastapi import HTTPException
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Insufficient stock for item {item.name}. Available: {item.available_qty}, Requested adjustment: {quantity}"
-            )
+        # If adding stock (procurement/return), also update total_qty
+        if qty_change > 0:
+            db_obj.total_qty += qty_change
+        
+        # Validation: prevent negative stock
+        if db_obj.available_qty < 0:
+            raise ValueError(f"Insufficient stock for {item_id}. Available: {db_obj.available_qty - qty_change}")
 
-        item.available_qty = new_available
-        session.add(item)
-        session.commit()
-        session.refresh(item)
-        return item
+        # LOG THE MOVEMENT (The Ledger)
+        movement = InventoryMovement(
+            inventory_id=item_id,
+            qty_change=qty_change,
+            movement_type=movement_type,
+            reference_id=reference_id,
+            note=note
+        )
+        session.add(movement)
+        session.add(db_obj)
+        # Note: We rely on the caller or the unit of work to commit
+        return db_obj
+
 
     def get_item_status(self, session: Session, item: InventoryItem) -> str:
         from systems.inventory.services.configuration_service import (
@@ -67,3 +86,16 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
 
         # qty exceeds all defined thresholds — use the last (highest) status
         return sorted_statuses[-1].key
+
+    def get_units(self, session: Session, item_id: str) -> list[InventoryUnit]:
+        from systems.inventory.models.inventory_unit import InventoryUnit
+        return session.exec(
+            select(InventoryUnit).where(InventoryUnit.inventory_id == item_id)
+        ).all()
+    def get_history(self, session: Session, item_id: str) -> list[InventoryMovement]:
+        from systems.inventory.models.inventory_movement import InventoryMovement
+        return session.exec(
+            select(InventoryMovement)
+            .where(InventoryMovement.inventory_id == item_id)
+            .order_by(InventoryMovement.occurred_at.desc())
+        ).all()

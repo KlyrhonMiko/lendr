@@ -1,8 +1,6 @@
 from sqlalchemy import Index, text
 from sqlmodel import Field
-
 from core.base_model import BaseModel
-
 
 class InventoryItem(BaseModel, table=True):
     __tablename__ = "inventory"
@@ -14,6 +12,9 @@ class InventoryItem(BaseModel, table=True):
     available_qty: int = Field(default=0)
     condition: str = Field(max_length=100)
 
+    item_type: str = Field(default="equipment", max_length=50)
+    classification: str | None = Field(default=None, max_length=100)
+    is_trackable: bool = Field(default=False)
 
     __table_args__ = (
         Index(

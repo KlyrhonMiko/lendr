@@ -117,7 +117,7 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         if not db_request or db_request.status != stage_3:
             raise ValueError(f"Request not found or not in '{stage_3}' status")
 
-        self.inventory_service.adjust_stock(session, db_request.item_id, -db_request.qty_requested)
+        self.inventory_service.adjust_stock(session, db_request.item_id, -db_request.qty_requested, movement_type="borrow_release", reference_id=db_request.borrow_id)
 
         db_request.status = stage_2
         db_request.released_by = admin_id
@@ -143,7 +143,7 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         if not db_request or db_request.status != stage_4:
             raise ValueError(f"Request not found or not in '{stage_4}' status")
 
-        self.inventory_service.adjust_stock(session, db_request.item_id, db_request.qty_requested)
+        self.inventory_service.adjust_stock(session, db_request.item_id, db_request.qty_requested, movement_type="borrow_return", reference_id=db_request.borrow_id)
 
         now = get_now_manila()
         db_request.status = stage_5

@@ -10,6 +10,8 @@ from systems.inventory.schemas.inventory_schemas import (
     InventoryItemRead,
     InventoryItemUpdate,
 )
+from systems.inventory.schemas.inventory_unit_schemas import InventoryUnitRead
+from systems.inventory.schemas.inventory_movement_schemas import InventoryMovementRead
 from systems.inventory.services.inventory_service import InventoryService
 
 router = APIRouter()
@@ -106,3 +108,24 @@ async def restore_item(
     item_read = InventoryItemRead.model_validate(restored_item)
     item_read.status_condition = inventory_service.get_item_status(session, restored_item)
     return create_success_response(data=item_read, message="Item restored successfully", request=request)
+
+@router.get("/{item_id}/units", response_model=GenericResponse[list[InventoryUnitRead]])
+async def get_item_units(
+    item_id: str, 
+    request: Request,
+    session: Session = Depends(get_session)
+):
+    """Get all individual units/serial numbers for a specific inventory item."""
+    units = inventory_service.get_units(session, item_id)
+    return create_success_response(data=units, request=request)
+
+@router.get("/{item_id}/history", response_model=GenericResponse[list[InventoryMovementRead]])
+async def get_item_history(
+    item_id: str, 
+    request: Request, 
+    session: Session = Depends(get_session)
+):
+    """Get the stock movement ledger (history) for a specific inventory item."""
+    history = inventory_service.get_history(session, item_id)
+    return create_success_response(data=history, request=request)
+
