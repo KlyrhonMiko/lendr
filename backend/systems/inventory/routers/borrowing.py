@@ -1,3 +1,5 @@
+from typing import Optional
+from systems.inventory.schemas.warehouse_approval_schemas import WarehouseApprovalRead
 from systems.inventory.schemas.borrow_request_schemas import BorrowRequestEventRead
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlmodel import Session
@@ -126,3 +128,30 @@ async def get_request_events(
     
     # Return the related events
     return create_success_response(data=borrow_req.events, request=request)
+
+@router.post("/requests/{request_id}/send-to-warehouse", response_model=GenericResponse[BorrowRequestRead])
+async def send_to_warehouse(
+    request_id: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        updated_req = borrow_service.send_to_warehouse(session, request_id, current_user.id)
+        return create_success_response(data=updated_req, message="Sent to warehouse", request=request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/requests/{request_id}/warehouse-approve", response_model=GenericResponse[WarehouseApprovalRead])
+async def warehouse_approve(
+    request_id: str,
+    request: Request,
+    remarks: Optional[str] = None,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        approval = borrow_service.warehouse_approve(session, request_id, current_user.id, remarks)
+        return create_success_response(data=approval, message="Warehouse approved", request=request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

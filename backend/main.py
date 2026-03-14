@@ -12,6 +12,7 @@ from systems.inventory.routers.configuration import router as config
 from systems.inventory.routers.inventory import router as inventory
 from systems.inventory.routers.users import router as users
 from systems.inventory.routers.dashboard import router as dashboard
+from systems.inventory.routers.requested_items import router as requested_items
 
 
 @asynccontextmanager
@@ -66,6 +67,7 @@ app.include_router(auth, prefix="/api/auth", tags=["Auth"])
 app.include_router(users, prefix="/api/users", tags=["Users"])
 app.include_router(inventory, prefix="/api/inventory", tags=["Inventory"])
 app.include_router(borrowing, prefix="/api/borrowing", tags=["Borrowing"])
+app.include_router(requested_items, prefix="/api/requested-items", tags=["Requested Items"])
 app.include_router(dashboard, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(config, prefix="/api/config", tags=["Configuration"])
 

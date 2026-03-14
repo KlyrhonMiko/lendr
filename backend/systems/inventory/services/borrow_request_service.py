@@ -9,12 +9,14 @@ from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestCreate,
     BorrowRequestUpdate,
 )
+from systems.inventory.models.warehouse_approval import WarehouseApproval
+from systems.inventory.schemas.borrow_request_schemas import BorrowRequestRead
 from systems.inventory.services.inventory_service import InventoryService
 from systems.inventory.services.user_service import UserService
 from utils.id_generator import get_next_sequence
 from utils.time_utils import get_now_manila
 
-_DEFAULT_STATUSES = ["pending", "approved", "released", "returned"]
+_DEFAULT_STATUSES = ["pending", "approved", "sent_to_warehouse", "warehouse_approved", "released", "returned"]
 
 class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowRequestUpdate]):
     def __init__(self):
@@ -109,11 +111,11 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         return db_request
 
     def release_request(self, session: Session, borrow_id: str, admin_id: UUID) -> BorrowRequest:
-        stage_1 = self._stage(session, 1)
-        stage_2 = self._stage(session, 2)
+        stage_3 = self._stage(session, 3)
+        stage_2 = self._stage(session, 4)
         db_request = self.get(session, borrow_id)
-        if not db_request or db_request.status != stage_1:
-            raise ValueError(f"Request not found or not in '{stage_1}' status")
+        if not db_request or db_request.status != stage_3:
+            raise ValueError(f"Request not found or not in '{stage_3}' status")
 
         self.inventory_service.adjust_stock(session, db_request.item_id, -db_request.qty_requested)
 
@@ -135,16 +137,16 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         return db_request
 
     def return_request(self, session: Session, borrow_id: str) -> BorrowRequest:
-        stage_2 = self._stage(session, 2)
-        stage_3 = self._stage(session, 3)
+        stage_4 = self._stage(session, 4)
+        stage_5 = self._stage(session, 5)
         db_request = self.get(session, borrow_id)
-        if not db_request or db_request.status != stage_2:
-            raise ValueError(f"Request not found or not in '{stage_2}' status")
+        if not db_request or db_request.status != stage_4:
+            raise ValueError(f"Request not found or not in '{stage_4}' status")
 
         self.inventory_service.adjust_stock(session, db_request.item_id, db_request.qty_requested)
 
         now = get_now_manila()
-        db_request.status = stage_3
+        db_request.status = stage_5
         db_request.returned_at = now
         
         # Calculate returned_on_time
@@ -190,3 +192,58 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
             return created_requests
         except Exception as e:
             raise e
+
+    def send_to_warehouse(self, session: Session, borrow_id: str, actor_id: UUID) -> BorrowRequest:
+        # Define the jump from approved to sent_to_warehouse
+        # Since we haven't updated _DEFAULT_STATUSES yet, let's assume the flow is:
+        # pending (0) -> approved (1) -> sent_to_warehouse (2) -> warehouse_approved (3) -> released (4) -> returned (5)
+        # Note: You'll need to update your SystemSettings 'borrow_status' later if you use them!
+        
+        db_request = self.get(session, borrow_id)
+        if not db_request or db_request.status != "approved":
+            raise ValueError("Request must be in 'approved' status to be sent to warehouse")
+
+        db_request.status = "sent_to_warehouse"
+        
+        # Log event
+        event = BorrowRequestEvent(
+            borrow_id=db_request.borrow_id,
+            event_type="sent_to_warehouse",
+            actor_id=actor_id
+        )
+        session.add(event)
+        session.add(db_request)
+        session.commit()
+        session.refresh(db_request)
+        return db_request
+
+    def warehouse_approve(self, session: Session, borrow_id: str, admin_id: UUID, remarks: str | None = None) -> WarehouseApproval:
+        db_request = self.get(session, borrow_id)
+        if not db_request or db_request.status != "sent_to_warehouse":
+            raise ValueError("Request must be in 'sent_to_warehouse' status")
+
+        # Create warehouse approval record
+        approval = WarehouseApproval(
+            borrow_id=borrow_id,
+            approved_by=admin_id,
+            remarks=remarks,
+            # Snapshot the request data for the receipt
+            printable_payload_json=db_request.model_dump(mode="json") 
+        )
+        
+        db_request.status = "warehouse_approved"
+        
+        # Log event
+        event = BorrowRequestEvent(
+            borrow_id=db_request.borrow_id,
+            event_type="warehouse_approved",
+            actor_id=admin_id,
+            note=remarks
+        )
+        
+        session.add(approval)
+        session.add(event)
+        session.add(db_request)
+        session.commit()
+        session.refresh(approval)
+        return approval
