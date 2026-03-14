@@ -1,6 +1,5 @@
 import os
 import subprocess
-from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -9,6 +8,7 @@ from sqlmodel import Session, select
 
 from core.config import settings
 from systems.admin.models.backup import BackupRun, BackupArtifact
+from utils.time_utils import get_now_manila
 
 
 class BackupService:
@@ -38,7 +38,7 @@ class BackupService:
                 pass
 
             backup_run.status = "completed"
-            backup_run.completed_at = datetime.now()
+            backup_run.completed_at = get_now_manila()
             
             session.add(backup_run)
             session.commit()
@@ -47,14 +47,14 @@ class BackupService:
             
         except Exception as e:
             backup_run.status = "failed"
-            backup_run.completed_at = datetime.now()
+            backup_run.completed_at = get_now_manila()
             session.add(backup_run)
             session.commit()
             # We raise the exception so the API returns a proper 500 error instead of "Success"
             raise Exception(f"Backup {backup_run.backup_id} failed: {str(e)}")
 
     def _run_local_backup(self, session: Session, backup_run: BackupRun):
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = get_now_manila().strftime("%Y%m%d_%H%M%S")
         filename = f"backup_{timestamp}.sql"
         filepath = self.backup_dir / filename
         # 1. Parse DB URL

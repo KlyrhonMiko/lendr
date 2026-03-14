@@ -1,5 +1,5 @@
 from fastapi import Depends, HTTPException, status
-from systems.inventory.models.user import User
+from systems.admin.models.user import User
 from core.deps import get_current_user
 
 def shift_guard(current_user: User = Depends(get_current_user)):

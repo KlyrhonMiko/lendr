@@ -4,7 +4,7 @@ from sqlmodel import Session
 from core.database import get_session
 from core.deps import get_current_user
 from core.schemas import GenericResponse, PaginationMeta, create_success_response
-from systems.inventory.models.user import User
+from systems.admin.models.user import User
 from systems.inventory.schemas.requested_item_schemas import (
     RequestedItemCreate,
     RequestedItemRead,
@@ -22,10 +22,12 @@ async def create_requested_item(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    if not request_data.requested_by:
-        request_data.requested_by = current_user.user_id
+    payload = request_data.model_dump()
+    if not payload.get("requested_by"):
+        payload["requested_by"] = current_user.user_id
+    create_schema = RequestedItemCreate(**payload)
     try:
-        db_obj = req_service.create_request(session, request_data)
+        db_obj = req_service.create_request(session, create_schema)
         return create_success_response(data=db_obj, message="Requested item created", request=request)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

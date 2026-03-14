@@ -5,7 +5,7 @@ from sqlmodel import Session
 from core.database import get_session
 from core.deps import get_current_user
 from core.schemas import GenericResponse, PaginationMeta, create_success_response
-from systems.inventory.models.user import User
+from systems.admin.models.user import User
 from systems.inventory.schemas.inventory_schemas import (
     InventoryItemCreate,
     InventoryItemRead,
@@ -19,7 +19,7 @@ from systems.inventory.dependencies import shift_guard
 router = APIRouter()
 inventory_service = InventoryService()
 
-@router.post("/items", response_model=GenericResponse[InventoryItemRead], status_code=201, responses={400: {"model": GenericResponse}, 401: {"model": GenericResponse}})
+@router.post("", response_model=GenericResponse[InventoryItemRead], status_code=201, responses={400: {"model": GenericResponse}, 401: {"model": GenericResponse}})
 async def create_item(
     item_data: InventoryItemCreate, 
     request: Request,
@@ -32,7 +32,7 @@ async def create_item(
     item_read.status_condition = inventory_service.get_item_status(session, item)
     return create_success_response(data=item_read, message="Item created successfully", request=request)
 
-@router.get("/items", response_model=GenericResponse[list[InventoryItemRead]], responses={401: {"model": GenericResponse}})
+@router.get("", response_model=GenericResponse[list[InventoryItemRead]], responses={401: {"model": GenericResponse}})
 async def list_items(
     request: Request,
     skip: int = 0, 
@@ -52,7 +52,7 @@ async def list_items(
         request=request
     )
 
-@router.get("/items/{item_id}", response_model=GenericResponse[InventoryItemRead], responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}})
+@router.get("/{item_id}", response_model=GenericResponse[InventoryItemRead], responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}})
 async def get_item(
     item_id: str, 
     request: Request,
@@ -66,7 +66,7 @@ async def get_item(
     item_read.status_condition = inventory_service.get_item_status(session, item)
     return create_success_response(data=item_read, request=request)
 
-@router.patch("/items/{item_id}", response_model=GenericResponse[InventoryItemRead], responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}})
+@router.patch("/{item_id}", response_model=GenericResponse[InventoryItemRead], responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}})
 async def update_item(
     item_id: str, 
     item_data: InventoryItemUpdate, 
@@ -83,7 +83,7 @@ async def update_item(
     item_read.status_condition = inventory_service.get_item_status(session, updated_item)
     return create_success_response(data=item_read, message="Item updated successfully", request=request)
 
-@router.post("/items/{item_id}/adjust-stock", response_model=GenericResponse[InventoryItemRead])
+@router.post("/{item_id}/adjust-stock", response_model=GenericResponse[InventoryItemRead])
 async def adjust_stock(
     item_id: str,
     qty_change: int,
@@ -108,7 +108,7 @@ async def adjust_stock(
         request=request
     )
 
-@router.delete("/items/{item_id}", response_model=GenericResponse[InventoryItemRead], responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}})
+@router.delete("/{item_id}", response_model=GenericResponse[InventoryItemRead], responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}})
 async def delete_item(
     item_id: str, 
     request: Request,
@@ -124,7 +124,7 @@ async def delete_item(
     item_read.status_condition = inventory_service.get_item_status(session, deleted_item)
     return create_success_response(data=item_read, message="Item deleted successfully", request=request)
 
-@router.post("/items/{item_id}/restore", response_model=GenericResponse[InventoryItemRead], responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}})
+@router.post("/{item_id}/restore", response_model=GenericResponse[InventoryItemRead], responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}})
 async def restore_item(
     item_id: str, 
     request: Request,

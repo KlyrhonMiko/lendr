@@ -1,4 +1,4 @@
-from sqlmodel import Session
+from sqlmodel import Session, select
 from uuid import UUID
 
 from core.base_service import BaseService
@@ -12,7 +12,7 @@ from systems.inventory.schemas.borrow_request_schemas import (
 from systems.inventory.models.borrow_participant import BorrowParticipant
 from systems.inventory.models.warehouse_approval import WarehouseApproval
 from systems.inventory.services.inventory_service import InventoryService
-from systems.inventory.services.user_service import UserService
+from systems.admin.services.user_service import UserService
 from systems.inventory.services.audit_service import audit_service
 from utils.id_generator import get_next_sequence
 from utils.time_utils import get_now_manila
@@ -26,7 +26,7 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         self.user_service = UserService()
 
     def _get_workflow(self, session: Session) -> list[str]:
-        from systems.inventory.services.configuration_service import ConfigurationService
+        from systems.admin.services.configuration_service import ConfigurationService
         settings = ConfigurationService().get_by_category(session, "borrow_status")
         if not settings:
             return _DEFAULT_STATUSES
@@ -41,6 +41,24 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
     def _active_statuses(self, session: Session) -> list[str]:
         workflow = self._get_workflow(session)
         return workflow[:-1]
+
+    def _normalize_compliance_fields(self, data: dict) -> dict:
+        payload = {**data}
+        is_emergency = bool(payload.get("is_emergency"))
+        request_channel = str(payload.get("request_channel") or "inventory_manager")
+        compliance_notes = payload.get("compliance_followup_notes")
+
+        if is_emergency:
+            payload["compliance_followup_required"] = True
+            if not compliance_notes:
+                if request_channel == "borrower_portal":
+                    payload["compliance_followup_notes"] = "Emergency request from portal. Verify condition manually."
+                else:
+                    payload["compliance_followup_notes"] = "Emergency request. Verify condition manually."
+        elif payload.get("compliance_followup_required") and not compliance_notes:
+            payload["compliance_followup_notes"] = "Compliance follow-up required."
+
+        return payload
 
     def create_request(self, session: Session, schema: BorrowRequestCreate) -> BorrowRequest:
         borrower = self.user_service.get(session, schema.borrower_id)
@@ -65,7 +83,7 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         year = get_now_manila().year
         transaction_ref = get_next_sequence(session, self.model, "transaction_ref", f"TXN-{year}")
         
-        data = schema.model_dump()
+        data = self._normalize_compliance_fields(schema.model_dump())
         data["transaction_ref"] = transaction_ref
         
         # Pull participants out of data before creating the BorrowRequest object
@@ -111,7 +129,13 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         session.refresh(db_obj)
         return db_obj
 
-    def approve_request(self, session: Session, borrow_id: str, admin_id: UUID) -> BorrowRequest:
+    def approve_request(
+        self,
+        session: Session,
+        borrow_id: str,
+        admin_id: UUID,
+        note: str | None = None,
+    ) -> BorrowRequest:
         stage_0 = self._stage(session, 0)
         stage_1 = self._stage(session, 1)
         db_request = self.get(session, borrow_id)
@@ -126,7 +150,8 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         event = BorrowRequestEvent(
             borrow_id=db_request.borrow_id,
             event_type="approved",
-            actor_id=admin_id
+            actor_id=admin_id,
+            note=note,
         )
 
         audit_service.log_action(
@@ -144,7 +169,49 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         session.refresh(db_request)
         return db_request
 
-    def release_request(self, session: Session, borrow_id: str, admin_id: UUID) -> BorrowRequest:
+    def reject_request(
+        self,
+        session: Session,
+        borrow_id: str,
+        admin_id: UUID,
+        note: str | None = None,
+    ) -> BorrowRequest:
+        stage_0 = self._stage(session, 0)
+        db_request = self.get(session, borrow_id)
+        if not db_request or db_request.status != stage_0:
+            raise ValueError(f"Request not found or not in '{stage_0}' status")
+
+        db_request.status = "rejected"
+
+        event = BorrowRequestEvent(
+            borrow_id=db_request.borrow_id,
+            event_type="rejected",
+            actor_id=admin_id,
+            note=note,
+        )
+
+        audit_service.log_action(
+            db=session,
+            entity_type="borrow",
+            entity_id=db_request.borrow_id,
+            action="reject",
+            after=db_request.model_dump(mode="json"),
+            actor_id=None,
+        )
+        session.add(event)
+
+        session.add(db_request)
+        session.commit()
+        session.refresh(db_request)
+        return db_request
+
+    def release_request(
+        self,
+        session: Session,
+        borrow_id: str,
+        admin_id: UUID,
+        note: str | None = None,
+    ) -> BorrowRequest:
         stage_3 = self._stage(session, 3)
         stage_2 = self._stage(session, 4)
         db_request = self.get(session, borrow_id)
@@ -161,7 +228,8 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         event = BorrowRequestEvent(
             borrow_id=db_request.borrow_id,
             event_type="released",
-            actor_id=admin_id
+            actor_id=admin_id,
+            note=note,
         )
 
         audit_service.log_action(
@@ -179,7 +247,13 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         session.refresh(db_request)
         return db_request
 
-    def return_request(self, session: Session, borrow_id: str) -> BorrowRequest:
+    def return_request(
+        self,
+        session: Session,
+        borrow_id: str,
+        actor_id: UUID,
+        note: str | None = None,
+    ) -> BorrowRequest:
         stage_4 = self._stage(session, 4)
         stage_5 = self._stage(session, 5)
         db_request = self.get(session, borrow_id)
@@ -201,7 +275,9 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         # Log event
         event = BorrowRequestEvent(
             borrow_id=db_request.borrow_id,
-            event_type="returned"
+            event_type="returned",
+            actor_id=actor_id,
+            note=note,
         )
 
         audit_service.log_action(
@@ -211,6 +287,56 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
             action="return",
             after=db_request.model_dump(mode="json"),
             actor_id=None, # Wire later
+        )
+        session.add(event)
+
+        session.add(db_request)
+        session.commit()
+        session.refresh(db_request)
+        return db_request
+
+    def reopen_request(
+        self,
+        session: Session,
+        borrow_id: str,
+        actor_id: UUID,
+        note: str | None = None,
+    ) -> BorrowRequest:
+        pending_stage = self._stage(session, 0)
+        db_request = self.get(session, borrow_id)
+        if not db_request or db_request.status not in {"rejected", "warehouse_rejected"}:
+            raise ValueError("Request must be in 'rejected' or 'warehouse_rejected' status")
+
+        duplicate_active_request = session.exec(
+            select(BorrowRequest).where(
+                BorrowRequest.borrower_id == db_request.borrower_id,
+                BorrowRequest.item_id == db_request.item_id,
+                BorrowRequest.is_deleted.is_(False),
+                BorrowRequest.status.in_(self._active_statuses(session)),
+                BorrowRequest.id != db_request.id,
+            )
+        ).first()
+        if duplicate_active_request:
+            raise ValueError(
+                "Cannot reopen request while another active request for the same borrower and item exists"
+            )
+
+        db_request.status = pending_stage
+
+        event = BorrowRequestEvent(
+            borrow_id=db_request.borrow_id,
+            event_type="reopened",
+            actor_id=actor_id,
+            note=note,
+        )
+
+        audit_service.log_action(
+            db=session,
+            entity_type="borrow",
+            entity_id=db_request.borrow_id,
+            action="reopen",
+            after=db_request.model_dump(mode="json"),
+            actor_id=None,
         )
         session.add(event)
 
@@ -249,7 +375,13 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         except Exception as e:
             raise e
 
-    def send_to_warehouse(self, session: Session, borrow_id: str, actor_id: UUID) -> BorrowRequest:
+    def send_to_warehouse(
+        self,
+        session: Session,
+        borrow_id: str,
+        actor_id: UUID,
+        note: str | None = None,
+    ) -> BorrowRequest:
         # Define the jump from approved to sent_to_warehouse
         # Since we haven't updated _DEFAULT_STATUSES yet, let's assume the flow is:
         # pending (0) -> approved (1) -> sent_to_warehouse (2) -> warehouse_approved (3) -> released (4) -> returned (5)
@@ -265,7 +397,8 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         event = BorrowRequestEvent(
             borrow_id=db_request.borrow_id,
             event_type="sent_to_warehouse",
-            actor_id=actor_id
+            actor_id=actor_id,
+            note=note,
         )
         audit_service.log_action(
             db=session,
@@ -281,7 +414,13 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         session.refresh(db_request)
         return db_request
 
-    def warehouse_approve(self, session: Session, borrow_id: str, admin_id: UUID, remarks: str | None = None) -> WarehouseApproval:
+    def warehouse_approve(
+        self,
+        session: Session,
+        borrow_id: str,
+        admin_id: UUID,
+        remarks: str | None = None,
+    ) -> WarehouseApproval:
         db_request = self.get(session, borrow_id)
         if not db_request or db_request.status != "sent_to_warehouse":
             raise ValueError("Request must be in 'sent_to_warehouse' status")
@@ -319,3 +458,31 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         session.commit()
         session.refresh(approval)
         return approval
+
+    def warehouse_reject(self, session: Session, borrow_id: str, admin_id: UUID, remarks: str | None = None) -> BorrowRequest:
+        db_request = self.get(session, borrow_id)
+        if not db_request or db_request.status != "sent_to_warehouse":
+            raise ValueError("Request must be in 'sent_to_warehouse' status")
+
+        db_request.status = "warehouse_rejected"
+
+        event = BorrowRequestEvent(
+            borrow_id=db_request.borrow_id,
+            event_type="warehouse_rejected",
+            actor_id=admin_id,
+            note=remarks,
+        )
+        audit_service.log_action(
+            db=session,
+            entity_type="borrow",
+            entity_id=db_request.borrow_id,
+            action="warehouse_reject",
+            after=db_request.model_dump(mode="json"),
+            actor_id=None,
+        )
+
+        session.add(event)
+        session.add(db_request)
+        session.commit()
+        session.refresh(db_request)
+        return db_request

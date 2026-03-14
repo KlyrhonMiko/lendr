@@ -5,7 +5,7 @@ from systems.inventory.schemas.requested_item_schemas import (
     RequestedItemCreate,
     RequestedItemUpdate,
 )
-from systems.inventory.services.user_service import UserService
+from systems.admin.services.user_service import UserService
 from utils.id_generator import get_next_sequence
 
 class RequestedItemService(BaseService[RequestedItem, RequestedItemCreate, RequestedItemUpdate]):

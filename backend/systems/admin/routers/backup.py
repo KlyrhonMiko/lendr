@@ -8,7 +8,7 @@ from sqlmodel import Session
 from core.database import get_session
 from core.deps import get_current_user
 from core.schemas import GenericResponse, create_success_response
-from systems.inventory.models.user import User
+from systems.admin.models.user import User
 from systems.admin.schemas.backup_schemas import BackupRunRead, BackupTrigger
 from systems.admin.services.backup_service import backup_service
 

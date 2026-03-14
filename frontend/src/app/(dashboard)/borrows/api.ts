@@ -18,16 +18,31 @@ export interface BorrowRequestCreate {
   qty_requested: number;
   notes?: string;
   borrower_id?: string;
+  due_at?: string;
+  team_name?: string;
+  involved_people?: Record<string, unknown>[];
+  store_name?: string;
+  location_name?: string;
+  is_emergency?: boolean;
+  compliance_followup_required?: boolean;
+  compliance_followup_notes?: string;
+}
+
+export interface BorrowActionPayload {
+  notes?: string;
 }
 
 export const borrowApi = {
-  list: () => api.get<BorrowRequest[]>('/borrowing/requests'),
+  list: () => api.get<BorrowRequest[]>('/inventory/borrowing/requests'),
   
-  create: (data: BorrowRequestCreate) => api.post<BorrowRequest>('/borrowing/requests', data),
+  create: (data: BorrowRequestCreate) => api.post<BorrowRequest>('/inventory/borrowing/requests', data),
   
-  approve: (id: string) => api.post<BorrowRequest>(`/borrowing/requests/${id}/approve`, {}),
+  approve: (id: string, payload: BorrowActionPayload = {}) =>
+    api.post<BorrowRequest>(`/inventory/borrowing/requests/${id}/approve`, payload),
   
-  release: (id: string) => api.post<BorrowRequest>(`/borrowing/requests/${id}/release`, {}),
+  release: (id: string, payload: BorrowActionPayload = {}) =>
+    api.post<BorrowRequest>(`/inventory/borrowing/requests/${id}/release`, payload),
   
-  return: (id: string) => api.post<BorrowRequest>(`/borrowing/requests/${id}/return`, {}),
+  return: (id: string, payload: BorrowActionPayload = {}) =>
+    api.post<BorrowRequest>(`/inventory/borrowing/requests/${id}/return`, payload),
 };

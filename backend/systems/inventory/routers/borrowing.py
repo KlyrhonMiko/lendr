@@ -7,11 +7,18 @@ from sqlmodel import Session
 from core.database import get_session
 from core.deps import get_current_user
 from core.schemas import GenericResponse, PaginationMeta, create_success_response
-from systems.inventory.models.user import User
+from systems.admin.models.user import User
 from systems.inventory.schemas.borrow_request_schemas import (
+    BorrowRequestApprove,
     BorrowRequestBatchCreate,
     BorrowRequestCreate,
+    BorrowRequestReject,
     BorrowRequestRead,
+    BorrowRequestReopen,
+    BorrowRequestRelease,
+    BorrowRequestSendToWarehouse,
+    BorrowRequestReturn,
+    BorrowRequestWarehouseApprove,
 )
 from systems.inventory.services.borrow_request_service import BorrowService
 
@@ -26,11 +33,13 @@ async def create_request(
     current_user: User = Depends(get_current_user)
 ):
     # Set borrower_id to current_user if not provided
-    if not request_data.borrower_id:
-        request_data.borrower_id = current_user.user_id
+    payload = request_data.model_dump()
+    if not payload.get("borrower_id"):
+        payload["borrower_id"] = current_user.user_id
+    request_schema = BorrowRequestCreate(**payload)
         
     try:
-        borrow_req = borrow_service.create_request(session, request_data)
+        borrow_req = borrow_service.create_request(session, request_schema)
         return create_success_response(data=borrow_req, message="Borrow request created", request=request)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -66,25 +75,56 @@ async def list_requests(
 @router.post("/requests/{request_id}/approve", response_model=GenericResponse[BorrowRequestRead], responses={404: {"model": GenericResponse}, 400: {"model": GenericResponse}, 401: {"model": GenericResponse}})
 async def approve_request(
     request_id: str, 
+    payload: BorrowRequestApprove,
     request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
     try:
-        updated_req = borrow_service.approve_request(session, request_id, current_user.id)
+        updated_req = borrow_service.approve_request(
+            session,
+            request_id,
+            current_user.id,
+            note=payload.notes,
+        )
         return create_success_response(data=updated_req, message="Request approved", request=request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/requests/{request_id}/reject", response_model=GenericResponse[BorrowRequestRead], responses={404: {"model": GenericResponse}, 400: {"model": GenericResponse}, 401: {"model": GenericResponse}})
+async def reject_request(
+    request_id: str,
+    payload: BorrowRequestReject,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        updated_req = borrow_service.reject_request(
+            session,
+            request_id,
+            current_user.id,
+            note=payload.notes,
+        )
+        return create_success_response(data=updated_req, message="Request rejected", request=request)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/requests/{request_id}/release", response_model=GenericResponse[BorrowRequestRead], responses={404: {"model": GenericResponse}, 400: {"model": GenericResponse}, 401: {"model": GenericResponse}})
 async def release_request(
     request_id: str, 
+    payload: BorrowRequestRelease,
     request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
     try:
-        updated_req = borrow_service.release_request(session, request_id, current_user.id)
+        updated_req = borrow_service.release_request(
+            session,
+            request_id,
+            current_user.id,
+            note=payload.notes,
+        )
         return create_success_response(data=updated_req, message="Request released", request=request)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -92,13 +132,38 @@ async def release_request(
 @router.post("/requests/{request_id}/return", response_model=GenericResponse[BorrowRequestRead], responses={404: {"model": GenericResponse}, 400: {"model": GenericResponse}, 401: {"model": GenericResponse}})
 async def return_request(
     request_id: str, 
+    payload: BorrowRequestReturn,
     request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
     try:
-        updated_req = borrow_service.return_request(session, request_id)
+        updated_req = borrow_service.return_request(
+            session,
+            request_id,
+            actor_id=current_user.id,
+            note=payload.notes,
+        )
         return create_success_response(data=updated_req, message="Request returned", request=request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/requests/{request_id}/reopen", response_model=GenericResponse[BorrowRequestRead], responses={404: {"model": GenericResponse}, 400: {"model": GenericResponse}, 401: {"model": GenericResponse}})
+async def reopen_request(
+    request_id: str,
+    payload: BorrowRequestReopen,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        updated_req = borrow_service.reopen_request(
+            session,
+            request_id,
+            actor_id=current_user.id,
+            note=payload.notes,
+        )
+        return create_success_response(data=updated_req, message="Request reopened", request=request)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -132,12 +197,18 @@ async def get_request_events(
 @router.post("/requests/{request_id}/send-to-warehouse", response_model=GenericResponse[BorrowRequestRead])
 async def send_to_warehouse(
     request_id: str,
+    payload: BorrowRequestSendToWarehouse,
     request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
     try:
-        updated_req = borrow_service.send_to_warehouse(session, request_id, current_user.id)
+        updated_req = borrow_service.send_to_warehouse(
+            session,
+            request_id,
+            current_user.id,
+            note=payload.notes,
+        )
         return create_success_response(data=updated_req, message="Sent to warehouse", request=request)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -145,13 +216,32 @@ async def send_to_warehouse(
 @router.post("/requests/{request_id}/warehouse-approve", response_model=GenericResponse[WarehouseApprovalRead])
 async def warehouse_approve(
     request_id: str,
+    payload: BorrowRequestWarehouseApprove,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        approval = borrow_service.warehouse_approve(
+            session,
+            request_id,
+            current_user.id,
+            remarks=payload.notes,
+        )
+        return create_success_response(data=approval, message="Warehouse approved", request=request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/requests/{request_id}/warehouse-reject", response_model=GenericResponse[BorrowRequestRead])
+async def warehouse_reject(
+    request_id: str,
     request: Request,
     remarks: Optional[str] = None,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
     try:
-        approval = borrow_service.warehouse_approve(session, request_id, current_user.id, remarks)
-        return create_success_response(data=approval, message="Warehouse approved", request=request)
+        updated_req = borrow_service.warehouse_reject(session, request_id, current_user.id, remarks)
+        return create_success_response(data=updated_req, message="Warehouse rejected", request=request)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

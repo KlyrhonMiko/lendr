@@ -7,6 +7,7 @@ from uuid import UUID
 from sqlmodel import Field, Relationship
 
 from core.base_model import BaseModel
+from utils.time_utils import get_now_manila
 
 
 def _generate_id(prefix: str) -> str:
@@ -23,7 +24,7 @@ class BackupRun(BaseModel, table=True):
         index=True,
         max_length=20,
     )
-    started_at: datetime = Field(default_factory=datetime.now)
+    started_at: datetime = Field(default_factory=get_now_manila)
     completed_at: Optional[datetime] = Field(default=None)
     status: str = Field(default="pending", max_length=20)  # pending, running, completed, failed
     destination: str = Field(max_length=100)  # local, s3, both

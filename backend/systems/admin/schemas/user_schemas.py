@@ -16,6 +16,7 @@ class UserBase(BaseModel):
     employee_id: Optional[str] = Field(default=None, max_length=50)
     shift_type: str = Field(default="day", max_length=20)
 
+
 class UserCreate(UserBase):
     username: str = Field(..., max_length=50)
     email: EmailStr = Field(..., max_length=255)
@@ -24,17 +25,13 @@ class UserCreate(UserBase):
     password: str = Field(..., min_length=6, max_length=255)
     role: str = Field(..., max_length=50)
 
+
 class UserUpdate(UserBase):
     password: Optional[str] = Field(default=None, min_length=6, max_length=255)
 
+
 class UserRead(UserBase):
     user_id: str
+
     class Config:
         from_attributes = True
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-
-class TokenData(BaseModel):
-    username: Optional[str] = None

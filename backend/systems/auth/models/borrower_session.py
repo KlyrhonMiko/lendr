@@ -1,7 +1,10 @@
 from datetime import datetime
+
 from sqlmodel import Field
+
 from core.base_model import BaseModel
 from utils.time_utils import get_now_manila
+
 
 class BorrowerSession(BaseModel, table=True):
     __tablename__ = "borrower_sessions"

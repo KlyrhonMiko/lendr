@@ -1,9 +1,8 @@
 import random
-import re
 import string
 
 from sqlalchemy import Index, text
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field
 
 from core.base_model import BaseModel
 
@@ -34,7 +33,7 @@ class User(BaseModel, table=True):
 
     role: str = Field(max_length=50)
     employee_id: str | None = Field(default=None, index=True, max_length=50)
-    shift_type: str = Field(default="day", max_length=20) # "day" or "night"
+    shift_type: str = Field(default="day", max_length=20)
 
     __table_args__ = (
         Index(

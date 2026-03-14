@@ -1,4 +1,4 @@
-from systems.inventory.models.user import User
+from systems.admin.models.user import User
 from sqlmodel import Session, select
 
 from core.base_service import BaseService
@@ -75,7 +75,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
 
 
     def get_item_status(self, session: Session, item: InventoryItem) -> str:
-        from systems.inventory.services.configuration_service import (
+        from systems.admin.services.configuration_service import (
             ConfigurationService,
         )
         config_service = ConfigurationService()
