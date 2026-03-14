@@ -6,6 +6,9 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from core.schemas import GenericResponse, create_error_response
+
+from systems.admin.routers.backup import router as backup
+
 from systems.inventory.routers.auth import router as auth
 from systems.inventory.routers.borrowing import router as borrowing
 from systems.inventory.routers.requested_items import router as requested_items
@@ -63,6 +66,9 @@ async def general_exception_handler(request: Request, exc: Exception):
             request=request
         ).model_dump(mode="json")
     )
+
+app.include_router(backup, prefix="/api/admin/backups", tags=["Admin - Backups"])
+
 app.include_router(auth, prefix="/api/auth", tags=["Auth"])
 app.include_router(users, prefix="/api/users", tags=["Users"])
 app.include_router(inventory, prefix="/api/inventory", tags=["Inventory"])
