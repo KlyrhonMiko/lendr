@@ -15,6 +15,7 @@ class BorrowRequestCreate(BorrowRequestBase):
     item_id: str = Field(..., max_length=50)
     borrower_id: Optional[str] = None
 
+    request_channel: str = "inventory_manager" 
     qty_requested: int = Field(..., gt=0)
     due_at: Optional[datetime] = None
 
@@ -50,6 +51,9 @@ class BorrowRequestRead(BorrowRequestBase):
     status: str
     request_date: datetime
     borrower_id: str
+    request_channel: str = "inventory_manager"
+    compliance_followup_required: bool = False
+    compliance_followup_notes: Optional[str] = None
     item_id: str
     due_at: Optional[datetime] = None
     returned_on_time: Optional[bool] = None
@@ -82,6 +86,10 @@ class BorrowRequestBatchCreate(BaseModel):
     borrower_id: str
     items: list[BatchItem]
     notes: Optional[str] = None
+
+    request_channel: str = "inventory_manager"
+    compliance_followup_required: bool = False
+    compliance_followup_notes: Optional[str] = None
 
     due_at: Optional[datetime] = None
     team_name: Optional[str] = None

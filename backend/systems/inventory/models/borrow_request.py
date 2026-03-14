@@ -3,6 +3,11 @@ from uuid import UUID
 
 from sqlalchemy import Index, text, Column, JSON
 from sqlmodel import Field, Relationship
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .borrow_request_event import BorrowRequestEvent
+    from .borrow_participant import BorrowParticipant
 
 from core.base_model import BaseModel
 from utils.time_utils import get_now_manila
@@ -37,7 +42,12 @@ class BorrowRequest(BaseModel, table=True):
 
     involved_people: list[dict] | None = Field(default=None, sa_column=Column(JSON))
 
+    request_channel: str = Field(default="inventory_manager", max_length=50)
+    compliance_followup_required: bool = Field(default=False)
+    compliance_followup_notes: str | None = Field(default=None, max_length=500)
+
     events: list["BorrowRequestEvent"] = Relationship(back_populates="borrow_request")
+    participants: list["BorrowParticipant"] = Relationship(back_populates="borrow_request")
 
     __table_args__ = (
         Index(

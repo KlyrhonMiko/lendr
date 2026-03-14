@@ -9,6 +9,8 @@ from .audit_log import AuditLog
 from .inventory import InventoryItem
 from .inventory_unit import InventoryUnit
 from .inventory_movement import InventoryMovement
+from .borrower_session import BorrowerSession
+from .borrow_participant import BorrowParticipant
 from .user import User
 
 __all__ = [
@@ -16,6 +18,8 @@ __all__ = [
     "InventoryItem",
     "BorrowRequest",
     "BorrowRequestEvent",
+    "BorrowerSession",
+    "BorrowParticipant",
     "RequestedItem",
     "WarehouseApproval",
     "InventoryUnit",

@@ -9,8 +9,8 @@ from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestCreate,
     BorrowRequestUpdate,
 )
+from systems.inventory.models.borrow_participant import BorrowParticipant
 from systems.inventory.models.warehouse_approval import WarehouseApproval
-from systems.inventory.schemas.borrow_request_schemas import BorrowRequestRead
 from systems.inventory.services.inventory_service import InventoryService
 from systems.inventory.services.user_service import UserService
 from systems.inventory.services.audit_service import audit_service
@@ -68,12 +68,27 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         data = schema.model_dump()
         data["transaction_ref"] = transaction_ref
         
+        # Pull participants out of data before creating the BorrowRequest object
+        # so they don't get saved as a JSON blob in involved_people
+        participants_data = data.pop("involved_people", [])
+
         # Generate borrow_id
         if not data.get(self.lookup_field):
             data[self.lookup_field] = get_next_sequence(session, self.model, self.lookup_field, "BRW")
 
         db_obj = self.model(**data)
         session.add(db_obj)
+
+        # Normalize participants
+        if participants_data:
+            for p in participants_data:
+                participant = BorrowParticipant(
+                    borrow_id=db_obj.borrow_id,
+                    user_id=p.get("user_id"),
+                    name=p.get("name") or p.get("fullname"),
+                    role_in_request=p.get("role") or "witness"
+                )
+                session.add(participant)
         
         # Log event
         event = BorrowRequestEvent(
@@ -222,7 +237,11 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
                     team_name=schema.team_name,
                     store_name=schema.store_name,
                     location_name=schema.location_name,
-                    is_emergency=schema.is_emergency
+                    is_emergency=schema.is_emergency,
+                    request_channel=schema.request_channel,
+                    compliance_followup_required=schema.compliance_followup_required,
+                    compliance_followup_notes=schema.compliance_followup_notes,
+                    involved_people=schema.involved_people if item_data == schema.items[0] else None # Only attach to first item in batch to avoid duplicates if mapping isn't item-specific
                 )
                 borrow_req = self.create_request(session, request_schema)
                 created_requests.append(borrow_req)

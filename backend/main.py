@@ -17,6 +17,7 @@ from systems.inventory.routers.users import router as users
 from systems.inventory.routers.dashboard import router as dashboard
 from systems.inventory.routers.audit_log import router as audit_log
 from systems.inventory.routers.configuration import router as config
+from systems.inventory.routers.borrower import router as borrower
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -77,6 +78,7 @@ app.include_router(requested_items, prefix="/api/requested-items", tags=["Reques
 app.include_router(dashboard, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(audit_log, prefix="/api/audit_log", tags=["Audit Logs"])
 app.include_router(config, prefix="/api/config", tags=["Configuration"])
+app.include_router(borrower, prefix="/api/borrower", tags=["Borrower Portal"])
 
 
 @app.get("/")
