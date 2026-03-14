@@ -4,11 +4,14 @@ from pydantic import BaseModel, EmailStr, Field
 
 
 class UserBase(BaseModel):
-    username: Optional[str] = Field(default=None, max_length=50)
-    email: Optional[EmailStr] = Field(default=None, max_length=255)
     first_name: Optional[str] = Field(default=None, max_length=100)
     last_name: Optional[str] = Field(default=None, max_length=100)
     middle_name: Optional[str] = Field(default=None, max_length=100)
+
+    email: Optional[EmailStr] = Field(default=None, max_length=255)
+    contact_number: Optional[str] = Field(default=None, max_length=20)
+
+    username: Optional[str] = Field(default=None, max_length=50)
     role: Optional[str] = Field(default=None, max_length=50)
 
 class UserCreate(UserBase):

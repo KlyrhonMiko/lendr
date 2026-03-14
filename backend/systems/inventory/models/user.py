@@ -25,8 +25,11 @@ class User(BaseModel, table=True):
     last_name: str = Field(max_length=100)
     first_name: str = Field(max_length=100)
     middle_name: str | None = Field(default=None, max_length=100)
-    username: str = Field(index=True, max_length=50)
+
     email: str = Field(index=True, max_length=255)
+    contact_number: str | None = Field(default=None, max_length=20)
+
+    username: str = Field(index=True, max_length=50)
     hashed_password: str = Field(max_length=255)
     role: str = Field(max_length=50)
 
