@@ -1,18 +1,24 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from core.schemas import GenericResponse, create_error_response
-from systems.inventory.routers.auth import router as auth
-from systems.inventory.routers.borrowing import router as borrowing
-from systems.inventory.routers.configuration import router as config
-from systems.inventory.routers.inventory import router as inventory
-from systems.inventory.routers.users import router as users
-from systems.inventory.routers.dashboard import router as dashboard
 
+from systems.admin.routers.backup import router as backup
+from systems.admin.routers.configuration import router as config
+from systems.admin.routers.users import router as users
+
+from systems.auth.dependencies import require_permission, require_system_access
+from systems.auth.routers.auth import router as auth
+from systems.inventory.routers.borrowing import router as borrowing
+from systems.inventory.routers.requested_items import router as requested_items
+from systems.inventory.routers.inventory import router as inventory
+from systems.inventory.routers.dashboard import router as dashboard
+from systems.inventory.routers.audit_log import router as audit_log
+from systems.inventory.routers.borrower import router as borrower
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -62,12 +68,58 @@ async def general_exception_handler(request: Request, exc: Exception):
             request=request
         ).model_dump(mode="json")
     )
+
+admin_access = [
+    Depends(require_system_access("admin")),
+    Depends(require_permission("admin:manage")),
+]
+
+app.include_router(backup, prefix="/api/admin/backups", tags=["Admin - Backups"], dependencies=admin_access)
+app.include_router(users, prefix="/api/admin/users", tags=["Admin - Users"], dependencies=admin_access)
+app.include_router(config, prefix="/api/admin/config", tags=["Admin - Configuration"], dependencies=admin_access)
+
 app.include_router(auth, prefix="/api/auth", tags=["Auth"])
-app.include_router(users, prefix="/api/users", tags=["Users"])
-app.include_router(inventory, prefix="/api/inventory", tags=["Inventory"])
-app.include_router(borrowing, prefix="/api/borrowing", tags=["Borrowing"])
-app.include_router(dashboard, prefix="/api/dashboard", tags=["Dashboard"])
-app.include_router(config, prefix="/api/config", tags=["Configuration"])
+
+inventory_access = [
+    Depends(require_system_access("inventory")),
+]
+
+app.include_router(
+    inventory,
+    prefix="/api/inventory/items",
+    tags=["Inventory - Items"],
+    dependencies=inventory_access + [Depends(require_permission("inventory:manage"))],
+)
+app.include_router(
+    borrowing,
+    prefix="/api/inventory/borrowing",
+    tags=["Inventory - Borrowing"],
+    dependencies=inventory_access + [Depends(require_permission("borrowing:manage"))],
+)
+app.include_router(
+    requested_items,
+    prefix="/api/inventory/requested-items",
+    tags=["Inventory - Requested Items"],
+    dependencies=inventory_access + [Depends(require_permission("requested_items:manage"))],
+)
+app.include_router(
+    dashboard,
+    prefix="/api/inventory/dashboard",
+    tags=["Inventory - Dashboard"],
+    dependencies=inventory_access + [Depends(require_permission("dashboard:view"))],
+)
+app.include_router(
+    audit_log,
+    prefix="/api/inventory/audit-log",
+    tags=["Inventory - Audit Logs"],
+    dependencies=inventory_access + [Depends(require_permission("audit:view"))],
+)
+app.include_router(
+    borrower,
+    prefix="/api/inventory/borrower",
+    tags=["Inventory - Borrower Portal"],
+    dependencies=inventory_access + [Depends(require_permission("borrower:access"))],
+)
 
 
 @app.get("/")

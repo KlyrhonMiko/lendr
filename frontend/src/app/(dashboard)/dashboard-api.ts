@@ -17,6 +17,6 @@ export interface RecentTransaction {
 }
 
 export const dashboardApi = {
-  getStats: () => api.get<DashboardStats>('/dashboard/stats'),
-  getRecent: () => api.get<RecentTransaction[]>('/dashboard/recent'),
+  getStats: () => api.get<DashboardStats>('/inventory/dashboard/stats'),
+  getRecent: () => api.get<RecentTransaction[]>('/inventory/dashboard/recent'),
 };

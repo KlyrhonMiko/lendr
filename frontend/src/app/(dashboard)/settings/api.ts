@@ -15,9 +15,9 @@ export interface SystemSettingCreate {
 }
 
 export const settingsApi = {
-  list: () => api.get<SystemSetting[]>('/config'),
+  list: () => api.get<SystemSetting[]>('/admin/config'),
   
-  create: (data: SystemSettingCreate) => api.post<SystemSetting>('/config', data),
+  create: (data: SystemSettingCreate) => api.post<SystemSetting>('/admin/config', data),
   
-  update: (key: string, value: string) => api.patch<SystemSetting>(`/config/${key}`, { value }),
+  update: (key: string, value: string) => api.patch<SystemSetting>(`/admin/config/${key}`, { value }),
 };

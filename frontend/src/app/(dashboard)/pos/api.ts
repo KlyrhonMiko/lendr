@@ -15,16 +15,24 @@ export interface BatchBorrowRequest {
   borrower_id: string;
   items: BatchItem[];
   notes?: string;
+  due_at?: string;
+  team_name?: string;
+  involved_people?: Record<string, unknown>[];
+  store_name?: string;
+  location_name?: string;
+  is_emergency?: boolean;
+  compliance_followup_required?: boolean;
+  compliance_followup_notes?: string;
 }
 
 export const posApi = {
   // Fetch users for the "Ordering For" selection
   getBorrowers: async () => {
-    return api.get<Borrower[]>('/users');
+    return api.get<Borrower[]>('/admin/users');
   },
 
   // Submit batch borrow requests
   createBatchBorrow: async (data: BatchBorrowRequest) => {
-    return api.post<any>('/borrowing/batch', data);
+    return api.post<any>('/inventory/borrowing/batch', data);
   }
 };

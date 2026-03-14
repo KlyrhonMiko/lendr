@@ -1,9 +1,8 @@
 import random
-import re
 import string
 
 from sqlalchemy import Index, text
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field
 
 from core.base_model import BaseModel
 
@@ -25,10 +24,16 @@ class User(BaseModel, table=True):
     last_name: str = Field(max_length=100)
     first_name: str = Field(max_length=100)
     middle_name: str | None = Field(default=None, max_length=100)
-    username: str = Field(index=True, max_length=50)
+
     email: str = Field(index=True, max_length=255)
+    contact_number: str | None = Field(default=None, max_length=20)
+
+    username: str = Field(index=True, max_length=50)
     hashed_password: str = Field(max_length=255)
+
     role: str = Field(max_length=50)
+    employee_id: str | None = Field(default=None, index=True, max_length=50)
+    shift_type: str = Field(default="day", max_length=20)
 
     __table_args__ = (
         Index(
@@ -40,6 +45,12 @@ class User(BaseModel, table=True):
         Index(
             "ix_user_email_active",
             "email",
+            unique=True,
+            postgresql_where=text("is_deleted IS FALSE"),
+        ),
+        Index(
+            "ix_user_employee_id_active",
+            "employee_id",
             unique=True,
             postgresql_where=text("is_deleted IS FALSE"),
         ),

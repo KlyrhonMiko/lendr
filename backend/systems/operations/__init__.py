@@ -1,1 +1,1 @@
-"""Operations system."""
+"""Operations Management System."""
