@@ -1,1 +1,1 @@
-"""Inventory system."""
+"""Borrow and Inventory Management System."""
