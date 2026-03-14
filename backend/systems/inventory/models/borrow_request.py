@@ -2,7 +2,7 @@ from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import Index, text
-from sqlmodel import Field
+from sqlmodel import Field, Relationship
 
 from core.base_model import BaseModel
 from utils.time_utils import get_now_manila
@@ -23,6 +23,19 @@ class BorrowRequest(BaseModel, table=True):
     returned_at: datetime | None = Field(default=None)
     request_date: datetime = Field(default_factory=get_now_manila)
     notes: str | None = Field(default=None, max_length=500)
+
+    transaction_ref: str = Field(unique=True, index=True, max_length=50)
+    due_at: datetime | None = Field(default=None)
+    returned_on_time: bool | None = Field(default=None)
+    release_employee_id: str | None = Field(default=None, max_length=50)
+    team_name: str | None = Field(default=None, max_length=100)
+    store_name: str | None = Field(default=None, max_length=100)
+    location_name: str | None = Field(default=None, max_length=100)
+    is_emergency: bool = Field(default=False)
+    approval_channel: str = Field(default="standard", max_length=50)
+
+    events: list["BorrowRequestEvent"] = Relationship(back_populates="borrow_request")
+
 
     __table_args__ = (
         Index(

@@ -1,3 +1,4 @@
+from systems.inventory.schemas.borrow_request_schemas import BorrowRequestEventRead
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlmodel import Session
 
@@ -98,3 +99,30 @@ async def return_request(
         return create_success_response(data=updated_req, message="Request returned", request=request)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/requests/{request_id}", response_model=GenericResponse[BorrowRequestRead], responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}})
+async def get_request(
+    request_id: str, 
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    # The service 'get' method already handles the lookup
+    borrow_req = borrow_service.get(session, request_id)
+    if not borrow_req:
+        raise HTTPException(status_code=404, detail="Request not found")
+    return create_success_response(data=borrow_req, request=request)
+
+@router.get("/requests/{request_id}/events", response_model=GenericResponse[list[BorrowRequestEventRead]], responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}})
+async def get_request_events(
+    request_id: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    borrow_req = borrow_service.get(session, request_id)
+    if not borrow_req:
+        raise HTTPException(status_code=404, detail="Request not found")
+    
+    # Return the related events
+    return create_success_response(data=borrow_req.events, request=request)

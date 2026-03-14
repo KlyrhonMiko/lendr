@@ -3,6 +3,7 @@ from uuid import UUID
 
 from core.base_service import BaseService
 from systems.inventory.models.borrow_request import BorrowRequest
+from systems.inventory.models.borrow_request_event import BorrowRequestEvent
 from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestBatchCreate,
     BorrowRequestCreate,
@@ -10,6 +11,7 @@ from systems.inventory.schemas.borrow_request_schemas import (
 )
 from systems.inventory.services.inventory_service import InventoryService
 from systems.inventory.services.user_service import UserService
+from utils.id_generator import get_next_sequence
 from utils.time_utils import get_now_manila
 
 _DEFAULT_STATUSES = ["pending", "approved", "released", "returned"]
@@ -21,24 +23,19 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         self.user_service = UserService()
 
     def _get_workflow(self, session: Session) -> list[str]:
-        """Returns status names in pipeline order from config, falling back to defaults."""
-        from systems.inventory.services.configuration_service import (
-            ConfigurationService,
-        )
+        from systems.inventory.services.configuration_service import ConfigurationService
         settings = ConfigurationService().get_by_category(session, "borrow_status")
         if not settings:
             return _DEFAULT_STATUSES
         return [s.key for s in sorted(settings, key=lambda s: int(s.value))]
 
     def _stage(self, session: Session, index: int) -> str:
-        """Returns the status name at a given pipeline position (0-based)."""
         workflow = self._get_workflow(session)
         if index >= len(workflow):
             raise ValueError(f"Workflow has no stage at position {index}")
         return workflow[index]
 
     def _active_statuses(self, session: Session) -> list[str]:
-        """Returns all non-terminal statuses (everything except the last stage)."""
         workflow = self._get_workflow(session)
         return workflow[:-1]
 
@@ -61,7 +58,31 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
             extra_filters=[BorrowRequest.status.in_(self._active_statuses(session))]
         )
 
-        return super().create(session, schema, prefix="BRW")
+        # Generate custom transaction_ref
+        year = get_now_manila().year
+        transaction_ref = get_next_sequence(session, self.model, "transaction_ref", f"TXN-{year}")
+        
+        data = schema.model_dump()
+        data["transaction_ref"] = transaction_ref
+        
+        # Generate borrow_id
+        if not data.get(self.lookup_field):
+            data[self.lookup_field] = get_next_sequence(session, self.model, self.lookup_field, "BRW")
+
+        db_obj = self.model(**data)
+        session.add(db_obj)
+        
+        # Log event
+        event = BorrowRequestEvent(
+            borrow_id=db_obj.borrow_id,
+            event_type="created",
+            note=schema.notes
+        )
+        session.add(event)
+        
+        session.commit()
+        session.refresh(db_obj)
+        return db_obj
 
     def approve_request(self, session: Session, borrow_id: str, admin_id: UUID) -> BorrowRequest:
         stage_0 = self._stage(session, 0)
@@ -74,6 +95,14 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         db_request.approved_by = admin_id
         db_request.approved_at = get_now_manila()
 
+        # Log event
+        event = BorrowRequestEvent(
+            borrow_id=db_request.borrow_id,
+            event_type="approved",
+            actor_id=admin_id
+        )
+        session.add(event)
+        
         session.add(db_request)
         session.commit()
         session.refresh(db_request)
@@ -92,6 +121,14 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         db_request.released_by = admin_id
         db_request.released_at = get_now_manila()
 
+        # Log event
+        event = BorrowRequestEvent(
+            borrow_id=db_request.borrow_id,
+            event_type="released",
+            actor_id=admin_id
+        )
+        session.add(event)
+
         session.add(db_request)
         session.commit()
         session.refresh(db_request)
@@ -106,8 +143,22 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
 
         self.inventory_service.adjust_stock(session, db_request.item_id, db_request.qty_requested)
 
+        now = get_now_manila()
         db_request.status = stage_3
-        db_request.returned_at = get_now_manila()
+        db_request.returned_at = now
+        
+        # Calculate returned_on_time
+        if db_request.due_at:
+            db_request.returned_on_time = now <= db_request.due_at
+        else:
+            db_request.returned_on_time = True # Or None if you prefer
+
+        # Log event
+        event = BorrowRequestEvent(
+            borrow_id=db_request.borrow_id,
+            event_type="returned"
+        )
+        session.add(event)
 
         session.add(db_request)
         session.commit()
@@ -126,18 +177,16 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
                     item_id=item_data.item_id,
                     borrower_id=schema.borrower_id,
                     qty_requested=item_data.qty_requested,
-                    notes=schema.notes
+                    notes=schema.notes,
+                    # Pass the new fields!
+                    due_at=schema.due_at,
+                    team_name=schema.team_name,
+                    store_name=schema.store_name,
+                    location_name=schema.location_name,
+                    is_emergency=schema.is_emergency
                 )
-                # create_request handles stock validation and uniqueness
                 borrow_req = self.create_request(session, request_schema)
                 created_requests.append(borrow_req)
-            
-            # Since create_request does session.add and session.commit is likely handled by BaseService or caller
-            # Wait, create_request calls super().create which does commit. 
-            # In a batch, we'd ideally want atomicity. 
-            # Let's check BaseService.create.
             return created_requests
         except Exception as e:
-            # If one fails, we might want to rollback others, but super().create commits individually.
-            # For now, following the existing pattern.
             raise e
