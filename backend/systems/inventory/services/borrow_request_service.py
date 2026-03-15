@@ -873,17 +873,52 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
 
             db_request.approval_channel = "warehouse_provisioned" if provision_qty > 0 else "warehouse_standard"
 
-        # Create warehouse approval record
+        # Capture inventory state after provisioning (for snapshot)
+        session.flush()
+        inventory_after_flush = self.inventory_service.get(session, db_request.item_id)
+
+        # Create warehouse approval record with compliance-ready snapshot
         approval = WarehouseApproval(
             approval_id=get_next_sequence(session, WarehouseApproval, "approval_id", "WAP"),
             borrow_id=borrow_id,
             approved_by=actor_id,
             remarks=remarks,
-            # Snapshot the request data for the receipt
+            # Comprehensive compliance receipt snapshot
             printable_payload_json={
-                **db_request.model_dump(mode="json"),
+                # Borrow request context
+                "borrow_id": db_request.borrow_id,
+                "borrower_id": db_request.borrower_id,
+                "quantity_requested": db_request.qty_requested,
+                "approval_channel": db_request.approval_channel or "warehouse_standard",
+                "is_emergency": db_request.is_emergency,
+                # Item context
+                "item_id": item.item_id,
+                "item_name": item.name,
+                "item_is_trackable": item.is_trackable,
+                # Inventory state snapshot at approval time
+                "inventory_state": {
+                    "available_qty_after": inventory_after_flush.available_qty,
+                    "total_qty_after": inventory_after_flush.total_qty,
+                },
+                # Warehouse provisioning details
                 "provision_qty": provision_qty,
-                "provisioned_units": provision_units,
+                "provisioned_units_count": len(provision_units),
+                "provisioned_units": [
+                    {
+                        "serial_number": u.get("serial_number"),
+                        "internal_ref": u.get("internal_ref"),
+                        "condition": u.get("condition", "good"),
+                    }
+                    for u in provision_units
+                ],
+                # Approval metadata
+                "approved_by_user_id": actor_user_id,
+                "approved_by_employee_id": actor_employee_id,
+                "approved_at": get_now_manila().isoformat(),
+                "remarks": remarks,
+                # Compliance trail markers
+                "snapshot_version": "1.0",
+                "snapshot_type": "warehouse_approval_compliance_receipt",
             },
         )
         

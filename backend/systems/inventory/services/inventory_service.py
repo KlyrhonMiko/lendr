@@ -1,4 +1,5 @@
 from datetime import datetime
+from collections import Counter
 from typing import Any, cast
 from uuid import UUID
 from systems.admin.models.user import User
@@ -15,6 +16,11 @@ from systems.inventory.models.inventory_unit import InventoryUnit
 from systems.inventory.services.audit_service import audit_service
 from utils.id_generator import get_next_sequence
 from utils.time_utils import get_now_manila
+from systems.inventory.schemas.inventory_movement_schemas import (
+    InventoryMovementAnomalyRead,
+    InventoryMovementReconciliationRead,
+    InventoryMovementSummaryRead,
+)
 
 
 VALID_UNIT_STATUSES = {
@@ -148,6 +154,215 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             .where(InventoryMovement.inventory_id == item_id)
             .order_by(InventoryMovement.occurred_at.desc())
         ).all()
+
+    def get_movement(self, session: Session, movement_id: str) -> InventoryMovement | None:
+        return session.exec(
+            select(InventoryMovement).where(InventoryMovement.movement_id == movement_id)
+        ).first()
+
+    def reconcile_movements(self, session: Session, item_id: str) -> InventoryMovementReconciliationRead:
+        item = self.get(session, item_id)
+        if not item:
+            raise ValueError(f"Item {item_id} not found")
+
+        movements = self.get_history(session, item_id)
+        ledger_balance = sum(movement.qty_change for movement in movements)
+        latest_movement_at = movements[0].occurred_at if movements else None
+        delta = ledger_balance - item.available_qty
+
+        return InventoryMovementReconciliationRead(
+            inventory_id=item_id,
+            movement_count=len(movements),
+            ledger_balance=ledger_balance,
+            actual_balance=item.available_qty,
+            delta=delta,
+            is_reconciled=delta == 0,
+            latest_movement_at=latest_movement_at,
+        )
+
+    def reverse_movement(
+        self,
+        session: Session,
+        movement_id: str,
+        reason: str,
+        actor_id: UUID | None = None,
+        actor_user_id: str | None = None,
+        actor_employee_id: str | None = None,
+    ) -> InventoryMovement:
+        original = self.get_movement(session, movement_id)
+        if not original:
+            raise ValueError(f"Movement {movement_id} not found")
+        if original.movement_type == "reversal":
+            raise ValueError("Reversal movements cannot be reversed again")
+
+        item = self.get(session, original.inventory_id)
+        if not item:
+            raise ValueError(f"Item {original.inventory_id} not found")
+
+        reversal_qty_change = -original.qty_change
+        new_available = item.available_qty + reversal_qty_change
+        new_total = item.total_qty
+
+        # Mirror adjust_stock side effects for positive original movements.
+        if original.qty_change > 0:
+            new_total -= original.qty_change
+
+        if new_available < 0:
+            raise ValueError("Reversal would make available quantity negative")
+        if new_total < 0:
+            raise ValueError("Reversal would make total quantity negative")
+        if new_available > new_total:
+            raise ValueError("Reversal would make available quantity exceed total quantity")
+
+        reversal = InventoryMovement(
+            movement_id=get_next_sequence(session, InventoryMovement, "movement_id", "MOV"),
+            inventory_id=original.inventory_id,
+            actor_id=actor_id,
+            actor_user_id=actor_user_id,
+            actor_employee_id=actor_employee_id,
+            qty_change=reversal_qty_change,
+            movement_type="reversal",
+            reference_id=original.movement_id,
+            note=reason,
+        )
+
+        item.available_qty = new_available
+        item.total_qty = new_total
+
+        audit_service.log_action(
+            db=session,
+            entity_type="inventory_movement",
+            entity_id=original.movement_id,
+            action="reversed",
+            before={
+                "movement_id": original.movement_id,
+                "inventory_id": original.inventory_id,
+                "qty_change": original.qty_change,
+                "movement_type": original.movement_type,
+                "reference_id": original.reference_id,
+            },
+            after={
+                "movement_id": reversal.movement_id,
+                "inventory_id": reversal.inventory_id,
+                "qty_change": reversal.qty_change,
+                "movement_type": reversal.movement_type,
+                "reference_id": reversal.reference_id,
+                "reason": reason,
+            },
+            actor_id=actor_id,
+            actor_user_id=actor_user_id,
+            actor_employee_id=actor_employee_id,
+        )
+
+        session.add(reversal)
+        session.add(item)
+        return reversal
+
+    def get_movements_summary(self, session: Session, item_id: str) -> InventoryMovementSummaryRead:
+        item = self.get(session, item_id)
+        if not item:
+            raise ValueError(f"Item {item_id} not found")
+
+        movements = list(
+            session.exec(
+                select(InventoryMovement)
+                .where(InventoryMovement.inventory_id == item_id)
+                .order_by(InventoryMovement.occurred_at.asc())
+            ).all()
+        )
+
+        movement_count = len(movements)
+        total_inflow = sum(m.qty_change for m in movements if m.qty_change > 0)
+        total_outflow = sum(m.qty_change for m in movements if m.qty_change < 0)
+        by_type_counter = Counter(m.movement_type for m in movements)
+        by_actor_counter = Counter(
+            m.actor_user_id for m in movements if m.actor_user_id is not None
+        )
+
+        return InventoryMovementSummaryRead(
+            inventory_id=item_id,
+            movement_count=movement_count,
+            total_inflow=total_inflow,
+            total_outflow=total_outflow,
+            net_change=total_inflow + total_outflow,
+            by_type=dict(by_type_counter),
+            by_actor_user_id=dict(by_actor_counter),
+            earliest_movement_at=movements[0].occurred_at if movements else None,
+            latest_movement_at=movements[-1].occurred_at if movements else None,
+        )
+
+    def get_movement_anomalies(
+        self,
+        session: Session,
+        severity: str | None = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> list[InventoryMovementAnomalyRead]:
+        valid_severities = {"low", "medium", "high", "critical"}
+        normalized: str | None = None
+        if severity is not None:
+            normalized = severity.strip().lower()
+            if normalized not in valid_severities:
+                raise ValueError(
+                    f"Invalid severity '{severity}'. Allowed values: {sorted(valid_severities)}"
+                )
+
+        items = list(
+            session.exec(
+                select(InventoryItem).where(InventoryItem.is_deleted.is_(False))
+                .offset(skip)
+                .limit(limit)
+            ).all()
+        )
+        anomalies: list[InventoryMovementAnomalyRead] = []
+
+        for item in items:
+            reconciliation = self.reconcile_movements(session, item.item_id)
+            if not reconciliation.is_reconciled:
+                level = "high" if abs(reconciliation.delta) >= 5 else "medium"
+                anomalies.append(
+                    InventoryMovementAnomalyRead(
+                        anomaly_type="ledger_mismatch",
+                        severity=level,
+                        inventory_id=item.item_id,
+                        message="Ledger-derived balance does not match item available quantity",
+                        details={
+                            "ledger_balance": reconciliation.ledger_balance,
+                            "actual_balance": reconciliation.actual_balance,
+                            "delta": reconciliation.delta,
+                            "movement_count": reconciliation.movement_count,
+                        },
+                    )
+                )
+
+            if item.available_qty < 0:
+                anomalies.append(
+                    InventoryMovementAnomalyRead(
+                        anomaly_type="negative_available_qty",
+                        severity="critical",
+                        inventory_id=item.item_id,
+                        message="Item has negative available quantity",
+                        details={"available_qty": item.available_qty},
+                    )
+                )
+
+            if item.available_qty > item.total_qty:
+                anomalies.append(
+                    InventoryMovementAnomalyRead(
+                        anomaly_type="available_exceeds_total",
+                        severity="high",
+                        inventory_id=item.item_id,
+                        message="Item has available quantity greater than total quantity",
+                        details={
+                            "available_qty": item.available_qty,
+                            "total_qty": item.total_qty,
+                        },
+                    )
+                )
+
+        if severity is None:
+            return anomalies
+        return [a for a in anomalies if a.severity == normalized]
 
     def get_all_movements(
         self, 

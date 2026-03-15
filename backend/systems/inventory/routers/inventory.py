@@ -19,6 +19,13 @@ from systems.inventory.schemas.inventory_unit_schemas import (
     InventoryUnitUpdate,
 )
 from systems.inventory.schemas.inventory_movement_schemas import InventoryMovementRead
+from systems.inventory.schemas.inventory_movement_schemas import (
+    InventoryMovementAnomalyRead,
+    InventoryMovementReconciliationRead,
+    InventoryMovementReversalRead,
+    InventoryMovementReversalRequest,
+    InventoryMovementSummaryRead,
+)
 from systems.inventory.services.inventory_service import InventoryService
 from systems.inventory.dependencies import shift_guard
 
@@ -361,4 +368,106 @@ async def retire_unit(
         return create_success_response(data=unit_read, message="Unit retired successfully", request=request)
     except ValueError as e:
         session.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{item_id}/movements/reconcile", response_model=GenericResponse[InventoryMovementReconciliationRead], responses={400: {"model": GenericResponse}, 401: {"model": GenericResponse}})
+async def reconcile_item_movements(
+    item_id: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: User = Depends(shift_guard)
+):
+    try:
+        result = inventory_service.reconcile_movements(session, item_id)
+        message = "Inventory ledger reconciled" if result.is_reconciled else "Inventory ledger mismatch detected"
+        return create_success_response(data=result, message=message, request=request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/movements/{movement_id}/reverse", response_model=GenericResponse[InventoryMovementReversalRead], responses={400: {"model": GenericResponse}, 401: {"model": GenericResponse}, 404: {"model": GenericResponse}})
+async def reverse_movement(
+    movement_id: str,
+    payload: InventoryMovementReversalRequest,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: User = Depends(shift_guard)
+):
+    try:
+        original = inventory_service.get_movement(session, movement_id)
+        if not original:
+            raise HTTPException(status_code=404, detail="Movement not found")
+
+        reversal = inventory_service.reverse_movement(
+            session,
+            movement_id,
+            reason=payload.reason,
+            actor_id=current_user.id,
+            actor_user_id=current_user.user_id,
+            actor_employee_id=current_user.employee_id,
+        )
+        session.commit()
+        session.refresh(reversal)
+
+        response = InventoryMovementReversalRead(
+            original_movement_id=original.movement_id,
+            reversal_movement_id=reversal.movement_id,
+            inventory_id=reversal.inventory_id,
+            original_qty_change=original.qty_change,
+            reversal_qty_change=reversal.qty_change,
+            reason=payload.reason,
+            occurred_at=reversal.occurred_at,
+        )
+        return create_success_response(data=response, message="Movement reversed with compensating entry", request=request)
+    except ValueError as e:
+        session.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        session.rollback()
+        raise
+    except Exception:
+        session.rollback()
+        raise
+
+
+@router.get("/{item_id}/movements/summary", response_model=GenericResponse[InventoryMovementSummaryRead], responses={400: {"model": GenericResponse}, 401: {"model": GenericResponse}})
+async def get_item_movement_summary(
+    item_id: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        summary = inventory_service.get_movements_summary(session, item_id)
+        return create_success_response(data=summary, request=request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/movements/anomalies", response_model=GenericResponse[list[InventoryMovementAnomalyRead]], responses={401: {"model": GenericResponse}})
+async def get_movement_anomalies(
+    request: Request,
+    severity: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 100,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: User = Depends(shift_guard)
+):
+    try:
+        anomalies = inventory_service.get_movement_anomalies(
+            session,
+            severity=severity,
+            skip=skip,
+            limit=limit,
+        )
+        return create_success_response(
+            data=anomalies,
+            meta=PaginationMeta(total=len(anomalies), limit=limit, offset=skip),
+            request=request,
+        )
+    except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
