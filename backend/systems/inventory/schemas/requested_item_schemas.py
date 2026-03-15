@@ -8,8 +8,6 @@ class RequestedItemBase(BaseModel):
     qty: int = Field(default=1, gt=0)
     justification: Optional[str] = Field(default=None, max_length=500)
 
-    borrow_id: Optional[str] = Field(default=None, max_length=50)
-
 class RequestedItemCreate(RequestedItemBase):
     requested_by: Optional[str] = None # Will be set from current_user if not provided
 

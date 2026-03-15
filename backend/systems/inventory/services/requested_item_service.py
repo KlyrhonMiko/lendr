@@ -24,6 +24,7 @@ class RequestedItemService(BaseService[RequestedItem, RequestedItemCreate, Reque
         # Generate custom request_ref (REQ-XXXXXX)
         data = schema.model_dump()
         data["request_ref"] = get_next_sequence(session, self.model, "request_ref", "REQ")
+        data["requested_by_uuid"] = user.id
 
         self.config_service.require_key(
             session,

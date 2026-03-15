@@ -8,16 +8,13 @@ class InventoryMovement(BaseModel, table=True):
     __tablename__ = "inventory_movements"
 
     movement_id: str = Field(unique=True, index=True, max_length=50)
-    inventory_id: str = Field(foreign_key="inventory.item_id", index=True, max_length=50)
+    inventory_uuid: UUID | None = Field(default=None, foreign_key="inventory.id", index=True)
     
     actor_id: UUID | None = Field(
         default=None, 
         foreign_key="users.id", # Link to the UUID primary key
         index=True
     )
-    # Human-readable actor identifiers for readability in logs
-    actor_user_id: str | None = Field(default=None, max_length=50)
-    actor_employee_id: str | None = Field(default=None, max_length=50)
     
     # How much changed (+5, -2, etc.)
     qty_change: int = Field(..., ge=-10000, le=10000)

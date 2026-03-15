@@ -418,7 +418,6 @@ async def reverse_movement(
         response = InventoryMovementReversalRead(
             original_movement_id=original.movement_id,
             reversal_movement_id=reversal.movement_id,
-            inventory_id=reversal.inventory_id,
             original_qty_change=original.qty_change,
             reversal_qty_change=reversal.qty_change,
             reason=payload.reason,

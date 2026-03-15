@@ -2,6 +2,7 @@ import os
 import subprocess
 from pathlib import Path
 from urllib.parse import urlparse
+from uuid import UUID
 
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
@@ -22,7 +23,12 @@ class BackupService:
     def _require_setting(self, session: Session, key: str, category: str, field_label: str) -> None:
         self.config_service.require_key(session, key=key, category=category, field_label=field_label)
 
-    def trigger_backup(self, session: Session, destination: str = "local", actor_id=None) -> BackupRun:
+    def trigger_backup(
+        self,
+        session: Session,
+        destination: str = "local",
+        actor_id: UUID | None = None,
+    ) -> BackupRun:
         self._require_setting(
             session,
             destination,
@@ -81,7 +87,7 @@ class BackupService:
             session.add(backup_run)
             session.commit()
             # We raise the exception so the API returns a proper 500 error instead of "Success"
-            raise Exception(f"Backup {backup_run.backup_id} failed: {str(e)}")
+            raise RuntimeError(f"Backup {backup_run.backup_id} failed: {str(e)}") from e
 
     def _run_local_backup(self, session: Session, backup_run: BackupRun):
         timestamp = get_now_manila().strftime("%Y%m%d_%H%M%S")

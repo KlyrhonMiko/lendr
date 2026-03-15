@@ -1,4 +1,5 @@
 from datetime import datetime
+from uuid import UUID
 from sqlmodel import Field
 from core.base_model import BaseModel
 from typing import TYPE_CHECKING
@@ -11,7 +12,7 @@ class InventoryUnit(BaseModel, table=True):
     __tablename__ = "inventory_units"
 
     unit_id: str = Field(unique=True, index=True, max_length=50)
-    inventory_id: str = Field(foreign_key="inventory.item_id", index=True, max_length=50)
+    inventory_uuid: UUID | None = Field(default=None, foreign_key="inventory.id", index=True)
     
     serial_number: str | None = Field(default=None, unique=True, index=True, max_length=100)
     
@@ -24,4 +25,7 @@ class InventoryUnit(BaseModel, table=True):
     
     condition: str | None = Field(default=None, max_length=100)
 
-    borrow_assignments: list["BorrowRequestUnit"] = Relationship(back_populates="inventory_unit")
+    borrow_assignments: list["BorrowRequestUnit"] = Relationship(
+        back_populates="inventory_unit",
+        sa_relationship_kwargs={"foreign_keys": "[BorrowRequestUnit.unit_uuid]"},
+    )

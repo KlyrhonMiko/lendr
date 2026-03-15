@@ -5,9 +5,6 @@ from utils.time_utils import format_datetime
 
 class InventoryMovementRead(BaseModel):
     movement_id: str
-    inventory_id: str
-    actor_user_id: Optional[str] = None
-    actor_employee_id: Optional[str] = None
     qty_change: int
     movement_type: str
     reason_code: Optional[str] = None
@@ -31,7 +28,6 @@ class InventoryMovementReversalRequest(BaseModel):
 class InventoryMovementReversalRead(BaseModel):
     original_movement_id: str
     reversal_movement_id: str
-    inventory_id: str
     original_qty_change: int
     reversal_qty_change: int
     reason: str
@@ -44,7 +40,6 @@ class InventoryMovementReversalRead(BaseModel):
 
 
 class InventoryMovementReconciliationRead(BaseModel):
-    inventory_id: str
     movement_count: int
     ledger_balance: int
     actual_balance: int
@@ -60,7 +55,6 @@ class InventoryMovementReconciliationRead(BaseModel):
 
 
 class InventoryMovementSummaryRead(BaseModel):
-    inventory_id: str
     movement_count: int
     total_inflow: int
     total_outflow: int
@@ -80,6 +74,5 @@ class InventoryMovementSummaryRead(BaseModel):
 class InventoryMovementAnomalyRead(BaseModel):
     anomaly_type: str
     severity: Literal["low", "medium", "high", "critical"]
-    inventory_id: str
     message: str
     details: dict[str, Any]

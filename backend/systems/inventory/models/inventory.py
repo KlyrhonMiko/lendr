@@ -20,7 +20,8 @@ class InventoryItem(BaseModel, table=True):
         Index(
             "ix_inventory_item_name_active",
             "name",
-            "category",
+            "classification",
+            "item_type",
             unique=True,
             postgresql_where=text("is_deleted IS FALSE"),
         ),

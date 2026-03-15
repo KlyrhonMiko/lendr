@@ -95,7 +95,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         self.validate_uniqueness(
             session, 
             schema, 
-            unique_fields=[["name", "category"]]
+            unique_fields=[["name", "classification", "item_type"]]
         )
 
         self._validate_item_config(session, schema.model_dump())
@@ -174,15 +174,13 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         # LOG THE MOVEMENT (The Ledger)
         movement = InventoryMovement(
             movement_id=get_next_sequence(session, InventoryMovement, "movement_id", "MOV"),
-            inventory_id=item_id,
+            inventory_uuid=db_obj.id,
             qty_change=qty_change,
             movement_type=movement_type,
             reason_code=reason_code,
             reference_id=reference_id,
             note=note,
             actor_id=actor_id,
-            actor_user_id=actor_user_id,
-            actor_employee_id=actor_employee_id,
         )
 
         audit_service.log_action(
@@ -241,15 +239,21 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
 
     def get_units(self, session: Session, item_id: str) -> list[InventoryUnit]:
         from systems.inventory.models.inventory_unit import InventoryUnit
+        item = self.get(session, item_id)
+        if not item:
+            return []
         return session.exec(
-            select(InventoryUnit).where(InventoryUnit.inventory_id == item_id)
+            select(InventoryUnit).where(InventoryUnit.inventory_uuid == item.id)
         ).all()
 
     def get_history(self, session: Session, item_id: str) -> list[InventoryMovement]:
         from systems.inventory.models.inventory_movement import InventoryMovement
+        item = self.get(session, item_id)
+        if not item:
+            return []
         return session.exec(
             select(InventoryMovement)
-            .where(InventoryMovement.inventory_id == item_id)
+            .where(InventoryMovement.inventory_uuid == item.id)
             .order_by(InventoryMovement.occurred_at.desc())
         ).all()
 
@@ -269,7 +273,6 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         delta = ledger_balance - item.available_qty
 
         return InventoryMovementReconciliationRead(
-            inventory_id=item_id,
             movement_count=len(movements),
             ledger_balance=ledger_balance,
             actual_balance=item.available_qty,
@@ -302,9 +305,17 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             field_label="inventory movement reason code",
         )
 
-        item = self.get(session, original.inventory_id)
+        if original.inventory_uuid is None:
+            raise ValueError(f"Movement {movement_id} has no inventory_uuid")
+
+        item = session.exec(
+            select(InventoryItem).where(
+                InventoryItem.id == original.inventory_uuid,
+                InventoryItem.is_deleted.is_(False),
+            )
+        ).first()
         if not item:
-            raise ValueError(f"Item {original.inventory_id} not found")
+            raise ValueError(f"Item for movement {movement_id} not found")
 
         reversal_qty_change = -original.qty_change
         new_available = item.available_qty + reversal_qty_change
@@ -323,10 +334,8 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
 
         reversal = InventoryMovement(
             movement_id=get_next_sequence(session, InventoryMovement, "movement_id", "MOV"),
-            inventory_id=original.inventory_id,
+            inventory_uuid=item.id,
             actor_id=actor_id,
-            actor_user_id=actor_user_id,
-            actor_employee_id=actor_employee_id,
             qty_change=reversal_qty_change,
             movement_type="reversal",
             reason_code=reason_code,
@@ -345,7 +354,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             reason_code=reason_code,
             before={
                 "movement_id": original.movement_id,
-                "inventory_id": original.inventory_id,
+                "inventory_id": item.item_id,
                 "qty_change": original.qty_change,
                 "movement_type": original.movement_type,
                 "reason_code": original.reason_code,
@@ -353,7 +362,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             },
             after={
                 "movement_id": reversal.movement_id,
-                "inventory_id": reversal.inventory_id,
+                "inventory_id": item.item_id,
                 "qty_change": reversal.qty_change,
                 "movement_type": reversal.movement_type,
                 "reason_code": reversal.reason_code,
@@ -377,7 +386,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         movements = list(
             session.exec(
                 select(InventoryMovement)
-                .where(InventoryMovement.inventory_id == item_id)
+                .where(InventoryMovement.inventory_uuid == item.id)
                 .order_by(InventoryMovement.occurred_at.asc())
             ).all()
         )
@@ -386,12 +395,23 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         total_inflow = sum(m.qty_change for m in movements if m.qty_change > 0)
         total_outflow = sum(m.qty_change for m in movements if m.qty_change < 0)
         by_type_counter = Counter(m.movement_type for m in movements)
+        actor_ids = {m.actor_id for m in movements if m.actor_id is not None}
+        actor_map: dict[UUID, str] = {}
+        if actor_ids:
+            actors = list(
+                session.exec(
+                    select(User).where(User.id.in_(actor_ids), User.is_deleted.is_(False))
+                ).all()
+            )
+            actor_map = {actor.id: actor.user_id for actor in actors}
+
         by_actor_counter = Counter(
-            m.actor_user_id for m in movements if m.actor_user_id is not None
+            actor_map[m.actor_id]
+            for m in movements
+            if m.actor_id is not None and m.actor_id in actor_map
         )
 
         return InventoryMovementSummaryRead(
-            inventory_id=item_id,
             movement_count=movement_count,
             total_inflow=total_inflow,
             total_outflow=total_outflow,
@@ -435,7 +455,6 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                     InventoryMovementAnomalyRead(
                         anomaly_type="ledger_mismatch",
                         severity=level,
-                        inventory_id=item.item_id,
                         message="Ledger-derived balance does not match item available quantity",
                         details={
                             "ledger_balance": reconciliation.ledger_balance,
@@ -451,7 +470,6 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                     InventoryMovementAnomalyRead(
                         anomaly_type="negative_available_qty",
                         severity="critical",
-                        inventory_id=item.item_id,
                         message="Item has negative available quantity",
                         details={"available_qty": item.available_qty},
                     )
@@ -462,7 +480,6 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                     InventoryMovementAnomalyRead(
                         anomaly_type="available_exceeds_total",
                         severity="high",
-                        inventory_id=item.item_id,
                         message="Item has available quantity greater than total quantity",
                         details={
                             "available_qty": item.available_qty,
@@ -491,7 +508,10 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         statement = select(InventoryMovement)
         
         if inventory_id:
-            statement = statement.where(InventoryMovement.inventory_id == inventory_id)
+            item = self.get(session, inventory_id)
+            if not item:
+                return [], 0
+            statement = statement.where(InventoryMovement.inventory_uuid == item.id)
         
         if movement_type:
             statement = statement.where(InventoryMovement.movement_type == movement_type)
@@ -645,7 +665,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
 
         unit = InventoryUnit(
             unit_id=get_next_sequence(session, InventoryUnit, "unit_id", "UNT"),
-            inventory_id=item_id,
+            inventory_uuid=item.id,
             serial_number=serial_number,
             internal_ref=internal_ref,
             status=initial_status,
@@ -751,7 +771,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             # Create unit
             unit = InventoryUnit(
                 unit_id=get_next_sequence(session, InventoryUnit, "unit_id", "UNT"),
-                inventory_id=item_id,
+                inventory_uuid=item.id,
                 serial_number=serial_number,
                 internal_ref=internal_ref,
                 status=initial_status,
@@ -829,7 +849,14 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             )
             unit.status = "expired"
 
-        item = self.get(session, unit.inventory_id)
+        item = None
+        if unit.inventory_uuid is not None:
+            item = session.exec(
+                select(InventoryItem).where(
+                    InventoryItem.id == unit.inventory_uuid,
+                    InventoryItem.is_deleted.is_(False),
+                )
+            ).first()
         if item and self._is_consumable_item(item) and unit.status == "borrowed":
             raise ValueError("Consumable/perishable units cannot use 'borrowed' status")
 
@@ -933,7 +960,11 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         """Get units for an item, optionally filtered by status, with pagination."""
         from sqlmodel import func
 
-        statement = select(InventoryUnit).where(InventoryUnit.inventory_id == item_id)
+        item = self.get(session, item_id)
+        if not item:
+            return [], 0
+
+        statement = select(InventoryUnit).where(InventoryUnit.inventory_uuid == item.id)
 
         if status:
             self._require_config_key(

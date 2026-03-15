@@ -32,9 +32,7 @@ class BorrowRequestUpdate(BorrowRequestBase):
 
 class BorrowRequestEventRead(BaseModel):
     event_id: str
-    borrow_id: str
     event_type: str
-    actor_employee_id: Optional[str] = None
     note: Optional[str] = None
     occurred_at: datetime
 
@@ -50,11 +48,9 @@ class BorrowRequestRead(BorrowRequestBase):
     transaction_ref: str
     status: str
     request_date: datetime
-    borrower_id: str
     request_channel: str = "inventory_manager"
     compliance_followup_required: bool = False
     compliance_followup_notes: Optional[str] = None
-    item_id: str
     due_at: Optional[datetime] = None
     returned_on_time: Optional[bool] = None
     team_name: Optional[str] = None
@@ -125,25 +121,13 @@ class BorrowRequestUnitAssign(BaseModel):
 
 class BorrowRequestUnitRead(BaseModel):
     borrow_unit_id: str
-    borrow_id: str
-    unit_id: str
+    unit_id: str | None = None
 
     requested_at: datetime | None = None
     approved_at: datetime | None = None
     assigned_at: datetime | None = None
     released_at: datetime | None = None
     returned_at: datetime | None = None
-
-    requested_by_user_id: str | None = None
-    requested_by_employee_id: str | None = None
-    approved_by_user_id: str | None = None
-    approved_by_employee_id: str | None = None
-    assigned_by_user_id: str | None = None
-    assigned_by_employee_id: str | None = None
-    released_by_user_id: str | None = None
-    released_by_employee_id: str | None = None
-    returned_by_user_id: str | None = None
-    returned_by_employee_id: str | None = None
 
     condition_on_return: str | None = None
     return_notes: str | None = None

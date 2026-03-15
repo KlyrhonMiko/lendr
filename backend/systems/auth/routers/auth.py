@@ -60,6 +60,7 @@ async def borrower_login(
         session=session,
         user_id=user.user_id,
         expires_delta=access_token_expires,
+        user_uuid=user.id,
     )
 
     return Token(access_token=access_token, token_type="bearer")

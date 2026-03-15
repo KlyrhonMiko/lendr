@@ -13,7 +13,7 @@ class InventoryUnitBase(BaseModel):
 
 class InventoryUnitCreate(InventoryUnitBase):
     """Create a single unit for an inventory item."""
-    inventory_id: str
+    pass
 
 
 class InventoryUnitBatchCreate(BaseModel):
@@ -31,7 +31,6 @@ class InventoryUnitUpdate(BaseModel):
 class InventoryUnitRead(InventoryUnitBase):
     """Unit read schema with server-assigned fields."""
     unit_id: str
-    inventory_id: str
     created_at: datetime
     updated_at: datetime
 

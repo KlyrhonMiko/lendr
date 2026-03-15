@@ -1,4 +1,5 @@
 from datetime import timedelta
+from uuid import UUID
 
 from sqlmodel import Session, select
 
@@ -31,14 +32,20 @@ class AuthService:
 
         return create_jwt(data["sub"])
 
-    def create_borrower_session(self, session: Session, user_id: str, expires_delta: timedelta) -> "BorrowerSession":
+    def create_borrower_session(
+        self,
+        session: Session,
+        user_id: str,
+        expires_delta: timedelta,
+        user_uuid: UUID | None = None,
+    ) -> "BorrowerSession":
         from systems.auth.models.borrower_session import BorrowerSession
         from utils.time_utils import get_now_manila
 
         expires_at = get_now_manila() + expires_delta
         db_session = BorrowerSession(
             session_id=get_next_sequence(session, BorrowerSession, "session_id", "BSE"),
-            borrower_id=user_id,
+            borrower_uuid=user_uuid,
             expires_at=expires_at,
         )
         session.add(db_session)
