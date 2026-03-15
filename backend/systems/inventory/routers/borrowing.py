@@ -10,6 +10,7 @@ from core.schemas import GenericResponse, PaginationMeta, create_success_respons
 from systems.admin.models.user import User
 from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestApprove,
+    BorrowRequestAutoRouteWarehouse,
     BorrowRequestBatchCreate,
     BorrowRequestCreate,
     BorrowRequestUnitAssign,
@@ -21,6 +22,7 @@ from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestSendToWarehouse,
     BorrowRequestReturn,
     BorrowRequestWarehouseApprove,
+    BorrowRequestWarehouseApproveWithProvision,
 )
 from systems.inventory.services.borrow_request_service import BorrowService
 
@@ -100,6 +102,7 @@ async def approve_request(
             request_id,
             current_user.id,
             note=payload.notes,
+            auto_route_shortage=payload.auto_route_shortage,
             actor_user_id=current_user.user_id,
             actor_employee_id=current_user.employee_id,
         )
@@ -286,6 +289,28 @@ async def send_to_warehouse(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+
+@router.patch("/requests/{request_id}/auto-route-warehouse", response_model=GenericResponse[BorrowRequestRead])
+async def auto_route_warehouse(
+    request_id: str,
+    payload: BorrowRequestAutoRouteWarehouse,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        updated_req = borrow_service.auto_route_to_warehouse(
+            session,
+            request_id,
+            current_user.id,
+            note=payload.notes,
+            actor_user_id=current_user.user_id,
+            actor_employee_id=current_user.employee_id,
+        )
+        return create_success_response(data=updated_req, message="Routed to warehouse", request=request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 @router.post("/requests/{request_id}/warehouse-approve", response_model=GenericResponse[WarehouseApprovalRead])
 async def warehouse_approve(
     request_id: str,
@@ -304,6 +329,30 @@ async def warehouse_approve(
             actor_employee_id=current_user.employee_id,
         )
         return create_success_response(data=approval, message="Warehouse approved", request=request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/requests/{request_id}/warehouse-approve-with-provision", response_model=GenericResponse[WarehouseApprovalRead])
+async def warehouse_approve_with_provision(
+    request_id: str,
+    payload: BorrowRequestWarehouseApproveWithProvision,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        approval = borrow_service.warehouse_approve_with_provision(
+            session=session,
+            borrow_id=request_id,
+            actor_id=current_user.id,
+            remarks=payload.notes,
+            provision_qty=payload.provision_qty,
+            units_data=[unit.model_dump() for unit in payload.units],
+            actor_user_id=current_user.user_id,
+            actor_employee_id=current_user.employee_id,
+        )
+        return create_success_response(data=approval, message="Warehouse approved with provisioning", request=request)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

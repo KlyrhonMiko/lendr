@@ -71,6 +71,7 @@ class BorrowRequestRead(BorrowRequestBase):
 
 class BorrowRequestApprove(BaseModel):
     notes: Optional[str] = Field(default=None, max_length=500)
+    auto_route_shortage: bool = Field(default=True)
 
 class BorrowRequestReject(BaseModel):
     notes: Optional[str] = Field(default=None, max_length=500)
@@ -97,6 +98,23 @@ class BorrowRequestSendToWarehouse(BaseModel):
     notes: Optional[str] = Field(default=None, max_length=500)
 
 class BorrowRequestWarehouseApprove(BaseModel):
+    notes: Optional[str] = Field(default=None, max_length=500)
+
+
+class WarehouseProvisionUnit(BaseModel):
+    serial_number: Optional[str] = Field(default=None, max_length=100)
+    internal_ref: Optional[str] = Field(default=None, max_length=100)
+    expiration_date: Optional[datetime] = None
+    condition: Optional[str] = Field(default=None, max_length=100)
+
+
+class BorrowRequestWarehouseApproveWithProvision(BaseModel):
+    notes: Optional[str] = Field(default=None, max_length=500)
+    provision_qty: int = Field(default=0, ge=0)
+    units: list[WarehouseProvisionUnit] = Field(default_factory=list, max_length=500)
+
+
+class BorrowRequestAutoRouteWarehouse(BaseModel):
     notes: Optional[str] = Field(default=None, max_length=500)
 
 
