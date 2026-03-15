@@ -1,21 +1,43 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field, field_serializer
+from pydantic import BaseModel, Field, field_serializer, field_validator
 
 from utils.time_utils import format_datetime
 
 
+class BorrowRequestItemCreate(BaseModel):
+    """Schema for a single item in a multi-item borrow request."""
+    item_id: str = Field(..., max_length=50)
+    qty_requested: int = Field(..., gt=0)
+
+
+class BorrowRequestItemRead(BaseModel):
+    """Schema for reading a single item in a borrow request."""
+    item_id: str
+    qty_requested: int
+
+    class Config:
+        from_attributes = True
+
+
 class BorrowRequestBase(BaseModel):
-    qty_requested: Optional[int] = Field(default=None, gt=0)
     notes: Optional[str] = Field(default=None, max_length=500)
 
-class BorrowRequestCreate(BorrowRequestBase):
-    item_id: str = Field(..., max_length=50)
+class BorrowRequestCreate(BaseModel):
+    """Schema for creating a borrow request. Supports both single and multi-item."""
     borrower_id: Optional[str] = None
 
+    # Single-item fields (for backward compatibility)
+    item_id: Optional[str] = Field(default=None, max_length=50)
+    qty_requested: Optional[int] = Field(default=None, gt=0)
+    
+    # Multi-item field
+    items: Optional[list[BorrowRequestItemCreate]] = Field(default=None, min_length=1)
+
+    # Common fields
+    notes: Optional[str] = Field(default=None, max_length=500)
     request_channel: str = "inventory_manager" 
-    qty_requested: int = Field(..., gt=0)
     due_at: Optional[datetime] = None
 
     team_name: Optional[str] = None
@@ -27,12 +49,29 @@ class BorrowRequestCreate(BorrowRequestBase):
     compliance_followup_required: bool = False
     compliance_followup_notes: Optional[str] = None
 
-class BorrowRequestUpdate(BorrowRequestBase):
+    @field_validator("items", mode="before")
+    @classmethod
+    def validate_items_or_single(cls, v, info):
+        """Ensure either items OR (item_id + qty_requested) is provided, not both."""
+        data = info.data
+        has_items = v is not None and len(v) > 0
+        has_single = data.get("item_id") is not None and data.get("qty_requested") is not None
+        
+        if has_items and has_single:
+            raise ValueError("Cannot specify both 'items' and 'item_id'/'qty_requested'")
+        if not has_items and not has_single:
+            raise ValueError("Must specify either 'items' (multi-item) or 'item_id'+'qty_requested' (single-item)")
+        
+        return v
+
+
+class BorrowRequestUpdate(BaseModel):
     status: Optional[str] = Field(default=None, max_length=50)
 
 class BorrowRequestEventRead(BaseModel):
     event_id: str
     event_type: str
+    actor_user_id: Optional[str] = None
     note: Optional[str] = None
     occurred_at: datetime
 
@@ -43,14 +82,24 @@ class BorrowRequestEventRead(BaseModel):
     class Config:
         from_attributes = True
 
-class BorrowRequestRead(BorrowRequestBase):
+class BorrowRequestRead(BaseModel):
     borrow_id: str
     transaction_ref: str
     status: str
     request_date: datetime
+    borrower_user_id: Optional[str] = None
     request_channel: str = "inventory_manager"
     compliance_followup_required: bool = False
     compliance_followup_notes: Optional[str] = None
+    notes: Optional[str] = None
+    
+    # For backward compatibility: single-item fields (will be set from first item if multi-item)
+    item_id: Optional[str] = None
+    qty_requested: Optional[int] = None
+    
+    # Multi-item fields
+    items: list[BorrowRequestItemRead] = []
+    
     due_at: Optional[datetime] = None
     returned_on_time: Optional[bool] = None
     team_name: Optional[str] = None
@@ -59,11 +108,14 @@ class BorrowRequestRead(BorrowRequestBase):
     is_emergency: bool = False
     involved_people: Optional[list[dict]] = None
     approval_channel: str = "standard"
-    events: list[BorrowRequestEventRead] = []
+    events: list["BorrowRequestEventRead"] = []
 
     @field_serializer("request_date", "due_at")
-    def serialize_dates(self, dt: datetime | None) -> str:
+    def serialize_dates(self, dt: datetime | None) -> str | None:
         return format_datetime(dt)
+
+    class Config:
+        from_attributes = True
 
 class BorrowRequestApprove(BaseModel):
     notes: Optional[str] = Field(default=None, max_length=500)

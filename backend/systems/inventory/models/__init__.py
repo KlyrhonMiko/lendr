@@ -2,6 +2,7 @@
 
 from .borrow_request import BorrowRequest
 from .borrow_request_event import BorrowRequestEvent
+from .borrow_request_item import BorrowRequestItem
 from .requested_item import RequestedItem
 from .warehouse_approval import WarehouseApproval
 from .audit_log import AuditLog 
@@ -15,6 +16,7 @@ __all__ = [
     "InventoryItem",
     "BorrowRequest",
     "BorrowRequestEvent",
+    "BorrowRequestItem",
     "BorrowParticipant",
     "BorrowRequestUnit",
     "RequestedItem",

@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from .borrow_request_event import BorrowRequestEvent
     from .borrow_participant import BorrowParticipant
     from .borrow_request_unit import BorrowRequestUnit
+    from .borrow_request_item import BorrowRequestItem
     from .warehouse_approval import WarehouseApproval
 
 from core.base_model import BaseModel
@@ -57,6 +58,10 @@ class BorrowRequest(BaseModel, table=True):
     participants: list["BorrowParticipant"] = Relationship(
         back_populates="borrow_request",
         sa_relationship_kwargs={"foreign_keys": "[BorrowParticipant.borrow_uuid]"},
+    )
+    items: list["BorrowRequestItem"] = Relationship(
+        back_populates="borrow_request",
+        sa_relationship_kwargs={"foreign_keys": "[BorrowRequestItem.borrow_uuid]"},
     )
     assigned_units: list["BorrowRequestUnit"] = Relationship(
         back_populates="borrow_request",

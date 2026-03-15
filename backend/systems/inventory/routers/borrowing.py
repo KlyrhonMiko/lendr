@@ -51,7 +51,7 @@ async def create_request(
             actor_user_id=current_user.user_id,
             actor_employee_id=current_user.employee_id,
         )
-        return create_success_response(data=borrow_req, message="Borrow request created", request=request)
+        return create_success_response(data=borrow_service.serialize_borrow_request(session, borrow_req), message="Borrow request created", request=request)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -70,7 +70,8 @@ async def create_batch_requests(
             actor_user_id=current_user.user_id,
             actor_employee_id=current_user.employee_id,
         )
-        return create_success_response(data=borrow_reqs, message=f"{len(borrow_reqs)} borrow requests created", request=request)
+        serialized = borrow_service.serialize_borrow_requests(session, borrow_reqs)
+        return create_success_response(data=serialized, message=f"{len(serialized)} borrow requests created", request=request)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -83,8 +84,9 @@ async def list_requests(
     current_user: User = Depends(get_current_user)
 ):
     requests, total = borrow_service.get_all(session, skip=skip, limit=limit)
+    serialized = borrow_service.serialize_borrow_requests(session, requests)
     return create_success_response(
-        data=requests, 
+        data=serialized, 
         meta=PaginationMeta(total=total, limit=limit, offset=skip),
         request=request
     )
@@ -108,7 +110,7 @@ async def approve_request(
             actor_user_id=current_user.user_id,
             actor_employee_id=current_user.employee_id,
         )
-        return create_success_response(data=updated_req, message="Request approved", request=request)
+        return create_success_response(data=borrow_service.serialize_borrow_request(session, updated_req), message="Request approved", request=request)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -130,7 +132,7 @@ async def reject_request(
             actor_user_id=current_user.user_id,
             actor_employee_id=current_user.employee_id,
         )
-        return create_success_response(data=updated_req, message="Request rejected", request=request)
+        return create_success_response(data=borrow_service.serialize_borrow_request(session, updated_req), message="Request rejected", request=request)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -152,7 +154,7 @@ async def release_request(
             actor_user_id=current_user.user_id,
             actor_employee_id=current_user.employee_id,
         )
-        return create_success_response(data=updated_req, message="Request released", request=request)
+        return create_success_response(data=borrow_service.serialize_borrow_request(session, updated_req), message="Request released", request=request)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -222,7 +224,7 @@ async def return_request(
             actor_user_id=current_user.user_id,
             actor_employee_id=current_user.employee_id,
         )
-        return create_success_response(data=updated_req, message="Request returned", request=request)
+        return create_success_response(data=borrow_service.serialize_borrow_request(session, updated_req), message="Request returned", request=request)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -244,7 +246,7 @@ async def reopen_request(
             actor_user_id=current_user.user_id,
             actor_employee_id=current_user.employee_id,
         )
-        return create_success_response(data=updated_req, message="Request reopened", request=request)
+        return create_success_response(data=borrow_service.serialize_borrow_request(session, updated_req), message="Request reopened", request=request)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -259,7 +261,7 @@ async def get_request(
     borrow_req = borrow_service.get(session, request_id)
     if not borrow_req:
         raise HTTPException(status_code=404, detail="Request not found")
-    return create_success_response(data=borrow_req, request=request)
+    return create_success_response(data=borrow_service.serialize_borrow_request(session, borrow_req), request=request)
 
 @router.get("/requests/{request_id}/events", response_model=GenericResponse[list[BorrowRequestEventRead]], responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}})
 async def get_request_events(
@@ -271,9 +273,9 @@ async def get_request_events(
     borrow_req = borrow_service.get(session, request_id)
     if not borrow_req:
         raise HTTPException(status_code=404, detail="Request not found")
-    
-    # Return the related events
-    return create_success_response(data=borrow_req.events, request=request)
+
+    events = borrow_service.serialize_borrow_events(session, borrow_req.events or [])
+    return create_success_response(data=events, request=request)
 
 @router.post("/requests/{request_id}/send-to-warehouse", response_model=GenericResponse[BorrowRequestRead])
 async def send_to_warehouse(
@@ -293,7 +295,7 @@ async def send_to_warehouse(
             actor_user_id=current_user.user_id,
             actor_employee_id=current_user.employee_id,
         )
-        return create_success_response(data=updated_req, message="Sent to warehouse", request=request)
+        return create_success_response(data=borrow_service.serialize_borrow_request(session, updated_req), message="Sent to warehouse", request=request)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -316,7 +318,7 @@ async def auto_route_warehouse(
             actor_user_id=current_user.user_id,
             actor_employee_id=current_user.employee_id,
         )
-        return create_success_response(data=updated_req, message="Routed to warehouse", request=request)
+        return create_success_response(data=borrow_service.serialize_borrow_request(session, updated_req), message="Routed to warehouse", request=request)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -385,6 +387,6 @@ async def warehouse_reject(
             actor_user_id=current_user.user_id,
             actor_employee_id=current_user.employee_id,
         )
-        return create_success_response(data=updated_req, message="Warehouse rejected", request=request)
+        return create_success_response(data=borrow_service.serialize_borrow_request(session, updated_req), message="Warehouse rejected", request=request)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

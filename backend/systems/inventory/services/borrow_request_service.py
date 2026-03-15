@@ -5,12 +5,16 @@ from core.base_service import BaseService
 from systems.admin.models.user import User
 from systems.inventory.models.borrow_request import BorrowRequest
 from systems.inventory.models.borrow_request_event import BorrowRequestEvent
+from systems.inventory.models.borrow_request_item import BorrowRequestItem
 from systems.inventory.models.borrow_request_unit import BorrowRequestUnit
 from systems.inventory.models.inventory import InventoryItem
 from systems.inventory.models.inventory_unit import InventoryUnit
 from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestBatchCreate,
     BorrowRequestCreate,
+    BorrowRequestEventRead,
+    BorrowRequestItemRead,
+    BorrowRequestRead,
     BorrowRequestUnitReturn,
     BorrowRequestUpdate,
 )
@@ -109,6 +113,112 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
                 InventoryItem.is_deleted.is_(False),
             )
         ).first()
+
+    def _build_user_id_map(self, session: Session, user_ids: set[UUID | None]) -> dict[UUID, str]:
+        clean_ids = [uid for uid in user_ids if uid is not None]
+        if not clean_ids:
+            return {}
+
+        users = session.exec(
+            select(User).where(
+                User.is_deleted.is_(False),
+                User.id.in_(clean_ids),
+            )
+        ).all()
+        return {user.id: user.user_id for user in users}
+
+    def _build_item_id_map(self, session: Session, item_ids: set[UUID | None]) -> dict[UUID, str]:
+        clean_ids = [iid for iid in item_ids if iid is not None]
+        if not clean_ids:
+            return {}
+
+        items = session.exec(
+            select(InventoryItem).where(
+                InventoryItem.is_deleted.is_(False),
+                InventoryItem.id.in_(clean_ids),
+            )
+        ).all()
+        return {item.id: item.item_id for item in items}
+
+    def serialize_borrow_request(self, session: Session, borrow_req: BorrowRequest) -> BorrowRequestRead:
+        actor_ids = {event.actor_id for event in (borrow_req.events or []) if event.actor_id is not None}
+        actor_ids.add(borrow_req.borrower_uuid)
+        user_id_map = self._build_user_id_map(session, actor_ids)
+        
+        # Get all items for this request
+        request_items = []
+        item_uuids = set()
+        if borrow_req.id:
+            request_items = session.exec(
+                select(BorrowRequestItem)
+                .where(
+                    BorrowRequestItem.borrow_uuid == borrow_req.id,
+                    BorrowRequestItem.is_deleted.is_(False),
+                )
+                .order_by(BorrowRequestItem.created_at.asc())
+            ).all()
+            item_uuids = {item.item_uuid for item in request_items if item.item_uuid}
+        
+        # Also check the legacy item_uuid field for backward compat
+        if borrow_req.item_uuid:
+            item_uuids.add(borrow_req.item_uuid)
+        
+        item_id_map = self._build_item_id_map(session, item_uuids)
+
+        payload = borrow_req.model_dump(mode="json")
+        payload["borrower_user_id"] = user_id_map.get(borrow_req.borrower_uuid)
+        
+        # Populate items list
+        payload["items"] = [
+            {
+                "item_id": item_id_map.get(item.item_uuid),
+                "qty_requested": item.qty_requested,
+            }
+            for item in request_items
+        ]
+        
+        # For backward compatibility: populate item_id and qty_requested from first item
+        if payload["items"]:
+            first_item = payload["items"][0]
+            payload["item_id"] = first_item.get("item_id")
+            payload["qty_requested"] = first_item.get("qty_requested")
+        elif borrow_req.item_uuid:
+            # Fallback to legacy fields if no items in new table (for old single-item requests)
+            payload["item_id"] = item_id_map.get(borrow_req.item_uuid)
+            payload["qty_requested"] = borrow_req.qty_requested
+        
+        payload["events"] = [
+            {
+                **event.model_dump(mode="json"),
+                "actor_user_id": user_id_map.get(event.actor_id),
+            }
+            for event in (borrow_req.events or [])
+        ]
+        return BorrowRequestRead.model_validate(payload)
+
+    def serialize_borrow_requests(
+        self,
+        session: Session,
+        borrow_requests: list[BorrowRequest],
+    ) -> list[BorrowRequestRead]:
+        return [self.serialize_borrow_request(session, request) for request in borrow_requests]
+
+    def serialize_borrow_events(
+        self,
+        session: Session,
+        events: list[BorrowRequestEvent],
+    ) -> list[BorrowRequestEventRead]:
+        actor_ids = {event.actor_id for event in events if event.actor_id is not None}
+        user_id_map = self._build_user_id_map(session, actor_ids)
+        return [
+            BorrowRequestEventRead.model_validate(
+                {
+                    **event.model_dump(mode="json"),
+                    "actor_user_id": user_id_map.get(event.actor_id),
+                }
+            )
+            for event in events
+        ]
 
     def _get_borrow_assignments(self, session: Session, borrow_request: BorrowRequest) -> list[BorrowRequestUnit]:
         if borrow_request.id is None:
@@ -308,19 +418,53 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         if not borrower:
             raise ValueError(f"Borrower {schema.borrower_id} not found")
 
-        item = self.inventory_service.get(session, schema.item_id)
-        if not item:
-            raise ValueError(f"Item {schema.item_id} not found")
+        # Determine if this is a multi-item or single-item request
+        is_multi_item = schema.items is not None and len(schema.items) > 0
+        
+        if is_multi_item:
+            # Multi-item request
+            items_to_request = schema.items
+        else:
+            # Single-item request (backward compat)
+            item = self.inventory_service.get(session, schema.item_id)
+            if not item:
+                raise ValueError(f"Item {schema.item_id} not found")
 
-        if item.available_qty < schema.qty_requested:
-            raise ValueError(f"Insufficient stock. Available: {item.available_qty}")
+            if item.available_qty < schema.qty_requested:
+                raise ValueError(f"Insufficient stock for {schema.item_id}. Available: {item.available_qty}")
+            
+            items_to_request = [
+                type('obj', (object,), {
+                    'item_id': schema.item_id,
+                    'qty_requested': schema.qty_requested,
+                })()
+            ]
 
-        self.validate_uniqueness(
-            session,
-            schema,
-            unique_fields=[["borrower_uuid", "item_uuid"]],
-            extra_filters=[BorrowRequest.status.in_(self._active_statuses(session))]
-        )
+        # For multi-item, validate all items exist and have sufficient stock
+        if is_multi_item:
+            items_by_id = {}
+            for item_req in items_to_request:
+                item = self.inventory_service.get(session, item_req.item_id)
+                if not item:
+                    raise ValueError(f"Item {item_req.item_id} not found")
+                
+                if item.available_qty < item_req.qty_requested:
+                    raise ValueError(f"Insufficient stock for {item_req.item_id}. Available: {item.available_qty}")
+                
+                items_by_id[item_req.item_id] = item
+
+        # Check for active requests by this borrower (unique constraint)
+        # For multi-item support, we now only check borrower_uuid and status
+        active_request = session.exec(
+            select(BorrowRequest).where(
+                BorrowRequest.borrower_uuid == borrower.id,
+                BorrowRequest.status.in_(self._active_statuses(session)),
+                BorrowRequest.is_deleted.is_(False),
+            )
+        ).first()
+        
+        if active_request:
+            raise ValueError(f"Borrower already has an active request")
 
         # Generate custom transaction_ref
         year = get_now_manila().year
@@ -328,9 +472,17 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         
         data = self._normalize_compliance_fields(schema.model_dump())
         data["borrower_uuid"] = borrower.id
-        data["item_uuid"] = item.id
+        
+        # For backward compat, set item_uuid and qty_requested from first item
+        first_item = items_to_request[0]
+        first_item_obj = items_by_id[first_item.item_id] if is_multi_item else item
+        data["item_uuid"] = first_item_obj.id
+        data["qty_requested"] = first_item.qty_requested
+        
         data.pop("borrower_id", None)
         data.pop("item_id", None)
+        data.pop("items", None)  # Remove items from data before creating BorrowRequest
+        
         self._require_setting(
             session,
             key=str(data["request_channel"]),
@@ -349,7 +501,6 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         data["transaction_ref"] = transaction_ref
         
         # Pull participants out of data before creating the BorrowRequest object
-        # so they don't get saved as a JSON blob in involved_people
         participants_data = data.pop("involved_people", [])
 
         # Generate borrow_id
@@ -358,6 +509,16 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
 
         db_obj = self.model(**data)
         session.add(db_obj)
+
+        # Create BorrowRequestItem records for all items
+        for item_req in items_to_request:
+            item_obj = items_by_id[item_req.item_id] if is_multi_item else first_item_obj
+            borrow_item = BorrowRequestItem(
+                borrow_uuid=db_obj.id,
+                item_uuid=item_obj.id,
+                qty_requested=item_req.qty_requested,
+            )
+            session.add(borrow_item)
 
         # Normalize participants
         if participants_data:
