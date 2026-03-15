@@ -1,6 +1,5 @@
 from datetime import datetime
 from typing import Optional
-from uuid import UUID
 from pydantic import BaseModel, field_serializer
 
 from utils.time_utils import format_datetime
@@ -12,7 +11,8 @@ class AuditLogRead(BaseModel):
     action: str
     before_json: Optional[dict] = None
     after_json: Optional[dict] = None
-    actor_id: Optional[UUID] = None
+    actor_user_id: Optional[str] = None
+    actor_employee_id: Optional[str] = None
     created_at: datetime
 
     @field_serializer("created_at")

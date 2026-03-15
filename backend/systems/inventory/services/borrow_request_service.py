@@ -60,7 +60,7 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
 
         return payload
 
-    def create_request(self, session: Session, schema: BorrowRequestCreate) -> BorrowRequest:
+    def create_request(self, session: Session, schema: BorrowRequestCreate, actor_id: UUID | None = None, actor_user_id: str | None = None, actor_employee_id: str | None = None) -> BorrowRequest:
         borrower = self.user_service.get(session, schema.borrower_id)
         if not borrower:
             raise ValueError(f"Borrower {schema.borrower_id} not found")
@@ -110,8 +110,11 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         
         # Log event
         event = BorrowRequestEvent(
+            event_id=get_next_sequence(session, BorrowRequestEvent, "event_id", "BRE"),
             borrow_id=db_obj.borrow_id,
             event_type="created",
+            actor_id=actor_id,
+            actor_employee_id=actor_employee_id,
             note=schema.notes
         )
 
@@ -121,7 +124,9 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
             entity_id=db_obj.borrow_id,
             action="create",
             after=db_obj.model_dump(mode="json"),
-            actor_id=None, # Wire later
+            actor_id=actor_id,
+            actor_user_id=actor_user_id,
+            actor_employee_id=actor_employee_id,
         )
         session.add(event)
         
@@ -133,8 +138,10 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         self,
         session: Session,
         borrow_id: str,
-        admin_id: UUID,
+        actor_id: UUID,
         note: str | None = None,
+        actor_user_id: str | None = None,
+        actor_employee_id: str | None = None,
     ) -> BorrowRequest:
         stage_0 = self._stage(session, 0)
         stage_1 = self._stage(session, 1)
@@ -143,14 +150,16 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
             raise ValueError(f"Request not found or not in '{stage_0}' status")
 
         db_request.status = stage_1
-        db_request.approved_by = admin_id
+        db_request.approved_by = actor_id
         db_request.approved_at = get_now_manila()
 
         # Log event
         event = BorrowRequestEvent(
+            event_id=get_next_sequence(session, BorrowRequestEvent, "event_id", "BRE"),
             borrow_id=db_request.borrow_id,
             event_type="approved",
-            actor_id=admin_id,
+            actor_id=actor_id,
+            actor_employee_id=actor_employee_id,
             note=note,
         )
 
@@ -160,7 +169,9 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
             entity_id=db_request.borrow_id,
             action="approve",
             after=db_request.model_dump(mode="json"),
-            actor_id=None, # Wire later
+            actor_id=actor_id,
+            actor_user_id=actor_user_id,
+            actor_employee_id=actor_employee_id,
         )
         session.add(event)
         
@@ -173,8 +184,10 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         self,
         session: Session,
         borrow_id: str,
-        admin_id: UUID,
+        actor_id: UUID,
         note: str | None = None,
+        actor_user_id: str | None = None,
+        actor_employee_id: str | None = None,
     ) -> BorrowRequest:
         stage_0 = self._stage(session, 0)
         db_request = self.get(session, borrow_id)
@@ -184,9 +197,11 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         db_request.status = "rejected"
 
         event = BorrowRequestEvent(
+            event_id=get_next_sequence(session, BorrowRequestEvent, "event_id", "BRE"),
             borrow_id=db_request.borrow_id,
             event_type="rejected",
-            actor_id=admin_id,
+            actor_id=actor_id,
+            actor_employee_id=actor_employee_id,
             note=note,
         )
 
@@ -196,7 +211,9 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
             entity_id=db_request.borrow_id,
             action="reject",
             after=db_request.model_dump(mode="json"),
-            actor_id=None,
+            actor_id=actor_id,
+            actor_user_id=actor_user_id,
+            actor_employee_id=actor_employee_id,
         )
         session.add(event)
 
@@ -209,8 +226,10 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         self,
         session: Session,
         borrow_id: str,
-        admin_id: UUID,
+        actor_id: UUID,
         note: str | None = None,
+        actor_user_id: str | None = None,
+        actor_employee_id: str | None = None,
     ) -> BorrowRequest:
         stage_3 = self._stage(session, 3)
         stage_2 = self._stage(session, 4)
@@ -218,17 +237,28 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         if not db_request or db_request.status != stage_3:
             raise ValueError(f"Request not found or not in '{stage_3}' status")
 
-        self.inventory_service.adjust_stock(session, db_request.item_id, -db_request.qty_requested, movement_type="borrow_release", reference_id=db_request.borrow_id)
+        self.inventory_service.adjust_stock(
+            session,
+            db_request.item_id,
+            -db_request.qty_requested,
+            movement_type="borrow_release",
+            reference_id=db_request.borrow_id,
+            actor_id=actor_id,
+            actor_user_id=actor_user_id,
+            actor_employee_id=actor_employee_id,
+        )
 
         db_request.status = stage_2
-        db_request.released_by = admin_id
+        db_request.released_by = actor_id
         db_request.released_at = get_now_manila()
 
         # Log event
         event = BorrowRequestEvent(
+            event_id=get_next_sequence(session, BorrowRequestEvent, "event_id", "BRE"),
             borrow_id=db_request.borrow_id,
             event_type="released",
-            actor_id=admin_id,
+            actor_id=actor_id,
+            actor_employee_id=actor_employee_id,
             note=note,
         )
 
@@ -238,7 +268,9 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
             entity_id=db_request.borrow_id,
             action="release",
             after=db_request.model_dump(mode="json"),
-            actor_id=None, # Wire later
+            actor_id=actor_id,
+            actor_user_id=actor_user_id,
+            actor_employee_id=actor_employee_id,
         )
         session.add(event)
 
@@ -253,6 +285,8 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         borrow_id: str,
         actor_id: UUID,
         note: str | None = None,
+        actor_user_id: str | None = None,
+        actor_employee_id: str | None = None,
     ) -> BorrowRequest:
         stage_4 = self._stage(session, 4)
         stage_5 = self._stage(session, 5)
@@ -260,7 +294,16 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         if not db_request or db_request.status != stage_4:
             raise ValueError(f"Request not found or not in '{stage_4}' status")
 
-        self.inventory_service.adjust_stock(session, db_request.item_id, db_request.qty_requested, movement_type="borrow_return", reference_id=db_request.borrow_id)
+        self.inventory_service.adjust_stock(
+            session,
+            db_request.item_id,
+            db_request.qty_requested,
+            movement_type="borrow_return",
+            reference_id=db_request.borrow_id,
+            actor_id=actor_id,
+            actor_user_id=actor_user_id,
+            actor_employee_id=actor_employee_id,
+        )
 
         now = get_now_manila()
         db_request.status = stage_5
@@ -274,9 +317,11 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
 
         # Log event
         event = BorrowRequestEvent(
+            event_id=get_next_sequence(session, BorrowRequestEvent, "event_id", "BRE"),
             borrow_id=db_request.borrow_id,
             event_type="returned",
             actor_id=actor_id,
+            actor_employee_id=actor_employee_id,
             note=note,
         )
 
@@ -286,7 +331,9 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
             entity_id=db_request.borrow_id,
             action="return",
             after=db_request.model_dump(mode="json"),
-            actor_id=None, # Wire later
+            actor_id=actor_id,
+            actor_user_id=actor_user_id,
+            actor_employee_id=actor_employee_id,
         )
         session.add(event)
 
@@ -301,6 +348,8 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         borrow_id: str,
         actor_id: UUID,
         note: str | None = None,
+        actor_user_id: str | None = None,
+        actor_employee_id: str | None = None,
     ) -> BorrowRequest:
         pending_stage = self._stage(session, 0)
         db_request = self.get(session, borrow_id)
@@ -324,9 +373,11 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         db_request.status = pending_stage
 
         event = BorrowRequestEvent(
+            event_id=get_next_sequence(session, BorrowRequestEvent, "event_id", "BRE"),
             borrow_id=db_request.borrow_id,
             event_type="reopened",
             actor_id=actor_id,
+            actor_employee_id=actor_employee_id,
             note=note,
         )
 
@@ -336,7 +387,9 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
             entity_id=db_request.borrow_id,
             action="reopen",
             after=db_request.model_dump(mode="json"),
-            actor_id=None,
+            actor_id=actor_id,
+            actor_user_id=actor_user_id,
+            actor_employee_id=actor_employee_id,
         )
         session.add(event)
 
@@ -345,7 +398,7 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         session.refresh(db_request)
         return db_request
 
-    def create_batch_requests(self, session: Session, schema: BorrowRequestBatchCreate) -> list[BorrowRequest]:
+    def create_batch_requests(self, session: Session, schema: BorrowRequestBatchCreate, actor_id: UUID | None = None, actor_user_id: str | None = None, actor_employee_id: str | None = None) -> list[BorrowRequest]:
         borrower = self.user_service.get(session, schema.borrower_id)
         if not borrower:
             raise ValueError(f"Borrower {schema.borrower_id} not found")
@@ -369,7 +422,7 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
                     compliance_followup_notes=schema.compliance_followup_notes,
                     involved_people=schema.involved_people if item_data == schema.items[0] else None # Only attach to first item in batch to avoid duplicates if mapping isn't item-specific
                 )
-                borrow_req = self.create_request(session, request_schema)
+                borrow_req = self.create_request(session, request_schema, actor_id=actor_id, actor_user_id=actor_user_id, actor_employee_id=actor_employee_id)
                 created_requests.append(borrow_req)
             return created_requests
         except Exception as e:
@@ -381,6 +434,8 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         borrow_id: str,
         actor_id: UUID,
         note: str | None = None,
+        actor_user_id: str | None = None,
+        actor_employee_id: str | None = None,
     ) -> BorrowRequest:
         # Define the jump from approved to sent_to_warehouse
         # Since we haven't updated _DEFAULT_STATUSES yet, let's assume the flow is:
@@ -395,9 +450,11 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         
         # Log event
         event = BorrowRequestEvent(
+            event_id=get_next_sequence(session, BorrowRequestEvent, "event_id", "BRE"),
             borrow_id=db_request.borrow_id,
             event_type="sent_to_warehouse",
             actor_id=actor_id,
+            actor_employee_id=actor_employee_id,
             note=note,
         )
         audit_service.log_action(
@@ -406,7 +463,9 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
             entity_id=db_request.borrow_id,
             action="warehouse_send",
             after=db_request.model_dump(mode="json"),
-            actor_id=None, # Wire later
+            actor_id=actor_id,
+            actor_user_id=actor_user_id,
+            actor_employee_id=actor_employee_id,
         )
         session.add(event)
         session.add(db_request)
@@ -418,8 +477,10 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         self,
         session: Session,
         borrow_id: str,
-        admin_id: UUID,
+        actor_id: UUID,
         remarks: str | None = None,
+        actor_user_id: str | None = None,
+        actor_employee_id: str | None = None,
     ) -> WarehouseApproval:
         db_request = self.get(session, borrow_id)
         if not db_request or db_request.status != "sent_to_warehouse":
@@ -427,8 +488,9 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
 
         # Create warehouse approval record
         approval = WarehouseApproval(
+            approval_id=get_next_sequence(session, WarehouseApproval, "approval_id", "WAP"),
             borrow_id=borrow_id,
-            approved_by=admin_id,
+            approved_by=actor_id,
             remarks=remarks,
             # Snapshot the request data for the receipt
             printable_payload_json=db_request.model_dump(mode="json") 
@@ -438,9 +500,11 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         
         # Log event
         event = BorrowRequestEvent(
+            event_id=get_next_sequence(session, BorrowRequestEvent, "event_id", "BRE"),
             borrow_id=db_request.borrow_id,
             event_type="warehouse_approved",
-            actor_id=admin_id,
+            actor_id=actor_id,
+            actor_employee_id=actor_employee_id,
             note=remarks
         )
         audit_service.log_action(
@@ -449,7 +513,9 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
             entity_id=db_request.borrow_id,
             action="warehouse_approve",
             after=db_request.model_dump(mode="json"),
-            actor_id=None, # Wire later
+            actor_id=actor_id,
+            actor_user_id=actor_user_id,
+            actor_employee_id=actor_employee_id,
         )
         
         session.add(approval)
@@ -459,7 +525,7 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         session.refresh(approval)
         return approval
 
-    def warehouse_reject(self, session: Session, borrow_id: str, admin_id: UUID, remarks: str | None = None) -> BorrowRequest:
+    def warehouse_reject(self, session: Session, borrow_id: str, actor_id: UUID, remarks: str | None = None, actor_user_id: str | None = None, actor_employee_id: str | None = None) -> BorrowRequest:
         db_request = self.get(session, borrow_id)
         if not db_request or db_request.status != "sent_to_warehouse":
             raise ValueError("Request must be in 'sent_to_warehouse' status")
@@ -467,9 +533,11 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         db_request.status = "warehouse_rejected"
 
         event = BorrowRequestEvent(
+            event_id=get_next_sequence(session, BorrowRequestEvent, "event_id", "BRE"),
             borrow_id=db_request.borrow_id,
             event_type="warehouse_rejected",
-            actor_id=admin_id,
+            actor_id=actor_id,
+            actor_employee_id=actor_employee_id,
             note=remarks,
         )
         audit_service.log_action(
@@ -478,7 +546,9 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
             entity_id=db_request.borrow_id,
             action="warehouse_reject",
             after=db_request.model_dump(mode="json"),
-            actor_id=None,
+            actor_id=actor_id,
+            actor_user_id=actor_user_id,
+            actor_employee_id=actor_employee_id,
         )
 
         session.add(event)

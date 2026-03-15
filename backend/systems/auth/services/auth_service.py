@@ -4,6 +4,7 @@ from sqlmodel import Session, select
 
 from systems.admin.models.user import User
 from systems.admin.services.user_service import UserService
+from utils.id_generator import get_next_sequence
 from utils.security import verify_password
 
 
@@ -36,6 +37,7 @@ class AuthService:
 
         expires_at = get_now_manila() + expires_delta
         db_session = BorrowerSession(
+            session_id=get_next_sequence(session, BorrowerSession, "session_id", "BSE"),
             borrower_id=user_id,
             expires_at=expires_at,
         )

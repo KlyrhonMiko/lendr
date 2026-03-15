@@ -16,3 +16,6 @@ class AuditLog(BaseModel, table=True):
     after_json: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     
     actor_id: Optional[UUID] = Field(default=None, index=True)
+    # Human-readable actor identifiers for readability in logs
+    actor_user_id: Optional[str] = Field(default=None, max_length=50)
+    actor_employee_id: Optional[str] = Field(default=None, max_length=50)

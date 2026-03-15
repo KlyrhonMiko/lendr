@@ -1,6 +1,5 @@
 from datetime import datetime
 from typing import Optional
-from uuid import UUID
 from pydantic import BaseModel, Field, field_serializer
 from utils.time_utils import format_datetime
 
@@ -20,7 +19,6 @@ class RequestedItemUpdate(BaseModel):
     justification: Optional[str] = Field(default=None, max_length=500)
 
 class RequestedItemRead(RequestedItemBase):
-    id: UUID 
     request_ref: str
     requested_by: str
     status: str

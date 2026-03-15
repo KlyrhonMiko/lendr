@@ -15,6 +15,8 @@ class AuditService(BaseService[AuditLog, Any, Any]):
         entity_id: str,
         action: str,
         actor_id: Optional[UUID] = None,
+        actor_user_id: Optional[str] = None,
+        actor_employee_id: Optional[str] = None,
         before: Optional[dict[str, Any]] = None,
         after: Optional[dict[str, Any]] = None,
     ) -> AuditLog:
@@ -29,6 +31,8 @@ class AuditService(BaseService[AuditLog, Any, Any]):
             entity_id=entity_id,
             action=action,
             actor_id=actor_id,
+            actor_user_id=actor_user_id,
+            actor_employee_id=actor_employee_id,
             before_json=before,
             after_json=after
         )

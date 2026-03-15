@@ -4,6 +4,10 @@ from pydantic import BaseModel, field_serializer
 from utils.time_utils import format_datetime
 
 class InventoryMovementRead(BaseModel):
+    movement_id: str
+    inventory_id: str
+    actor_user_id: Optional[str] = None
+    actor_employee_id: Optional[str] = None
     qty_change: int
     movement_type: str
     reference_id: Optional[str] = None

@@ -1,6 +1,5 @@
 from datetime import datetime
 from typing import Optional
-from uuid import UUID
 from pydantic import BaseModel, field_serializer
 
 from utils.time_utils import format_datetime
@@ -30,7 +29,6 @@ class BackupRunRead(BaseModel):
     status: str
     destination: str
     checksum: Optional[str] = None
-    triggered_by: Optional[UUID] = None
     artifacts: list[BackupArtifactRead] = []
 
     @field_serializer("started_at", "completed_at")

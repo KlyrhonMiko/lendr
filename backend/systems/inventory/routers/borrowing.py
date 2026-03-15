@@ -39,7 +39,13 @@ async def create_request(
     request_schema = BorrowRequestCreate(**payload)
         
     try:
-        borrow_req = borrow_service.create_request(session, request_schema)
+        borrow_req = borrow_service.create_request(
+            session,
+            request_schema,
+            actor_id=current_user.id,
+            actor_user_id=current_user.user_id,
+            actor_employee_id=current_user.employee_id,
+        )
         return create_success_response(data=borrow_req, message="Borrow request created", request=request)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -52,7 +58,13 @@ async def create_batch_requests(
     current_user: User = Depends(get_current_user)
 ):
     try:
-        borrow_reqs = borrow_service.create_batch_requests(session, request_data)
+        borrow_reqs = borrow_service.create_batch_requests(
+            session,
+            request_data,
+            actor_id=current_user.id,
+            actor_user_id=current_user.user_id,
+            actor_employee_id=current_user.employee_id,
+        )
         return create_success_response(data=borrow_reqs, message=f"{len(borrow_reqs)} borrow requests created", request=request)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -86,6 +98,8 @@ async def approve_request(
             request_id,
             current_user.id,
             note=payload.notes,
+            actor_user_id=current_user.user_id,
+            actor_employee_id=current_user.employee_id,
         )
         return create_success_response(data=updated_req, message="Request approved", request=request)
     except ValueError as e:
@@ -105,6 +119,8 @@ async def reject_request(
             request_id,
             current_user.id,
             note=payload.notes,
+            actor_user_id=current_user.user_id,
+            actor_employee_id=current_user.employee_id,
         )
         return create_success_response(data=updated_req, message="Request rejected", request=request)
     except ValueError as e:
@@ -124,6 +140,8 @@ async def release_request(
             request_id,
             current_user.id,
             note=payload.notes,
+            actor_user_id=current_user.user_id,
+            actor_employee_id=current_user.employee_id,
         )
         return create_success_response(data=updated_req, message="Request released", request=request)
     except ValueError as e:
@@ -143,6 +161,8 @@ async def return_request(
             request_id,
             actor_id=current_user.id,
             note=payload.notes,
+            actor_user_id=current_user.user_id,
+            actor_employee_id=current_user.employee_id,
         )
         return create_success_response(data=updated_req, message="Request returned", request=request)
     except ValueError as e:
@@ -162,6 +182,8 @@ async def reopen_request(
             request_id,
             actor_id=current_user.id,
             note=payload.notes,
+            actor_user_id=current_user.user_id,
+            actor_employee_id=current_user.employee_id,
         )
         return create_success_response(data=updated_req, message="Request reopened", request=request)
     except ValueError as e:
@@ -208,6 +230,8 @@ async def send_to_warehouse(
             request_id,
             current_user.id,
             note=payload.notes,
+            actor_user_id=current_user.user_id,
+            actor_employee_id=current_user.employee_id,
         )
         return create_success_response(data=updated_req, message="Sent to warehouse", request=request)
     except ValueError as e:
@@ -227,6 +251,8 @@ async def warehouse_approve(
             request_id,
             current_user.id,
             remarks=payload.notes,
+            actor_user_id=current_user.user_id,
+            actor_employee_id=current_user.employee_id,
         )
         return create_success_response(data=approval, message="Warehouse approved", request=request)
     except ValueError as e:
@@ -241,7 +267,14 @@ async def warehouse_reject(
     current_user: User = Depends(get_current_user)
 ):
     try:
-        updated_req = borrow_service.warehouse_reject(session, request_id, current_user.id, remarks)
+        updated_req = borrow_service.warehouse_reject(
+            session,
+            request_id,
+            current_user.id,
+            remarks,
+            actor_user_id=current_user.user_id,
+            actor_employee_id=current_user.employee_id,
+        )
         return create_success_response(data=updated_req, message="Warehouse rejected", request=request)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

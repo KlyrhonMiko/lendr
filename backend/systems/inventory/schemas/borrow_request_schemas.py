@@ -1,6 +1,5 @@
 from datetime import datetime
 from typing import Optional
-from uuid import UUID
 
 from pydantic import BaseModel, Field, field_serializer
 
@@ -32,10 +31,9 @@ class BorrowRequestUpdate(BorrowRequestBase):
     status: Optional[str] = Field(default=None, max_length=50)
 
 class BorrowRequestEventRead(BaseModel):
-    id: UUID
+    event_id: str
     borrow_id: str
     event_type: str
-    actor_id: Optional[UUID] = None
     actor_employee_id: Optional[str] = None
     note: Optional[str] = None
     occurred_at: datetime

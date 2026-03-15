@@ -1,6 +1,5 @@
 from datetime import datetime
 from typing import Optional
-from uuid import UUID
 from pydantic import BaseModel, Field, field_serializer
 from utils.time_utils import format_datetime
 
@@ -12,9 +11,8 @@ class WarehouseApprovalCreate(WarehouseApprovalBase):
     printable_payload_json: dict = Field(default_factory=dict)
 
 class WarehouseApprovalRead(WarehouseApprovalBase):
-    id: UUID
+    approval_id: str
     borrow_id: str
-    approved_by: UUID
     approved_at: datetime
     printable_payload_json: dict
 
