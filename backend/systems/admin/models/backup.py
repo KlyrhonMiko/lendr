@@ -29,7 +29,7 @@ class BackupRun(BaseModel, table=True):
     status: str = Field(default="pending", max_length=20)  # pending, running, completed, failed
     destination: str = Field(max_length=100)  # local, s3, both
     checksum: Optional[str] = Field(default=None, max_length=255)
-    triggered_by: Optional[UUID] = Field(default=None, index=True)
+    triggered_by: Optional[UUID] = Field(default=None, foreign_key="users.id", index=True)
 
     artifacts: list["BackupArtifact"] = Relationship(back_populates="run")
 

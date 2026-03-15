@@ -26,7 +26,7 @@ class DashboardService:
 
         # Active users (unique borrowers in non-terminal states)
         active_users = session.exec(
-            select(func.count(func.distinct(BorrowRequest.borrower_id)))
+            select(func.count(func.distinct(BorrowRequest.borrower_uuid)))
             .where(BorrowRequest.status.in_(["approved", "released"]))
             .where(BorrowRequest.is_deleted.is_(False))
         ).one()

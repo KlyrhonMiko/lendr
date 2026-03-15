@@ -2,12 +2,14 @@ import os
 import subprocess
 from pathlib import Path
 from urllib.parse import urlparse
+from uuid import UUID
 
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
 from core.config import settings
 from systems.admin.models.backup import BackupRun, BackupArtifact
+from systems.admin.services.configuration_service import ConfigurationService
 from utils.time_utils import get_now_manila
 
 
@@ -16,8 +18,30 @@ class BackupService:
         # Use a path relative to the app root so it persists to the host via volume mount
         self.backup_dir = Path("./.backups")
         self.backup_dir.mkdir(parents=True, exist_ok=True)
+        self.config_service = ConfigurationService()
 
-    def trigger_backup(self, session: Session, destination: str = "local", actor_id=None) -> BackupRun:
+    def _require_setting(self, session: Session, key: str, category: str, field_label: str) -> None:
+        self.config_service.require_key(session, key=key, category=category, field_label=field_label)
+
+    def trigger_backup(
+        self,
+        session: Session,
+        destination: str = "local",
+        actor_id: UUID | None = None,
+    ) -> BackupRun:
+        self._require_setting(
+            session,
+            destination,
+            self.config_service.category_for("backup_runs", "destination"),
+            "backup destination",
+        )
+        self._require_setting(
+            session,
+            "running",
+            self.config_service.category_for("backup_runs", "status"),
+            "backup run status",
+        )
+
         # 1. Create the database record
         backup_run = BackupRun(
             destination=destination,
@@ -37,6 +61,12 @@ class BackupService:
             if destination in ["s3", "both"]:
                 pass
 
+            self._require_setting(
+                session,
+                "completed",
+                self.config_service.category_for("backup_runs", "status"),
+                "backup run status",
+            )
             backup_run.status = "completed"
             backup_run.completed_at = get_now_manila()
             
@@ -46,12 +76,18 @@ class BackupService:
             return backup_run
             
         except Exception as e:
+            self._require_setting(
+                session,
+                "failed",
+                self.config_service.category_for("backup_runs", "status"),
+                "backup run status",
+            )
             backup_run.status = "failed"
             backup_run.completed_at = get_now_manila()
             session.add(backup_run)
             session.commit()
             # We raise the exception so the API returns a proper 500 error instead of "Success"
-            raise Exception(f"Backup {backup_run.backup_id} failed: {str(e)}")
+            raise RuntimeError(f"Backup {backup_run.backup_id} failed: {str(e)}") from e
 
     def _run_local_backup(self, session: Session, backup_run: BackupRun):
         timestamp = get_now_manila().strftime("%Y%m%d_%H%M%S")
@@ -81,6 +117,12 @@ class BackupService:
             if result.returncode != 0:
                 raise Exception(f"pg_dump failed: {result.stderr}")
             # 5. Record the artifact
+            self._require_setting(
+                session,
+                "local",
+                self.config_service.category_for("backup_artifacts", "target_type"),
+                "backup artifact target type",
+            )
             artifact = BackupArtifact(
                 backup_run_id=backup_run.id,
                 target_type="local",

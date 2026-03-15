@@ -1,5 +1,6 @@
+from datetime import datetime
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlmodel import Session
 
 from core.database import get_session
@@ -11,8 +12,20 @@ from systems.inventory.schemas.inventory_schemas import (
     InventoryItemRead,
     InventoryItemUpdate,
 )
-from systems.inventory.schemas.inventory_unit_schemas import InventoryUnitRead
+from systems.inventory.schemas.inventory_unit_schemas import (
+    InventoryUnitRead,
+    InventoryUnitCreate,
+    InventoryUnitBatchCreate,
+    InventoryUnitUpdate,
+)
 from systems.inventory.schemas.inventory_movement_schemas import InventoryMovementRead
+from systems.inventory.schemas.inventory_movement_schemas import (
+    InventoryMovementAnomalyRead,
+    InventoryMovementReconciliationRead,
+    InventoryMovementReversalRead,
+    InventoryMovementReversalRequest,
+    InventoryMovementSummaryRead,
+)
 from systems.inventory.services.inventory_service import InventoryService
 from systems.inventory.dependencies import shift_guard
 
@@ -88,7 +101,8 @@ async def adjust_stock(
     item_id: str,
     qty_change: int,
     request: Request,
-    note: Optional[str] = None,
+    reason_code: str = Query(..., min_length=1, max_length=50),
+    note: str = Query(..., min_length=10, max_length=500),
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: User = Depends(shift_guard) # Protected by shift guard
@@ -97,7 +111,18 @@ async def adjust_stock(
     Transactional stock adjustment. 
     Use this for procurement, damage, or manual corrections.
     """
-    item = inventory_service.adjust_stock(session, item_id, qty_change, note=note)
+    item = inventory_service.adjust_stock(
+        session,
+        item_id,
+        qty_change,
+        reason_code=reason_code,
+        note=note,
+        actor_id=current_user.id,
+        actor_user_id=current_user.user_id,
+        actor_employee_id=current_user.employee_id,
+    )
+    session.commit()
+    session.refresh(item)
     
     item_read = InventoryItemRead.model_validate(item)
     item_read.status_condition = inventory_service.get_item_status(session, item)
@@ -140,15 +165,29 @@ async def restore_item(
     item_read.status_condition = inventory_service.get_item_status(session, restored_item)
     return create_success_response(data=item_read, message="Item restored successfully", request=request)
 
-@router.get("/{item_id}/units", response_model=GenericResponse[list[InventoryUnitRead]])
-async def get_item_units(
-    item_id: str, 
+@router.get("/movements/ledger", response_model=GenericResponse[list[InventoryMovementRead]])
+async def get_all_movements_ledger(
     request: Request,
-    session: Session = Depends(get_session)
+    skip: int = 0,
+    limit: int = 100,
+    movement_type: Optional[str] = None,
+    inventory_id: Optional[str] = None,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
 ):
-    """Get all individual units/serial numbers for a specific inventory item."""
-    units = inventory_service.get_units(session, item_id)
-    return create_success_response(data=units, request=request)
+    """Get the complete inventory movement ledger across all items with pagination and optional filters."""
+    movements, total = inventory_service.get_all_movements(
+        session, 
+        skip=skip, 
+        limit=limit,
+        movement_type=movement_type,
+        inventory_id=inventory_id
+    )
+    return create_success_response(
+        data=movements, 
+        meta=PaginationMeta(total=total, limit=limit, offset=skip),
+        request=request
+    )
 
 @router.get("/{item_id}/history", response_model=GenericResponse[list[InventoryMovementRead]])
 async def get_item_history(
@@ -160,3 +199,278 @@ async def get_item_history(
     history = inventory_service.get_history(session, item_id)
     return create_success_response(data=history, request=request)
 
+
+# ===== UNIT MANAGEMENT ENDPOINTS (Phase 2) =====
+
+@router.post("/{item_id}/units", response_model=GenericResponse[InventoryUnitRead], status_code=201, responses={400: {"model": GenericResponse}, 401: {"model": GenericResponse}, 404: {"model": GenericResponse}})
+async def create_unit(
+    item_id: str,
+    unit_data: InventoryUnitCreate,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: User = Depends(shift_guard)
+):
+    """
+    Create a single unit for a trackable inventory item.
+    Item must exist and be marked as trackable (is_trackable=true).
+    Serial number and internal_ref must be unique across all units.
+    """
+    try:
+        unit = inventory_service.create_unit(
+            session,
+            item_id=item_id,
+            serial_number=unit_data.serial_number,
+            internal_ref=unit_data.internal_ref,
+            expiration_date=unit_data.expiration_date,
+            condition=unit_data.condition,
+            actor_id=current_user.id,
+            actor_user_id=current_user.user_id,
+            actor_employee_id=current_user.employee_id,
+        )
+        session.commit()
+        session.refresh(unit)
+        unit_read = InventoryUnitRead.model_validate(unit)
+        return create_success_response(data=unit_read, message="Unit created successfully", request=request)
+    except ValueError as e:
+        session.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{item_id}/units/batch", response_model=GenericResponse[list[InventoryUnitRead]], status_code=201, responses={400: {"model": GenericResponse}, 401: {"model": GenericResponse}, 404: {"model": GenericResponse}})
+async def create_units_batch(
+    item_id: str,
+    batch_data: InventoryUnitBatchCreate,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: User = Depends(shift_guard)
+):
+    """
+    Batch create multiple units for a trackable inventory item.
+    All units must be valid and unique. If any validation fails, the entire batch is rejected (atomic transaction).
+    Maximum 500 units per batch.
+    """
+    try:
+        units_list = [unit_data.model_dump() for unit_data in batch_data.units]
+        created_units = inventory_service.create_units_batch(
+            session,
+            item_id=item_id,
+            units_data=units_list,
+            actor_id=current_user.id,
+            actor_user_id=current_user.user_id,
+            actor_employee_id=current_user.employee_id,
+        )
+        session.commit()
+        for unit in created_units:
+            session.refresh(unit)
+        units_read = [InventoryUnitRead.model_validate(u) for u in created_units]
+        return create_success_response(
+            data=units_read, 
+            message=f"{len(units_read)} units created successfully", 
+            request=request
+        )
+    except ValueError as e:
+        session.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/{item_id}/units", response_model=GenericResponse[list[InventoryUnitRead]], responses={401: {"model": GenericResponse}})
+async def list_item_units(
+    item_id: str,
+    request: Request,
+    skip: int = 0,
+    limit: int = 100,
+    status: Optional[str] = None,
+    expiring_before: Optional[datetime] = None,
+    include_expired: bool = True,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get all units for a specific inventory item with optional status filter and pagination.
+    Status filter: 'available', 'borrowed', 'maintenance', 'retired'
+    """
+    units, total = inventory_service.get_units_by_status(
+        session, 
+        item_id=item_id, 
+        status=status,
+        expiring_before=expiring_before,
+        include_expired=include_expired,
+        skip=skip, 
+        limit=limit
+    )
+    units_read = [InventoryUnitRead.model_validate(u) for u in units]
+    return create_success_response(
+        data=units_read,
+        meta=PaginationMeta(total=total, limit=limit, offset=skip),
+        request=request
+    )
+
+
+@router.patch("/{item_id}/units/{unit_id}", response_model=GenericResponse[InventoryUnitRead], responses={400: {"model": GenericResponse}, 401: {"model": GenericResponse}, 404: {"model": GenericResponse}})
+async def update_unit(
+    item_id: str,
+    unit_id: str,
+    unit_data: InventoryUnitUpdate,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: User = Depends(shift_guard)
+):
+    """
+    Update unit status and/or condition.
+    Serial number and internal_ref are immutable and cannot be modified.
+    Status values: 'available', 'borrowed', 'maintenance', 'retired'
+    """
+    try:
+        unit = inventory_service.update_unit(
+            session,
+            unit_id=unit_id,
+            status=unit_data.status,
+            expiration_date=unit_data.expiration_date,
+            condition=unit_data.condition,
+            actor_id=current_user.id,
+            actor_user_id=current_user.user_id,
+            actor_employee_id=current_user.employee_id,
+        )
+        session.commit()
+        session.refresh(unit)
+        unit_read = InventoryUnitRead.model_validate(unit)
+        return create_success_response(data=unit_read, message="Unit updated successfully", request=request)
+    except ValueError as e:
+        session.rollback()
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.delete("/{item_id}/units/{unit_id}", response_model=GenericResponse[InventoryUnitRead], responses={400: {"model": GenericResponse}, 401: {"model": GenericResponse}, 404: {"model": GenericResponse}})
+async def retire_unit(
+    item_id: str,
+    unit_id: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: User = Depends(shift_guard)
+):
+    """
+    Retire (soft delete) a unit. Once retired, a unit cannot be borrowed or used.
+    Retiring a unit is a permanent status change (status → 'retired').
+    """
+    try:
+        unit = inventory_service.retire_unit(
+            session,
+            unit_id=unit_id,
+            actor_id=current_user.id,
+            actor_user_id=current_user.user_id,
+            actor_employee_id=current_user.employee_id,
+        )
+        session.commit()
+        session.refresh(unit)
+        unit_read = InventoryUnitRead.model_validate(unit)
+        return create_success_response(data=unit_read, message="Unit retired successfully", request=request)
+    except ValueError as e:
+        session.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{item_id}/movements/reconcile", response_model=GenericResponse[InventoryMovementReconciliationRead], responses={400: {"model": GenericResponse}, 401: {"model": GenericResponse}})
+async def reconcile_item_movements(
+    item_id: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: User = Depends(shift_guard)
+):
+    try:
+        result = inventory_service.reconcile_movements(session, item_id)
+        message = "Inventory ledger reconciled" if result.is_reconciled else "Inventory ledger mismatch detected"
+        return create_success_response(data=result, message=message, request=request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/movements/{movement_id}/reverse", response_model=GenericResponse[InventoryMovementReversalRead], responses={400: {"model": GenericResponse}, 401: {"model": GenericResponse}, 404: {"model": GenericResponse}})
+async def reverse_movement(
+    movement_id: str,
+    payload: InventoryMovementReversalRequest,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: User = Depends(shift_guard)
+):
+    try:
+        original = inventory_service.get_movement(session, movement_id)
+        if not original:
+            raise HTTPException(status_code=404, detail="Movement not found")
+
+        reversal = inventory_service.reverse_movement(
+            session,
+            movement_id,
+            reason=payload.reason,
+            reason_code=payload.reason_code,
+            actor_id=current_user.id,
+            actor_user_id=current_user.user_id,
+            actor_employee_id=current_user.employee_id,
+        )
+        session.commit()
+        session.refresh(reversal)
+
+        response = InventoryMovementReversalRead(
+            original_movement_id=original.movement_id,
+            reversal_movement_id=reversal.movement_id,
+            original_qty_change=original.qty_change,
+            reversal_qty_change=reversal.qty_change,
+            reason=payload.reason,
+            reason_code=reversal.reason_code,
+            occurred_at=reversal.occurred_at,
+        )
+        return create_success_response(data=response, message="Movement reversed with compensating entry", request=request)
+    except ValueError as e:
+        session.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        session.rollback()
+        raise
+    except Exception:
+        session.rollback()
+        raise
+
+
+@router.get("/{item_id}/movements/summary", response_model=GenericResponse[InventoryMovementSummaryRead], responses={400: {"model": GenericResponse}, 401: {"model": GenericResponse}})
+async def get_item_movement_summary(
+    item_id: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        summary = inventory_service.get_movements_summary(session, item_id)
+        return create_success_response(data=summary, request=request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/movements/anomalies", response_model=GenericResponse[list[InventoryMovementAnomalyRead]], responses={401: {"model": GenericResponse}})
+async def get_movement_anomalies(
+    request: Request,
+    severity: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 100,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: User = Depends(shift_guard)
+):
+    try:
+        anomalies = inventory_service.get_movement_anomalies(
+            session,
+            severity=severity,
+            skip=skip,
+            limit=limit,
+        )
+        return create_success_response(
+            data=anomalies,
+            meta=PaginationMeta(total=len(anomalies), limit=limit, offset=skip),
+            request=request,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

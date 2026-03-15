@@ -14,7 +14,7 @@ class SystemSettingCreate(SystemSettingBase):
 
 
 class SystemSettingUpdate(SystemSettingBase):
-    pass
+    description: Optional[str] = None
 
 
 class SystemSettingRead(SystemSettingBase):

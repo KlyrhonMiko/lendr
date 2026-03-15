@@ -36,7 +36,13 @@ async def borrower_submit_request(
     )
 
     try:
-        created_request = borrow_service.create_request(session, portal_schema)
+        created_request = borrow_service.create_request(
+            session,
+            portal_schema,
+            actor_id=current_user.id,
+            actor_user_id=current_user.user_id,
+            actor_employee_id=current_user.employee_id,
+        )
         return create_success_response(
             data=created_request,
             message="Request submitted successfully via Portal",
@@ -57,7 +63,13 @@ async def borrower_submit_batch_request(
     )
 
     try:
-        created_requests = borrow_service.create_batch_requests(session, portal_schema)
+        created_requests = borrow_service.create_batch_requests(
+            session,
+            portal_schema,
+            actor_id=current_user.id,
+            actor_user_id=current_user.user_id,
+            actor_employee_id=current_user.employee_id,
+        )
         return create_success_response(
             data=created_requests,
             message=f"{len(created_requests)} requests submitted successfully via Portal",
