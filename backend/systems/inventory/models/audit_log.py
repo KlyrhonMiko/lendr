@@ -11,6 +11,7 @@ class AuditLog(BaseModel, table=True):
     entity_type: str = Field(index=True, max_length=50) # "inventory", "borrow", etc.
     entity_id: str = Field(index=True, max_length=50)
     action: str = Field(max_length=50) # "create", "update", "delete", "restore"
+    reason_code: Optional[str] = Field(default=None, index=True, max_length=50)
     
     before_json: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     after_json: Optional[dict] = Field(default=None, sa_column=Column(JSON))

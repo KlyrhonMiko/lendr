@@ -10,6 +10,7 @@ class InventoryMovementRead(BaseModel):
     actor_employee_id: Optional[str] = None
     qty_change: int
     movement_type: str
+    reason_code: Optional[str] = None
     reference_id: Optional[str] = None
     note: Optional[str] = None
     occurred_at: datetime
@@ -23,6 +24,7 @@ class InventoryMovementRead(BaseModel):
 
 
 class InventoryMovementReversalRequest(BaseModel):
+    reason_code: str = Field(min_length=1, max_length=50)
     reason: str = Field(min_length=1, max_length=500)
 
 
@@ -33,6 +35,7 @@ class InventoryMovementReversalRead(BaseModel):
     original_qty_change: int
     reversal_qty_change: int
     reason: str
+    reason_code: str | None = None
     occurred_at: datetime
 
     @field_serializer("occurred_at")

@@ -24,6 +24,8 @@ class InventoryMovement(BaseModel, table=True):
     
     # type: "manual_adjustment", "borrow_release", "borrow_return", "procurement"
     movement_type: str = Field(max_length=50)
+
+    reason_code: str | None = Field(default=None, index=True, max_length=50)
     
     # Optional link to the transaction (Borrow ID or Request Ref)
     reference_id: str | None = Field(default=None, max_length=50)

@@ -119,6 +119,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         qty_change: int, 
         movement_type: str = "manual_adjustment",
         reference_id: str | None = None,
+        reason_code: str | None = None,
         note: str | None = None,
         actor_id: UUID | None = None,
         actor_user_id: str | None = None,
@@ -131,6 +132,27 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             field_name="movement_type",
             field_label="inventory movement type",
         )
+
+        if movement_type == "manual_adjustment":
+            if not reason_code:
+                raise ValueError("reason_code is required for manual stock adjustments")
+            if note is None or not note.strip():
+                raise ValueError("note is required for manual stock adjustments")
+            self._require_config_key(
+                session,
+                key=reason_code,
+                table_name="inventory_movements",
+                field_name="reason_code",
+                field_label="inventory movement reason code",
+            )
+        elif reason_code is not None:
+            self._require_config_key(
+                session,
+                key=reason_code,
+                table_name="inventory_movements",
+                field_name="reason_code",
+                field_label="inventory movement reason code",
+            )
 
         db_obj = self.get(session, item_id)
         if not db_obj:
@@ -155,6 +177,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             inventory_id=item_id,
             qty_change=qty_change,
             movement_type=movement_type,
+            reason_code=reason_code,
             reference_id=reference_id,
             note=note,
             actor_id=actor_id,
@@ -167,8 +190,16 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             entity_type="inventory",
             entity_id=db_obj.item_id,
             action="stock_adjustment",
+            reason_code=reason_code,
             before={"qty": old_qty},
-            after={"qty": db_obj.available_qty},
+            after={
+                "qty": db_obj.available_qty,
+                "qty_change": qty_change,
+                "movement_type": movement_type,
+                "reason_code": reason_code,
+                "reference_id": reference_id,
+                "note": note,
+            },
             actor_id=actor_id,
             actor_user_id=actor_user_id,
             actor_employee_id=actor_employee_id,
@@ -252,6 +283,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         session: Session,
         movement_id: str,
         reason: str,
+        reason_code: str,
         actor_id: UUID | None = None,
         actor_user_id: str | None = None,
         actor_employee_id: str | None = None,
@@ -261,6 +293,14 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             raise ValueError(f"Movement {movement_id} not found")
         if original.movement_type == "reversal":
             raise ValueError("Reversal movements cannot be reversed again")
+
+        self._require_config_key(
+            session,
+            key=reason_code,
+            table_name="inventory_movements",
+            field_name="reason_code",
+            field_label="inventory movement reason code",
+        )
 
         item = self.get(session, original.inventory_id)
         if not item:
@@ -289,6 +329,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             actor_employee_id=actor_employee_id,
             qty_change=reversal_qty_change,
             movement_type="reversal",
+            reason_code=reason_code,
             reference_id=original.movement_id,
             note=reason,
         )
@@ -301,11 +342,13 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             entity_type="inventory_movement",
             entity_id=original.movement_id,
             action="reversed",
+            reason_code=reason_code,
             before={
                 "movement_id": original.movement_id,
                 "inventory_id": original.inventory_id,
                 "qty_change": original.qty_change,
                 "movement_type": original.movement_type,
+                "reason_code": original.reason_code,
                 "reference_id": original.reference_id,
             },
             after={
@@ -313,6 +356,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                 "inventory_id": reversal.inventory_id,
                 "qty_change": reversal.qty_change,
                 "movement_type": reversal.movement_type,
+                "reason_code": reversal.reason_code,
                 "reference_id": reversal.reference_id,
                 "reason": reason,
             },

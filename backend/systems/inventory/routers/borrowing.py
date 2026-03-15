@@ -24,6 +24,7 @@ from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestWarehouseApprove,
     BorrowRequestWarehouseApproveWithProvision,
 )
+from systems.inventory.dependencies import shift_guard
 from systems.inventory.services.borrow_request_service import BorrowService
 
 router = APIRouter()
@@ -94,7 +95,8 @@ async def approve_request(
     payload: BorrowRequestApprove,
     request: Request,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    _: User = Depends(shift_guard),
 ):
     try:
         updated_req = borrow_service.approve_request(
@@ -116,7 +118,8 @@ async def reject_request(
     payload: BorrowRequestReject,
     request: Request,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    _: User = Depends(shift_guard),
 ):
     try:
         updated_req = borrow_service.reject_request(
@@ -137,7 +140,8 @@ async def release_request(
     payload: BorrowRequestRelease,
     request: Request,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    _: User = Depends(shift_guard),
 ):
     try:
         updated_req = borrow_service.release_request(
@@ -164,6 +168,7 @@ async def assign_units_to_request(
     request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
+    _: User = Depends(shift_guard),
 ):
     try:
         assignments = borrow_service.assign_units(
@@ -204,7 +209,8 @@ async def return_request(
     payload: BorrowRequestReturn,
     request: Request,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    _: User = Depends(shift_guard),
 ):
     try:
         updated_req = borrow_service.return_request(
@@ -226,7 +232,8 @@ async def reopen_request(
     payload: BorrowRequestReopen,
     request: Request,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    _: User = Depends(shift_guard),
 ):
     try:
         updated_req = borrow_service.reopen_request(
@@ -274,7 +281,8 @@ async def send_to_warehouse(
     payload: BorrowRequestSendToWarehouse,
     request: Request,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    _: User = Depends(shift_guard),
 ):
     try:
         updated_req = borrow_service.send_to_warehouse(
@@ -296,7 +304,8 @@ async def auto_route_warehouse(
     payload: BorrowRequestAutoRouteWarehouse,
     request: Request,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    _: User = Depends(shift_guard),
 ):
     try:
         updated_req = borrow_service.auto_route_to_warehouse(
@@ -317,7 +326,8 @@ async def warehouse_approve(
     payload: BorrowRequestWarehouseApprove,
     request: Request,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    _: User = Depends(shift_guard),
 ):
     try:
         approval = borrow_service.warehouse_approve(
@@ -339,7 +349,8 @@ async def warehouse_approve_with_provision(
     payload: BorrowRequestWarehouseApproveWithProvision,
     request: Request,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    _: User = Depends(shift_guard),
 ):
     try:
         approval = borrow_service.warehouse_approve_with_provision(
@@ -362,7 +373,8 @@ async def warehouse_reject(
     request: Request,
     remarks: Optional[str] = None,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    _: User = Depends(shift_guard),
 ):
     try:
         updated_req = borrow_service.warehouse_reject(

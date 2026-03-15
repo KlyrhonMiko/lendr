@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlmodel import Session
 
 from core.database import get_session
@@ -101,7 +101,8 @@ async def adjust_stock(
     item_id: str,
     qty_change: int,
     request: Request,
-    note: Optional[str] = None,
+    reason_code: str = Query(..., min_length=1, max_length=50),
+    note: str = Query(..., min_length=10, max_length=500),
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: User = Depends(shift_guard) # Protected by shift guard
@@ -114,6 +115,7 @@ async def adjust_stock(
         session,
         item_id,
         qty_change,
+        reason_code=reason_code,
         note=note,
         actor_id=current_user.id,
         actor_user_id=current_user.user_id,
@@ -405,6 +407,7 @@ async def reverse_movement(
             session,
             movement_id,
             reason=payload.reason,
+            reason_code=payload.reason_code,
             actor_id=current_user.id,
             actor_user_id=current_user.user_id,
             actor_employee_id=current_user.employee_id,
@@ -419,6 +422,7 @@ async def reverse_movement(
             original_qty_change=original.qty_change,
             reversal_qty_change=reversal.qty_change,
             reason=payload.reason,
+            reason_code=reversal.reason_code,
             occurred_at=reversal.occurred_at,
         )
         return create_success_response(data=response, message="Movement reversed with compensating entry", request=request)

@@ -9,6 +9,7 @@ class AuditLogRead(BaseModel):
     entity_type: str
     entity_id: str
     action: str
+    reason_code: Optional[str] = None
     before_json: Optional[dict] = None
     after_json: Optional[dict] = None
     actor_user_id: Optional[str] = None
