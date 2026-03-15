@@ -17,6 +17,38 @@ config_service = ConfigurationService()
 
 
 @router.get(
+    "/tables",
+    response_model=GenericResponse[list[str]],
+    responses={401: {"model": GenericResponse}},
+)
+async def list_configurable_tables(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("config:view")),
+):
+    tables = config_service.list_tables()
+    return create_success_response(data=tables, request=request)
+
+
+@router.get(
+    "/tables/{table_name}/columns",
+    response_model=GenericResponse[list[str]],
+    responses={400: {"model": GenericResponse}, 401: {"model": GenericResponse}},
+)
+async def list_configurable_columns(
+    table_name: str,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("config:view")),
+):
+    try:
+        columns = config_service.list_columns(table_name)
+        return create_success_response(data=columns, request=request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get(
     "",
     response_model=GenericResponse[list[SystemSettingRead]],
     responses={401: {"model": GenericResponse}},
@@ -50,8 +82,19 @@ async def create_setting(
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_permission("config:manage")),
 ):
-    if config_service.get_by_key(session, setting_data.key):
-        raise HTTPException(status_code=400, detail=f"Setting '{setting_data.key}' already exists")
+    try:
+        config_service.validate_category_exists(setting_data.category)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if config_service.get_by_key(session, setting_data.key, category=setting_data.category):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Setting '{setting_data.key}' already exists in category "
+                f"'{setting_data.category}'"
+            ),
+        )
 
     config_service.set_value(
         session,
@@ -63,7 +106,7 @@ async def create_setting(
 
     return create_success_response(
         message=f"Setting '{setting_data.key}' created successfully",
-        data=config_service.get_by_key(session, setting_data.key),
+        data=config_service.get_by_key(session, setting_data.key, category=setting_data.category),
         request=request,
     )
 
@@ -77,17 +120,37 @@ async def update_setting(
     key: str,
     setting_data: SystemSettingUpdate,
     request: Request,
+    category: str = "general",
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_permission("config:manage")),
 ):
-    if not config_service.get_by_key(session, key):
-        raise HTTPException(status_code=404, detail=f"Setting '{key}' not found")
+    try:
+        config_service.validate_category_exists(category)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    config_service.set_value(session, key, setting_data.value)
+    try:
+        setting = config_service.get_by_key(session, key, category=category)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if not setting:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Setting '{key}' not found in category '{category}'",
+        )
+
+    config_service.set_value(
+        session,
+        key,
+        setting_data.value,
+        category=category,
+        description=setting_data.description,
+    )
 
     return create_success_response(
         message=f"Setting '{key}' updated successfully",
-        data=config_service.get_by_key(session, key),
+        data=config_service.get_by_key(session, key, category=category),
         request=request,
     )

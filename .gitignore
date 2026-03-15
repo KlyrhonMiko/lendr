@@ -3,6 +3,9 @@
 #backups
 .backups/
 
+#documentation
+.documentation/
+
 # dependencies
 node_modules/
 /.pnp

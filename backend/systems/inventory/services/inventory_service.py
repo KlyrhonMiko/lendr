@@ -4,6 +4,7 @@ from typing import Any, cast
 from uuid import UUID
 from systems.admin.models.user import User
 from sqlmodel import Session, select
+from systems.admin.services.configuration_service import ConfigurationService
 
 from core.base_service import BaseService
 from systems.inventory.models.inventory import InventoryItem
@@ -46,6 +47,49 @@ ALLOWED_STATUS_TRANSITIONS = {
 class InventoryService(BaseService[InventoryItem, InventoryItemCreate, InventoryItemUpdate]):
     def __init__(self):
         super().__init__(InventoryItem, lookup_field="item_id")
+        self.config_service = ConfigurationService()
+
+    def _require_config_key(
+        self,
+        session: Session,
+        key: str,
+        table_name: str,
+        field_name: str,
+        field_label: str,
+    ) -> None:
+        self.config_service.require_table_field_key(
+            session,
+            key=key,
+            table_name=table_name,
+            field_name=field_name,
+            field_label=field_label,
+        )
+
+    def _validate_item_config(self, session: Session, data: dict[str, Any]) -> None:
+        if data.get("item_type") is not None:
+            self._require_config_key(
+                session,
+                key=str(data["item_type"]),
+                table_name="inventory",
+                field_name="item_type",
+                field_label="inventory item type",
+            )
+        if data.get("condition") is not None:
+            self._require_config_key(
+                session,
+                key=str(data["condition"]),
+                table_name="inventory",
+                field_name="condition",
+                field_label="inventory item condition",
+            )
+        if data.get("category") is not None:
+            self._require_config_key(
+                session,
+                key=str(data["category"]),
+                table_name="inventory",
+                field_name="category",
+                field_label="inventory item category",
+            )
 
     def create(self, session: Session, schema: InventoryItemCreate) -> InventoryItem:
         self.validate_uniqueness(
@@ -54,7 +98,19 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             unique_fields=[["name", "category"]]
         )
 
+        self._validate_item_config(session, schema.model_dump())
+
         return super().create(session, schema, prefix="ITEM")
+
+    def update(
+        self,
+        session: Session,
+        db_obj: InventoryItem,
+        schema: InventoryItemUpdate,
+    ) -> InventoryItem:
+        obj_data = schema.model_dump(exclude_unset=True)
+        self._validate_item_config(session, obj_data)
+        return super().update(session, db_obj, schema)
 
     def adjust_stock(
         self, 
@@ -68,6 +124,14 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         actor_user_id: str | None = None,
         actor_employee_id: str | None = None,
     ) -> InventoryItem:
+        self._require_config_key(
+            session,
+            key=movement_type,
+            table_name="inventory_movements",
+            field_name="movement_type",
+            field_label="inventory movement type",
+        )
+
         db_obj = self.get(session, item_id)
         if not db_obj:
             raise ValueError(f"Item {item_id} not found")
@@ -121,7 +185,10 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         )
         config_service = ConfigurationService()
 
-        status_settings = config_service.get_by_category(session, "inventory_status")
+        status_settings = config_service.get_by_category(
+            session,
+            config_service.category_for("inventory", "available_qty"),
+        )
 
         if not status_settings:
             # Hardcoded fallback if no statuses have been configured yet
@@ -411,7 +478,22 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
     def _is_consumable_item(self, item: InventoryItem) -> bool:
         return item.item_type in {"consumable", "perishable"}
 
-    def _validate_status_transition(self, current_status: str, next_status: str) -> None:
+    def _validate_status_transition(self, session: Session, current_status: str, next_status: str) -> None:
+        self._require_config_key(
+            session,
+            key=current_status,
+            table_name="inventory_units",
+            field_name="status",
+            field_label="inventory unit status",
+        )
+        self._require_config_key(
+            session,
+            key=next_status,
+            table_name="inventory_units",
+            field_name="status",
+            field_label="inventory unit status",
+        )
+
         if next_status not in VALID_UNIT_STATUSES:
             raise ValueError(f"Invalid status '{next_status}'. Allowed values: {sorted(VALID_UNIT_STATUSES)}")
 
@@ -501,6 +583,22 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
 
         # Create unit with default status "available"
         initial_status = "expired" if expiration_date and expiration_date <= get_now_manila() else "available"
+        self._require_config_key(
+            session,
+            key=initial_status,
+            table_name="inventory_units",
+            field_name="status",
+            field_label="inventory unit status",
+        )
+        if condition is not None:
+            self._require_config_key(
+                session,
+                key=condition,
+                table_name="inventory_units",
+                field_name="condition",
+                field_label="inventory unit condition",
+            )
+
         unit = InventoryUnit(
             unit_id=get_next_sequence(session, InventoryUnit, "unit_id", "UNT"),
             inventory_id=item_id,
@@ -590,6 +688,21 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                 expiration_date = datetime.fromisoformat(expiration_date)
 
             initial_status = "expired" if expiration_date and expiration_date <= get_now_manila() else "available"
+            self._require_config_key(
+                session,
+                key=initial_status,
+                table_name="inventory_units",
+                field_name="status",
+                field_label="inventory unit status",
+            )
+            if condition is not None:
+                self._require_config_key(
+                    session,
+                    key=condition,
+                    table_name="inventory_units",
+                    field_name="condition",
+                    field_label="inventory unit condition",
+                )
 
             # Create unit
             unit = InventoryUnit(
@@ -656,13 +769,20 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
 
         # Update only if provided
         if status is not None:
-            self._validate_status_transition(unit.status, status)
+            self._validate_status_transition(session, unit.status, status)
             unit.status = status
 
         if expiration_date is not None:
             unit.expiration_date = expiration_date
 
         if unit.expiration_date and unit.expiration_date <= get_now_manila() and unit.status in {"available", "borrowed"}:
+            self._require_config_key(
+                session,
+                key="expired",
+                table_name="inventory_units",
+                field_name="status",
+                field_label="inventory unit status",
+            )
             unit.status = "expired"
 
         item = self.get(session, unit.inventory_id)
@@ -670,6 +790,13 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             raise ValueError("Consumable/perishable units cannot use 'borrowed' status")
 
         if condition is not None:
+            self._require_config_key(
+                session,
+                key=condition,
+                table_name="inventory_units",
+                field_name="condition",
+                field_label="inventory unit condition",
+            )
             unit.condition = condition
 
         after_state = {
@@ -718,6 +845,14 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             "condition": unit.condition,
         }
 
+        self._require_config_key(
+            session,
+            key="retired",
+            table_name="inventory_units",
+            field_name="status",
+            field_label="inventory unit status",
+        )
+
         unit.status = "retired"
 
         after_state = {
@@ -757,6 +892,13 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         statement = select(InventoryUnit).where(InventoryUnit.inventory_id == item_id)
 
         if status:
+            self._require_config_key(
+                session,
+                key=status,
+                table_name="inventory_units",
+                field_name="status",
+                field_label="inventory unit status",
+            )
             statement = statement.where(InventoryUnit.status == status)
 
         if expiring_before:
@@ -764,6 +906,13 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             statement = statement.where(expiration_field <= expiring_before)
 
         if not include_expired:
+            self._require_config_key(
+                session,
+                key="expired",
+                table_name="inventory_units",
+                field_name="status",
+                field_label="inventory unit status",
+            )
             statement = statement.where(InventoryUnit.status != "expired")
 
         # Count total

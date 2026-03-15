@@ -16,6 +16,7 @@ from systems.inventory.schemas.borrow_request_schemas import (
 from systems.inventory.models.borrow_participant import BorrowParticipant
 from systems.inventory.models.warehouse_approval import WarehouseApproval
 from systems.inventory.services.inventory_service import InventoryService
+from systems.admin.services.configuration_service import ConfigurationService
 from systems.admin.services.user_service import UserService
 from systems.inventory.services.audit_service import audit_service
 from utils.id_generator import get_next_sequence
@@ -28,10 +29,38 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         super().__init__(BorrowRequest, lookup_field="borrow_id")
         self.inventory_service = InventoryService()
         self.user_service = UserService()
+        self.config_service = ConfigurationService()
+
+    def _require_setting(
+        self,
+        session: Session,
+        key: str,
+        table_name: str,
+        field_name: str,
+        field_label: str,
+    ) -> None:
+        self.config_service.require_table_field_key(
+            session,
+            key=key,
+            table_name=table_name,
+            field_name=field_name,
+            field_label=field_label,
+        )
+
+    def _require_borrow_status(self, session: Session, status_key: str) -> None:
+        category = self.config_service.category_for("borrow_requests", "status")
+        if self.config_service.exists(session, status_key, category):
+            return
+        raise ValueError(
+            f"Invalid borrow request status: '{status_key}'. Missing system setting "
+            f"({category}, {status_key})."
+        )
 
     def _get_workflow(self, session: Session) -> list[str]:
-        from systems.admin.services.configuration_service import ConfigurationService
-        settings = ConfigurationService().get_by_category(session, "borrow_status")
+        settings = self.config_service.get_by_category(
+            session,
+            self.config_service.category_for("borrow_requests", "status"),
+        )
         if not settings:
             return _DEFAULT_STATUSES
         return [s.key for s in sorted(settings, key=lambda s: int(s.value))]
@@ -50,6 +79,7 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         payload = {**data}
         is_emergency = bool(payload.get("is_emergency"))
         request_channel = str(payload.get("request_channel") or "inventory_manager")
+        payload["request_channel"] = request_channel
         compliance_notes = payload.get("compliance_followup_notes")
 
         if is_emergency:
@@ -108,6 +138,22 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         actor_user_id: str | None = None,
         actor_employee_id: str | None = None,
     ) -> None:
+        self._require_borrow_status(session, "sent_to_warehouse")
+        self._require_setting(
+            session,
+            key=approval_channel,
+            table_name="borrow_requests",
+            field_name="approval_channel",
+            field_label="borrow approval channel",
+        )
+        self._require_setting(
+            session,
+            key="sent_to_warehouse",
+            table_name="borrow_request_events",
+            field_name="event_type",
+            field_label="borrow request event type",
+        )
+
         db_request.status = "sent_to_warehouse"
         db_request.approval_channel = approval_channel
 
@@ -152,6 +198,14 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
 
         if db_request.status not in {"approved", "sent_to_warehouse", "warehouse_approved"}:
             raise ValueError("Units can only be assigned when request is approved, sent_to_warehouse, or warehouse_approved")
+
+        self._require_setting(
+            session,
+            key="units_assigned",
+            table_name="borrow_request_events",
+            field_name="event_type",
+            field_label="borrow request event type",
+        )
 
         item = self.inventory_service.get(session, db_request.item_id)
         if not item:
@@ -260,6 +314,21 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         transaction_ref = get_next_sequence(session, self.model, "transaction_ref", f"TXN-{year}")
         
         data = self._normalize_compliance_fields(schema.model_dump())
+        self._require_setting(
+            session,
+            key=str(data["request_channel"]),
+            table_name="borrow_requests",
+            field_name="request_channel",
+            field_label="borrow request channel",
+        )
+        self._require_borrow_status(session, "pending")
+        self._require_setting(
+            session,
+            key="created",
+            table_name="borrow_request_events",
+            field_name="event_type",
+            field_label="borrow request event type",
+        )
         data["transaction_ref"] = transaction_ref
         
         # Pull participants out of data before creating the BorrowRequest object
@@ -281,6 +350,13 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
                     user_id=p.get("user_id"),
                     name=p.get("name") or p.get("fullname"),
                     role_in_request=p.get("role") or "witness"
+                )
+                self._require_setting(
+                    session,
+                    key=participant.role_in_request,
+                    table_name="borrow_participants",
+                    field_name="role_in_request",
+                    field_label="borrow participant role",
                 )
                 session.add(participant)
         
@@ -337,6 +413,22 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
                 f"Insufficient stock for approval. Requested {db_request.qty_requested}, available {item.available_qty}, shortage {shortage}. Route to warehouse first."
             )
 
+        self._require_borrow_status(session, stage_1)
+        self._require_setting(
+            session,
+            key="standard",
+            table_name="borrow_requests",
+            field_name="approval_channel",
+            field_label="borrow approval channel",
+        )
+        self._require_setting(
+            session,
+            key="approved",
+            table_name="borrow_request_events",
+            field_name="event_type",
+            field_label="borrow request event type",
+        )
+
         db_request.status = stage_1
         db_request.approval_channel = "standard"
         db_request.approved_by = actor_id
@@ -344,6 +436,7 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
 
         if item.available_qty < db_request.qty_requested:
             shortage = db_request.qty_requested - item.available_qty
+            self._require_borrow_status(session, stage_2)
             db_request.status = stage_2
             warehouse_note = note or (
                 f"Auto-routed to warehouse due to shortage: requested={db_request.qty_requested}, available={item.available_qty}, shortage={shortage}"
@@ -399,6 +492,14 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         if not db_request or db_request.status != stage_0:
             raise ValueError(f"Request not found or not in '{stage_0}' status")
 
+        self._require_borrow_status(session, "rejected")
+        self._require_setting(
+            session,
+            key="rejected",
+            table_name="borrow_request_events",
+            field_name="event_type",
+            field_label="borrow request event type",
+        )
         db_request.status = "rejected"
 
         event = BorrowRequestEvent(
@@ -463,6 +564,13 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         now = get_now_manila()
 
         if not item.is_trackable:
+            self._require_setting(
+                session,
+                key="unit_assignment_skipped",
+                table_name="borrow_request_events",
+                field_name="event_type",
+                field_label="borrow request event type",
+            )
             skip_event = BorrowRequestEvent(
                 event_id=get_next_sequence(session, BorrowRequestEvent, "event_id", "BRE"),
                 borrow_id=db_request.borrow_id,
@@ -481,6 +589,7 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
             if unit.status != "available":
                 raise ValueError(f"Assigned unit {assignment.unit_id} is not available for release")
 
+            self.inventory_service._validate_status_transition(session, unit.status, "borrowed")
             unit.status = "borrowed"
             assignment.released_at = now
             assignment.released_by = actor_id
@@ -508,8 +617,23 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
             actor_employee_id=actor_employee_id,
         )
 
+        self._require_borrow_status(session, stage_released)
+        self._require_setting(
+            session,
+            key="released",
+            table_name="borrow_request_events",
+            field_name="event_type",
+            field_label="borrow request event type",
+        )
         db_request.status = stage_released
         if is_emergency_bypass:
+            self._require_setting(
+                session,
+                key="emergency_bypass",
+                table_name="borrow_requests",
+                field_name="approval_channel",
+                field_label="borrow approval channel",
+            )
             db_request.approval_channel = "emergency_bypass"
         db_request.released_by = actor_id
         db_request.released_at = now
@@ -582,9 +706,16 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
                 else:
                     status_on_return = "available"
 
-            self.inventory_service._validate_status_transition(unit.status, status_on_return)
+            self.inventory_service._validate_status_transition(session, unit.status, status_on_return)
             unit.status = status_on_return
             if return_data and return_data.condition is not None:
+                self._require_setting(
+                    session,
+                    key=return_data.condition,
+                    table_name="inventory_units",
+                    field_name="condition",
+                    field_label="inventory unit condition",
+                )
                 unit.condition = return_data.condition
 
             assignment.returned_at = get_now_manila()
@@ -609,6 +740,14 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         )
 
         now = get_now_manila()
+        self._require_borrow_status(session, stage_5)
+        self._require_setting(
+            session,
+            key="returned",
+            table_name="borrow_request_events",
+            field_name="event_type",
+            field_label="borrow request event type",
+        )
         db_request.status = stage_5
         db_request.returned_at = now
         
@@ -673,6 +812,14 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
                 "Cannot reopen request while another active request for the same borrower and item exists"
             )
 
+        self._require_borrow_status(session, pending_stage)
+        self._require_setting(
+            session,
+            key="reopened",
+            table_name="borrow_request_events",
+            field_name="event_type",
+            field_label="borrow request event type",
+        )
         db_request.status = pending_stage
 
         event = BorrowRequestEvent(
@@ -871,7 +1018,15 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
                     actor_employee_id=actor_employee_id,
                 )
 
-            db_request.approval_channel = "warehouse_provisioned" if provision_qty > 0 else "warehouse_standard"
+            next_channel = "warehouse_provisioned" if provision_qty > 0 else "warehouse_standard"
+            self._require_setting(
+                session,
+                key=next_channel,
+                table_name="borrow_requests",
+                field_name="approval_channel",
+                field_label="borrow approval channel",
+            )
+            db_request.approval_channel = next_channel
 
         # Capture inventory state after provisioning (for snapshot)
         session.flush()
@@ -922,6 +1077,14 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
             },
         )
         
+        self._require_borrow_status(session, "warehouse_approved")
+        self._require_setting(
+            session,
+            key="warehouse_approved",
+            table_name="borrow_request_events",
+            field_name="event_type",
+            field_label="borrow request event type",
+        )
         db_request.status = "warehouse_approved"
         
         # Log event
@@ -956,6 +1119,14 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         if not db_request or db_request.status != "sent_to_warehouse":
             raise ValueError("Request must be in 'sent_to_warehouse' status")
 
+        self._require_borrow_status(session, "warehouse_rejected")
+        self._require_setting(
+            session,
+            key="warehouse_rejected",
+            table_name="borrow_request_events",
+            field_name="event_type",
+            field_label="borrow request event type",
+        )
         db_request.status = "warehouse_rejected"
 
         event = BorrowRequestEvent(
