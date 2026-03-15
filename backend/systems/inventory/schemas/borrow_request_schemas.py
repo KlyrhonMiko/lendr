@@ -78,8 +78,17 @@ class BorrowRequestReject(BaseModel):
 class BorrowRequestRelease(BaseModel):
     notes: Optional[str] = Field(default=None, max_length=500)
 
+
+class BorrowRequestUnitReturn(BaseModel):
+    unit_id: str = Field(..., max_length=50)
+    condition: Optional[str] = Field(default=None, max_length=100)
+    notes: Optional[str] = Field(default=None, max_length=500)
+    status_on_return: Optional[str] = Field(default=None, max_length=50)
+
+
 class BorrowRequestReturn(BaseModel):
     notes: Optional[str] = Field(default=None, max_length=500)
+    unit_returns: list[BorrowRequestUnitReturn] = Field(default_factory=list)
 
 class BorrowRequestReopen(BaseModel):
     notes: Optional[str] = Field(default=None, max_length=500)
@@ -89,6 +98,44 @@ class BorrowRequestSendToWarehouse(BaseModel):
 
 class BorrowRequestWarehouseApprove(BaseModel):
     notes: Optional[str] = Field(default=None, max_length=500)
+
+
+class BorrowRequestUnitAssign(BaseModel):
+    unit_ids: list[str] = Field(min_length=1)
+    notes: Optional[str] = Field(default=None, max_length=500)
+
+
+class BorrowRequestUnitRead(BaseModel):
+    borrow_unit_id: str
+    borrow_id: str
+    unit_id: str
+
+    requested_at: datetime | None = None
+    approved_at: datetime | None = None
+    assigned_at: datetime | None = None
+    released_at: datetime | None = None
+    returned_at: datetime | None = None
+
+    requested_by_user_id: str | None = None
+    requested_by_employee_id: str | None = None
+    approved_by_user_id: str | None = None
+    approved_by_employee_id: str | None = None
+    assigned_by_user_id: str | None = None
+    assigned_by_employee_id: str | None = None
+    released_by_user_id: str | None = None
+    released_by_employee_id: str | None = None
+    returned_by_user_id: str | None = None
+    returned_by_employee_id: str | None = None
+
+    condition_on_return: str | None = None
+    return_notes: str | None = None
+
+    @field_serializer("requested_at", "approved_at", "assigned_at", "released_at", "returned_at")
+    def serialize_dates(self, dt: datetime | None) -> str | None:
+        return format_datetime(dt)
+
+    class Config:
+        from_attributes = True
 
 class BatchItem(BaseModel):
     item_id: str

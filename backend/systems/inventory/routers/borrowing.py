@@ -12,6 +12,8 @@ from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestApprove,
     BorrowRequestBatchCreate,
     BorrowRequestCreate,
+    BorrowRequestUnitAssign,
+    BorrowRequestUnitRead,
     BorrowRequestReject,
     BorrowRequestRead,
     BorrowRequestReopen,
@@ -147,6 +149,52 @@ async def release_request(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+
+@router.patch(
+    "/requests/{request_id}/assign-units",
+    response_model=GenericResponse[list[BorrowRequestUnitRead]],
+    responses={404: {"model": GenericResponse}, 400: {"model": GenericResponse}, 401: {"model": GenericResponse}},
+)
+async def assign_units_to_request(
+    request_id: str,
+    payload: BorrowRequestUnitAssign,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        assignments = borrow_service.assign_units(
+            session,
+            borrow_id=request_id,
+            unit_ids=payload.unit_ids,
+            actor_id=current_user.id,
+            note=payload.notes,
+            actor_user_id=current_user.user_id,
+            actor_employee_id=current_user.employee_id,
+        )
+        return create_success_response(data=assignments, message="Units assigned to request", request=request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get(
+    "/requests/{request_id}/units",
+    response_model=GenericResponse[list[BorrowRequestUnitRead]],
+    responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}},
+)
+async def get_assigned_units(
+    request_id: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    borrow_req = borrow_service.get(session, request_id)
+    if not borrow_req:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    units = borrow_service.get_assigned_units(session, request_id)
+    return create_success_response(data=units, request=request)
+
 @router.post("/requests/{request_id}/return", response_model=GenericResponse[BorrowRequestRead], responses={404: {"model": GenericResponse}, 400: {"model": GenericResponse}, 401: {"model": GenericResponse}})
 async def return_request(
     request_id: str, 
@@ -161,6 +209,7 @@ async def return_request(
             request_id,
             actor_id=current_user.id,
             note=payload.notes,
+            unit_returns=payload.unit_returns,
             actor_user_id=current_user.user_id,
             actor_employee_id=current_user.employee_id,
         )

@@ -9,12 +9,14 @@ from .inventory import InventoryItem
 from .inventory_unit import InventoryUnit
 from .inventory_movement import InventoryMovement
 from .borrow_participant import BorrowParticipant
+from .borrow_request_unit import BorrowRequestUnit
 
 __all__ = [
     "InventoryItem",
     "BorrowRequest",
     "BorrowRequestEvent",
     "BorrowParticipant",
+    "BorrowRequestUnit",
     "RequestedItem",
     "WarehouseApproval",
     "InventoryUnit",

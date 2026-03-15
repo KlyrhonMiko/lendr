@@ -2,11 +2,15 @@ from sqlmodel import Session, select
 from uuid import UUID
 
 from core.base_service import BaseService
+from systems.admin.models.user import User
 from systems.inventory.models.borrow_request import BorrowRequest
 from systems.inventory.models.borrow_request_event import BorrowRequestEvent
+from systems.inventory.models.borrow_request_unit import BorrowRequestUnit
+from systems.inventory.models.inventory import InventoryItem
 from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestBatchCreate,
     BorrowRequestCreate,
+    BorrowRequestUnitReturn,
     BorrowRequestUpdate,
 )
 from systems.inventory.models.borrow_participant import BorrowParticipant
@@ -59,6 +63,143 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
             payload["compliance_followup_notes"] = "Compliance follow-up required."
 
         return payload
+
+    def _get_user_by_uuid(self, session: Session, user_id: UUID | None) -> User | None:
+        if user_id is None:
+            return None
+        return session.exec(select(User).where(User.id == user_id, User.is_deleted.is_(False))).first()
+
+    def _get_borrow_assignments(self, session: Session, borrow_id: str) -> list[BorrowRequestUnit]:
+        return list(
+            session.exec(
+                select(BorrowRequestUnit)
+                .where(
+                    BorrowRequestUnit.borrow_id == borrow_id,
+                    BorrowRequestUnit.is_deleted.is_(False),
+                )
+                .order_by(BorrowRequestUnit.created_at.asc())
+            ).all()
+        )
+
+    def _validate_trackable_assignment_prerequisites(
+        self,
+        session: Session,
+        db_request: BorrowRequest,
+        item: InventoryItem,
+    ) -> list[BorrowRequestUnit]:
+        if not item.is_trackable:
+            return []
+
+        assignments = self._get_borrow_assignments(session, db_request.borrow_id)
+        if len(assignments) != db_request.qty_requested:
+            raise ValueError(
+                f"Trackable item '{item.item_id}' requires exactly {db_request.qty_requested} assigned units before release"
+            )
+
+        return assignments
+
+    def get_assigned_units(self, session: Session, borrow_id: str) -> list[BorrowRequestUnit]:
+        return self._get_borrow_assignments(session, borrow_id)
+
+    def assign_units(
+        self,
+        session: Session,
+        borrow_id: str,
+        unit_ids: list[str],
+        actor_id: UUID,
+        note: str | None = None,
+        actor_user_id: str | None = None,
+        actor_employee_id: str | None = None,
+    ) -> list[BorrowRequestUnit]:
+        db_request = self.get(session, borrow_id)
+        if not db_request:
+            raise ValueError("Request not found")
+
+        if db_request.status not in {"approved", "sent_to_warehouse", "warehouse_approved"}:
+            raise ValueError("Units can only be assigned when request is approved, sent_to_warehouse, or warehouse_approved")
+
+        item = self.inventory_service.get(session, db_request.item_id)
+        if not item:
+            raise ValueError(f"Item {db_request.item_id} not found")
+        if not item.is_trackable:
+            raise ValueError("Unit assignment is only applicable to trackable items")
+
+        normalized_unit_ids = [unit_id.strip() for unit_id in unit_ids if unit_id and unit_id.strip()]
+        if len(normalized_unit_ids) != len(unit_ids):
+            raise ValueError("unit_ids must not contain empty values")
+        if len(set(normalized_unit_ids)) != len(normalized_unit_ids):
+            raise ValueError("unit_ids must be unique")
+        if len(normalized_unit_ids) != db_request.qty_requested:
+            raise ValueError(
+                f"Expected {db_request.qty_requested} units for request {borrow_id}, got {len(normalized_unit_ids)}"
+            )
+
+        existing_assignments = self._get_borrow_assignments(session, borrow_id)
+        if existing_assignments:
+            raise ValueError("Units are already assigned for this request")
+
+        borrower = self.user_service.get(session, db_request.borrower_id)
+        approver = self._get_user_by_uuid(session, db_request.approved_by)
+        now = get_now_manila()
+        created_assignments: list[BorrowRequestUnit] = []
+
+        for unit_id in normalized_unit_ids:
+            unit = self.inventory_service.get_unit(session, unit_id)
+            if not unit or unit.inventory_id != db_request.item_id:
+                raise ValueError(f"Unit {unit_id} does not belong to item {db_request.item_id}")
+            if unit.status != "available":
+                raise ValueError(f"Unit {unit_id} is not available for assignment")
+
+            assignment = BorrowRequestUnit(
+                borrow_unit_id=get_next_sequence(session, BorrowRequestUnit, "borrow_unit_id", "BRU"),
+                borrow_id=db_request.borrow_id,
+                unit_id=unit.unit_id,
+                requested_at=db_request.request_date,
+                approved_at=db_request.approved_at,
+                assigned_at=now,
+                requested_by=borrower.id if borrower else None,
+                requested_by_user_id=borrower.user_id if borrower else db_request.borrower_id,
+                requested_by_employee_id=borrower.employee_id if borrower else None,
+                approved_by=db_request.approved_by,
+                approved_by_user_id=approver.user_id if approver else None,
+                approved_by_employee_id=approver.employee_id if approver else None,
+                assigned_by=actor_id,
+                assigned_by_user_id=actor_user_id,
+                assigned_by_employee_id=actor_employee_id,
+            )
+            session.add(assignment)
+            created_assignments.append(assignment)
+
+        event = BorrowRequestEvent(
+            event_id=get_next_sequence(session, BorrowRequestEvent, "event_id", "BRE"),
+            borrow_id=db_request.borrow_id,
+            event_type="units_assigned",
+            actor_id=actor_id,
+            actor_employee_id=actor_employee_id,
+            note=note,
+        )
+        session.add(event)
+
+        audit_service.log_action(
+            db=session,
+            entity_type="borrow",
+            entity_id=db_request.borrow_id,
+            action="assign_units",
+            after={
+                "borrow_id": db_request.borrow_id,
+                "unit_ids": normalized_unit_ids,
+                "assigned_by_user_id": actor_user_id,
+                "assigned_by_employee_id": actor_employee_id,
+            },
+            actor_id=actor_id,
+            actor_user_id=actor_user_id,
+            actor_employee_id=actor_employee_id,
+        )
+
+        session.commit()
+        for assignment in created_assignments:
+            session.refresh(assignment)
+        return created_assignments
 
     def create_request(self, session: Session, schema: BorrowRequestCreate, actor_id: UUID | None = None, actor_user_id: str | None = None, actor_employee_id: str | None = None) -> BorrowRequest:
         borrower = self.user_service.get(session, schema.borrower_id)
@@ -237,6 +378,35 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         if not db_request or db_request.status != stage_3:
             raise ValueError(f"Request not found or not in '{stage_3}' status")
 
+        item = self.inventory_service.get(session, db_request.item_id)
+        if not item:
+            raise ValueError(f"Item {db_request.item_id} not found")
+
+        now = get_now_manila()
+        assignments = self._validate_trackable_assignment_prerequisites(session, db_request, item)
+        for assignment in assignments:
+            unit = self.inventory_service.get_unit(session, assignment.unit_id)
+            if not unit:
+                raise ValueError(f"Assigned unit {assignment.unit_id} not found")
+            if unit.status != "available":
+                raise ValueError(f"Assigned unit {assignment.unit_id} is not available for release")
+
+            unit.status = "borrowed"
+            assignment.released_at = now
+            assignment.released_by = actor_id
+            assignment.released_by_user_id = actor_user_id
+            assignment.released_by_employee_id = actor_employee_id
+
+            if assignment.approved_by is None:
+                approver = self._get_user_by_uuid(session, db_request.approved_by)
+                assignment.approved_by = db_request.approved_by
+                assignment.approved_at = db_request.approved_at
+                assignment.approved_by_user_id = approver.user_id if approver else None
+                assignment.approved_by_employee_id = approver.employee_id if approver else None
+
+            session.add(unit)
+            session.add(assignment)
+
         self.inventory_service.adjust_stock(
             session,
             db_request.item_id,
@@ -250,7 +420,7 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
 
         db_request.status = stage_2
         db_request.released_by = actor_id
-        db_request.released_at = get_now_manila()
+        db_request.released_at = now
 
         # Log event
         event = BorrowRequestEvent(
@@ -285,6 +455,7 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         borrow_id: str,
         actor_id: UUID,
         note: str | None = None,
+        unit_returns: list[BorrowRequestUnitReturn] | None = None,
         actor_user_id: str | None = None,
         actor_employee_id: str | None = None,
     ) -> BorrowRequest:
@@ -293,6 +464,46 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         db_request = self.get(session, borrow_id)
         if not db_request or db_request.status != stage_4:
             raise ValueError(f"Request not found or not in '{stage_4}' status")
+
+        item = self.inventory_service.get(session, db_request.item_id)
+        if not item:
+            raise ValueError(f"Item {db_request.item_id} not found")
+
+        unit_return_map = {
+            unit_return.unit_id: unit_return
+            for unit_return in (unit_returns or [])
+        }
+
+        assignments = self._validate_trackable_assignment_prerequisites(session, db_request, item)
+        for assignment in assignments:
+            unit = self.inventory_service.get_unit(session, assignment.unit_id)
+            if not unit:
+                raise ValueError(f"Assigned unit {assignment.unit_id} not found")
+            if unit.status != "borrowed":
+                raise ValueError(f"Assigned unit {assignment.unit_id} is not marked as borrowed")
+
+            return_data = unit_return_map.get(assignment.unit_id)
+            status_on_return = return_data.status_on_return if return_data else None
+            if status_on_return is None:
+                if return_data and return_data.condition and return_data.condition.lower() in {"damaged", "for_repair", "repair"}:
+                    status_on_return = "maintenance"
+                else:
+                    status_on_return = "available"
+
+            self.inventory_service._validate_status_transition(unit.status, status_on_return)
+            unit.status = status_on_return
+            if return_data and return_data.condition is not None:
+                unit.condition = return_data.condition
+
+            assignment.returned_at = get_now_manila()
+            assignment.returned_by = actor_id
+            assignment.returned_by_user_id = actor_user_id
+            assignment.returned_by_employee_id = actor_employee_id
+            assignment.condition_on_return = return_data.condition if return_data else None
+            assignment.return_notes = return_data.notes if return_data else None
+
+            session.add(unit)
+            session.add(assignment)
 
         self.inventory_service.adjust_stock(
             session,

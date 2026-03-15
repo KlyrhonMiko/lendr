@@ -1,6 +1,11 @@
 from datetime import datetime
 from sqlmodel import Field
 from core.base_model import BaseModel
+from typing import TYPE_CHECKING
+from sqlmodel import Relationship
+
+if TYPE_CHECKING:
+    from .borrow_request_unit import BorrowRequestUnit
 
 class InventoryUnit(BaseModel, table=True):
     __tablename__ = "inventory_units"
@@ -18,3 +23,5 @@ class InventoryUnit(BaseModel, table=True):
     expiration_date: datetime | None = Field(default=None, index=True, nullable=True)
     
     condition: str | None = Field(default=None, max_length=100)
+
+    borrow_assignments: list["BorrowRequestUnit"] = Relationship(back_populates="inventory_unit")

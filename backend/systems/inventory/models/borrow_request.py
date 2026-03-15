@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .borrow_request_event import BorrowRequestEvent
     from .borrow_participant import BorrowParticipant
+    from .borrow_request_unit import BorrowRequestUnit
 
 from core.base_model import BaseModel
 from utils.time_utils import get_now_manila
@@ -48,6 +49,7 @@ class BorrowRequest(BaseModel, table=True):
 
     events: list["BorrowRequestEvent"] = Relationship(back_populates="borrow_request")
     participants: list["BorrowParticipant"] = Relationship(back_populates="borrow_request")
+    assigned_units: list["BorrowRequestUnit"] = Relationship(back_populates="borrow_request")
 
     __table_args__ = (
         Index(
