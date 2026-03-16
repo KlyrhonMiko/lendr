@@ -21,7 +21,9 @@ def get_current_user(
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         user_id = payload.get("sub")
-        if not user_id:
+        session_id = payload.get("session_id")
+        
+        if not user_id or not session_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Could not validate credentials",
@@ -35,7 +37,23 @@ def get_current_user(
     user = user_service.get(session, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    from systems.auth.services.auth_service import auth_service
+    
+    is_valid = False
+    if user.role == "borrower":
+        is_valid = auth_service.is_borrower_session_valid(session, session_id)
+    else:
+        is_valid = auth_service.is_user_session_valid(session, session_id)
+
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session has expired or been revoked. Please log in again.",
+        )
+
     return user
+
 
 
 def require_system_access(system: str):

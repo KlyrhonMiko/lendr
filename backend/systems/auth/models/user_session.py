@@ -1,0 +1,14 @@
+from datetime import datetime
+from uuid import UUID
+from sqlmodel import Field
+from core.base_model import BaseModel
+from utils.time_utils import get_now_manila
+
+class UserSession(BaseModel, table=True):
+    __tablename__ = "user_sessions"
+
+    session_id: str = Field(unique=True, index=True, max_length=50)
+    user_uuid: UUID | None = Field(default=None, foreign_key="users.id", index=True)
+    issued_at: datetime = Field(default_factory=get_now_manila)
+    expires_at: datetime
+    is_revoked: bool = Field(default=False)

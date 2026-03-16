@@ -1,4 +1,7 @@
+from systems.auth.dependencies import reusable_oauth2
 from datetime import timedelta
+
+from jose import jwt
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -32,8 +35,16 @@ async def login_for_access_token(
         )
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+
+    db_session = auth_service.create_user_session(
+            session=session,
+            user_uuid=user.id,
+            expires_delta=access_token_expires
+        )
+
     access_token = auth_service.create_access_token(
-        data={"sub": user.user_id}, expires_delta=access_token_expires
+        data={"sub": user.user_id, "session_id": db_session.session_id}, 
+        expires_delta=access_token_expires
     )
 
     return Token(access_token=access_token, token_type="bearer")
@@ -52,15 +63,17 @@ async def borrower_login(
         )
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = auth_service.create_access_token(
-        data={"sub": user.user_id}, expires_delta=access_token_expires
-    )
 
-    auth_service.create_borrower_session(
+    db_session = auth_service.create_borrower_session(
         session=session,
         user_id=user.user_id,
         expires_delta=access_token_expires,
         user_uuid=user.id,
+    )
+
+    access_token = auth_service.create_access_token(
+        data={"sub": user.user_id, "session_id": db_session.session_id}, 
+        expires_delta=access_token_expires
     )
 
     return Token(access_token=access_token, token_type="bearer")
@@ -93,3 +106,30 @@ async def get_my_policy(
         permissions=[str(value) for value in policy.get("permissions", [])],
     )
     return create_success_response(data=data, request=request)
+
+
+@router.post("/logout", response_model=GenericResponse)
+async def logout(
+    request: Request,
+    session: Session = Depends(get_session),
+    token: str = Depends(reusable_oauth2)
+):
+    try:
+        # Decode token to get session_id and user role
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        session_id = payload.get("session_id")
+        user_id = payload.get("sub")
+        
+        user = auth_service.user_service.get(session, user_id)
+        if user and session_id:
+            if user.role == "borrower":
+                auth_service.revoke_borrower_session(session, session_id)
+            else:
+                auth_service.revoke_user_session(session, session_id)
+                
+        return create_success_response(
+            message="Successfully logged out",
+            request=request
+        )
+    except jwt.JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
