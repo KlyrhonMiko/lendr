@@ -17,6 +17,47 @@ config_service = ConfigurationService()
 
 
 @router.get(
+    "",
+    response_model=GenericResponse[list[SystemSettingRead]],
+    responses={401: {"model": GenericResponse}},
+)
+async def list_settings(
+    request: Request,
+    skip: int = 0,
+    limit: int = 100,
+    key: str | None = None,
+    category: str | None = None,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("config:view")),
+):
+    settings, total = config_service.get_all(
+        session, skip=skip, limit=limit, key=key, category=category
+    )
+    return create_success_response(
+        data=settings,
+        meta=PaginationMeta(total=total, limit=limit, offset=skip),
+        request=request,
+    )
+
+
+
+@router.get(
+    "/categories",
+    response_model=GenericResponse[list[str]],
+    responses={401: {"model": GenericResponse}},
+)
+async def list_categories(
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("config:view")),
+):
+    categories = config_service.get_categories(session)
+    return create_success_response(data=categories, request=request)
+
+
+@router.get(
     "/tables",
     response_model=GenericResponse[list[str]],
     responses={401: {"model": GenericResponse}},
@@ -46,27 +87,6 @@ async def list_configurable_columns(
         return create_success_response(data=columns, request=request)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.get(
-    "",
-    response_model=GenericResponse[list[SystemSettingRead]],
-    responses={401: {"model": GenericResponse}},
-)
-async def list_settings(
-    request: Request,
-    skip: int = 0,
-    limit: int = 100,
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permission("config:view")),
-):
-    settings, total = config_service.get_all(session, skip=skip, limit=limit)
-    return create_success_response(
-        data=settings,
-        meta=PaginationMeta(total=total, limit=limit, offset=skip),
-        request=request,
-    )
 
 
 @router.post(
@@ -152,5 +172,63 @@ async def update_setting(
     return create_success_response(
         message=f"Setting '{key}' updated successfully",
         data=config_service.get_by_key(session, key, category=category),
+        request=request,
+    )
+
+
+@router.delete(
+    "/{key}",
+    response_model=GenericResponse[SystemSettingRead],
+    responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}},
+)
+async def delete_setting(
+    key: str,
+    request: Request,
+    category: str = "general",
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("config:manage")),
+):
+    setting = config_service.get_by_key(session, key, category=category)
+    if not setting:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Setting '{key}' not found in category '{category}'",
+        )
+
+    config_service.delete(session, setting)
+
+    return create_success_response(
+        message=f"Setting '{key}' deleted successfully",
+        data=setting,
+        request=request,
+    )
+
+
+@router.post(
+    "/{key}/restore",
+    response_model=GenericResponse[SystemSettingRead],
+    responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}},
+)
+async def restore_setting(
+    key: str,
+    request: Request,
+    category: str = "general",
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("config:manage")),
+):
+    setting = config_service.get_by_key(session, key, category=category, include_deleted=True)
+    if not setting:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Setting '{key}' not found in category '{category}'",
+        )
+
+    config_service.restore(session, setting)
+
+    return create_success_response(
+        message=f"Setting '{key}' restored successfully",
+        data=setting,
         request=request,
     )

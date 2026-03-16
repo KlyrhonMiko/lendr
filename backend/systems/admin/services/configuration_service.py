@@ -10,6 +10,42 @@ class ConfigurationService(BaseService[SystemSetting, None, None]):
     def __init__(self):
         super().__init__(SystemSetting)
 
+    def get_all(
+        self,
+        session: Session,
+        skip: int = 0,
+        limit: int = 100,
+        key: str | None = None,
+        category: str | None = None,
+    ) -> tuple[list[SystemSetting], int]:
+        """Get settings with optional filtering and pagination."""
+        from sqlmodel import func
+
+        statement = select(SystemSetting).where(SystemSetting.is_deleted.is_(False))
+
+        if key:
+            statement = statement.where(SystemSetting.key.ilike(f"%{key}%"))
+        if category:
+            statement = statement.where(SystemSetting.category == category)
+
+        # Count before pagination
+        total_statement = select(func.count()).select_from(statement.subquery())
+        total = session.exec(total_statement).one()
+
+        # Apply pagination
+        statement = statement.offset(skip).limit(limit)
+        results = list(session.exec(statement).all())
+
+        return results, total
+
+    def get_categories(self, session: Session) -> list[str]:
+        """Get all unique categories currently in use."""
+        statement = select(SystemSetting.category).where(
+            SystemSetting.is_deleted.is_(False)
+        ).distinct()
+        return sorted(list(session.exec(statement).all()))
+
+
     def get_by_key(
         self,
         session: Session,
