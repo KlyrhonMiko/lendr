@@ -2,13 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlmodel import Session
 
 from core.database import get_session
-from core.schemas import GenericResponse, PaginationMeta, create_success_response
-from systems.admin.models.user import User
-from systems.admin.schemas.configuration_schemas import (
-    SystemSettingCreate,
-    SystemSettingRead,
-    SystemSettingUpdate,
+from core.schemas import (
+    ConfigCreate,
+    ConfigRead,
+    ConfigUpdate,
+    GenericResponse,
+    PaginationMeta,
+    create_success_response,
 )
+from systems.admin.models.user import User
 from systems.admin.services.configuration_service import ConfigurationService
 from systems.auth.dependencies import get_current_user, require_permission
 
@@ -18,7 +20,7 @@ config_service = ConfigurationService()
 
 @router.get(
     "",
-    response_model=GenericResponse[list[SystemSettingRead]],
+    response_model=GenericResponse[list[ConfigRead]],
     responses={401: {"model": GenericResponse}},
 )
 async def list_settings(
@@ -91,12 +93,12 @@ async def list_configurable_columns(
 
 @router.post(
     "",
-    response_model=GenericResponse[SystemSettingRead],
+    response_model=GenericResponse[ConfigRead],
     status_code=201,
     responses={400: {"model": GenericResponse}, 401: {"model": GenericResponse}},
 )
 async def create_setting(
-    setting_data: SystemSettingCreate,
+    setting_data: ConfigCreate,
     request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
@@ -133,12 +135,12 @@ async def create_setting(
 
 @router.patch(
     "/{key}",
-    response_model=GenericResponse[SystemSettingRead],
+    response_model=GenericResponse[ConfigRead],
     responses={404: {"model": GenericResponse}, 400: {"model": GenericResponse}, 401: {"model": GenericResponse}},
 )
 async def update_setting(
     key: str,
-    setting_data: SystemSettingUpdate,
+    setting_data: ConfigUpdate,
     request: Request,
     category: str = "general",
     session: Session = Depends(get_session),
@@ -178,7 +180,7 @@ async def update_setting(
 
 @router.delete(
     "/{key}",
-    response_model=GenericResponse[SystemSettingRead],
+    response_model=GenericResponse[ConfigRead],
     responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}},
 )
 async def delete_setting(
@@ -207,7 +209,7 @@ async def delete_setting(
 
 @router.post(
     "/{key}/restore",
-    response_model=GenericResponse[SystemSettingRead],
+    response_model=GenericResponse[ConfigRead],
     responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}},
 )
 async def restore_setting(

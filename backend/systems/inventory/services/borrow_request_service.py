@@ -13,7 +13,6 @@ from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestBatchCreate,
     BorrowRequestCreate,
     BorrowRequestEventRead,
-    BorrowRequestItemRead,
     BorrowRequestRead,
     BorrowRequestUnitReturn,
     BorrowRequestUpdate,
@@ -21,7 +20,10 @@ from systems.inventory.schemas.borrow_request_schemas import (
 from systems.inventory.models.borrow_participant import BorrowParticipant
 from systems.inventory.models.warehouse_approval import WarehouseApproval
 from systems.inventory.services.inventory_service import InventoryService
-from systems.admin.services.configuration_service import ConfigurationService
+from systems.inventory.services.configuration_service import (
+    BorrowerConfigService,
+    InventoryConfigService,
+)
 from systems.admin.services.user_service import UserService
 from systems.inventory.services.audit_service import audit_service
 from utils.id_generator import get_next_sequence
@@ -34,7 +36,8 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         super().__init__(BorrowRequest, lookup_field="borrow_id")
         self.inventory_service = InventoryService()
         self.user_service = UserService()
-        self.config_service = ConfigurationService()
+        self.config_service = BorrowerConfigService()
+        self.inventory_config_service = InventoryConfigService()
 
     def _require_setting(
         self,
@@ -464,7 +467,7 @@ class BorrowService(BaseService[BorrowRequest, BorrowRequestCreate, BorrowReques
         ).first()
         
         if active_request:
-            raise ValueError(f"Borrower already has an active request")
+            raise ValueError("Borrower already has an active request")
 
         # Generate custom transaction_ref
         year = get_now_manila().year

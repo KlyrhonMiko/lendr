@@ -2,4 +2,6 @@
 
 from .borrower_session import BorrowerSession
 from .user_session import UserSession
-__all__ = ["BorrowerSession", "UserSession"]
+from .settings import AuthConfig
+
+__all__ = ["BorrowerSession", "UserSession", "AuthConfig"]

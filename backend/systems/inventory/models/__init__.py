@@ -11,6 +11,7 @@ from .inventory_unit import InventoryUnit
 from .inventory_movement import InventoryMovement
 from .borrow_participant import BorrowParticipant
 from .borrow_request_unit import BorrowRequestUnit
+from .settings import InventoryConfig, BorrowerConfig 
 
 __all__ = [
     "InventoryItem",
@@ -24,4 +25,6 @@ __all__ = [
     "InventoryUnit",
     "InventoryMovement",
     "AuditLog",
+    "InventoryConfig",
+    "BorrowerConfig",
 ]

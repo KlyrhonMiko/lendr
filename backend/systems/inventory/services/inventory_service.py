@@ -4,7 +4,7 @@ from typing import Any, cast
 from uuid import UUID
 from systems.admin.models.user import User
 from sqlmodel import Session, select
-from systems.admin.services.configuration_service import ConfigurationService
+from systems.inventory.services.configuration_service import InventoryConfigService
 
 from core.base_service import BaseService
 from systems.inventory.models.inventory import InventoryItem
@@ -47,7 +47,7 @@ ALLOWED_STATUS_TRANSITIONS = {
 class InventoryService(BaseService[InventoryItem, InventoryItemCreate, InventoryItemUpdate]):
     def __init__(self):
         super().__init__(InventoryItem, lookup_field="item_id")
-        self.config_service = ConfigurationService()
+        self.config_service = InventoryConfigService()
 
     def _require_config_key(
         self,
@@ -209,10 +209,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
 
 
     def get_item_status(self, session: Session, item: InventoryItem) -> str:
-        from systems.admin.services.configuration_service import (
-            ConfigurationService,
-        )
-        config_service = ConfigurationService()
+        config_service = InventoryConfigService()
 
         status_settings = config_service.get_by_category(
             session,

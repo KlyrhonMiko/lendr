@@ -13,3 +13,9 @@ class BaseModel(SQLModel):
     updated_at: datetime = Field(default_factory=get_now_manila, nullable=False)
     is_deleted: bool = Field(default=False, nullable=False)
     deleted_at: datetime | None = Field(default=None, nullable=True)
+
+class ConfigurationBase(BaseModel):
+    key: str = Field(index=True, max_length=100)
+    value: str = Field(max_length=255)
+    category: str = Field(default="general", max_length=50)
+    description: str | None = Field(default=None, max_length=500)
