@@ -11,7 +11,6 @@ from systems.admin.models.user import User
 from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestApprove,
     BorrowRequestAutoRouteWarehouse,
-    BorrowRequestBatchCreate,
     BorrowRequestCreate,
     BorrowRequestUnitAssign,
     BorrowRequestUnitRead,
@@ -45,19 +44,13 @@ async def create_request(
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_permission("inventory:borrow_requests:manage")),
 ):
-    # Set borrower_id to current_user if not provided
-    payload = request_data.model_dump()
-    if not payload.get("borrower_id"):
-        payload["borrower_id"] = current_user.user_id
-    request_schema = BorrowRequestCreate(**payload)
-
     try:
         borrow_req = borrow_service.create_request(
             session,
-            request_schema,
+            request_data,
+            borrower_id=current_user.user_id,
+            request_channel="inventory_manager",
             actor_id=current_user.id,
-            actor_user_id=current_user.user_id,
-            actor_employee_id=current_user.employee_id,
         )
         return create_success_response(
             data=borrow_service.serialize_borrow_request(session, borrow_req),
@@ -68,40 +61,9 @@ async def create_request(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post(
-    "/batch",
-    response_model=GenericResponse[List[BorrowRequestRead]],
-    status_code=201,
-    responses={400: {"model": GenericResponse}, 401: {"model": GenericResponse}},
-)
-async def create_batch_requests(
-    request_data: BorrowRequestBatchCreate,
-    request: Request,
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permission("inventory:borrow_requests:manage")),
-):
-    try:
-        borrow_reqs = borrow_service.create_batch_requests(
-            session,
-            request_data,
-            actor_id=current_user.id,
-            actor_user_id=current_user.user_id,
-            actor_employee_id=current_user.employee_id,
-        )
-        serialized = borrow_service.serialize_borrow_requests(session, borrow_reqs)
-        return create_success_response(
-            data=serialized,
-            message=f"{len(serialized)} borrow requests created",
-            request=request,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
 @router.get(
     "/requests",
-    response_model=GenericResponse[List[BorrowRequestRead]],
+    response_model=GenericResponse[list[BorrowRequestRead]],
     responses={401: {"model": GenericResponse}},
 )
 async def list_requests(
@@ -146,8 +108,6 @@ async def approve_request(
             current_user.id,
             note=payload.notes,
             auto_route_shortage=payload.auto_route_shortage,
-            actor_user_id=current_user.user_id,
-            actor_employee_id=current_user.employee_id,
         )
         return create_success_response(
             data=borrow_service.serialize_borrow_request(session, updated_req),
@@ -182,8 +142,6 @@ async def reject_request(
             request_id,
             current_user.id,
             note=payload.notes,
-            actor_user_id=current_user.user_id,
-            actor_employee_id=current_user.employee_id,
         )
         return create_success_response(
             data=borrow_service.serialize_borrow_request(session, updated_req),
@@ -218,8 +176,6 @@ async def release_request(
             request_id,
             current_user.id,
             note=payload.notes,
-            actor_user_id=current_user.user_id,
-            actor_employee_id=current_user.employee_id,
         )
         return create_success_response(
             data=borrow_service.serialize_borrow_request(session, updated_req),
@@ -232,7 +188,7 @@ async def release_request(
 
 @router.patch(
     "/requests/{request_id}/assign-units",
-    response_model=GenericResponse[List[BorrowRequestUnitRead]],
+    response_model=GenericResponse[list[BorrowRequestUnitRead]],
     responses={
         404: {"model": GenericResponse},
         400: {"model": GenericResponse},
@@ -251,12 +207,11 @@ async def assign_units_to_request(
     try:
         assignments = borrow_service.assign_units(
             session,
-            borrow_id=request_id,
+            request_id=request_id,
             unit_ids=payload.unit_ids,
             actor_id=current_user.id,
+            item_id=payload.item_id,
             note=payload.notes,
-            actor_user_id=current_user.user_id,
-            actor_employee_id=current_user.employee_id,
         )
         return create_success_response(
             data=assignments, message="Units assigned to request", request=request
@@ -267,7 +222,7 @@ async def assign_units_to_request(
 
 @router.get(
     "/requests/{request_id}/units",
-    response_model=GenericResponse[List[BorrowRequestUnitRead]],
+    response_model=GenericResponse[list[BorrowRequestUnitRead]],
     responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}},
 )
 async def get_assigned_units(
@@ -310,8 +265,6 @@ async def return_request(
             actor_id=current_user.id,
             note=payload.notes,
             unit_returns=payload.unit_returns,
-            actor_user_id=current_user.user_id,
-            actor_employee_id=current_user.employee_id,
         )
         return create_success_response(
             data=borrow_service.serialize_borrow_request(session, updated_req),
@@ -346,8 +299,6 @@ async def reopen_request(
             request_id,
             actor_id=current_user.id,
             note=payload.notes,
-            actor_user_id=current_user.user_id,
-            actor_employee_id=current_user.employee_id,
         )
         return create_success_response(
             data=borrow_service.serialize_borrow_request(session, updated_req),
@@ -382,7 +333,7 @@ async def get_request(
 
 @router.get(
     "/requests/{request_id}/events",
-    response_model=GenericResponse[List[BorrowRequestEventRead]],
+    response_model=GenericResponse[list[BorrowRequestEventRead]],
     responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}},
 )
 async def get_request_events(
@@ -419,8 +370,6 @@ async def send_to_warehouse(
             request_id,
             current_user.id,
             note=payload.notes,
-            actor_user_id=current_user.user_id,
-            actor_employee_id=current_user.employee_id,
         )
         return create_success_response(
             data=borrow_service.serialize_borrow_request(session, updated_req),
@@ -450,8 +399,6 @@ async def auto_route_warehouse(
             request_id,
             current_user.id,
             note=payload.notes,
-            actor_user_id=current_user.user_id,
-            actor_employee_id=current_user.employee_id,
         )
         return create_success_response(
             data=borrow_service.serialize_borrow_request(session, updated_req),
@@ -481,8 +428,6 @@ async def warehouse_approve(
             request_id,
             current_user.id,
             remarks=payload.notes,
-            actor_user_id=current_user.user_id,
-            actor_employee_id=current_user.employee_id,
         )
         return create_success_response(
             data=approval, message="Warehouse approved", request=request
@@ -507,13 +452,12 @@ async def warehouse_approve_with_provision(
     try:
         approval = borrow_service.warehouse_approve_with_provision(
             session=session,
-            borrow_id=request_id,
+            request_id=request_id,
             actor_id=current_user.id,
             remarks=payload.notes,
             provision_qty=payload.provision_qty,
             units_data=[unit.model_dump() for unit in payload.units],
-            actor_user_id=current_user.user_id,
-            actor_employee_id=current_user.employee_id,
+            item_id=payload.item_id,
         )
         return create_success_response(
             data=approval,
@@ -543,8 +487,6 @@ async def warehouse_reject(
             request_id,
             current_user.id,
             remarks,
-            actor_user_id=current_user.user_id,
-            actor_employee_id=current_user.employee_id,
         )
         return create_success_response(
             data=borrow_service.serialize_borrow_request(session, updated_req),

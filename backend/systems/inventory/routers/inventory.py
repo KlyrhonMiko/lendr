@@ -25,6 +25,7 @@ from systems.inventory.schemas.inventory_movement_schemas import (
     InventoryMovementReversalRead,
     InventoryMovementReversalRequest,
     InventoryMovementSummaryRead,
+    InventoryMovementAdjust,
 )
 from systems.inventory.services.inventory_service import InventoryService
 from systems.inventory.dependencies import shift_guard
@@ -49,7 +50,11 @@ async def create_item(
     _: User = Depends(shift_guard),
     __: None = Depends(require_permission("inventory:items:manage")),
 ):
-    item = inventory_service.create(session, item_data)
+    item = inventory_service.create(
+        session, 
+        item_data,
+        actor_id=current_user.id,
+    )
     item_read = InventoryItemRead.model_validate(item)
     item_read.status_condition = inventory_service.get_item_status(session, item)
 
@@ -60,7 +65,7 @@ async def create_item(
 
 @router.get(
     "",
-    response_model=GenericResponse[List[InventoryItemRead]],
+    response_model=GenericResponse[list[InventoryItemRead]],
     responses={401: {"model": GenericResponse}},
 )
 async def list_items(
@@ -123,7 +128,12 @@ async def update_item(
     item = inventory_service.get(session, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
-    updated_item = inventory_service.update(session, item, item_data)
+    updated_item = inventory_service.update(
+        session, 
+        item, 
+        item_data,
+        actor_id=current_user.id,
+    )
     item_read = InventoryItemRead.model_validate(updated_item)
     item_read.status_condition = inventory_service.get_item_status(
         session, updated_item
@@ -139,10 +149,8 @@ async def update_item(
 )
 async def adjust_stock(
     item_id: str,
-    qty_change: int,
+    payload: InventoryMovementAdjust,
     request: Request,
-    reason_code: str = Query(..., min_length=1, max_length=50),
-    note: str = Query(..., min_length=10, max_length=500),
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: User = Depends(shift_guard),
@@ -152,27 +160,31 @@ async def adjust_stock(
     Transactional stock adjustment.
     Use this for procurement, damage, or manual corrections.
     """
-    item = inventory_service.adjust_stock(
-        session,
-        item_id,
-        qty_change,
-        reason_code=reason_code,
-        note=note,
-        actor_id=current_user.id,
-        actor_user_id=current_user.user_id,
-        actor_employee_id=current_user.employee_id,
-    )
-    session.commit()
-    session.refresh(item)
+    try:
+        item = inventory_service.adjust_stock(
+            session,
+            item_id,
+            qty_change=payload.qty_change,
+            movement_type=payload.movement_type,
+            reason_code=payload.reason_code,
+            reference_id=payload.reference_id,
+            note=payload.note,
+            actor_id=current_user.id,
+        )
+        session.commit()
+        session.refresh(item)
 
-    item_read = InventoryItemRead.model_validate(item)
-    item_read.status_condition = inventory_service.get_item_status(session, item)
+        item_read = InventoryItemRead.model_validate(item)
+        item_read.status_condition = inventory_service.get_item_status(session, item)
 
-    return create_success_response(
-        data=item_read,
-        message=f"Stock successfully adjusted by {qty_change}",
-        request=request,
-    )
+        return create_success_response(
+            data=item_read,
+            message=f"Stock successfully adjusted by {payload.qty_change}",
+            request=request,
+        )
+    except ValueError as e:
+        session.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.delete(
@@ -191,7 +203,11 @@ async def delete_item(
     item = inventory_service.get(session, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
-    deleted_item = inventory_service.delete(session, item)
+    deleted_item = inventory_service.delete(
+        session, 
+        item,
+        actor_id=current_user.id,
+    )
     item_read = InventoryItemRead.model_validate(deleted_item)
     item_read.status_condition = inventory_service.get_item_status(
         session, deleted_item
@@ -216,9 +232,21 @@ async def restore_item(
     __: None = Depends(require_permission("inventory:items:manage")),
 ):
     item = inventory_service.get(session, item_id, include_deleted=True)
+    
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
-    restored_item = inventory_service.restore(session, item)
+    
+    if not item.is_deleted:
+        raise HTTPException(
+            status_code=400, 
+            detail="Item is already active and does not need to be restored"
+        )
+        
+    restored_item = inventory_service.restore(
+        session, 
+        item,
+        actor_id=current_user.id,
+    )
     item_read = InventoryItemRead.model_validate(restored_item)
     item_read.status_condition = inventory_service.get_item_status(
         session, restored_item
@@ -229,7 +257,7 @@ async def restore_item(
 
 
 @router.get(
-    "/movements/ledger", response_model=GenericResponse[List[InventoryMovementRead]]
+    "/movements/ledger", response_model=GenericResponse[list[InventoryMovementRead]]
 )
 async def get_all_movements_ledger(
     request: Request,
@@ -258,7 +286,7 @@ async def get_all_movements_ledger(
 
 
 @router.get(
-    "/{item_id}/history", response_model=GenericResponse[List[InventoryMovementRead]]
+    "/{item_id}/movement-history", response_model=GenericResponse[list[InventoryMovementRead]]
 )
 async def get_item_history(
     item_id: str,
@@ -304,10 +332,7 @@ async def create_unit(
             serial_number=unit_data.serial_number,
             internal_ref=unit_data.internal_ref,
             expiration_date=unit_data.expiration_date,
-            condition=unit_data.condition,
             actor_id=current_user.id,
-            actor_user_id=current_user.user_id,
-            actor_employee_id=current_user.employee_id,
         )
         session.commit()
         session.refresh(unit)
@@ -323,7 +348,7 @@ async def create_unit(
 
 @router.post(
     "/{item_id}/units/batch",
-    response_model=GenericResponse[List[InventoryUnitRead]],
+    response_model=GenericResponse[list[InventoryUnitRead]],
     status_code=201,
     responses={
         400: {"model": GenericResponse},
@@ -352,8 +377,6 @@ async def create_units_batch(
             item_id=item_id,
             units_data=units_list,
             actor_id=current_user.id,
-            actor_user_id=current_user.user_id,
-            actor_employee_id=current_user.employee_id,
         )
         session.commit()
         for unit in created_units:
@@ -372,7 +395,7 @@ async def create_units_batch(
 
 @router.get(
     "/{item_id}/units",
-    response_model=GenericResponse[List[InventoryUnitRead]],
+    response_model=GenericResponse[list[InventoryUnitRead]],
     responses={401: {"model": GenericResponse}},
 )
 async def list_item_units(
@@ -441,8 +464,6 @@ async def update_unit(
             expiration_date=unit_data.expiration_date,
             condition=unit_data.condition,
             actor_id=current_user.id,
-            actor_user_id=current_user.user_id,
-            actor_employee_id=current_user.employee_id,
         )
         session.commit()
         session.refresh(unit)
@@ -483,8 +504,6 @@ async def retire_unit(
             session,
             unit_id=unit_id,
             actor_id=current_user.id,
-            actor_user_id=current_user.user_id,
-            actor_employee_id=current_user.employee_id,
         )
         session.commit()
         session.refresh(unit)
@@ -553,8 +572,6 @@ async def reverse_movement(
             reason=payload.reason,
             reason_code=payload.reason_code,
             actor_id=current_user.id,
-            actor_user_id=current_user.user_id,
-            actor_employee_id=current_user.employee_id,
         )
         session.commit()
         session.refresh(reversal)
@@ -607,7 +624,7 @@ async def get_item_movement_summary(
 
 @router.get(
     "/movements/anomalies",
-    response_model=GenericResponse[List[InventoryMovementAnomalyRead]],
+    response_model=GenericResponse[list[InventoryMovementAnomalyRead]],
     responses={401: {"model": GenericResponse}},
 )
 async def get_movement_anomalies(

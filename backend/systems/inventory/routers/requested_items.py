@@ -38,7 +38,7 @@ async def create_requested_item(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("", response_model=GenericResponse[List[RequestedItemRead]])
+@router.get("", response_model=GenericResponse[list[RequestedItemRead]])
 async def list_requested_items(
     request: Request,
     skip: int = 0,

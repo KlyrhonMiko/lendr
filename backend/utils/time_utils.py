@@ -9,7 +9,7 @@ def get_now_manila() -> datetime:
     return datetime.now(MANILA_TZ)
 
 def format_datetime(dt: Optional[datetime]) -> str:
-    """Formats a datetime object as MM/DD/YYYY - HH:MM:SS."""
+    """Formats a datetime object as MM/DD/YYYY - hh:MM:SS AM/PM."""
     if not dt:
         return ""
     
@@ -20,4 +20,4 @@ def format_datetime(dt: Optional[datetime]) -> str:
     else:
         dt = dt.astimezone(MANILA_TZ)
     
-    return dt.strftime("%m/%d/%Y - %H:%M:%S")
+    return dt.strftime("%m/%d/%Y - %I:%M:%S %p")

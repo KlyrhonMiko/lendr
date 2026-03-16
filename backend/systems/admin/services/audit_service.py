@@ -1,13 +1,15 @@
+from datetime import datetime
 from typing import Any, Optional
 from uuid import UUID
 from sqlmodel import Session, select, desc, func
 from core.base_service import BaseService
-from systems.inventory.models.audit_log import AuditLog
+from core.models.audit_log import AuditLog
 from systems.admin.models.user import User
 from systems.inventory.models.inventory import InventoryItem
 from systems.inventory.models.borrow_request import BorrowRequest
 from systems.inventory.models.inventory_unit import InventoryUnit
 from systems.inventory.models.inventory_movement import InventoryMovement
+from utils.time_utils import format_datetime
 
 class AuditService(BaseService[AuditLog, Any, Any]):
     def __init__(self):
@@ -19,7 +21,7 @@ class AuditService(BaseService[AuditLog, Any, Any]):
             "borrower_uuid": "borrower_id",
             "item_uuid": "item_id",
             "inventory_uuid": "inventory_id",
-            "borrow_uuid": "borrow_id",
+            "borrow_uuid": "request_id",
             "unit_uuid": "unit_id",
             "user_uuid": "user_id",
             "actor_id": "actor_user_id",
@@ -40,6 +42,27 @@ class AuditService(BaseService[AuditLog, Any, Any]):
             except ValueError:
                 return None
         return None
+
+    @staticmethod
+    def _format_snapshot_datetime_value(value: Any) -> Any:
+        if isinstance(value, datetime):
+            return format_datetime(value)
+
+        if isinstance(value, str):
+            normalized_value = value.strip()
+            if not normalized_value:
+                return value
+
+            try:
+                parsed_datetime = datetime.fromisoformat(
+                    normalized_value.replace("Z", "+00:00")
+                )
+            except ValueError:
+                return value
+
+            return format_datetime(parsed_datetime)
+
+        return value
 
     def _resolve_human_id(
         self,
@@ -72,8 +95,8 @@ class AuditService(BaseService[AuditLog, Any, Any]):
             select(BorrowRequest).where(BorrowRequest.id == parsed_uuid, BorrowRequest.is_deleted.is_(False))
         ).first()
         if borrow is not None:
-            uuid_cache[parsed_uuid] = borrow.borrow_id
-            return borrow.borrow_id
+            uuid_cache[parsed_uuid] = borrow.request_id
+            return borrow.request_id
 
         unit = session.exec(
             select(InventoryUnit).where(InventoryUnit.id == parsed_uuid, InventoryUnit.is_deleted.is_(False))
@@ -129,7 +152,7 @@ class AuditService(BaseService[AuditLog, Any, Any]):
         if parsed_uuid is not None:
             return self._resolve_human_id(session, parsed_uuid, uuid_cache)
 
-        return value
+        return self._format_snapshot_datetime_value(value)
 
     def log_action(
         self,
@@ -139,8 +162,6 @@ class AuditService(BaseService[AuditLog, Any, Any]):
         action: str,
         reason_code: Optional[str] = None,
         actor_id: Optional[UUID] = None,
-        actor_user_id: Optional[str] = None,
-        actor_employee_id: Optional[str] = None,
         before: Optional[dict[str, Any]] = None,
         after: Optional[dict[str, Any]] = None,
     ) -> AuditLog:
@@ -156,8 +177,6 @@ class AuditService(BaseService[AuditLog, Any, Any]):
             action=action,
             reason_code=reason_code,
             actor_id=actor_id,
-            actor_user_id=actor_user_id,
-            actor_employee_id=actor_employee_id,
             before_json=before,
             after_json=after
         )
@@ -167,25 +186,35 @@ class AuditService(BaseService[AuditLog, Any, Any]):
     def get_logs(
         self,
         session: Session,
+        entity_types: Optional[list[str]] = None,
         entity_type: Optional[str] = None,
         entity_id: Optional[str] = None,
         skip: int = 0,
         limit: int = 50
     ) -> tuple[list[dict[str, Any]], int]:
-        """Query system-wide activity logs with optional filters."""
-        statement = select(AuditLog).order_by(desc(AuditLog.created_at))
+        """Query system-wide activity logs with multi-type and legacy filters."""
+        statement = select(AuditLog, User.user_id, User.employee_id).outerjoin(
+            User, AuditLog.actor_id == User.id
+        ).order_by(desc(AuditLog.created_at))
         
+        # Legacy support
         if entity_type:
             statement = statement.where(AuditLog.entity_type == entity_type)
+            
+        # Multi-type support
+        if entity_types:
+            statement = statement.where(AuditLog.entity_type.in_(entity_types))
+            
         if entity_id:
             statement = statement.where(AuditLog.entity_id == entity_id)
             
         total_count = session.exec(select(func.count()).select_from(statement.subquery())).one()
-        logs = session.exec(statement.offset(skip).limit(limit)).all()
+        results = session.exec(statement.offset(skip).limit(limit)).all()
 
         uuid_cache: dict[UUID, str | None] = {}
-        sanitized_logs = [
-            {
+        sanitized_logs = []
+        for log, user_id, employee_id in results:
+            sanitized_logs.append({
                 "audit_id": log.audit_id,
                 "entity_type": log.entity_type,
                 "entity_id": log.entity_id,
@@ -193,12 +222,10 @@ class AuditService(BaseService[AuditLog, Any, Any]):
                 "reason_code": log.reason_code,
                 "before_json": self._sanitize_snapshot_payload(session, log.before_json, uuid_cache),
                 "after_json": self._sanitize_snapshot_payload(session, log.after_json, uuid_cache),
-                "actor_user_id": log.actor_user_id,
-                "actor_employee_id": log.actor_employee_id,
+                "user_id": user_id,
+                "employee_id": employee_id,
                 "created_at": log.created_at,
-            }
-            for log in logs
-        ]
+            })
 
         return sanitized_logs, total_count
 

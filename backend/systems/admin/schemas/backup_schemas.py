@@ -31,7 +31,7 @@ class BackupRunRead(BaseModel):
     status: str
     destination: str
     checksum: Optional[str] = None
-    artifacts: List[BackupArtifactRead] = []
+    artifacts: list[BackupArtifactRead] = []
 
     @field_serializer("started_at", "completed_at")
     def serialize_run_timestamps(self, dt: datetime | None) -> str:

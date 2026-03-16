@@ -35,7 +35,7 @@ class BackupRun(BaseModel, table=True):
         default=None, foreign_key="users.id", index=True
     )
 
-    artifacts: List["BackupArtifact"] = Relationship(back_populates="run")
+    artifacts: list["BackupArtifact"] = Relationship(back_populates="run")
 
 
 class BackupArtifact(BaseModel, table=True):

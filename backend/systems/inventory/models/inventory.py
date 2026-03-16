@@ -8,12 +8,12 @@ class InventoryItem(BaseModel, table=True):
     item_id: str = Field(unique=True, index=True, max_length=50)
 
     name: str = Field(max_length=255)
-    category: str = Field(max_length=100)
+    category: str | None = Field(default=None, max_length=100)
 
     total_qty: int = Field(default=0, ge=0)
     available_qty: int = Field(default=0, ge=0) 
     
-    condition: str = Field(max_length=100)
+    condition: str = Field(default="good", max_length=100)
 
     item_type: str = Field(default="equipment", max_length=50)
     classification: str | None = Field(default=None, max_length=100)

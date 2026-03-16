@@ -20,7 +20,7 @@ config_service = ConfigurationService()
 
 @router.get(
     "",
-    response_model=GenericResponse[List[ConfigRead]],
+    response_model=GenericResponse[list[ConfigRead]],
     responses={401: {"model": GenericResponse}},
 )
 async def list_settings(
@@ -46,7 +46,7 @@ async def list_settings(
 
 @router.get(
     "/categories",
-    response_model=GenericResponse[List[str]],
+    response_model=GenericResponse[list[str]],
     responses={401: {"model": GenericResponse}},
 )
 async def list_categories(
@@ -62,7 +62,7 @@ async def list_categories(
 
 @router.get(
     "/tables",
-    response_model=GenericResponse[List[str]],
+    response_model=GenericResponse[list[str]],
     responses={401: {"model": GenericResponse}},
 )
 async def list_configurable_tables(
@@ -76,7 +76,7 @@ async def list_configurable_tables(
 
 @router.get(
     "/tables/{table_name}/columns",
-    response_model=GenericResponse[List[str]],
+    response_model=GenericResponse[list[str]],
     responses={400: {"model": GenericResponse}, 401: {"model": GenericResponse}},
 )
 async def list_configurable_columns(

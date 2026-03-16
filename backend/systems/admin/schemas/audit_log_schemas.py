@@ -16,8 +16,8 @@ class AuditLogRead(BaseModel):
     before_json: Optional[dict] = None
     after_json: Optional[dict] = None
     
-    actor_user_id: Optional[str] = None
-    actor_employee_id: Optional[str] = None
+    user_id: Optional[str] = None
+    employee_id: Optional[str] = None
     created_at: datetime
 
     @field_serializer("created_at")

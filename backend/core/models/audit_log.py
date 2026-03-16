@@ -18,6 +18,4 @@ class AuditLog(BaseModel, table=True):
     before_json: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     after_json: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     
-    actor_id: Optional[UUID] = Field(default=None, foreign_key="users.id", index=True)
-    actor_user_id: Optional[str] = Field(default=None, max_length=50)
-    actor_employee_id: Optional[str] = Field(default=None, max_length=50)
+    actor_id: Optional[UUID] = Field(default=None, index=True) # Removed foreign_key for core portability

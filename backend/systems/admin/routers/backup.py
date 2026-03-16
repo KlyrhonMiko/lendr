@@ -1,5 +1,4 @@
 import os
-from typing import List
 
 from fastapi import APIRouter, Depends, Request, HTTPException
 from fastapi.responses import FileResponse
@@ -39,7 +38,7 @@ async def trigger_backup(
     )
 
 
-@router.get("/runs", response_model=GenericResponse[List[BackupRunRead]])
+@router.get("/runs", response_model=GenericResponse[list[BackupRunRead]])
 async def list_backup_runs(
     request: Request,
     session: Session = Depends(get_session),

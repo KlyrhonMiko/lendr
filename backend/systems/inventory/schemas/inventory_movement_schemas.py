@@ -12,6 +12,10 @@ class InventoryMovementRead(BaseModel):
 
     reference_id: Optional[str] = None
     note: Optional[str] = None
+    
+    user_id: Optional[str] = None
+    inventory_id: Optional[str] = None
+    
     occurred_at: datetime
 
     @field_serializer("occurred_at")
@@ -20,6 +24,14 @@ class InventoryMovementRead(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class InventoryMovementAdjust(BaseModel):
+    qty_change: int = Field(..., allow_inf_nan=False)
+    movement_type: str = Field(..., min_length=1, max_length=50)
+    reason_code: Optional[str] = Field(default=None, max_length=50)
+    reference_id: Optional[str] = Field(default=None, max_length=50)
+    note: str = Field(..., min_length=5, max_length=500)
 
 
 class InventoryMovementReversalRequest(BaseModel):

@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional
 
-from pydantic import BaseModel, Field, field_serializer, field_validator
+from pydantic import BaseModel, Field, field_serializer
 
 from utils.time_utils import format_datetime
 
@@ -28,51 +28,15 @@ class BorrowRequestBase(BaseModel):
 
 
 class BorrowRequestCreate(BaseModel):
-    """Schema for creating a borrow request. Supports both single and multi-item."""
-
-    borrower_id: Optional[str] = None
-
-    # Single-item fields (for backward compatibility)
-    item_id: Optional[str] = Field(default=None, max_length=50)
-    qty_requested: Optional[int] = Field(default=None, gt=0)
-
-    # Multi-item field
-    items: Optional[List[BorrowRequestItemCreate]] = Field(default=None, min_length=1)
-
-    # Common fields
+    # borrower_id and request_channel are now automated in the router
+    
+    items: list[BorrowRequestItemCreate] = Field(..., min_length=1)
     notes: Optional[str] = Field(default=None, max_length=500)
-    request_channel: str = "inventory_manager"
-    due_at: Optional[datetime] = None
-
-    team_name: Optional[str] = None
-    involved_people: Optional[List[dict]] = Field(default=None)
-    store_name: Optional[str] = None
-    location_name: Optional[str] = None
+    return_at: Optional[datetime] = None  # Renamed and optional
+    involved_people: Optional[list[dict]] = Field(default=None)
 
     is_emergency: bool = False
-    compliance_followup_required: bool = False
-    compliance_followup_notes: Optional[str] = None
 
-    @field_validator("items", mode="before")
-    @classmethod
-    def validate_items_or_single(cls, v, info):
-        """Ensure either items OR (item_id + qty_requested) is provided, not both."""
-        data = info.data
-        has_items = v is not None and len(v) > 0
-        has_single = (
-            data.get("item_id") is not None and data.get("qty_requested") is not None
-        )
-
-        if has_items and has_single:
-            raise ValueError(
-                "Cannot specify both 'items' and 'item_id'/'qty_requested'"
-            )
-        if not has_items and not has_single:
-            raise ValueError(
-                "Must specify either 'items' (multi-item) or 'item_id'+'qty_requested' (single-item)"
-            )
-
-        return v
 
 
 class BorrowRequestUpdate(BaseModel):
@@ -95,39 +59,32 @@ class BorrowRequestEventRead(BaseModel):
 
 
 class BorrowRequestRead(BaseModel):
-    borrow_id: str
+    request_id: str
     transaction_ref: str
     status: str
     request_date: datetime
     borrower_user_id: Optional[str] = None
     request_channel: str = "inventory_manager"
+    
+    # Keep these for internal status tracking!
     compliance_followup_required: bool = False
     compliance_followup_notes: Optional[str] = None
+    
     notes: Optional[str] = None
+    items: list[BorrowRequestItemRead] = []
 
-    # For backward compatibility: single-item fields (will be set from first item if multi-item)
-    item_id: Optional[str] = None
-    qty_requested: Optional[int] = None
-
-    # Multi-item fields
-    items: List[BorrowRequestItemRead] = []
-
-    due_at: Optional[datetime] = None
+    return_at: Optional[datetime] = None
     returned_on_time: Optional[bool] = None
-    team_name: Optional[str] = None
-    store_name: Optional[str] = None
-    location_name: Optional[str] = None
+    
     is_emergency: bool = False
-    involved_people: Optional[List[dict]] = None
+    involved_people: Optional[list[dict]] = None
     approval_channel: str = "standard"
-    events: List["BorrowRequestEventRead"] = []
+    events: list["BorrowRequestEventRead"] = []
 
-    @field_serializer("request_date", "due_at")
+    @field_serializer("request_date", "return_at")
     def serialize_dates(self, dt: datetime | None) -> str | None:
         return format_datetime(dt)
 
-    class Config:
-        from_attributes = True
 
 
 class BorrowRequestApprove(BaseModel):
@@ -152,7 +109,7 @@ class BorrowRequestUnitReturn(BaseModel):
 
 class BorrowRequestReturn(BaseModel):
     notes: Optional[str] = Field(default=None, max_length=500)
-    unit_returns: List[BorrowRequestUnitReturn] = Field(default_factory=List)
+    unit_returns: list[BorrowRequestUnitReturn] = Field(default_factory=list)
 
 
 class BorrowRequestReopen(BaseModel):
@@ -177,7 +134,8 @@ class WarehouseProvisionUnit(BaseModel):
 class BorrowRequestWarehouseApproveWithProvision(BaseModel):
     notes: Optional[str] = Field(default=None, max_length=500)
     provision_qty: int = Field(default=0, ge=0)
-    units: List[WarehouseProvisionUnit] = Field(default_factory=List, max_length=500)
+    units: list[WarehouseProvisionUnit] = Field(default_factory=list, max_length=500)
+    item_id: Optional[str] = Field(default=None, max_length=50)
 
 
 class BorrowRequestAutoRouteWarehouse(BaseModel):
@@ -185,8 +143,9 @@ class BorrowRequestAutoRouteWarehouse(BaseModel):
 
 
 class BorrowRequestUnitAssign(BaseModel):
-    unit_ids: List[str] = Field(min_length=1)
+    unit_ids: list[str] = Field(min_length=1)
     notes: Optional[str] = Field(default=None, max_length=500)
+    item_id: Optional[str] = Field(default=None, max_length=50)
 
 
 class BorrowRequestUnitRead(BaseModel):
@@ -216,19 +175,3 @@ class BatchItem(BaseModel):
     item_id: str
     qty_requested: int
 
-
-class BorrowRequestBatchCreate(BaseModel):
-    borrower_id: str
-    items: List[BatchItem]
-    notes: Optional[str] = None
-
-    request_channel: str = "inventory_manager"
-    compliance_followup_required: bool = False
-    compliance_followup_notes: Optional[str] = None
-
-    due_at: Optional[datetime] = None
-    team_name: Optional[str] = None
-    involved_people: Optional[List[dict]] = Field(default=None)
-    store_name: Optional[str] = None
-    location_name: Optional[str] = None
-    is_emergency: bool = False

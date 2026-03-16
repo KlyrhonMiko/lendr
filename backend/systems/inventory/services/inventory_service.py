@@ -1,9 +1,10 @@
 from datetime import datetime
+from fastapi import HTTPException
 from collections import Counter
 from typing import Any, cast
 from uuid import UUID
 from systems.admin.models.user import User
-from sqlmodel import Session, select
+from sqlmodel import Session, select, func
 from systems.inventory.services.configuration_service import InventoryConfigService
 
 from core.base_service import BaseService
@@ -14,7 +15,7 @@ from systems.inventory.schemas.inventory_schemas import (
 )
 from systems.inventory.models.inventory_movement import InventoryMovement
 from systems.inventory.models.inventory_unit import InventoryUnit
-from systems.inventory.services.audit_service import audit_service
+from systems.admin.services.audit_service import audit_service
 from utils.id_generator import get_next_sequence
 from utils.time_utils import get_now_manila
 from systems.inventory.schemas.inventory_movement_schemas import (
@@ -91,7 +92,12 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                 field_label="inventory item category",
             )
 
-    def create(self, session: Session, schema: InventoryItemCreate) -> InventoryItem:
+    def create(
+        self, 
+        session: Session, 
+        schema: InventoryItemCreate,
+        actor_id: UUID | None = None,
+    ) -> InventoryItem:
         self.validate_uniqueness(
             session, 
             schema, 
@@ -100,17 +106,54 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
 
         self._validate_item_config(session, schema.model_dump())
 
-        return super().create(session, schema, prefix="ITEM")
+        return super().create(
+            session, 
+            schema, 
+            prefix="ITEM",
+            actor_id=actor_id,
+        )
 
     def update(
         self,
         session: Session,
         db_obj: InventoryItem,
         schema: InventoryItemUpdate,
+        actor_id: UUID | None = None,
     ) -> InventoryItem:
         obj_data = schema.model_dump(exclude_unset=True)
         self._validate_item_config(session, obj_data)
-        return super().update(session, db_obj, schema)
+        return super().update(
+            session, 
+            db_obj, 
+            schema,
+            actor_id=actor_id,
+        )
+
+    def restore(
+        self,
+        session: Session,
+        db_obj: InventoryItem,
+        actor_id: UUID | None = None,
+    ) -> InventoryItem:
+        # Check for active items with the same name, classification, and item_type
+        # This prevents IntegrityError from ix_inventory_item_name_active
+        existing = session.exec(
+            select(InventoryItem).where(
+                InventoryItem.name == db_obj.name,
+                InventoryItem.classification == db_obj.classification,
+                InventoryItem.item_type == db_obj.item_type,
+                InventoryItem.is_deleted.is_(False),
+                InventoryItem.id != db_obj.id  # Exclude current item
+            )
+        ).first()
+
+        if existing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"An active item with name '{db_obj.name}' already exists. Cannot restore duplicate."
+            )
+
+        return super().restore(session, db_obj, actor_id=actor_id)
 
     def adjust_stock(
         self, 
@@ -122,8 +165,6 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         reason_code: str | None = None,
         note: str | None = None,
         actor_id: UUID | None = None,
-        actor_user_id: str | None = None,
-        actor_employee_id: str | None = None,
     ) -> InventoryItem:
         self._require_config_key(
             session,
@@ -199,8 +240,6 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                 "note": note,
             },
             actor_id=actor_id,
-            actor_user_id=actor_user_id,
-            actor_employee_id=actor_employee_id,
         )
         session.add(movement)
         session.add(db_obj)
@@ -235,7 +274,6 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         return sorted_statuses[-1].key
 
     def get_units(self, session: Session, item_id: str) -> list[InventoryUnit]:
-        from systems.inventory.models.inventory_unit import InventoryUnit
         item = self.get(session, item_id)
         if not item:
             return []
@@ -243,16 +281,36 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             select(InventoryUnit).where(InventoryUnit.inventory_uuid == item.id)
         ).all()
 
-    def get_history(self, session: Session, item_id: str) -> list[InventoryMovement]:
-        from systems.inventory.models.inventory_movement import InventoryMovement
+    def get_history(self, session: Session, item_id: str) -> list[dict[str, Any]]:
+
         item = self.get(session, item_id)
         if not item:
             return []
-        return session.exec(
-            select(InventoryMovement)
-            .where(InventoryMovement.inventory_uuid == item.id)
-            .order_by(InventoryMovement.occurred_at.desc())
+            
+        results = session.exec(
+            select(
+                InventoryMovement, 
+                User.user_id, 
+                InventoryItem.item_id
+            ).outerjoin(
+                User, InventoryMovement.actor_id == User.id
+            ).outerjoin(
+                InventoryItem, InventoryMovement.inventory_uuid == InventoryItem.id
+            ).where(
+                InventoryMovement.inventory_uuid == item.id
+            ).order_by(
+                InventoryMovement.occurred_at.desc()
+            )
         ).all()
+        
+        formatted_results = []
+        for movement, user_id, inv_item_id in results:
+            m_dict = movement.model_dump()
+            m_dict["user_id"] = user_id
+            m_dict["inventory_id"] = inv_item_id
+            formatted_results.append(m_dict)
+            
+        return formatted_results
 
     def get_movement(self, session: Session, movement_id: str) -> InventoryMovement | None:
         return session.exec(
@@ -265,8 +323,8 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             raise ValueError(f"Item {item_id} not found")
 
         movements = self.get_history(session, item_id)
-        ledger_balance = sum(movement.qty_change for movement in movements)
-        latest_movement_at = movements[0].occurred_at if movements else None
+        ledger_balance = sum(movement["qty_change"] for movement in movements)
+        latest_movement_at = movements[0]["occurred_at"] if movements else None
         delta = ledger_balance - item.available_qty
 
         return InventoryMovementReconciliationRead(
@@ -285,8 +343,6 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         reason: str,
         reason_code: str,
         actor_id: UUID | None = None,
-        actor_user_id: str | None = None,
-        actor_employee_id: str | None = None,
     ) -> InventoryMovement:
         original = self.get_movement(session, movement_id)
         if not original:
@@ -367,8 +423,6 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                 "reason": reason,
             },
             actor_id=actor_id,
-            actor_user_id=actor_user_id,
-            actor_employee_id=actor_employee_id,
         )
 
         session.add(reversal)
@@ -496,13 +550,18 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         limit: int = 100,
         movement_type: str | None = None,
         inventory_id: str | None = None
-    ) -> tuple[list[InventoryMovement], int]:
+    ) -> tuple[list[dict[str, Any]], int]:
         """Get all inventory movements across all items with optional filtering and pagination."""
-        from systems.inventory.models.inventory_movement import InventoryMovement
-        from sqlmodel import func
-        
-        # Build query with filters
-        statement = select(InventoryMovement)
+        # Build query with filters and joins
+        statement = select(
+            InventoryMovement, 
+            User.user_id, 
+            InventoryItem.item_id
+        ).outerjoin(
+            User, InventoryMovement.actor_id == User.id
+        ).outerjoin(
+            InventoryItem, InventoryMovement.inventory_uuid == InventoryItem.id
+        )
         
         if inventory_id:
             item = self.get(session, inventory_id)
@@ -525,7 +584,15 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             .limit(limit)
         ).all()
         
-        return results, total_count
+        # Format results for the schema
+        formatted_results = []
+        for movement, user_id, item_id in results:
+            m_dict = movement.model_dump()
+            m_dict["user_id"] = user_id
+            m_dict["inventory_id"] = item_id
+            formatted_results.append(m_dict)
+            
+        return formatted_results, total_count
 
     def _verify_shift_access(self, user: User):
         """Ensures the user is authorized for their current shift."""
@@ -667,7 +734,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             internal_ref=internal_ref,
             status=initial_status,
             expiration_date=expiration_date,
-            condition=condition,
+            condition=condition or "good",
         )
 
         if self._is_consumable_item(item) and unit.status == "borrowed":
@@ -688,8 +755,6 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                 "expiration_date": expiration_date.isoformat() if expiration_date else None,
             },
             actor_id=actor_id,
-            actor_user_id=actor_user_id,
-            actor_employee_id=actor_employee_id,
         )
 
         session.add(unit)
@@ -701,8 +766,6 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         item_id: str,
         units_data: list[dict],
         actor_id: UUID | None = None,
-        actor_user_id: str | None = None,
-        actor_employee_id: str | None = None,
     ) -> list[InventoryUnit]:
         """
         Create multiple units for a trackable inventory item in a single transaction.
@@ -722,8 +785,8 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         for unit_data in units_data:
             serial_number = unit_data.get("serial_number")
             internal_ref = unit_data.get("internal_ref")
-            condition = unit_data.get("condition")
             expiration_date = unit_data.get("expiration_date")
+            condition = unit_data.get("condition") or "good"
 
             # Check uniqueness within batch
             if serial_number:
@@ -794,8 +857,6 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                     "expiration_date": expiration_date.isoformat() if expiration_date else None,
                 },
                 actor_id=actor_id,
-                actor_user_id=actor_user_id,
-                actor_employee_id=actor_employee_id,
             )
 
             session.add(unit)
@@ -882,8 +943,6 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             before=before_state,
             after=after_state,
             actor_id=actor_id,
-            actor_user_id=actor_user_id,
-            actor_employee_id=actor_employee_id,
         )
 
         session.add(unit)
@@ -937,8 +996,6 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             before=before_state,
             after=after_state,
             actor_id=actor_id,
-            actor_user_id=actor_user_id,
-            actor_employee_id=actor_employee_id,
         )
 
         session.add(unit)
@@ -955,7 +1012,6 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         limit: int = 100,
     ) -> tuple[list[InventoryUnit], int]:
         """Get units for an item, optionally filtered by status, with pagination."""
-        from sqlmodel import func
 
         item = self.get(session, item_id)
         if not item:

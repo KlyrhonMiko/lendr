@@ -1,4 +1,5 @@
-from typing import Any, Generic, Iterable, Type, TypeVar
+from typing import Any, Generic, Iterable, Type, TypeVar, Optional
+from uuid import UUID
 
 from fastapi import HTTPException
 from sqlmodel import Session, and_, select, func
@@ -51,8 +52,42 @@ class BaseService(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
         return items, total_count
 
+    def _log_audit(
+        self,
+        session: Session,
+        action: str,
+        entity_id: str,
+        before: dict | None = None,
+        after: dict | None = None,
+        actor_id: Optional[UUID] = None,
+        reason_code: Optional[str] = None,
+    ):
+        """Helper to log actions to the audit trial."""
+        from core.models.audit_log import AuditLog
+        
+        # Prevent infinite recursion if we are auditing the AuditLog table itself
+        if self.model == AuditLog:
+            return
+
+        audit_id = get_next_sequence(session, AuditLog, "audit_id", "AUDIT")
+        log_entry = AuditLog(
+            audit_id=audit_id,
+            entity_type=self.model.__tablename__,
+            entity_id=entity_id,
+            action=action,
+            reason_code=reason_code,
+            actor_id=actor_id,
+            before_json=before,
+            after_json=after,
+        )
+        session.add(log_entry)
+
     def create(
-        self, session: Session, schema: CreateSchemaType, prefix: str | None = None
+        self, 
+        session: Session, 
+        schema: CreateSchemaType, 
+        prefix: str | None = None,
+        actor_id: Optional[UUID] = None,
     ) -> ModelType:
         """Create a new record from a schema, optionally generating a formatted ID."""
         data = schema.model_dump()
@@ -65,14 +100,29 @@ class BaseService(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
         db_obj = self.model(**data)
         session.add(db_obj)
+        
+        # Log the creation
+        self._log_audit(
+            session=session,
+            action="created",
+            entity_id=getattr(db_obj, self.lookup_field),
+            after=db_obj.model_dump(mode="json"),
+            actor_id=actor_id,
+        )
+
         session.commit()
         session.refresh(db_obj)
 
         return db_obj
 
     def update(
-        self, session: Session, db_obj: ModelType, schema: UpdateSchemaType
+        self, 
+        session: Session, 
+        db_obj: ModelType, 
+        schema: UpdateSchemaType,
+        actor_id: Optional[UUID] = None,
     ) -> ModelType:
+        before = db_obj.model_dump(mode="json")
         obj_data = schema.model_dump(exclude_unset=True)
 
         for key, value in obj_data.items():
@@ -80,24 +130,69 @@ class BaseService(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
         db_obj.updated_at = get_now_manila()
         session.add(db_obj)
+
+        # Log the update
+        self._log_audit(
+            session=session,
+            action="updated",
+            entity_id=getattr(db_obj, self.lookup_field),
+            before=before,
+            after=db_obj.model_dump(mode="json"),
+            actor_id=actor_id,
+        )
+
         session.commit()
         session.refresh(db_obj)
 
         return db_obj
 
-    def delete(self, session: Session, db_obj: ModelType) -> ModelType:
+    def delete(
+        self, 
+        session: Session, 
+        db_obj: ModelType,
+        actor_id: Optional[UUID] = None,
+    ) -> ModelType:
+        before = db_obj.model_dump(mode="json")
         db_obj.is_deleted = True
         db_obj.deleted_at = get_now_manila()
         session.add(db_obj)
+
+        # Log the deletion
+        self._log_audit(
+            session=session,
+            action="deleted",
+            entity_id=getattr(db_obj, self.lookup_field),
+            before=before,
+            after=db_obj.model_dump(mode="json"),
+            actor_id=actor_id,
+        )
+
         session.commit()
         session.refresh(db_obj)
 
         return db_obj
 
-    def restore(self, session: Session, db_obj: ModelType) -> ModelType:
+    def restore(
+        self, 
+        session: Session, 
+        db_obj: ModelType,
+        actor_id: Optional[UUID] = None,
+    ) -> ModelType:
+        before = db_obj.model_dump(mode="json")
         db_obj.is_deleted = False
         db_obj.deleted_at = None
         session.add(db_obj)
+
+        # Log the restoration
+        self._log_audit(
+            session=session,
+            action="restored",
+            entity_id=getattr(db_obj, self.lookup_field),
+            before=before,
+            after=db_obj.model_dump(mode="json"),
+            actor_id=actor_id,
+        )
+
         session.commit()
         session.refresh(db_obj)
 

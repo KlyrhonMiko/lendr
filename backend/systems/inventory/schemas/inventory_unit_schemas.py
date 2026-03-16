@@ -10,7 +10,6 @@ class InventoryUnitBase(BaseModel):
     internal_ref: Optional[str] = Field(default=None, max_length=100)
     status: str = Field(default="available", max_length=50)
     expiration_date: Optional[datetime] = None
-    condition: Optional[str] = Field(default=None, max_length=100)
 
 
 class InventoryUnitCreate(InventoryUnitBase):
@@ -33,6 +32,7 @@ class InventoryUnitUpdate(BaseModel):
 class InventoryUnitRead(InventoryUnitBase):
     """Unit read schema with server-assigned fields."""
     unit_id: str
+    condition: str
     created_at: datetime
     updated_at: datetime
 

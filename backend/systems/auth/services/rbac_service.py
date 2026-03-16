@@ -10,7 +10,7 @@ def _normalize_role(role: str) -> str:
     return role.strip().lower().replace("-", "_").replace(" ", "_")
 
 
-DEFAULT_ROLE_POLICIES: dict[str, dict[str, List[str] | str]] = {
+DEFAULT_ROLE_POLICIES: dict[str, dict[str, list[str] | str]] = {
     "admin": {
         "display_name": "Admin",
         "description": "Complete authority over user management, system configuration, and data overrides.",
@@ -26,12 +26,12 @@ class RBACService:
 
     def _build_policies(
         self, session: Session
-    ) -> dict[str, dict[str, List[str] | str]]:
-        policies: dict[str, dict[str, List[str] | str]] = {
+    ) -> dict[str, dict[str, list[str] | str]]:
+        policies: dict[str, dict[str, list[str] | str]] = {
             role: {
                 "display_name": str(policy["display_name"]),
-                "systems": List(policy["systems"]),
-                "permissions": List(policy["permissions"]),
+                "systems": list(policy["systems"]),
+                "permissions": list(policy["permissions"]),
             }
             for role, policy in DEFAULT_ROLE_POLICIES.items()
         }
@@ -59,7 +59,7 @@ class RBACService:
             permissions = parsed.get("permissions", base["permissions"])
             display_name = parsed.get("display_name", base["display_name"])
 
-            if isinstance(systems, List) and isinstance(permissions, List):
+            if isinstance(systems, list) and isinstance(permissions, list):
                 policies[role_key] = {
                     "display_name": str(display_name),
                     "systems": [str(system).lower() for system in systems],
@@ -70,7 +70,7 @@ class RBACService:
 
     def get_role_policy(
         self, session: Session, role: str | None
-    ) -> dict[str, List[str] | str]:
+    ) -> dict[str, list[str] | str]:
         normalized = _normalize_role(role or "")
         policies = self._build_policies(session)
         return policies.get(

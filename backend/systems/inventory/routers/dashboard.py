@@ -27,7 +27,7 @@ async def get_dashboard_stats(
     return create_success_response(data=stats, request=request)
 
 
-@router.get("/recent", response_model=GenericResponse[List[BorrowRequestRead]])
+@router.get("/recent", response_model=GenericResponse[list[BorrowRequestRead]])
 async def get_recent_activity(
     request: Request,
     limit: int = 5,

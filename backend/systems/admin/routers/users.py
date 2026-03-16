@@ -34,7 +34,7 @@ async def register_user(
 
 @router.get(
     "",
-    response_model=GenericResponse[List[UserRead]],
+    response_model=GenericResponse[list[UserRead]],
     responses={401: {"model": GenericResponse}},
 )
 async def list_users(

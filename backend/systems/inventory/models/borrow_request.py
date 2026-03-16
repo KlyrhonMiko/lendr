@@ -19,11 +19,9 @@ from utils.time_utils import get_now_manila
 class BorrowRequest(BaseModel, table=True):
     __tablename__ = "borrow_requests"
 
-    borrow_id: str = Field(unique=True, index=True, max_length=50)
+    request_id: str = Field(unique=True, index=True, max_length=50)
     borrower_uuid: UUID | None = Field(default=None, foreign_key="users.id", index=True)
-    item_uuid: UUID | None = Field(default=None, foreign_key="inventory.id", index=True)
 
-    qty_requested: int
     status: str = Field(default="pending", max_length=50)
     approved_by: UUID | None = Field(default=None, foreign_key="users.id")
     approved_at: datetime | None = Field(default=None)
@@ -40,12 +38,9 @@ class BorrowRequest(BaseModel, table=True):
 
     transaction_ref: str = Field(unique=True, index=True, max_length=50)
     release_employee_id: str | None = Field(default=None, max_length=50)
-    team_name: str | None = Field(default=None, max_length=100)
-    store_name: str | None = Field(default=None, max_length=100)
-    location_name: str | None = Field(default=None, max_length=100)
-    involved_people: List[dict] | None = Field(default=None, sa_column=Column(JSON))
+    involved_people: list[dict] | None = Field(default=None, sa_column=Column(JSON))
 
-    due_at: datetime | None = Field(default=None)
+    return_at: datetime | None = Field(default=None)
     returned_on_time: bool | None = Field(default=None)
 
     request_channel: str = Field(default="inventory_manager", max_length=50)
@@ -55,19 +50,19 @@ class BorrowRequest(BaseModel, table=True):
     compliance_followup_required: bool = Field(default=False)
     compliance_followup_notes: str | None = Field(default=None, max_length=500)
 
-    events: List["BorrowRequestEvent"] = Relationship(
+    events: list["BorrowRequestEvent"] = Relationship(
         back_populates="borrow_request",
         sa_relationship_kwargs={"foreign_keys": "[BorrowRequestEvent.borrow_uuid]"},
     )
-    participants: List["BorrowParticipant"] = Relationship(
+    participants: list["BorrowParticipant"] = Relationship(
         back_populates="borrow_request",
         sa_relationship_kwargs={"foreign_keys": "[BorrowParticipant.borrow_uuid]"},
     )
-    items: List["BorrowRequestItem"] = Relationship(
+    items: list["BorrowRequestItem"] = Relationship(
         back_populates="borrow_request",
         sa_relationship_kwargs={"foreign_keys": "[BorrowRequestItem.borrow_uuid]"},
     )
-    assigned_units: List["BorrowRequestUnit"] = Relationship(
+    assigned_units: list["BorrowRequestUnit"] = Relationship(
         back_populates="borrow_request",
         sa_relationship_kwargs={"foreign_keys": "[BorrowRequestUnit.borrow_uuid]"},
     )
@@ -83,7 +78,6 @@ class BorrowRequest(BaseModel, table=True):
         Index(
             "ix_active_borrow_request_uuid",
             "borrower_uuid",
-            "item_uuid",
             unique=True,
             postgresql_where=text(
                 "status IN ('pending', 'approved', 'released') AND is_deleted IS FALSE"

@@ -18,7 +18,7 @@ config_service = AuthConfigService()
 
 @router.get(
     "",
-    response_model=GenericResponse[List[ConfigRead]],
+    response_model=GenericResponse[list[ConfigRead]],
 )
 async def list_auth_settings(
     request: Request,

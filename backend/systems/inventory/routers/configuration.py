@@ -24,7 +24,7 @@ borrower_service = BorrowerConfigService()
 
 @router.get(
     "/inventory",
-    response_model=GenericResponse[List[ConfigRead]],
+    response_model=GenericResponse[list[ConfigRead]],
 )
 async def list_inventory_settings(
     request: Request,
@@ -76,7 +76,7 @@ async def create_inventory_setting(
 
 @router.get(
     "/borrower",
-    response_model=GenericResponse[List[ConfigRead]],
+    response_model=GenericResponse[list[ConfigRead]],
 )
 async def list_borrower_settings(
     request: Request,
