@@ -7,6 +7,7 @@ from utils.time_utils import format_datetime
 
 class BackupArtifactRead(BaseModel):
     artifact_id: str
+
     target_type: str
     file_path_or_key: str
     size_bytes: Optional[int] = None
@@ -24,6 +25,7 @@ class BackupArtifactRead(BaseModel):
 
 class BackupRunRead(BaseModel):
     backup_id: str
+
     started_at: datetime
     completed_at: Optional[datetime] = None
     status: str

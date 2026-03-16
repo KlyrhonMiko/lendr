@@ -8,6 +8,7 @@ class BorrowParticipant(BaseModel, table=True):
 
     borrow_uuid: UUID | None = Field(default=None, foreign_key="borrow_requests.id", index=True)
     user_uuid: UUID | None = Field(default=None, foreign_key="users.id", index=True)
+    
     name: str | None = Field(default=None, max_length=100)  # For non-registered participants
     role_in_request: str = Field(default="witness", max_length=50)  # companion, witness, etc.
 

@@ -19,22 +19,20 @@ class BorrowRequestUnit(BaseModel, table=True):
     borrow_uuid: UUID | None = Field(default=None, foreign_key="borrow_requests.id", index=True)
     unit_uuid: UUID | None = Field(default=None, foreign_key="inventory_units.id", index=True)
 
-    requested_at: datetime | None = Field(default=None)
-    approved_at: datetime | None = Field(default=None)
-    assigned_at: datetime | None = Field(default_factory=get_now_manila)
-    released_at: datetime | None = Field(default=None)
-    returned_at: datetime | None = Field(default=None)
-
     requested_by: UUID | None = Field(default=None, foreign_key="users.id")
+    requested_at: datetime | None = Field(default=None)
 
     approved_by: UUID | None = Field(default=None, foreign_key="users.id")
+    approved_at: datetime | None = Field(default=None)
 
     assigned_by: UUID | None = Field(default=None, foreign_key="users.id")
+    assigned_at: datetime | None = Field(default_factory=get_now_manila)
 
     released_by: UUID | None = Field(default=None, foreign_key="users.id")
+    released_at: datetime | None = Field(default=None)
 
     returned_by: UUID | None = Field(default=None, foreign_key="users.id")
-
+    returned_at: datetime | None = Field(default=None)
     condition_on_return: str | None = Field(default=None, max_length=100)
     return_notes: str | None = Field(default=None, max_length=500)
 

@@ -1,6 +1,7 @@
 from sqlmodel import Session, select, func
 from systems.inventory.models.inventory import InventoryItem
 from systems.inventory.models.borrow_request import BorrowRequest
+from systems.inventory.models.borrow_request_item import BorrowRequestItem
 from pydantic import BaseModel
 
 class DashboardStats(BaseModel):
@@ -17,11 +18,13 @@ class DashboardService:
             .where(InventoryItem.is_deleted.is_(False))
         ).one()
         
-        # Items currently borrowed (Status = 'released')
+        # Items currently borrowed (sum all line-item quantities on released requests)
         items_borrowed = session.exec(
-            select(func.sum(BorrowRequest.qty_requested))
+            select(func.sum(BorrowRequestItem.qty_requested))
+            .join(BorrowRequest, BorrowRequestItem.borrow_uuid == BorrowRequest.id)
             .where(BorrowRequest.status == "released")
             .where(BorrowRequest.is_deleted.is_(False))
+            .where(BorrowRequestItem.is_deleted.is_(False))
         ).one() or 0
 
         # Active users (unique borrowers in non-terminal states)

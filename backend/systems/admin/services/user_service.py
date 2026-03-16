@@ -7,32 +7,32 @@ from utils.id_generator import get_next_sequence
 from utils.security import get_password_hash
 from utils.time_utils import get_now_manila
 
-
 class UserService(BaseService[User, UserCreate, UserUpdate]):
     def __init__(self):
         super().__init__(User, lookup_field="user_id")
-
+        
     def create(self, session: Session, schema: UserCreate) -> User:
+        from systems.auth.services.configuration_service import AuthConfigService
+        self.config_service = AuthConfigService()
         self.validate_uniqueness(
             session,
             schema,
             unique_fields=[["email"], ["username"]],
         )
 
-        role_prefixes = {
-            "accountant": "ACCT",
-            "finance_manager": "FNCM",
-            "finance manager": "FNCM",
-            "finance managers": "FNCM",
-            "dispatch": "DSPT",
-            "borrowers": "BRWR",
-            "employees": "EMPL",
-            "inventory_manager": "IVTM",
-            "inventory manager": "IVTM",
-            "admin": "ADMIN",
-        }
+        setting = self.config_service.get_by_key(
+            session, 
+            key=schema.role.lower(), 
+            category="users_role"
+        )
+        
+        if not setting:
+             raise ValueError(
+                f"Configuration Error: ID prefix for role '{schema.role}' is not defined. "
+                f"Please add it to system_settings under category 'users_role'."
+            )
 
-        prefix = role_prefixes.get(schema.role.lower(), "USER")
+        prefix = setting.value
 
         data = schema.model_dump()
         password = data.pop("password")

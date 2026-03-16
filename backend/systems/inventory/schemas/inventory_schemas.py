@@ -6,9 +6,6 @@ from pydantic import BaseModel, Field
 class InventoryItemBase(BaseModel):
     name: Optional[str] = Field(default=None, max_length=255)
     category: Optional[str] = Field(default=None, max_length=100)
-    total_qty: Optional[int] = Field(default=None, ge=0)
-    available_qty: Optional[int] = Field(default=None, ge=0)
-    condition: Optional[str] = Field(default=None, max_length=100)
 
     item_type: Optional[str] = Field(default="equipment", max_length=50)
     classification: Optional[str] = Field(default=None, max_length=100)
@@ -16,16 +13,16 @@ class InventoryItemBase(BaseModel):
 
 class InventoryItemCreate(InventoryItemBase):
     name: str = Field(..., max_length=255)
-    category: str = Field(..., max_length=100)
-    total_qty: int = Field(..., ge=0)
-    available_qty: int = Field(..., ge=0)
-    condition: str = Field(..., max_length=100)
+    category: Optional[str] = Field(default=None, max_length=100)
 
 class InventoryItemUpdate(InventoryItemBase):
-    pass # Everything in Base is already Optional
+    condition: Optional[str] = Field(default=None, max_length=100)
 
 class InventoryItemRead(InventoryItemBase):
     item_id: str
+    total_qty: int
+    available_qty: int
+    condition: str
     status_condition: Optional[str] = None
     
     class Config:

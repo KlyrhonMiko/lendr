@@ -23,7 +23,7 @@ class InventoryUnit(BaseModel, table=True):
 
     expiration_date: datetime | None = Field(default=None, index=True, nullable=True)
     
-    condition: str | None = Field(default=None, max_length=100)
+    condition: str | None = Field(default="good", max_length=100)
 
     borrow_assignments: list["BorrowRequestUnit"] = Relationship(
         back_populates="inventory_unit",

@@ -6,14 +6,18 @@ from utils.time_utils import format_datetime
 
 class AuditLogRead(BaseModel):
     audit_id: str
+
     entity_type: str
     entity_id: str
+
     action: str
     reason_code: Optional[str] = None
+
     before_json: Optional[dict] = None
     after_json: Optional[dict] = None
-    actor_user_id: Optional[str] = None
-    actor_employee_id: Optional[str] = None
+    
+    user_id: Optional[str] = None
+    employee_id: Optional[str] = None
     created_at: datetime
 
     @field_serializer("created_at")

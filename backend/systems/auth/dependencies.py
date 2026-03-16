@@ -11,17 +11,16 @@ from systems.admin.services.user_service import UserService
 from systems.auth.services.rbac_service import rbac_service
 
 reusable_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
-
 user_service = UserService()
 
 
-def get_current_user(
-    session: Session = Depends(get_session), token: str = Depends(reusable_oauth2)
-) -> User:
+def get_current_user(session: Session = Depends(get_session), token: str = Depends(reusable_oauth2)) -> User:
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         user_id = payload.get("sub")
-        if not user_id:
+        session_id = payload.get("session_id")
+        
+        if not user_id or not session_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Could not validate credentials",
@@ -35,14 +34,27 @@ def get_current_user(
     user = user_service.get(session, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    from systems.auth.services.auth_service import auth_service
+    
+    is_valid = False
+    if str(session_id).startswith("BSE"):
+        is_valid = auth_service.is_borrower_session_valid(session, session_id)
+    elif str(session_id).startswith("USE"):
+        is_valid = auth_service.is_user_session_valid(session, session_id)
+
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session has expired or been revoked. Please log in again.",
+        )
+
     return user
 
 
+
 def require_system_access(system: str):
-    def _checker(
-        session: Session = Depends(get_session),
-        current_user: User = Depends(get_current_user),
-    ) -> None:
+    def _checker(session: Session = Depends(get_session), current_user: User = Depends(get_current_user),) -> None:
         if not rbac_service.has_system_access(session, current_user, system):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -53,10 +65,7 @@ def require_system_access(system: str):
 
 
 def require_permission(permission: str):
-    def _checker(
-        session: Session = Depends(get_session),
-        current_user: User = Depends(get_current_user),
-    ) -> None:
+    def _checker(session: Session = Depends(get_session), current_user: User = Depends(get_current_user),) -> None:
         if not rbac_service.has_permission(session, current_user, permission):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

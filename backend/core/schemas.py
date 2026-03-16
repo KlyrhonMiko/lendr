@@ -57,3 +57,26 @@ def create_error_response(
         path=str(request.url.path) if request else None,
         method=request.method if request else None
     )
+
+# Generic Configuration Schemas
+class ConfigBase(BaseModel):
+    value: str = Field(..., max_length=255)
+
+
+class ConfigCreate(ConfigBase):
+    key: str = Field(..., max_length=100)
+    category: str = Field(default="general", max_length=50)
+    description: Optional[str] = None
+
+
+class ConfigUpdate(ConfigBase):
+    description: Optional[str] = None
+
+
+class ConfigRead(ConfigBase):
+    key: str
+    category: str
+    description: Optional[str] = None
+
+    class Config:
+        from_attributes = True

@@ -16,6 +16,7 @@ class BorrowRequestItem(BaseModel, table=True):
 
     borrow_uuid: UUID | None = Field(default=None, foreign_key="borrow_requests.id", index=True)
     item_uuid: UUID | None = Field(default=None, foreign_key="inventory.id", index=True)
+    
     qty_requested: int = Field(gt=0)
 
     # Relationships
