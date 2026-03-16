@@ -13,8 +13,10 @@ class WarehouseApproval(BaseModel, table=True):
     __tablename__ = "warehouse_approvals"
 
     approval_id: str = Field(unique=True, index=True, max_length=50)
+
     borrow_id: str = Field(unique=True, index=True, max_length=50)
     borrow_uuid: UUID | None = Field(default=None, foreign_key="borrow_requests.id", unique=True, index=True)
+    
     approved_by: UUID = Field(foreign_key="users.id")
     approved_at: datetime = Field(default_factory=get_now_manila)
     remarks: str | None = Field(default=None, max_length=500)

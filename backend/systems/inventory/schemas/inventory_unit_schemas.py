@@ -1,6 +1,8 @@
 from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
+
+from utils.time_utils import format_datetime
 
 
 class InventoryUnitBase(BaseModel):
@@ -33,6 +35,12 @@ class InventoryUnitRead(InventoryUnitBase):
     unit_id: str
     created_at: datetime
     updated_at: datetime
+
+    @field_serializer("created_at", "updated_at", "expiration_date")
+    def serialize_dates(self, dt: datetime | None) -> str | None:
+        if dt is None:
+            return None
+        return format_datetime(dt)
 
     class Config:
         from_attributes = True

@@ -5,9 +5,11 @@ from utils.time_utils import format_datetime
 
 class InventoryMovementRead(BaseModel):
     movement_id: str
+
     qty_change: int
     movement_type: str
     reason_code: Optional[str] = None
+
     reference_id: Optional[str] = None
     note: Optional[str] = None
     occurred_at: datetime
@@ -28,8 +30,10 @@ class InventoryMovementReversalRequest(BaseModel):
 class InventoryMovementReversalRead(BaseModel):
     original_movement_id: str
     reversal_movement_id: str
+
     original_qty_change: int
     reversal_qty_change: int
+
     reason: str
     reason_code: str | None = None
     occurred_at: datetime
@@ -41,8 +45,10 @@ class InventoryMovementReversalRead(BaseModel):
 
 class InventoryMovementReconciliationRead(BaseModel):
     movement_count: int
+
     ledger_balance: int
     actual_balance: int
+
     delta: int
     is_reconciled: bool
     latest_movement_at: datetime | None = None
@@ -56,11 +62,15 @@ class InventoryMovementReconciliationRead(BaseModel):
 
 class InventoryMovementSummaryRead(BaseModel):
     movement_count: int
+
     total_inflow: int
     total_outflow: int
+
     net_change: int
     by_type: dict[str, int]
+
     by_actor_user_id: dict[str, int]
+    
     earliest_movement_at: datetime | None = None
     latest_movement_at: datetime | None = None
 

@@ -13,7 +13,12 @@ router = APIRouter()
 user_service = UserService()
 
 
-@router.post("/register", response_model=GenericResponse[UserRead], status_code=201, responses={400: {"model": GenericResponse}})
+@router.post(
+    "/register",
+    response_model=GenericResponse[UserRead],
+    status_code=201,
+    responses={400: {"model": GenericResponse}},
+)
 async def register_user(
     user_data: UserCreate,
     request: Request,
@@ -22,10 +27,16 @@ async def register_user(
     _: None = Depends(require_permission("admin:users:manage")),
 ):
     user = user_service.create(session, user_data)
-    return create_success_response(data=user, message="User registered successfully", request=request)
+    return create_success_response(
+        data=user, message="User registered successfully", request=request
+    )
 
 
-@router.get("", response_model=GenericResponse[list[UserRead]], responses={401: {"model": GenericResponse}})
+@router.get(
+    "",
+    response_model=GenericResponse[List[UserRead]],
+    responses={401: {"model": GenericResponse}},
+)
 async def list_users(
     request: Request,
     skip: int = 0,
@@ -42,7 +53,11 @@ async def list_users(
     )
 
 
-@router.get("/{user_id}", response_model=GenericResponse[UserRead], responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}})
+@router.get(
+    "/{user_id}",
+    response_model=GenericResponse[UserRead],
+    responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}},
+)
 async def get_user(
     user_id: str,
     request: Request,
@@ -56,7 +71,11 @@ async def get_user(
     return create_success_response(data=user, request=request)
 
 
-@router.patch("/{user_id}", response_model=GenericResponse[UserRead], responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}})
+@router.patch(
+    "/{user_id}",
+    response_model=GenericResponse[UserRead],
+    responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}},
+)
 async def update_user(
     user_id: str,
     user_data: UserUpdate,
@@ -69,10 +88,16 @@ async def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     updated_user = user_service.update(session, user, user_data)
-    return create_success_response(data=updated_user, message="User updated successfully", request=request)
+    return create_success_response(
+        data=updated_user, message="User updated successfully", request=request
+    )
 
 
-@router.delete("/{user_id}", response_model=GenericResponse[UserRead], responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}})
+@router.delete(
+    "/{user_id}",
+    response_model=GenericResponse[UserRead],
+    responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}},
+)
 async def delete_user(
     user_id: str,
     request: Request,
@@ -84,10 +109,16 @@ async def delete_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     deleted_user = user_service.delete(session, user)
-    return create_success_response(data=deleted_user, message="User deleted successfully", request=request)
+    return create_success_response(
+        data=deleted_user, message="User deleted successfully", request=request
+    )
 
 
-@router.post("/{user_id}/restore", response_model=GenericResponse[UserRead], responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}})
+@router.post(
+    "/{user_id}/restore",
+    response_model=GenericResponse[UserRead],
+    responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}},
+)
 async def restore_user(
     user_id: str,
     request: Request,
@@ -99,4 +130,6 @@ async def restore_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     restored_user = user_service.restore(session, user)
-    return create_success_response(data=restored_user, message="User restored successfully", request=request)
+    return create_success_response(
+        data=restored_user, message="User restored successfully", request=request
+    )

@@ -9,10 +9,12 @@ class BorrowRequestEvent(BaseModel, table=True):
 
     event_id: str = Field(unique=True, index=True, max_length=50)
     borrow_uuid: UUID | None = Field(default=None, foreign_key="borrow_requests.id", index=True)
+
     event_type: str = Field(max_length=50)  # e.g., created, approved, released, returned
-    actor_id: UUID | None = Field(default=None, foreign_key="users.id")
     note: str | None = Field(default=None, max_length=500)
     occurred_at: datetime = Field(default_factory=get_now_manila)
+
+    actor_id: UUID | None = Field(default=None, foreign_key="users.id")
 
     borrow_request: "BorrowRequest" = Relationship(
         back_populates="events",

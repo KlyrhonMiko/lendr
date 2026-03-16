@@ -11,13 +11,10 @@ from systems.admin.services.user_service import UserService
 from systems.auth.services.rbac_service import rbac_service
 
 reusable_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
-
 user_service = UserService()
 
 
-def get_current_user(
-    session: Session = Depends(get_session), token: str = Depends(reusable_oauth2)
-) -> User:
+def get_current_user(session: Session = Depends(get_session), token: str = Depends(reusable_oauth2)) -> User:
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         user_id = payload.get("sub")
@@ -57,10 +54,7 @@ def get_current_user(
 
 
 def require_system_access(system: str):
-    def _checker(
-        session: Session = Depends(get_session),
-        current_user: User = Depends(get_current_user),
-    ) -> None:
+    def _checker(session: Session = Depends(get_session), current_user: User = Depends(get_current_user),) -> None:
         if not rbac_service.has_system_access(session, current_user, system):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -71,10 +65,7 @@ def require_system_access(system: str):
 
 
 def require_permission(permission: str):
-    def _checker(
-        session: Session = Depends(get_session),
-        current_user: User = Depends(get_current_user),
-    ) -> None:
+    def _checker(session: Session = Depends(get_session), current_user: User = Depends(get_current_user),) -> None:
         if not rbac_service.has_permission(session, current_user, permission):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

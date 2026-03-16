@@ -20,7 +20,7 @@ config_service = ConfigurationService()
 
 @router.get(
     "",
-    response_model=GenericResponse[list[ConfigRead]],
+    response_model=GenericResponse[List[ConfigRead]],
     responses={401: {"model": GenericResponse}},
 )
 async def list_settings(
@@ -36,6 +36,7 @@ async def list_settings(
     settings, total = config_service.get_all(
         session, skip=skip, limit=limit, key=key, category=category
     )
+
     return create_success_response(
         data=settings,
         meta=PaginationMeta(total=total, limit=limit, offset=skip),
@@ -43,10 +44,9 @@ async def list_settings(
     )
 
 
-
 @router.get(
     "/categories",
-    response_model=GenericResponse[list[str]],
+    response_model=GenericResponse[List[str]],
     responses={401: {"model": GenericResponse}},
 )
 async def list_categories(
@@ -56,12 +56,13 @@ async def list_categories(
     _: None = Depends(require_permission("admin:config:manage")),
 ):
     categories = config_service.get_categories(session)
+
     return create_success_response(data=categories, request=request)
 
 
 @router.get(
     "/tables",
-    response_model=GenericResponse[list[str]],
+    response_model=GenericResponse[List[str]],
     responses={401: {"model": GenericResponse}},
 )
 async def list_configurable_tables(
@@ -75,7 +76,7 @@ async def list_configurable_tables(
 
 @router.get(
     "/tables/{table_name}/columns",
-    response_model=GenericResponse[list[str]],
+    response_model=GenericResponse[List[str]],
     responses={400: {"model": GenericResponse}, 401: {"model": GenericResponse}},
 )
 async def list_configurable_columns(
@@ -109,7 +110,9 @@ async def create_setting(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    if config_service.get_by_key(session, setting_data.key, category=setting_data.category):
+    if config_service.get_by_key(
+        session, setting_data.key, category=setting_data.category
+    ):
         raise HTTPException(
             status_code=400,
             detail=(
@@ -128,7 +131,9 @@ async def create_setting(
 
     return create_success_response(
         message=f"Setting '{setting_data.key}' created successfully",
-        data=config_service.get_by_key(session, setting_data.key, category=setting_data.category),
+        data=config_service.get_by_key(
+            session, setting_data.key, category=setting_data.category
+        ),
         request=request,
     )
 
@@ -136,7 +141,11 @@ async def create_setting(
 @router.patch(
     "/{key}",
     response_model=GenericResponse[ConfigRead],
-    responses={404: {"model": GenericResponse}, 400: {"model": GenericResponse}, 401: {"model": GenericResponse}},
+    responses={
+        404: {"model": GenericResponse},
+        400: {"model": GenericResponse},
+        401: {"model": GenericResponse},
+    },
 )
 async def update_setting(
     key: str,
@@ -220,7 +229,9 @@ async def restore_setting(
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_permission("admin:config:manage")),
 ):
-    setting = config_service.get_by_key(session, key, category=category, include_deleted=True)
+    setting = config_service.get_by_key(
+        session, key, category=category, include_deleted=True
+    )
     if not setting:
         raise HTTPException(
             status_code=404,

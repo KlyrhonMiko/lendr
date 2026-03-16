@@ -15,9 +15,10 @@ from systems.auth.dependencies import require_permission
 router = APIRouter()
 config_service = AuthConfigService()
 
+
 @router.get(
     "",
-    response_model=GenericResponse[list[ConfigRead]],
+    response_model=GenericResponse[List[ConfigRead]],
 )
 async def list_auth_settings(
     request: Request,
@@ -31,11 +32,13 @@ async def list_auth_settings(
     settings, total = config_service.get_all(
         session, skip=skip, limit=limit, key=key, category=category
     )
+
     return create_success_response(
         data=settings,
         meta=PaginationMeta(total=total, limit=limit, offset=skip),
         request=request,
     )
+
 
 @router.post(
     "",
@@ -55,5 +58,8 @@ async def create_auth_setting(
         category=setting_data.category,
         description=setting_data.description,
     )
-    setting = config_service.get_by_key(session, setting_data.key, category=setting_data.category)
+    setting = config_service.get_by_key(
+        session, setting_data.key, category=setting_data.category
+    )
+
     return create_success_response(data=setting, request=request)

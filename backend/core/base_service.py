@@ -1,7 +1,7 @@
 from typing import Any, Generic, Iterable, Type, TypeVar
 
 from fastapi import HTTPException
-from sqlmodel import Session, and_, col, select, func
+from sqlmodel import Session, and_, select, func
 
 from core.base_model import BaseModel
 from core.base_model import ConfigurationBase

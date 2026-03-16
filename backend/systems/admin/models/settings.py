@@ -1,8 +1,6 @@
 from core.base_model import ConfigurationBase
 from sqlalchemy import Index, UniqueConstraint
-from sqlmodel import Field
 
-from core.base_model import BaseModel
 
 
 class AdminConfig(ConfigurationBase, table=True):

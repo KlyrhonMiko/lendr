@@ -26,12 +26,16 @@ class BackupRun(BaseModel, table=True):
     )
     started_at: datetime = Field(default_factory=get_now_manila)
     completed_at: Optional[datetime] = Field(default=None)
-    status: str = Field(default="pending", max_length=20)  # pending, running, completed, failed
+    status: str = Field(
+        default="pending", max_length=20
+    )  # pending, running, completed, failed
     destination: str = Field(max_length=100)  # local, s3, both
     checksum: Optional[str] = Field(default=None, max_length=255)
-    triggered_by: Optional[UUID] = Field(default=None, foreign_key="users.id", index=True)
+    triggered_by: Optional[UUID] = Field(
+        default=None, foreign_key="users.id", index=True
+    )
 
-    artifacts: list["BackupArtifact"] = Relationship(back_populates="run")
+    artifacts: List["BackupArtifact"] = Relationship(back_populates="run")
 
 
 class BackupArtifact(BaseModel, table=True):
@@ -44,6 +48,7 @@ class BackupArtifact(BaseModel, table=True):
         max_length=20,
     )
     backup_run_id: UUID = Field(foreign_key="backup_runs.id", index=True)
+
     target_type: str = Field(max_length=20)  # local, s3
     file_path_or_key: str = Field(max_length=255)
     size_bytes: Optional[int] = Field(default=None)

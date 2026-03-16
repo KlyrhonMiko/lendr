@@ -3,7 +3,6 @@ import sys
 from logging.config import fileConfig
 from pathlib import Path
 
-import sqlalchemy as sa
 from sqlalchemy import engine_from_config, pool
 from sqlmodel import SQLModel
 from sqlmodel.main import AutoString

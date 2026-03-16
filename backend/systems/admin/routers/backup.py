@@ -15,6 +15,7 @@ from systems.admin.services.backup_service import backup_service
 
 router = APIRouter()
 
+
 @router.post("/trigger", response_model=GenericResponse[BackupRunRead])
 async def trigger_backup(
     request: Request,
@@ -37,6 +38,7 @@ async def trigger_backup(
         request=request
     )
 
+
 @router.get("/runs", response_model=GenericResponse[List[BackupRunRead]])
 async def list_backup_runs(
     request: Request,
@@ -53,6 +55,8 @@ async def list_backup_runs(
         message="Backup runs retrieved successfully",
         request=request
     )
+
+
 @router.get("/artifacts/{artifact_id}/download")
 async def download_artifact(
     artifact_id: str,

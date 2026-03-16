@@ -5,7 +5,6 @@ from typing import List
 from core.database import get_session
 from core.deps import get_current_user
 from core.schemas import GenericResponse, create_success_response
-from systems.inventory.models.borrow_request import BorrowRequest
 from systems.admin.models.user import User
 from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestBatchCreate,
@@ -24,6 +23,7 @@ def _borrower_portal_payload(payload: dict, current_user: User) -> dict:
     merged["request_channel"] = "borrower_portal"
     merged["borrower_id"] = current_user.user_id
     return merged
+
 
 @router.post("/requests", response_model=GenericResponse[BorrowRequestRead])
 async def borrower_submit_request(
@@ -52,6 +52,7 @@ async def borrower_submit_request(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
 
 @router.post("/batch", response_model=GenericResponse[List[BorrowRequestRead]])
 async def borrower_submit_batch_request(

@@ -21,9 +21,10 @@ borrower_service = BorrowerConfigService()
 
 # --- Inventory Config ---
 
+
 @router.get(
     "/inventory",
-    response_model=GenericResponse[list[ConfigRead]],
+    response_model=GenericResponse[List[ConfigRead]],
 )
 async def list_inventory_settings(
     request: Request,
@@ -37,11 +38,13 @@ async def list_inventory_settings(
     settings, total = inventory_service.get_all(
         session, skip=skip, limit=limit, key=key, category=category
     )
+
     return create_success_response(
         data=settings,
         meta=PaginationMeta(total=total, limit=limit, offset=skip),
         request=request,
     )
+
 
 @router.post(
     "/inventory",
@@ -61,14 +64,19 @@ async def create_inventory_setting(
         category=setting_data.category,
         description=setting_data.description,
     )
-    setting = inventory_service.get_by_key(session, setting_data.key, category=setting_data.category)
+    setting = inventory_service.get_by_key(
+        session, setting_data.key, category=setting_data.category
+    )
+
     return create_success_response(data=setting, request=request)
+
 
 # --- Borrower Config ---
 
+
 @router.get(
     "/borrower",
-    response_model=GenericResponse[list[ConfigRead]],
+    response_model=GenericResponse[List[ConfigRead]],
 )
 async def list_borrower_settings(
     request: Request,
@@ -82,11 +90,13 @@ async def list_borrower_settings(
     settings, total = borrower_service.get_all(
         session, skip=skip, limit=limit, key=key, category=category
     )
+
     return create_success_response(
         data=settings,
         meta=PaginationMeta(total=total, limit=limit, offset=skip),
         request=request,
     )
+
 
 @router.post(
     "/borrower",
@@ -106,5 +116,8 @@ async def create_borrower_setting(
         category=setting_data.category,
         description=setting_data.description,
     )
-    setting = borrower_service.get_by_key(session, setting_data.key, category=setting_data.category)
+    setting = borrower_service.get_by_key(
+        session, setting_data.key, category=setting_data.category
+    )
+
     return create_success_response(data=setting, request=request)

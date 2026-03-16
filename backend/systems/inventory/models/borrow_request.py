@@ -22,48 +22,52 @@ class BorrowRequest(BaseModel, table=True):
     borrow_id: str = Field(unique=True, index=True, max_length=50)
     borrower_uuid: UUID | None = Field(default=None, foreign_key="users.id", index=True)
     item_uuid: UUID | None = Field(default=None, foreign_key="inventory.id", index=True)
+
     qty_requested: int
     status: str = Field(default="pending", max_length=50)
     approved_by: UUID | None = Field(default=None, foreign_key="users.id")
     approved_at: datetime | None = Field(default=None)
+
     released_by: UUID | None = Field(default=None, foreign_key="users.id")
     released_at: datetime | None = Field(default=None)
+
     returned_by: UUID | None = Field(default=None, foreign_key="users.id")
-    received_by: UUID | None = Field(default=None, foreign_key="users.id")
     returned_at: datetime | None = Field(default=None)
+    received_by: UUID | None = Field(default=None, foreign_key="users.id")
+
     request_date: datetime = Field(default_factory=get_now_manila)
     notes: str | None = Field(default=None, max_length=500)
 
     transaction_ref: str = Field(unique=True, index=True, max_length=50)
-    due_at: datetime | None = Field(default=None)
-    returned_on_time: bool | None = Field(default=None)
     release_employee_id: str | None = Field(default=None, max_length=50)
     team_name: str | None = Field(default=None, max_length=100)
     store_name: str | None = Field(default=None, max_length=100)
     location_name: str | None = Field(default=None, max_length=100)
+    involved_people: List[dict] | None = Field(default=None, sa_column=Column(JSON))
 
-    is_emergency: bool = Field(default=False)
-    approval_channel: str = Field(default="standard", max_length=50)
-
-    involved_people: list[dict] | None = Field(default=None, sa_column=Column(JSON))
+    due_at: datetime | None = Field(default=None)
+    returned_on_time: bool | None = Field(default=None)
 
     request_channel: str = Field(default="inventory_manager", max_length=50)
+    approval_channel: str = Field(default="standard", max_length=50)
+
+    is_emergency: bool = Field(default=False)
     compliance_followup_required: bool = Field(default=False)
     compliance_followup_notes: str | None = Field(default=None, max_length=500)
 
-    events: list["BorrowRequestEvent"] = Relationship(
+    events: List["BorrowRequestEvent"] = Relationship(
         back_populates="borrow_request",
         sa_relationship_kwargs={"foreign_keys": "[BorrowRequestEvent.borrow_uuid]"},
     )
-    participants: list["BorrowParticipant"] = Relationship(
+    participants: List["BorrowParticipant"] = Relationship(
         back_populates="borrow_request",
         sa_relationship_kwargs={"foreign_keys": "[BorrowParticipant.borrow_uuid]"},
     )
-    items: list["BorrowRequestItem"] = Relationship(
+    items: List["BorrowRequestItem"] = Relationship(
         back_populates="borrow_request",
         sa_relationship_kwargs={"foreign_keys": "[BorrowRequestItem.borrow_uuid]"},
     )
-    assigned_units: list["BorrowRequestUnit"] = Relationship(
+    assigned_units: List["BorrowRequestUnit"] = Relationship(
         back_populates="borrow_request",
         sa_relationship_kwargs={"foreign_keys": "[BorrowRequestUnit.borrow_uuid]"},
     )

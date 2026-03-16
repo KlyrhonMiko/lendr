@@ -14,9 +14,7 @@ class AuthService:
         self.user_service = UserService()
 
     def authenticate_user(self, session: Session, username_or_email: str, password: str) -> User | None:
-        statement = select(User).where(
-            (User.username == username_or_email) | (User.email == username_or_email)
-        ).where(User.is_deleted.is_(False))
+        statement = select(User).where((User.username == username_or_email) | (User.email == username_or_email)).where(User.is_deleted.is_(False))
 
         user = session.exec(statement).first()
         if not user:
@@ -51,6 +49,7 @@ class AuthService:
         session.add(db_session)
         session.commit()
         session.refresh(db_session)
+
         return db_session
 
     def is_borrower_session_valid(self, session: Session, session_id: str) -> bool:
@@ -63,12 +62,14 @@ class AuthService:
             BorrowerSession.expires_at > get_now_manila()
         )
         db_session = session.exec(statement).first()
+
         return db_session is not None
 
     def revoke_borrower_session(self, session: Session, session_id: str):
         from systems.auth.models.borrower_session import BorrowerSession
         statement = select(BorrowerSession).where(BorrowerSession.session_id == session_id)
         db_session = session.exec(statement).first()
+
         if db_session:
             db_session.is_revoked = True
             session.add(db_session)
@@ -92,6 +93,7 @@ class AuthService:
         session.add(db_session)
         session.commit()
         session.refresh(db_session)
+
         return db_session
 
     def is_user_session_valid(self, session: Session, session_id: str) -> bool:
@@ -104,6 +106,7 @@ class AuthService:
             UserSession.expires_at > get_now_manila()
         )
         db_session = session.exec(statement).first()
+
         return db_session is not None
 
     def revoke_user_session(self, session: Session, session_id: str):
@@ -114,5 +117,6 @@ class AuthService:
             db_session.is_revoked = True
             session.add(db_session)
             session.commit()
+
 
 auth_service = AuthService()

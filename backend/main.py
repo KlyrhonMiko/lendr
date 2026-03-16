@@ -5,7 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from core.schemas import GenericResponse, create_error_response
+from core.schemas import create_error_response
 
 from systems.admin.routers.backup import router as backup
 from systems.admin.routers.configuration import router as config

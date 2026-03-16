@@ -12,7 +12,12 @@ from systems.inventory.services.audit_service import audit_service
 
 router = APIRouter()
 
-@router.get("/logs", response_model=GenericResponse[list[AuditLogRead]], responses={401: {"model": GenericResponse}})
+
+@router.get(
+    "/logs",
+    response_model=GenericResponse[List[AuditLogRead]],
+    responses={401: {"model": GenericResponse}},
+)
 async def list_audit_logs(
     request: Request,
     entity_type: Optional[str] = None,
@@ -28,16 +33,12 @@ async def list_audit_logs(
     Supports filtering by entity type (e.g., 'inventory', 'borrow') and specific entity IDs.
     """
     logs, total_count = audit_service.get_logs(
-        session, 
-        entity_type=entity_type, 
-        entity_id=entity_id, 
-        skip=skip, 
-        limit=limit
+        session, entity_type=entity_type, entity_id=entity_id, skip=skip, limit=limit
     )
-    
+
     return create_success_response(
         data=logs,
         meta=PaginationMeta(total=total_count, limit=limit, offset=skip),
         message="Audit logs retrieved successfully",
-        request=request
+        request=request,
     )

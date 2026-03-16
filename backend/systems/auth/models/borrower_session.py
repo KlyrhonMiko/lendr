@@ -11,7 +11,9 @@ class BorrowerSession(BaseModel, table=True):
     __tablename__ = "borrower_sessions"
 
     session_id: str = Field(unique=True, index=True, max_length=50)
+
     borrower_uuid: UUID | None = Field(default=None, foreign_key="users.id", index=True)
+    
     issued_at: datetime = Field(default_factory=get_now_manila)
     expires_at: datetime
     is_revoked: bool = Field(default=False)

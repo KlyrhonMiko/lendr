@@ -6,10 +6,11 @@ from pydantic import BaseModel, Field
 class InventoryItemBase(BaseModel):
     name: Optional[str] = Field(default=None, max_length=255)
     category: Optional[str] = Field(default=None, max_length=100)
+
     total_qty: Optional[int] = Field(default=None, ge=0)
     available_qty: Optional[int] = Field(default=None, ge=0)
-    condition: Optional[str] = Field(default=None, max_length=100)
 
+    condition: Optional[str] = Field(default=None, max_length=100)
     item_type: Optional[str] = Field(default="equipment", max_length=50)
     classification: Optional[str] = Field(default=None, max_length=100)
     is_trackable: Optional[bool] = Field(default=False)
@@ -17,8 +18,10 @@ class InventoryItemBase(BaseModel):
 class InventoryItemCreate(InventoryItemBase):
     name: str = Field(..., max_length=255)
     category: str = Field(..., max_length=100)
+
     total_qty: int = Field(..., ge=0)
     available_qty: int = Field(..., ge=0)
+    
     condition: str = Field(..., max_length=100)
 
 class InventoryItemUpdate(InventoryItemBase):

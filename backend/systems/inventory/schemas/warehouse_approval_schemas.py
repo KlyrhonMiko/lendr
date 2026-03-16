@@ -14,6 +14,7 @@ class WarehouseApprovalRead(WarehouseApprovalBase):
     approval_id: str
     borrow_id: str
     approved_at: datetime
+    
     printable_payload_json: dict
 
     @field_serializer("approved_at")

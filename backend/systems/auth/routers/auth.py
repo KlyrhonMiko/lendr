@@ -100,6 +100,7 @@ async def read_users_me(
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_permission("auth:session:manage")),
 ):
+
     return create_success_response(data=current_user, request=request)
 
 
@@ -121,6 +122,7 @@ async def get_my_policy(
         systems=[str(value) for value in policy.get("systems", [])],
         permissions=[str(value) for value in policy.get("permissions", [])],
     )
+
     return create_success_response(data=data, request=request)
 
 
