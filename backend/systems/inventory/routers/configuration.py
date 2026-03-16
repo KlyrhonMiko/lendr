@@ -32,7 +32,7 @@ async def list_inventory_settings(
     key: str | None = None,
     category: str | None = None,
     session: Session = Depends(get_session),
-    _: None = Depends(require_permission("inventory:manage")),
+    _: None = Depends(require_permission("inventory:config:manage")),
 ):
     settings, total = inventory_service.get_all(
         session, skip=skip, limit=limit, key=key, category=category
@@ -52,7 +52,7 @@ async def create_inventory_setting(
     setting_data: ConfigCreate,
     request: Request,
     session: Session = Depends(get_session),
-    _: None = Depends(require_permission("inventory:manage")),
+    _: None = Depends(require_permission("inventory:config:manage")),
 ):
     inventory_service.set_value(
         session,
@@ -77,7 +77,7 @@ async def list_borrower_settings(
     key: str | None = None,
     category: str | None = None,
     session: Session = Depends(get_session),
-    _: None = Depends(require_permission("inventory:manage")),
+    _: None = Depends(require_permission("inventory:config:manage")),
 ):
     settings, total = borrower_service.get_all(
         session, skip=skip, limit=limit, key=key, category=category
@@ -97,7 +97,7 @@ async def create_borrower_setting(
     setting_data: ConfigCreate,
     request: Request,
     session: Session = Depends(get_session),
-    _: None = Depends(require_permission("inventory:manage")),
+    _: None = Depends(require_permission("inventory:config:manage")),
 ):
     borrower_service.set_value(
         session,

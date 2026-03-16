@@ -11,6 +11,7 @@ from systems.inventory.schemas.requested_item_schemas import (
     RequestedItemUpdate,
 )
 from systems.inventory.services.requested_item_service import RequestedItemService
+from systems.auth.dependencies import require_permission
 
 router = APIRouter()
 req_service = RequestedItemService()
@@ -20,7 +21,8 @@ async def create_requested_item(
     request_data: RequestedItemCreate,
     request: Request,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("inventory:requested_items:manage")),
 ):
     payload = request_data.model_dump()
     if not payload.get("requested_by"):
@@ -38,7 +40,8 @@ async def list_requested_items(
     skip: int = 0,
     limit: int = 100,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("inventory:requested_items:manage")),
 ):
     items, total = req_service.get_all(session, skip=skip, limit=limit)
     return create_success_response(

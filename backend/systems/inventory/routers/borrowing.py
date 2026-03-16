@@ -26,6 +26,7 @@ from systems.inventory.schemas.borrow_request_schemas import (
 )
 from systems.inventory.dependencies import shift_guard
 from systems.inventory.services.borrow_request_service import BorrowService
+from systems.auth.dependencies import require_permission
 
 router = APIRouter()
 borrow_service = BorrowService()
@@ -35,7 +36,8 @@ async def create_request(
     request_data: BorrowRequestCreate,
     request: Request,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("inventory:borrow_requests:manage")),
 ):
     # Set borrower_id to current_user if not provided
     payload = request_data.model_dump()
@@ -60,7 +62,8 @@ async def create_batch_requests(
     request_data: BorrowRequestBatchCreate,
     request: Request,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("inventory:borrow_requests:manage")),
 ):
     try:
         borrow_reqs = borrow_service.create_batch_requests(
@@ -81,7 +84,8 @@ async def list_requests(
     skip: int = 0, 
     limit: int = 100, 
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("inventory:borrow_requests:manage")),
 ):
     requests, total = borrow_service.get_all(session, skip=skip, limit=limit)
     serialized = borrow_service.serialize_borrow_requests(session, requests)
@@ -99,6 +103,7 @@ async def approve_request(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: User = Depends(shift_guard),
+    __: None = Depends(require_permission("inventory:borrow_requests:manage")),
 ):
     try:
         updated_req = borrow_service.approve_request(
@@ -122,6 +127,7 @@ async def reject_request(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: User = Depends(shift_guard),
+    __: None = Depends(require_permission("inventory:borrow_requests:manage")),
 ):
     try:
         updated_req = borrow_service.reject_request(
@@ -144,6 +150,7 @@ async def release_request(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: User = Depends(shift_guard),
+    __: None = Depends(require_permission("inventory:borrow_requests:manage")),
 ):
     try:
         updated_req = borrow_service.release_request(
@@ -171,6 +178,7 @@ async def assign_units_to_request(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: User = Depends(shift_guard),
+    __: None = Depends(require_permission("inventory:borrow_requests:manage")),
 ):
     try:
         assignments = borrow_service.assign_units(
@@ -197,6 +205,7 @@ async def get_assigned_units(
     request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("inventory:borrow_requests:manage")),
 ):
     borrow_req = borrow_service.get(session, request_id)
     if not borrow_req:
@@ -213,6 +222,7 @@ async def return_request(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: User = Depends(shift_guard),
+    __: None = Depends(require_permission("inventory:borrow_requests:manage")),
 ):
     try:
         updated_req = borrow_service.return_request(
@@ -236,6 +246,7 @@ async def reopen_request(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: User = Depends(shift_guard),
+    __: None = Depends(require_permission("inventory:borrow_requests:manage")),
 ):
     try:
         updated_req = borrow_service.reopen_request(
@@ -255,7 +266,8 @@ async def get_request(
     request_id: str, 
     request: Request,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("inventory:borrow_requests:manage")),
 ):
     # The service 'get' method already handles the lookup
     borrow_req = borrow_service.get(session, request_id)
@@ -268,7 +280,8 @@ async def get_request_events(
     request_id: str,
     request: Request,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("inventory:borrow_requests:manage")),
 ):
     borrow_req = borrow_service.get(session, request_id)
     if not borrow_req:
@@ -285,6 +298,7 @@ async def send_to_warehouse(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: User = Depends(shift_guard),
+    __: None = Depends(require_permission("inventory:warehouse:manage")),
 ):
     try:
         updated_req = borrow_service.send_to_warehouse(
@@ -308,6 +322,7 @@ async def auto_route_warehouse(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: User = Depends(shift_guard),
+    __: None = Depends(require_permission("inventory:warehouse:manage")),
 ):
     try:
         updated_req = borrow_service.auto_route_to_warehouse(
@@ -330,6 +345,7 @@ async def warehouse_approve(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: User = Depends(shift_guard),
+    __: None = Depends(require_permission("inventory:warehouse:manage")),
 ):
     try:
         approval = borrow_service.warehouse_approve(
@@ -353,6 +369,7 @@ async def warehouse_approve_with_provision(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: User = Depends(shift_guard),
+    __: None = Depends(require_permission("inventory:warehouse:manage")),
 ):
     try:
         approval = borrow_service.warehouse_approve_with_provision(
@@ -377,6 +394,7 @@ async def warehouse_reject(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: User = Depends(shift_guard),
+    __: None = Depends(require_permission("inventory:warehouse:manage")),
 ):
     try:
         updated_req = borrow_service.warehouse_reject(

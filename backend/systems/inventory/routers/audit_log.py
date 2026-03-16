@@ -5,6 +5,7 @@ from sqlmodel import Session
 from core.database import get_session
 from core.deps import get_current_user
 from core.schemas import GenericResponse, PaginationMeta, create_success_response
+from systems.auth.dependencies import require_permission
 from systems.admin.models.user import User
 from systems.inventory.schemas.audit_log_schemas import AuditLogRead
 from systems.inventory.services.audit_service import audit_service
@@ -19,7 +20,8 @@ async def list_audit_logs(
     skip: int = 0,
     limit: int = 50,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("inventory:audit:view")),
 ):
     """
     Query system-wide activity logs via the AuditService.

@@ -13,6 +13,7 @@ from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestRead,
 )
 from systems.inventory.services.borrow_request_service import BorrowService
+from systems.auth.dependencies import require_permission
 
 router = APIRouter()
 borrow_service = BorrowService()
@@ -29,7 +30,8 @@ async def borrower_submit_request(
     request: Request,
     schema: BorrowRequestCreate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("inventory:borrower_portal:access")),
 ):
     portal_schema = BorrowRequestCreate(
         **_borrower_portal_payload(schema.model_dump(), current_user)
@@ -56,7 +58,8 @@ async def borrower_submit_batch_request(
     request: Request,
     batch_schema: BorrowRequestBatchCreate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("inventory:borrower_portal:access")),
 ):
     portal_schema = BorrowRequestBatchCreate(
         **_borrower_portal_payload(batch_schema.model_dump(), current_user)

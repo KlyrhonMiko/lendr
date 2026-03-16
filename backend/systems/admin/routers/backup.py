@@ -7,6 +7,7 @@ from sqlmodel import Session
 
 from core.database import get_session
 from core.deps import get_current_user
+from systems.auth.dependencies import require_permission
 from core.schemas import GenericResponse, create_success_response
 from systems.admin.models.user import User
 from systems.admin.schemas.backup_schemas import BackupRunRead, BackupTrigger
@@ -19,7 +20,8 @@ async def trigger_backup(
     request: Request,
     trigger: BackupTrigger,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("admin:backup:manage")),
 ):
     """
     Manually trigger a database backup.
@@ -39,7 +41,8 @@ async def trigger_backup(
 async def list_backup_runs(
     request: Request,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("admin:backup:manage")),
 ):
     """
     List all backup runs and their status.
@@ -54,7 +57,8 @@ async def list_backup_runs(
 async def download_artifact(
     artifact_id: str,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("admin:backup:manage")),
 ):
     """
     Download a specific backup artifact.

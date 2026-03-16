@@ -36,11 +36,19 @@ async def login_for_access_token(
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
-    db_session = auth_service.create_user_session(
+    if user.role == "borrower":
+        db_session = auth_service.create_borrower_session(
             session=session,
+            user_id=user.user_id,
+            expires_delta=access_token_expires,
             user_uuid=user.id,
-            expires_delta=access_token_expires
         )
+    else:
+        db_session = auth_service.create_user_session(
+                session=session,
+                user_uuid=user.id,
+                expires_delta=access_token_expires
+            )
 
     access_token = auth_service.create_access_token(
         data={"sub": user.user_id, "session_id": db_session.session_id}, 
@@ -64,12 +72,19 @@ async def borrower_login(
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
-    db_session = auth_service.create_borrower_session(
-        session=session,
-        user_id=user.user_id,
-        expires_delta=access_token_expires,
-        user_uuid=user.id,
-    )
+    if user.role == "borrower":
+        db_session = auth_service.create_borrower_session(
+            session=session,
+            user_id=user.user_id,
+            expires_delta=access_token_expires,
+            user_uuid=user.id,
+        )
+    else:
+        db_session = auth_service.create_user_session(
+                session=session,
+                user_uuid=user.id,
+                expires_delta=access_token_expires
+            )
 
     access_token = auth_service.create_access_token(
         data={"sub": user.user_id, "session_id": db_session.session_id}, 
@@ -83,7 +98,7 @@ async def borrower_login(
 async def read_users_me(
     request: Request,
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permission("auth:me")),
+    _: None = Depends(require_permission("auth:session:manage")),
 ):
     return create_success_response(data=current_user, request=request)
 
@@ -97,6 +112,7 @@ async def get_my_policy(
     request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("auth:session:manage")),
 ):
     policy = rbac_service.get_role_policy(session, current_user.role)
     data = RolePolicyRead(
@@ -112,7 +128,8 @@ async def get_my_policy(
 async def logout(
     request: Request,
     session: Session = Depends(get_session),
-    token: str = Depends(reusable_oauth2)
+    token: str = Depends(reusable_oauth2),
+    _: None = Depends(require_permission("auth:session:manage")),
 ):
     try:
         # Decode token to get session_id and user role

@@ -41,9 +41,9 @@ def get_current_user(
     from systems.auth.services.auth_service import auth_service
     
     is_valid = False
-    if user.role == "borrower":
+    if str(session_id).startswith("BSE"):
         is_valid = auth_service.is_borrower_session_valid(session, session_id)
-    else:
+    elif str(session_id).startswith("USE"):
         is_valid = auth_service.is_user_session_valid(session, session_id)
 
     if not is_valid:

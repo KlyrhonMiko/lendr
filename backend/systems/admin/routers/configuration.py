@@ -31,7 +31,7 @@ async def list_settings(
     category: str | None = None,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permission("config:view")),
+    _: None = Depends(require_permission("admin:config:manage")),
 ):
     settings, total = config_service.get_all(
         session, skip=skip, limit=limit, key=key, category=category
@@ -53,7 +53,7 @@ async def list_categories(
     request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permission("config:view")),
+    _: None = Depends(require_permission("admin:config:manage")),
 ):
     categories = config_service.get_categories(session)
     return create_success_response(data=categories, request=request)
@@ -67,7 +67,7 @@ async def list_categories(
 async def list_configurable_tables(
     request: Request,
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permission("config:view")),
+    _: None = Depends(require_permission("admin:config:manage")),
 ):
     tables = config_service.list_tables()
     return create_success_response(data=tables, request=request)
@@ -82,7 +82,7 @@ async def list_configurable_columns(
     table_name: str,
     request: Request,
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permission("config:view")),
+    _: None = Depends(require_permission("admin:config:manage")),
 ):
     try:
         columns = config_service.list_columns(table_name)
@@ -102,7 +102,7 @@ async def create_setting(
     request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permission("config:manage")),
+    _: None = Depends(require_permission("admin:config:manage")),
 ):
     try:
         config_service.validate_category_exists(setting_data.category)
@@ -145,7 +145,7 @@ async def update_setting(
     category: str = "general",
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permission("config:manage")),
+    _: None = Depends(require_permission("admin:config:manage")),
 ):
     try:
         config_service.validate_category_exists(category)
@@ -189,7 +189,7 @@ async def delete_setting(
     category: str = "general",
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permission("config:manage")),
+    _: None = Depends(require_permission("admin:config:manage")),
 ):
     setting = config_service.get_by_key(session, key, category=category)
     if not setting:
@@ -218,7 +218,7 @@ async def restore_setting(
     category: str = "general",
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permission("config:manage")),
+    _: None = Depends(require_permission("admin:config:manage")),
 ):
     setting = config_service.get_by_key(session, key, category=category, include_deleted=True)
     if not setting:

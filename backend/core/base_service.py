@@ -19,16 +19,17 @@ class BaseService(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         self.model = model
         self.lookup_field = lookup_field
 
-    def get(self, session: Session, lookup_val: Any, include_deleted: bool = False) -> ModelType | None:
-        
+    def get(
+        self, session: Session, lookup_val: Any, include_deleted: bool = False
+    ) -> ModelType | None:
+
         statement = select(self.model).where(
             getattr(self.model, self.lookup_field) == lookup_val
         )
         if not include_deleted:
             statement = statement.where(self.model.is_deleted.is_(False))
-            
-        return session.exec(statement).first()
 
+        return session.exec(statement).first()
 
     def get_all(
         self, session: Session, skip: int = 0, limit: int = 100
@@ -58,8 +59,6 @@ class BaseService(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
         # If a prefix is provided and the lookup_field is empty, generate it
         if prefix and not data.get(self.lookup_field):
-            
-
             data[self.lookup_field] = get_next_sequence(
                 session, self.model, self.lookup_field, prefix
             )
@@ -105,17 +104,17 @@ class BaseService(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         return db_obj
 
     def validate_uniqueness(
-        self, 
-        session: Session, 
-        schema: CreateSchemaType | UpdateSchemaType, 
+        self,
+        session: Session,
+        schema: CreateSchemaType | UpdateSchemaType,
         unique_fields: list[list[str]],
-        extra_filters: Iterable[Any] = None
+        extra_filters: Iterable[Any] = None,
     ):
         """
         Validates that the given sets of fields are unique among active records.
         """
         data = schema.model_dump()
-        
+
         for field_set in unique_fields:
             conditions = []
 
@@ -123,12 +122,16 @@ class BaseService(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                 val = data.get(field)
                 if val is not None:
                     conditions.append(getattr(self.model, field) == val)
-            
+
             if not conditions:
                 continue
 
-            query = select(self.model).where(and_(*conditions)).where(self.model.is_deleted.is_(False))
-            
+            query = (
+                select(self.model)
+                .where(and_(*conditions))
+                .where(self.model.is_deleted.is_(False))
+            )
+
             if extra_filters:
                 for filter_cond in extra_filters:
                     query = query.where(filter_cond)
@@ -138,8 +141,8 @@ class BaseService(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             if existing:
                 field_names = " and ".join(field_set)
                 raise HTTPException(
-                    status_code=400, 
-                    detail=f"A record with this {field_names} already exists."
+                    status_code=400,
+                    detail=f"A record with this {field_names} already exists.",
                 )
 
 
@@ -280,9 +283,11 @@ class ConfigBaseService(Generic[ConfigModelType]):
         return results, total
 
     def get_categories(self, session: Session) -> list[str]:
-        statement = select(self.model.category).where(
-            self.model.is_deleted.is_(False)
-        ).distinct()
+        statement = (
+            select(self.model.category)
+            .where(self.model.is_deleted.is_(False))
+            .distinct()
+        )
 
         return sorted(list(session.exec(statement).all()))
 

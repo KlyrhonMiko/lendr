@@ -3,6 +3,7 @@ from sqlmodel import Session
 
 from core.database import get_session
 from core.deps import get_current_user
+from systems.auth.dependencies import require_permission
 from core.schemas import GenericResponse, PaginationMeta, create_success_response
 from systems.admin.models.user import User
 from systems.admin.schemas.user_schemas import UserCreate, UserRead, UserUpdate
@@ -17,6 +18,8 @@ async def register_user(
     user_data: UserCreate,
     request: Request,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("admin:users:manage")),
 ):
     user = user_service.create(session, user_data)
     return create_success_response(data=user, message="User registered successfully", request=request)
@@ -29,6 +32,7 @@ async def list_users(
     limit: int = 100,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("admin:users:manage")),
 ):
     users, total = user_service.get_all(session, skip=skip, limit=limit)
     return create_success_response(
@@ -44,6 +48,7 @@ async def get_user(
     request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("admin:users:manage")),
 ):
     user = user_service.get(session, user_id)
     if not user:
@@ -58,6 +63,7 @@ async def update_user(
     request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("admin:users:manage")),
 ):
     user = user_service.get(session, user_id)
     if not user:
@@ -72,6 +78,7 @@ async def delete_user(
     request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("admin:users:manage")),
 ):
     user = user_service.get(session, user_id)
     if not user:
@@ -86,6 +93,7 @@ async def restore_user(
     request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("admin:users:manage")),
 ):
     user = user_service.get(session, user_id, include_deleted=True)
     if not user:
