@@ -4,14 +4,14 @@ Configuration Settings Seeding Script for Phase 5.5
 This script populates the system_settings table with all configurable enums,
 statuses, and conditions based on the Phase 5.5 implementation plan.
 
-Follows the exact same patterns as seed_test_data.py:
-- Uses the REST API endpoints (not direct DB queries)
+Features:
+- Direct database query to pre-create admin123 user if needed (idempotent)
+- Uses REST API endpoints for all configuration creation (idempotent)
 - Logs all requests/responses
-- Idempotent across re-runs (duplicate key+category is rejected gracefully)
-- Requires admin authentication (admin123:admin123)
+- Requires DATABASE_URL to be set for direct DB access
 
-Run from the backend directory:
-    python .tests/seed_configuration.py
+Run from the backend directory after `alembic upgrade head`:
+    python data/seed_configuration.py
 
 The script seeds the following domains:
     - Inventory (items, units, movements)
@@ -20,20 +20,35 @@ The script seeds the following domains:
     - Users (roles, shift types)
     - Backup lifecycle
     - Audit events
+
+Usage in CI/CD:
+    1. alembic upgrade head
+    2. python data/seed_configuration.py
+    3. python .tests/seed_test_data.py (optional, for test data)
 """
 
 from __future__ import annotations
 
 import json
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from time import perf_counter
 from typing import Any
+from uuid import uuid4
 
 import requests
+from sqlmodel import Session, select
+from sqlalchemy import create_engine, text
 
-BASE_URL = "http://127.0.0.1:8000"
+# Import settings and models from the backend
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from core.config import settings
+from systems.admin.models.user import User
+from utils.security import get_password_hash
+
+BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 
 # ANSI colors
 GREEN = "\033[92m"
@@ -239,16 +254,100 @@ def login(username: str, password: str, label: str) -> tuple[dict[str, str] | No
     return {"Authorization": f"Bearer {token}"}, response
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# DATABASE INITIALIZATION — Pre-create admin123 user if needed
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _get_db_engine():
+    """Get SQLAlchemy engine from settings."""
+    if not settings.DATABASE_URL:
+        print(f"{RED}ERROR: DATABASE_URL is not set. Cannot proceed.{RESET}")
+        sys.exit(1)
+    return create_engine(settings.DATABASE_URL)
+
+
+def ensure_admin_exists() -> None:
+    """Pre-create admin123 user directly in database if it doesn't exist (idempotent)."""
+    global pass_count, fail_count
+    
+    section("DATABASE INIT — Ensure admin123 user exists")
+    
+    try:
+        engine = _get_db_engine()
+        
+        with Session(engine) as db_session:
+            # Check if admin123 already exists
+            existing = db_session.exec(
+                select(User).where(User.username == "admin123", User.is_deleted.is_(False))
+            ).first()
+            
+            if existing:
+                print(f"  {GREEN}✓{RESET}  admin123 user already exists               {GREEN}ok{RESET}")
+                _log_event("admin_check", {"status": "already_exists", "user_id": str(existing.id)})
+                pass_count += 1
+                return
+            
+            # Create admin123 user directly
+            admin_user = User(
+                id=uuid4(),
+                user_id="ADMIN-001",
+                username="admin123",
+                email="admin@lendr.system",
+                hashed_password=get_password_hash("admin123"),
+                first_name="System",
+                last_name="Administrator",
+                middle_name="Init",
+                contact_number="",
+                employee_id="SYS-ADMIN-001",
+                role="admin",
+                shift_type="day",
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc),
+            )
+            
+            db_session.add(admin_user)
+            db_session.commit()
+            db_session.refresh(admin_user)
+            
+            print(f"  {GREEN}✓{RESET}  admin123 user created                     {GREEN}created{RESET}")
+            _log_event("admin_created", {
+                "user_id": str(admin_user.id),
+                "username": admin_user.username,
+                "email": admin_user.email,
+                "role": admin_user.role,
+            })
+            pass_count += 1
+            
+    except Exception as e:
+        fail_count += 1
+        print(f"  {RED}✗{RESET}  admin123 user creation                 {RED}failed{RESET}")
+        print(f"     {YELLOW}↳ {str(e)[:200]}{RESET}")
+        _log_event("admin_creation_error", {
+            "error": str(e),
+            "error_type": type(e).__name__,
+        })
+        raise
+
+
 def bootstrap_admin() -> dict[str, str]:
     """Login as admin123 and return auth headers."""
-    section("BOOTSTRAP — Admin Authentication")
+    section("BOOTSTRAP — Admin Authentication (API)")
     
-    admin_headers, resp = login("admin123", "admin123", "POST /api/auth/login (admin123)")
-    if not admin_headers:
-        print(f"\n{RED}Cannot continue without admin credentials. Aborting.{RESET}")
-        sys.exit(1)
+    # Retry login up to 3 times (in case API is starting)
+    max_retries = 3
+    for attempt in range(max_retries):
+        admin_headers, resp = login("admin123", "admin123", "POST /api/auth/login (admin123)")
+        if admin_headers:
+            return admin_headers
+        
+        if attempt < max_retries - 1:
+            print(f"  {YELLOW}Retry {attempt + 1}/{max_retries}...{RESET}")
+            import time
+            time.sleep(2)
     
-    return admin_headers
+    print(f"\n{RED}Cannot authenticate as admin123. Aborting.{RESET}")
+    _log_event("admin_auth_failed", {"attempts": max_retries})
+    sys.exit(1)
 
 
 def create_setting(
@@ -848,9 +947,13 @@ def print_summary() -> int:
 def main() -> int:
     """Main entry point."""
     try:
+        # Step 1: Ensure admin123 exists in database (direct DB query, idempotent)
+        ensure_admin_exists()
+        
+        # Step 2: Authenticate and get API headers
         admin_headers = bootstrap_admin()
         
-        # Seed all configuration categories
+        # Step 3: Seed all configuration categories via API
         seed_inventory_configurations(admin_headers)
         seed_inventory_unit_configurations(admin_headers)
         seed_inventory_batch_configurations(admin_headers)
@@ -863,7 +966,7 @@ def main() -> int:
         seed_backup_configurations(admin_headers)
         seed_audit_configurations(admin_headers)
         
-        # Print summary and return exit code
+        # Step 4: Print summary and return exit code
         return print_summary()
     
     except KeyboardInterrupt:
