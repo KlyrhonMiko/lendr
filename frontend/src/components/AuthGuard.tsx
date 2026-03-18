@@ -6,15 +6,21 @@ import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/auth';
 import { Loader2 } from 'lucide-react';
 
-export function AuthGuard({ children }: { children: React.ReactNode }) {
+export function AuthGuard({
+  children,
+  redirectTo = '/auth/login',
+}: {
+  children: React.ReactNode;
+  redirectTo?: string;
+}) {
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { loading } = useAuth();
 
   useEffect(() => {
     if (!loading && !auth.isAuthenticated()) {
-      router.push('/login');
+      router.push(redirectTo);
     }
-  }, [loading, router]);
+  }, [loading, redirectTo, router]);
 
   if (loading) {
     return (

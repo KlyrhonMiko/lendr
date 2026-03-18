@@ -1,0 +1,149 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { History, Search, Loader2, AlertCircle, ShieldCheck } from 'lucide-react';
+import { adminAuditApi, AuditLog, AuditLogParams } from './api';
+import { Pagination } from '@/components/ui/Pagination';
+import type { PaginationMeta } from '@/lib/api';
+
+export default function AdminAuditLogsPage() {
+  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [meta, setMeta] = useState<PaginationMeta | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
+  const [search, setSearch] = useState('');
+  const [entityFilter, setEntityFilter] = useState('');
+
+  const fetchLogs = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params: AuditLogParams = {
+        page,
+        per_page: perPage,
+        actor_id: search || undefined,
+        entity_type: entityFilter || undefined,
+      };
+      const res = await adminAuditApi.list(params);
+      setLogs(res.data);
+      if (res.meta) setMeta(res.meta);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch audit logs');
+    } finally {
+      setLoading(false);
+    }
+  }, [page, perPage, search, entityFilter]);
+
+  useEffect(() => {
+    fetchLogs();
+  }, [fetchLogs]);
+
+  return (
+    <div className="w-full max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+      <div>
+        <h1 className="text-4xl font-bold font-heading mb-2">System Audit Logs</h1>
+        <p className="text-muted-foreground text-lg">Trace administrative actions, security changes, and system configuration updates.</p>
+      </div>
+
+      <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-sm">
+        <div className="p-4 border-b border-border bg-background/50 flex items-center gap-3 flex-wrap">
+          <div className="relative w-80">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search Actor ID..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full h-10 pl-10 pr-4 rounded-xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all text-sm font-medium"
+            />
+          </div>
+
+          <select
+            value={entityFilter}
+            onChange={(e) => setEntityFilter(e.target.value)}
+            className="h-10 px-4 rounded-xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all text-sm font-medium"
+          >
+            <option value="">All Systems</option>
+            <option value="user">User Account</option>
+            <option value="role">Permissions & Roles</option>
+            <option value="config">System Configuration</option>
+            <option value="auth">Security & Session</option>
+          </select>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-border/50 text-xs uppercase tracking-wider text-muted-foreground bg-background/30 font-semibold font-heading">
+                <th className="p-4 pl-6">Timestamp</th>
+                <th className="p-4">System Entity</th>
+                <th className="p-4">Action Taken</th>
+                <th className="p-4">Administrator</th>
+                <th className="p-4 pr-6">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/50">
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="p-12 text-center">
+                    <Loader2 className="w-8 h-8 animate-spin text-indigo-500 mx-auto mb-3" />
+                    <p className="text-muted-foreground font-medium">Fetching administrative trail...</p>
+                  </td>
+                </tr>
+              ) : logs.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="p-12 text-center text-muted-foreground">
+                    <ShieldCheck className="w-12 h-12 mx-auto mb-4 opacity-10" />
+                    No administrative logs reported.
+                  </td>
+                </tr>
+              ) : (
+                logs.map((log) => (
+                  <tr key={log.audit_id} className="hover:bg-muted/30 transition-colors group">
+                    <td className="p-4 pl-6">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-foreground">{log.created_at.split(' - ')[0]}</span>
+                        <span className="text-xs text-muted-foreground">{log.created_at.split(' - ')[1]}</span>
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold tracking-tight text-foreground">{log.entity_id}</span>
+                        <span className="text-[10px] uppercase font-bold text-indigo-400">{log.entity_type}</span>
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <span className="text-sm font-medium text-foreground">{log.action.replace('_', ' ')}</span>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-foreground">{log.user_id || 'Master'}</span>
+                        <span className="text-[10px] text-muted-foreground">ID: {log.employee_id || 'ADM-001'}</span>
+                      </div>
+                    </td>
+                    <td className="p-4 pr-6">
+                      <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 uppercase">
+                        Verified
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {meta && (
+          <Pagination
+            meta={meta}
+            onPageChange={setPage}
+            onPerPageChange={setPerPage}
+          />
+        )}
+      </div>
+    </div>
+  );
+}

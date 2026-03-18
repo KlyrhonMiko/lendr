@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlmodel import Session
 
 from core.database import get_session
@@ -7,8 +7,8 @@ from core.schemas import (
     ConfigRead,
     ConfigUpdate,
     GenericResponse,
-    PaginationMeta,
     create_success_response,
+    make_pagination_meta,
 )
 from systems.admin.models.user import User
 from systems.admin.services.configuration_service import ConfigurationService
@@ -25,21 +25,22 @@ config_service = ConfigurationService()
 )
 async def list_settings(
     request: Request,
-    skip: int = 0,
-    limit: int = 100,
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=20, ge=1, le=500),
     key: str | None = None,
     category: str | None = None,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_permission("admin:config:manage")),
 ):
+    skip = (page - 1) * per_page
     settings, total = config_service.get_all(
-        session, skip=skip, limit=limit, key=key, category=category
+        session, skip=skip, limit=per_page, key=key, category=category
     )
 
     return create_success_response(
         data=settings,
-        meta=PaginationMeta(total=total, limit=limit, offset=skip),
+        meta=make_pagination_meta(total=total, skip=skip, limit=per_page, page=page, per_page=per_page),
         request=request,
     )
 

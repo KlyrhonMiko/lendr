@@ -1,4 +1,5 @@
-from sqlmodel import Session, select
+from datetime import datetime
+from sqlmodel import Session, select, func
 from uuid import UUID
 
 from core.base_service import BaseService
@@ -162,6 +163,87 @@ class BorrowService(
             )
         ).all()
         return {item.id: item.item_id for item in items}
+
+    def get_all(
+        self,
+        session: Session,
+        skip: int = 0,
+        limit: int = 100,
+        status: str | None = None,
+        request_channel: str | None = None,
+        is_emergency: bool | None = None,
+        borrower_id: str | None = None,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
+        returned_on_time: bool | None = None,
+    ) -> tuple[list[BorrowRequest], int]:
+        """Get all borrow requests with optional filters and pagination."""
+        statement = select(BorrowRequest).where(BorrowRequest.is_deleted.is_(False))
+
+        if status is not None:
+            statement = statement.where(BorrowRequest.status == status)
+        if request_channel is not None:
+            statement = statement.where(BorrowRequest.request_channel == request_channel)
+        if is_emergency is not None:
+            statement = statement.where(BorrowRequest.is_emergency == is_emergency)
+        if returned_on_time is not None:
+            statement = statement.where(BorrowRequest.returned_on_time == returned_on_time)
+        if date_from is not None:
+            statement = statement.where(BorrowRequest.request_date >= date_from)
+        if date_to is not None:
+            statement = statement.where(BorrowRequest.request_date <= date_to)
+        if borrower_id is not None:
+            # Resolve borrower_id string to a UUID via join
+            borrower = self.user_service.get(session, borrower_id)
+            if not borrower:
+                return [], 0
+            statement = statement.where(BorrowRequest.borrower_uuid == borrower.id)
+
+        count_statement = select(func.count()).select_from(statement.subquery())
+        total_count = session.exec(count_statement).one()
+
+        results = session.exec(
+            statement.order_by(BorrowRequest.request_date.desc()).offset(skip).limit(limit)
+        ).all()
+        return list(results), total_count
+
+    def get_by_borrower(
+        self,
+        session: Session,
+        borrower_uuid: UUID,
+        skip: int = 0,
+        limit: int = 100,
+        status: str | None = None,
+        is_emergency: bool | None = None,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
+    ) -> tuple[list[BorrowRequest], int]:
+        """Get all requests for a specific borrower with optional filters and pagination."""
+        statement = (
+            select(BorrowRequest)
+            .where(
+                BorrowRequest.borrower_uuid == borrower_uuid,
+                BorrowRequest.is_deleted.is_(False),
+            )
+            .order_by(BorrowRequest.request_date.desc())
+        )
+
+        if status is not None:
+            statement = statement.where(BorrowRequest.status == status)
+        if is_emergency is not None:
+            statement = statement.where(BorrowRequest.is_emergency == is_emergency)
+        if date_from is not None:
+            statement = statement.where(BorrowRequest.request_date >= date_from)
+        if date_to is not None:
+            statement = statement.where(BorrowRequest.request_date <= date_to)
+
+        total_statement = select(func.count()).select_from(statement.subquery())
+
+        total_count = session.exec(total_statement).one()
+        items = session.exec(statement.offset(skip).limit(limit)).all()
+
+        return list(items), total_count
+
 
     def serialize_borrow_request(
         self, session: Session, borrow_req: BorrowRequest

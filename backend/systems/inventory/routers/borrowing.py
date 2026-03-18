@@ -1,12 +1,13 @@
+from datetime import datetime
 from typing import Optional
 from systems.inventory.schemas.warehouse_approval_schemas import WarehouseApprovalRead
 from systems.inventory.schemas.borrow_request_schemas import BorrowRequestEventRead
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlmodel import Session
 
 from core.database import get_session
 from core.deps import get_current_user
-from core.schemas import GenericResponse, PaginationMeta, create_success_response
+from core.schemas import GenericResponse, create_success_response, make_pagination_meta
 from systems.admin.models.user import User
 from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestApprove,
@@ -68,17 +69,36 @@ async def create_request(
 )
 async def list_requests(
     request: Request,
-    skip: int = 0,
-    limit: int = 100,
+    page: int = Query(default=1, ge=1, description="Page number"),
+    per_page: int = Query(default=20, ge=1, le=500, description="Records per page"),
+    status: Optional[str] = Query(default=None, description="Filter by status (pending, approved, released, returned, rejected, etc.)"),
+    request_channel: Optional[str] = Query(default=None, description="Filter by request channel (inventory_manager, borrower_portal)"),
+    is_emergency: Optional[bool] = Query(default=None, description="Filter by emergency flag"),
+    borrower_id: Optional[str] = Query(default=None, description="Filter by borrower user ID (e.g. ST-001)"),
+    returned_on_time: Optional[bool] = Query(default=None, description="Filter by on-time return status"),
+    date_from: Optional[datetime] = Query(default=None, description="Filter requests from this date (inclusive)"),
+    date_to: Optional[datetime] = Query(default=None, description="Filter requests up to this date (inclusive)"),
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_permission("inventory:borrow_requests:manage")),
 ):
-    requests, total = borrow_service.get_all(session, skip=skip, limit=limit)
+    skip = (page - 1) * per_page
+    requests, total = borrow_service.get_all(
+        session,
+        skip=skip,
+        limit=per_page,
+        status=status,
+        request_channel=request_channel,
+        is_emergency=is_emergency,
+        borrower_id=borrower_id,
+        returned_on_time=returned_on_time,
+        date_from=date_from,
+        date_to=date_to,
+    )
     serialized = borrow_service.serialize_borrow_requests(session, requests)
     return create_success_response(
         data=serialized,
-        meta=PaginationMeta(total=total, limit=limit, offset=skip),
+        meta=make_pagination_meta(total=total, skip=skip, limit=per_page, page=page, per_page=per_page),
         request=request,
     )
 

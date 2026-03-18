@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import HTTPException
 from collections import Counter
-from typing import Any, cast
+from typing import Any, Optional, cast
 from uuid import UUID
 from systems.admin.models.user import User
 from sqlmodel import Session, select, func
@@ -22,6 +22,11 @@ from systems.inventory.schemas.inventory_movement_schemas import (
     InventoryMovementAnomalyRead,
     InventoryMovementReconciliationRead,
     InventoryMovementSummaryRead,
+)
+from systems.inventory.models.inventory_batch import InventoryBatch
+from systems.inventory.schemas.inventory_batch_schemas import (
+    InventoryBatchCreate,
+    InventoryBatchUpdate,
 )
 
 
@@ -67,7 +72,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         )
 
     def _validate_item_config(self, session: Session, data: dict[str, Any]) -> None:
-        if data.get("item_type") is not None:
+        if data.get("item_type"):
             self._require_config_key(
                 session,
                 key=str(data["item_type"]),
@@ -75,7 +80,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                 field_name="item_type",
                 field_label="inventory item type",
             )
-        if data.get("condition") is not None:
+        if data.get("condition"):
             self._require_config_key(
                 session,
                 key=str(data["condition"]),
@@ -83,7 +88,15 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                 field_name="condition",
                 field_label="inventory item condition",
             )
-        if data.get("category") is not None:
+        if data.get("classification"):
+            self._require_config_key(
+                session,
+                key=str(data["classification"]),
+                table_name="inventory",
+                field_name="classification",
+                field_label="inventory item classification",
+            )
+        if data.get("category"):
             self._require_config_key(
                 session,
                 key=str(data["category"]),
@@ -91,6 +104,47 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                 field_name="category",
                 field_label="inventory item category",
             )
+
+    def get_all(
+        self,
+        session: Session,
+        skip: int = 0,
+        limit: int = 100,
+        search: Optional[str] = None,
+        category: Optional[str] = None,
+        item_type: Optional[str] = None,
+        classification: Optional[str] = None,
+        is_trackable: Optional[bool] = None,
+        condition: Optional[str] = None,
+        include_deleted: bool = False,
+    ) -> tuple[list[InventoryItem], int]:
+        """Get inventory items with optional search and filters."""
+        statement = select(InventoryItem)
+
+        if not include_deleted:
+            statement = statement.where(InventoryItem.is_deleted.is_(False))
+
+        if search:
+            statement = statement.where(InventoryItem.name.ilike(f"%{search}%"))
+        if category is not None:
+            statement = statement.where(InventoryItem.category == category)
+        if item_type is not None:
+            statement = statement.where(InventoryItem.item_type == item_type)
+        if classification is not None:
+            statement = statement.where(InventoryItem.classification == classification)
+        if is_trackable is not None:
+            statement = statement.where(InventoryItem.is_trackable == is_trackable)
+        if condition:
+            statement = statement.where(InventoryItem.condition == condition)
+
+        count_statement = select(func.count()).select_from(statement.subquery())
+        total_count = session.exec(count_statement).one()
+
+        items = session.exec(
+            statement.order_by(InventoryItem.name.asc()).offset(skip).limit(limit)
+        ).all()
+
+        return list(items), total_count
 
     def create(
         self, 
@@ -155,6 +209,210 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
 
         return super().restore(session, db_obj, actor_id=actor_id)
 
+    def recalculate_batch_status(self, session: Session, batch: InventoryBatch) -> str:
+        """
+        Automatically determine batch status based on thresholds in InventoryConfig.
+        Priority: Expired > Near Expiry > Out of Stock > Low Stock > Healthy
+        """
+        configs = self.config_service.get_by_category(session, "inventory_batches_status")
+        thresholds = {c.key: c.value for c in configs}
+        
+        # Default thresholds if not configured
+        expired_days = int(thresholds.get("expired", "0"))
+        near_expiry_days = int(thresholds.get("near_expiry", "7"))
+        out_of_stock_qty = int(thresholds.get("out_of_stock", "0"))
+        low_stock_qty = int(thresholds.get("low_stock", "10"))
+        
+        now = get_now_manila()
+        
+        # 1. Check Expiration
+        if batch.expiration_date:
+            exp_date = batch.expiration_date
+            if exp_date.tzinfo is None:
+                # If naive, we assume it's UTC (standard practice for DB)
+                exp_date = exp_date.replace(tzinfo=timezone.utc)
+            
+            days_remaining = (exp_date - now).days
+            if days_remaining <= expired_days:
+                return "expired"
+            if days_remaining <= near_expiry_days:
+                return "near_expiry"
+                
+        # 2. Check Quantity
+        if batch.available_qty <= out_of_stock_qty:
+            return "out_of_stock"
+        if batch.available_qty <= low_stock_qty:
+            return "low_stock"
+            
+        return "healthy"
+
+    def _sync_item_quantities(self, session: Session, item_id: str) -> InventoryItem:
+        """
+        Purely aggregate quantities from children (Units/Batches) and update parent InventoryItem.
+        """
+        item = self.get(session, item_id)
+        if not item:
+            raise ValueError(f"Item {item_id} not found for sync")
+
+        if item.is_trackable:
+            # Aggregate from InventoryUnit
+            # Total: not retired, not deleted
+            total_stmt = select(func.count(InventoryUnit.id)).where(
+                InventoryUnit.inventory_uuid == item.id,
+                InventoryUnit.is_deleted.is_(False),
+                InventoryUnit.status != "retired"
+            )
+            # Available: status is 'available', not deleted
+            avail_stmt = select(func.count(InventoryUnit.id)).where(
+                InventoryUnit.inventory_uuid == item.id,
+                InventoryUnit.is_deleted.is_(False),
+                InventoryUnit.status == "available"
+            )
+            
+            item.total_qty = session.exec(total_stmt).one()
+            item.available_qty = session.exec(avail_stmt).one()
+        else:
+            # Aggregate from InventoryBatch
+            total_stmt = select(func.sum(InventoryBatch.total_qty)).where(
+                InventoryBatch.inventory_uuid == item.id,
+                InventoryBatch.is_deleted.is_(False)
+            )
+            avail_stmt = select(func.sum(InventoryBatch.available_qty)).where(
+                InventoryBatch.inventory_uuid == item.id,
+                InventoryBatch.is_deleted.is_(False)
+            )
+            
+            total_sum = session.exec(total_stmt).one()
+            avail_sum = session.exec(avail_stmt).one()
+            
+            item.total_qty = total_sum if total_sum is not None else 0
+            item.available_qty = avail_sum if avail_sum is not None else 0
+
+        session.add(item)
+        return item
+
+    def sync_all_quantities(self, session: Session) -> int:
+        """Syncs quantities for all non-deleted inventory items."""
+        items = session.exec(select(InventoryItem).where(InventoryItem.is_deleted.is_(False))).all()
+        for item in items:
+            self._sync_item_quantities(session, item.item_id)
+        return len(items)
+
+    def get_batch(self, session: Session, batch_id: str) -> InventoryBatch | None:
+        """Get a single batch by human-readable batch_id."""
+        return session.exec(
+            select(InventoryBatch).where(InventoryBatch.batch_id == batch_id)
+        ).first()
+
+    def get_batches(
+        self,
+        session: Session,
+        item_id: str,
+        status: Optional[str] = None,
+        include_expired: bool = True,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> tuple[list[InventoryBatch], int]:
+        """Get batches for an item with optional status filter."""
+        item = self.get(session, item_id)
+        if not item:
+            return [], 0
+            
+        statement = select(InventoryBatch).where(InventoryBatch.inventory_uuid == item.id)
+        
+        if status:
+            statement = statement.where(InventoryBatch.status == status)
+            
+        if not include_expired:
+            statement = statement.where(InventoryBatch.status != "expired")
+            
+        count_statement = select(func.count()).select_from(statement.subquery())
+        total_count = session.exec(count_statement).one()
+        
+        batches = session.exec(
+            statement.order_by(InventoryBatch.received_at.desc()).offset(skip).limit(limit)
+        ).all()
+        
+        return list(batches), total_count
+
+    def create_batch(
+        self,
+        session: Session,
+        item_id: str,
+        schema: InventoryBatchCreate,
+        actor_id: UUID | None = None,
+    ) -> InventoryBatch:
+        """Create a new batch for an untrackable item (Metadata only)."""
+        item = self.get(session, item_id)
+        if not item:
+            raise ValueError(f"Item {item_id} not found")
+            
+        if item.is_trackable:
+            raise ValueError(f"Item {item_id} is trackable and uses individual units, not batches")
+            
+        batch = InventoryBatch(
+            batch_id=get_next_sequence(session, InventoryBatch, "batch_id", "BATCH"),
+            inventory_uuid=item.id,
+            expiration_date=schema.expiration_date,
+            available_qty=0,
+            total_qty=0,
+        )
+        batch.status = self.recalculate_batch_status(session, batch)
+        
+        session.add(batch)
+        
+        # Log audit
+        audit_service.log_action(
+            db=session,
+            entity_type="inventory_batch",
+            entity_id=batch.batch_id,
+            action="created",
+            before={},
+            after=batch.model_dump(mode="json"),
+            actor_id=actor_id,
+        )
+
+        self._sync_item_quantities(session, item_id)
+        
+        return batch
+
+    def update_batch(
+        self,
+        session: Session,
+        batch_id: str,
+        schema: InventoryBatchUpdate,
+        actor_id: UUID | None = None,
+    ) -> InventoryBatch:
+        """Update batch metadata (status and/or expiration)."""
+        batch = self.get_batch(session, batch_id)
+        if not batch:
+            raise ValueError(f"Batch {batch_id} not found")
+            
+        before = batch.model_dump(mode="json")
+        
+        if schema.status is not None:
+            batch.status = schema.status
+        if schema.expiration_date is not None:
+            batch.expiration_date = schema.expiration_date
+        
+        # Auto-recalculate after manual overrides or date changes
+        batch.status = self.recalculate_batch_status(session, batch)
+            
+        session.add(batch)
+        
+        # Log audit
+        audit_service.log_action(
+            db=session,
+            entity_type="inventory_batch",
+            entity_id=batch.batch_id,
+            action="updated",
+            before=before,
+            after=batch.model_dump(mode="json"),
+            actor_id=actor_id,
+        )
+        
+        return batch
+
     def adjust_stock(
         self, 
         session: Session, 
@@ -165,7 +423,11 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         reason_code: str | None = None,
         note: str | None = None,
         actor_id: UUID | None = None,
+        batch_id: str | None = None,
     ) -> InventoryItem:
+        """
+        Transactional stock adjustment for an item, optionally targeting a specific batch.
+        """
         self._require_config_key(
             session,
             key=movement_type,
@@ -199,23 +461,38 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         if not db_obj:
             raise ValueError(f"Item {item_id} not found")
 
+        batch = None
+        if batch_id:
+            batch = self.get_batch(session, batch_id)
+            if not batch:
+                raise ValueError(f"Batch {batch_id} not found")
+            if batch.inventory_uuid != db_obj.id:
+                raise ValueError(f"Batch {batch_id} does not belong to item {item_id}")
+                
+            # Update batch quantities
+            batch.available_qty += qty_change
+            if qty_change > 0:
+                batch.total_qty += qty_change
+                
+            # Auto-update status based on thresholds
+            batch.status = self.recalculate_batch_status(session, batch)
+
+            session.add(batch)
+
         old_qty = db_obj.available_qty
 
-        # Update quantities
-        db_obj.available_qty += qty_change
-        
-        # If adding stock (procurement/return), also update total_qty
-        if qty_change > 0:
-            db_obj.total_qty += qty_change
-        
+        # Sync Item quantities (Purely Aggregate)
+        self._sync_item_quantities(session, item_id)
+
         # Validation: prevent negative stock
         if db_obj.available_qty < 0:
-            raise ValueError(f"Insufficient stock for {item_id}. Available: {db_obj.available_qty - qty_change}")
+            raise ValueError(f"Insufficient total stock for {item_id}. Available: {db_obj.available_qty - qty_change}")
 
         # LOG THE MOVEMENT (The Ledger)
         movement = InventoryMovement(
             movement_id=get_next_sequence(session, InventoryMovement, "movement_id", "MOV"),
             inventory_uuid=db_obj.id,
+            batch_uuid=batch.id if batch else None,
             qty_change=qty_change,
             movement_type=movement_type,
             reason_code=reason_code,
@@ -224,6 +501,17 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             actor_id=actor_id,
         )
 
+        audit_data_after = {
+            "qty": db_obj.available_qty,
+            "qty_change": qty_change,
+            "movement_type": movement_type,
+            "reason_code": reason_code,
+            "reference_id": reference_id,
+            "note": note,
+        }
+        if batch:
+            audit_data_after["batch_id"] = batch.batch_id
+
         audit_service.log_action(
             db=session,
             entity_type="inventory",
@@ -231,14 +519,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             action="stock_adjustment",
             reason_code=reason_code,
             before={"qty": old_qty},
-            after={
-                "qty": db_obj.available_qty,
-                "qty_change": qty_change,
-                "movement_type": movement_type,
-                "reason_code": reason_code,
-                "reference_id": reference_id,
-                "note": note,
-            },
+            after=audit_data_after,
             actor_id=actor_id,
         )
         session.add(movement)
@@ -281,36 +562,68 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             select(InventoryUnit).where(InventoryUnit.inventory_uuid == item.id)
         ).all()
 
-    def get_history(self, session: Session, item_id: str) -> list[dict[str, Any]]:
+    def get_history(
+        self,
+        session: Session,
+        item_id: str,
+        movement_type: Optional[str] = None,
+        date_from: Optional[datetime] = None,
+        date_to: Optional[datetime] = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Get movement history for a specific item with optional filters and pagination."""
 
         item = self.get(session, item_id)
         if not item:
-            return []
-            
+            return [], 0
+
+        statement = select(
+            InventoryMovement,
+            User.user_id,
+            InventoryItem.item_id,
+        ).outerjoin(
+            User, InventoryMovement.actor_id == User.id
+        ).outerjoin(
+            InventoryItem, InventoryMovement.inventory_uuid == InventoryItem.id
+        ).where(
+            InventoryMovement.inventory_uuid == item.id
+        )
+
+        if movement_type:
+            statement = statement.where(InventoryMovement.movement_type == movement_type)
+        if date_from:
+            statement = statement.where(InventoryMovement.occurred_at >= date_from)
+        if date_to:
+            statement = statement.where(InventoryMovement.occurred_at <= date_to)
+
+        count_statement = select(func.count()).select_from(statement.subquery())
+        total_count = session.exec(count_statement).one()
+
         results = session.exec(
-            select(
-                InventoryMovement, 
-                User.user_id, 
-                InventoryItem.item_id
-            ).outerjoin(
-                User, InventoryMovement.actor_id == User.id
-            ).outerjoin(
-                InventoryItem, InventoryMovement.inventory_uuid == InventoryItem.id
-            ).where(
-                InventoryMovement.inventory_uuid == item.id
-            ).order_by(
-                InventoryMovement.occurred_at.desc()
+            statement.order_by(InventoryMovement.occurred_at.desc()).offset(skip).limit(limit)
+        ).all()
+
+        # Identify reversed movements
+        moved_ids = [m.movement_id for m, _, _ in results]
+        reversals = session.exec(
+            select(InventoryMovement.reference_id)
+            .where(
+                InventoryMovement.movement_type == "reversal",
+                InventoryMovement.reference_id.in_(moved_ids)
             )
         ).all()
-        
+        reversed_ids = set(reversals)
+
         formatted_results = []
         for movement, user_id, inv_item_id in results:
             m_dict = movement.model_dump()
             m_dict["user_id"] = user_id
             m_dict["inventory_id"] = inv_item_id
+            m_dict["is_reversed"] = movement.movement_id in reversed_ids
             formatted_results.append(m_dict)
-            
-        return formatted_results
+
+        return formatted_results, total_count
 
     def get_movement(self, session: Session, movement_id: str) -> InventoryMovement | None:
         return session.exec(
@@ -322,7 +635,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         if not item:
             raise ValueError(f"Item {item_id} not found")
 
-        movements = self.get_history(session, item_id)
+        movements, _ = self.get_history(session, item_id)
         ledger_balance = sum(movement["qty_change"] for movement in movements)
         latest_movement_at = movements[0]["occurred_at"] if movements else None
         delta = ledger_balance - item.available_qty
@@ -504,6 +817,8 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                 level = "high" if abs(reconciliation.delta) >= 5 else "medium"
                 anomalies.append(
                     InventoryMovementAnomalyRead(
+                        item_id=item.item_id,
+                        item_name=item.name,
                         anomaly_type="ledger_mismatch",
                         severity=level,
                         message="Ledger-derived balance does not match item available quantity",
@@ -519,6 +834,8 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             if item.available_qty < 0:
                 anomalies.append(
                     InventoryMovementAnomalyRead(
+                        item_id=item.item_id,
+                        item_name=item.name,
                         anomaly_type="negative_available_qty",
                         severity="critical",
                         message="Item has negative available quantity",
@@ -529,6 +846,8 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             if item.available_qty > item.total_qty:
                 anomalies.append(
                     InventoryMovementAnomalyRead(
+                        item_id=item.item_id,
+                        item_name=item.name,
                         anomaly_type="available_exceeds_total",
                         severity="high",
                         message="Item has available quantity greater than total quantity",
@@ -544,54 +863,71 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         return [a for a in anomalies if a.severity == normalized]
 
     def get_all_movements(
-        self, 
-        session: Session, 
-        skip: int = 0, 
+        self,
+        session: Session,
+        skip: int = 0,
         limit: int = 100,
         movement_type: str | None = None,
-        inventory_id: str | None = None
+        inventory_id: str | None = None,
+        reason_code: str | None = None,
+        reference_id: str | None = None,
+        date_from: Optional[datetime] = None,
+        date_to: Optional[datetime] = None,
     ) -> tuple[list[dict[str, Any]], int]:
         """Get all inventory movements across all items with optional filtering and pagination."""
-        # Build query with filters and joins
         statement = select(
-            InventoryMovement, 
-            User.user_id, 
-            InventoryItem.item_id
+            InventoryMovement,
+            User.user_id,
+            InventoryItem.item_id,
         ).outerjoin(
             User, InventoryMovement.actor_id == User.id
         ).outerjoin(
             InventoryItem, InventoryMovement.inventory_uuid == InventoryItem.id
         )
-        
+
         if inventory_id:
             item = self.get(session, inventory_id)
             if not item:
                 return [], 0
             statement = statement.where(InventoryMovement.inventory_uuid == item.id)
-        
+
         if movement_type:
             statement = statement.where(InventoryMovement.movement_type == movement_type)
-        
-        # Count total before pagination
+        if reason_code:
+            statement = statement.where(InventoryMovement.reason_code == reason_code)
+        if reference_id:
+            statement = statement.where(InventoryMovement.reference_id == reference_id)
+        if date_from:
+            statement = statement.where(InventoryMovement.occurred_at >= date_from)
+        if date_to:
+            statement = statement.where(InventoryMovement.occurred_at <= date_to)
+
         count_statement = select(func.count()).select_from(statement.subquery())
         total_count = session.exec(count_statement).one()
-        
-        # Get paginated results ordered by most recent first
+
         results = session.exec(
-            statement
-            .order_by(InventoryMovement.occurred_at.desc())
-            .offset(skip)
-            .limit(limit)
+            statement.order_by(InventoryMovement.occurred_at.desc()).offset(skip).limit(limit)
         ).all()
-        
-        # Format results for the schema
+
+        # Identify reversed movements
+        moved_ids = [m.movement_id for m, _, _ in results]
+        reversals = session.exec(
+            select(InventoryMovement.reference_id)
+            .where(
+                InventoryMovement.movement_type == "reversal",
+                InventoryMovement.reference_id.in_(moved_ids)
+            )
+        ).all()
+        reversed_ids = set(reversals)
+
         formatted_results = []
         for movement, user_id, item_id in results:
             m_dict = movement.model_dump()
             m_dict["user_id"] = user_id
             m_dict["inventory_id"] = item_id
+            m_dict["is_reversed"] = movement.movement_id in reversed_ids
             formatted_results.append(m_dict)
-            
+
         return formatted_results, total_count
 
     def _verify_shift_access(self, user: User):
@@ -691,7 +1027,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         serial_number: str | None = None,
         internal_ref: str | None = None,
         expiration_date: datetime | None = None,
-        condition: str | None = None,
+        condition: str = "good",
         actor_id: UUID | None = None,
         actor_user_id: str | None = None,
         actor_employee_id: str | None = None,
@@ -710,6 +1046,10 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         )
 
         # Create unit with default status "available"
+        if expiration_date and expiration_date.tzinfo is None:
+            from utils.time_utils import MANILA_TZ
+            expiration_date = expiration_date.replace(tzinfo=timezone.utc).astimezone(MANILA_TZ)
+
         initial_status = "expired" if expiration_date and expiration_date <= get_now_manila() else "available"
         self._require_config_key(
             session,
@@ -718,7 +1058,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             field_name="status",
             field_label="inventory unit status",
         )
-        if condition is not None:
+        if condition:
             self._require_config_key(
                 session,
                 key=condition,
@@ -752,12 +1092,14 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                 "serial_number": serial_number,
                 "internal_ref": internal_ref,
                 "status": unit.status,
+                "condition": unit.condition,
                 "expiration_date": expiration_date.isoformat() if expiration_date else None,
             },
             actor_id=actor_id,
         )
 
         session.add(unit)
+        self._sync_item_quantities(session, item_id)
         return unit
 
     def create_units_batch(
@@ -811,6 +1153,10 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             if isinstance(expiration_date, str):
                 expiration_date = datetime.fromisoformat(expiration_date)
 
+            if expiration_date and expiration_date.tzinfo is None:
+                from utils.time_utils import MANILA_TZ
+                expiration_date = expiration_date.replace(tzinfo=timezone.utc).astimezone(MANILA_TZ)
+
             initial_status = "expired" if expiration_date and expiration_date <= get_now_manila() else "available"
             self._require_config_key(
                 session,
@@ -819,7 +1165,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                 field_name="status",
                 field_label="inventory unit status",
             )
-            if condition is not None:
+            if condition:
                 self._require_config_key(
                     session,
                     key=condition,
@@ -854,6 +1200,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                     "serial_number": serial_number,
                     "internal_ref": internal_ref,
                     "status": unit.status,
+                    "condition": unit.condition,
                     "expiration_date": expiration_date.isoformat() if expiration_date else None,
                 },
                 actor_id=actor_id,
@@ -862,6 +1209,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             session.add(unit)
             created_units.append(unit)
 
+        self._sync_item_quantities(session, item_id)
         return created_units
 
     def update_unit(
@@ -897,7 +1245,12 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         if expiration_date is not None:
             unit.expiration_date = expiration_date
 
-        if unit.expiration_date and unit.expiration_date <= get_now_manila() and unit.status in {"available", "borrowed"}:
+        current_exp = unit.expiration_date
+        if current_exp and current_exp.tzinfo is None:
+            from utils.time_utils import MANILA_TZ
+            current_exp = current_exp.replace(tzinfo=timezone.utc).astimezone(MANILA_TZ)
+
+        if current_exp and current_exp <= get_now_manila() and unit.status in {"available", "borrowed"}:
             self._require_config_key(
                 session,
                 key="expired",
@@ -918,7 +1271,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         if item and self._is_consumable_item(item) and unit.status == "borrowed":
             raise ValueError("Consumable/perishable units cannot use 'borrowed' status")
 
-        if condition is not None:
+        if condition:
             self._require_config_key(
                 session,
                 key=condition,
@@ -946,6 +1299,8 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         )
 
         session.add(unit)
+        if item:
+            self._sync_item_quantities(session, item.item_id)
         return unit
 
     def retire_unit(
@@ -999,6 +1354,12 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         )
 
         session.add(unit)
+        
+        # Sync parent item
+        item = session.exec(select(InventoryItem).where(InventoryItem.id == unit.inventory_uuid)).first()
+        if item:
+            self._sync_item_quantities(session, item.item_id)
+            
         return unit
 
     def get_units_by_status(
@@ -1008,10 +1369,13 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         status: str | None = None,
         expiring_before: datetime | None = None,
         include_expired: bool = True,
+        condition: str | None = None,
+        serial_number: str | None = None,
+        internal_ref: str | None = None,
         skip: int = 0,
         limit: int = 100,
     ) -> tuple[list[InventoryUnit], int]:
-        """Get units for an item, optionally filtered by status, with pagination."""
+        """Get units for an item with optional status, condition, and identifier filters."""
 
         item = self.get(session, item_id)
         if not item:
@@ -1043,15 +1407,18 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             )
             statement = statement.where(InventoryUnit.status != "expired")
 
-        # Count total
+        if condition:
+            statement = statement.where(InventoryUnit.condition == condition)
+        if serial_number is not None:
+            statement = statement.where(InventoryUnit.serial_number.ilike(f"%{serial_number}%"))
+        if internal_ref is not None:
+            statement = statement.where(InventoryUnit.internal_ref.ilike(f"%{internal_ref}%"))
+
         count_statement = select(func.count()).select_from(statement.subquery())
         total_count = session.exec(count_statement).one()
 
-        # Get paginated results
         results = session.exec(
-            statement
-            .offset(skip)
-            .limit(limit)
+            statement.offset(skip).limit(limit)
         ).all()
 
         return list(results), total_count

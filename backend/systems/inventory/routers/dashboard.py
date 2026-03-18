@@ -9,10 +9,12 @@ from systems.inventory.services.dashboard_service import (
     DashboardService,
     DashboardStats,
 )
+from systems.inventory.services.borrow_request_service import BorrowService
 from systems.auth.dependencies import require_permission
 
 router = APIRouter()
 dashboard_service = DashboardService()
+borrow_service = BorrowService()
 
 
 @router.get("/stats", response_model=GenericResponse[DashboardStats])
@@ -36,6 +38,6 @@ async def get_recent_activity(
     _: None = Depends(require_permission("inventory:dashboard:view")),
 ):
     recent = dashboard_service.get_recent_activity(session, limit)
-    recent_read = [BorrowRequestRead.model_validate(item) for item in recent]
+    recent_read = borrow_service.serialize_borrow_requests(session, recent)
 
     return create_success_response(data=recent_read, request=request)

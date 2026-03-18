@@ -64,12 +64,14 @@ def require_system_access(system: str):
     return _checker
 
 
-def require_permission(permission: str):
+def require_permission(permission: str | list[str]):
     def _checker(session: Session = Depends(get_session), current_user: User = Depends(get_current_user),) -> None:
-        if not rbac_service.has_permission(session, current_user, permission):
+        perms = [permission] if isinstance(permission, str) else permission
+        if not any(rbac_service.has_permission(session, current_user, p) for p in perms):
+            required = ", ".join(perms) if isinstance(permission, list) else permission
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Role '{current_user.role}' lacks permission: {permission}",
+                detail=f"Role '{current_user.role}' lacks any of the required permissions: {required}",
             )
 
     return _checker
