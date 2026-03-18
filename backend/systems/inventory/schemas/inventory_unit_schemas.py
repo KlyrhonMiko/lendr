@@ -9,6 +9,7 @@ class InventoryUnitBase(BaseModel):
     serial_number: Optional[str] = Field(default=None, max_length=100)
     internal_ref: Optional[str] = Field(default=None, max_length=100)
     status: str = Field(default="available", max_length=50)
+    condition: str = Field(default="good", max_length=100)
     expiration_date: Optional[datetime] = None
 
 

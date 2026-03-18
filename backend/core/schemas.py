@@ -11,6 +11,27 @@ class PaginationMeta(BaseModel):
     total: int
     limit: int
     offset: int
+    page: Optional[int] = None
+    per_page: Optional[int] = None
+
+
+def make_pagination_meta(
+    total: int,
+    skip: int,
+    limit: int,
+    page: Optional[int] = None,
+    per_page: Optional[int] = None,
+) -> "PaginationMeta":
+    """Build PaginationMeta supporting both skip/limit and page/per_page conventions."""
+    effective_per_page = per_page or limit
+    effective_page = page or (skip // effective_per_page + 1 if effective_per_page else 1)
+    return PaginationMeta(
+        total=total,
+        limit=effective_per_page,
+        offset=skip,
+        page=effective_page,
+        per_page=effective_per_page,
+    )
 
 class GenericResponse(BaseModel, Generic[T]):
     # Common Fields
@@ -60,7 +81,7 @@ def create_error_response(
 
 # Generic Configuration Schemas
 class ConfigBase(BaseModel):
-    value: str = Field(..., max_length=255)
+    value: str
 
 
 class ConfigCreate(ConfigBase):
@@ -71,6 +92,7 @@ class ConfigCreate(ConfigBase):
 
 class ConfigUpdate(ConfigBase):
     description: Optional[str] = None
+
 
 
 class ConfigRead(ConfigBase):

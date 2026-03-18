@@ -6,7 +6,7 @@ import { auth, User } from '@/lib/auth';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  logout: () => void;
+  logout: (redirectTo?: string) => Promise<void>;
   refreshUser: () => Promise<void>;
 }
 
@@ -29,12 +29,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    refreshUser();
+    let mounted = true;
+
+    const initializeUser = async () => {
+      if (!auth.isAuthenticated()) {
+        if (mounted) {
+          setUser(null);
+          setLoading(false);
+        }
+        return;
+      }
+
+      const userData = await auth.getUser();
+      if (mounted) {
+        setUser(userData);
+        setLoading(false);
+      }
+    };
+
+    void initializeUser();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  const logout = () => {
-    auth.logout();
+  const logout = async (redirectTo = '/auth/login') => {
     setUser(null);
+    await auth.logout(redirectTo);
   };
 
   return (

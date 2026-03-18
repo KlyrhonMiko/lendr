@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlmodel import Session
 
 from core.database import get_session
 from core.deps import get_current_user
 from systems.auth.dependencies import require_permission
-from core.schemas import GenericResponse, PaginationMeta, create_success_response
+from core.schemas import GenericResponse, create_success_response, make_pagination_meta
 from systems.admin.models.user import User
 from systems.admin.schemas.user_schemas import UserCreate, UserRead, UserUpdate
 from systems.admin.services.user_service import UserService
@@ -39,18 +40,33 @@ async def register_user(
 )
 async def list_users(
     request: Request,
-    skip: int = 0,
-    limit: int = 100,
+    page: int = Query(default=1, ge=1, description="Page number"),
+    per_page: int = Query(default=20, ge=1, le=500, description="Records per page"),
+    search: Optional[str] = Query(default=None, description="Search by user ID, email, first name, or last name (case-insensitive)"),
+    role: Optional[str] = Query(default=None, description="Filter by role (exact match, e.g. 'staff', 'admin')"),
+    is_active: Optional[bool] = Query(default=None, description="Filter by active status (true=active, false=deactivated)"),
+    shift_type: Optional[str] = Query(default=None, description="Filter by shift type (e.g. 'day', 'night')"),
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_permission("admin:users:manage")),
 ):
-    users, total = user_service.get_all(session, skip=skip, limit=limit)
+    skip = (page - 1) * per_page
+    users, total = user_service.get_all(
+        session,
+        skip=skip,
+        limit=per_page,
+        search=search,
+        role=role,
+        is_active=is_active,
+        shift_type=shift_type,
+    )
     return create_success_response(
         data=users,
-        meta=PaginationMeta(total=total, limit=limit, offset=skip),
+        meta=make_pagination_meta(total=total, skip=skip, limit=per_page, page=page, per_page=per_page),
         request=request,
     )
+
+
 
 
 @router.get(

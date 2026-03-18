@@ -189,6 +189,10 @@ class AuditService(BaseService[AuditLog, Any, Any]):
         entity_types: Optional[list[str]] = None,
         entity_type: Optional[str] = None,
         entity_id: Optional[str] = None,
+        action: Optional[str] = None,
+        actor_user_id: Optional[str] = None,
+        date_from: Optional[datetime] = None,
+        date_to: Optional[datetime] = None,
         skip: int = 0,
         limit: int = 50
     ) -> tuple[list[dict[str, Any]], int]:
@@ -196,17 +200,34 @@ class AuditService(BaseService[AuditLog, Any, Any]):
         statement = select(AuditLog, User.user_id, User.employee_id).outerjoin(
             User, AuditLog.actor_id == User.id
         ).order_by(desc(AuditLog.created_at))
-        
+
         # Legacy support
         if entity_type:
             statement = statement.where(AuditLog.entity_type == entity_type)
-            
+
         # Multi-type support
         if entity_types:
             statement = statement.where(AuditLog.entity_type.in_(entity_types))
-            
+
         if entity_id:
             statement = statement.where(AuditLog.entity_id == entity_id)
+
+        if action:
+            statement = statement.where(AuditLog.action == action)
+
+        if actor_user_id:
+            # Resolve actor_user_id (string ID like "ST-001") to a UUID
+            actor = session.exec(
+                select(User).where(User.user_id == actor_user_id, User.is_deleted.is_(False))
+            ).first()
+            if not actor:
+                return [], 0
+            statement = statement.where(AuditLog.actor_id == actor.id)
+
+        if date_from:
+            statement = statement.where(AuditLog.created_at >= date_from)
+        if date_to:
+            statement = statement.where(AuditLog.created_at <= date_to)
             
         total_count = session.exec(select(func.count()).select_from(statement.subquery())).one()
         results = session.exec(statement.offset(skip).limit(limit)).all()

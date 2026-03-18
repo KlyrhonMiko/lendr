@@ -2,18 +2,40 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Package, History, Settings, Box } from 'lucide-react';
+import { LayoutDashboard, Package, History, Settings, Box, Activity } from 'lucide-react';
 
-const navItems = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'POS / Borrow', href: '/pos', icon: Box },
-  { name: 'Inventory', href: '/inventory', icon: Package },
-  { name: 'Borrow History', href: '/borrows', icon: History },
-  { name: 'Settings', href: '/settings', icon: Settings },
-];
+const navigation = {
+  admin: [
+    { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
+    { name: 'System Logs', href: '/admin/audit_logs', icon: History },
+    { name: 'System Settings', href: '/admin/settings', icon: Settings },
+  ],
+  inventory: [
+    { name: 'Dashboard', href: '/inventory/dashboard', icon: LayoutDashboard },
+    { name: 'Inventory', href: '/inventory/items', icon: Package },
+    { name: 'Requests List', href: '/inventory/requests', icon: History },
+    { name: 'Audit Logs', href: '/inventory/audit_logs', icon: History },
+    { name: 'Movement Ledger', href: '/inventory/ledger', icon: Activity },
+    { name: 'Inventory Settings', href: '/inventory/settings', icon: Settings },
+  ],
+  borrow_portal: [
+    { name: 'Request Form', href: '/borrow_portal/request_form', icon: Box },
+    { name: 'Request History', href: '/borrow_portal/history', icon: History },
+  ],
+};
 
 export function Sidebar() {
   const pathname = usePathname();
+
+  const getSystem = () => {
+    if (pathname.startsWith('/inventory')) return 'inventory';
+    if (pathname.startsWith('/admin')) return 'admin';
+    if (pathname.startsWith('/borrow_portal')) return 'borrow_portal';
+    return null;
+  };
+
+  const system = getSystem();
+  const navItems = system ? navigation[system as keyof typeof navigation] : [];
 
   return (
     <aside className="fixed inset-y-0 left-0 z-50 w-64 bg-background/80 backdrop-blur-xl border-r border-border flex flex-col pt-6 pb-4">
@@ -28,7 +50,7 @@ export function Sidebar() {
 
       <nav className="flex-1 px-4 space-y-2">
         {navItems.map((item) => {
-          const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
+          const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
             <Link
               key={item.name}

@@ -1,4 +1,5 @@
-from sqlmodel import Session
+from typing import Optional
+from sqlmodel import Session, select, func, or_
 
 from core.base_service import BaseService
 from systems.admin.models.user import User
@@ -10,7 +11,51 @@ from utils.time_utils import get_now_manila
 class UserService(BaseService[User, UserCreate, UserUpdate]):
     def __init__(self):
         super().__init__(User, lookup_field="user_id")
-        
+
+    def get_all(
+        self,
+        session: Session,
+        skip: int = 0,
+        limit: int = 100,
+        search: Optional[str] = None,
+        role: Optional[str] = None,
+        is_active: Optional[bool] = None,
+        shift_type: Optional[str] = None,
+    ) -> tuple[list[User], int]:
+        """Get users with optional search and filter params."""
+        statement = select(User)
+
+        # Default: only show active users
+        if is_active is None:
+            statement = statement.where(User.is_deleted.is_(False))
+        elif is_active:
+            statement = statement.where(User.is_deleted.is_(False))
+        else:
+            statement = statement.where(User.is_deleted.is_(True))
+
+        if search:
+            statement = statement.where(
+                or_(
+                    User.user_id.ilike(f"%{search}%"),
+                    User.email.ilike(f"%{search}%"),
+                    User.first_name.ilike(f"%{search}%"),
+                    User.last_name.ilike(f"%{search}%"),
+                )
+            )
+        if role is not None:
+            statement = statement.where(User.role == role)
+        if shift_type is not None:
+            statement = statement.where(User.shift_type == shift_type)
+
+        count_stmt = select(func.count()).select_from(statement.subquery())
+        total = session.exec(count_stmt).one()
+
+        results = session.exec(
+            statement.order_by(User.last_name.asc(), User.first_name.asc()).offset(skip).limit(limit)
+        ).all()
+
+        return list(results), total
+
     def create(self, session: Session, schema: UserCreate) -> User:
         from systems.auth.services.configuration_service import AuthConfigService
         self.config_service = AuthConfigService()
@@ -21,11 +66,11 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
         )
 
         setting = self.config_service.get_by_key(
-            session, 
-            key=schema.role.lower(), 
+            session,
+            key=schema.role.lower(),
             category="users_role"
         )
-        
+
         if not setting:
              raise ValueError(
                 f"Configuration Error: ID prefix for role '{schema.role}' is not defined. "

@@ -5,7 +5,7 @@ from sqlmodel import Session
 
 from core.database import get_session
 from core.deps import get_current_user
-from core.schemas import GenericResponse, PaginationMeta, create_success_response
+from core.schemas import GenericResponse, PaginationMeta, create_success_response, make_pagination_meta
 from systems.admin.models.user import User
 from systems.inventory.schemas.inventory_schemas import (
     InventoryItemCreate,
@@ -17,6 +17,11 @@ from systems.inventory.schemas.inventory_unit_schemas import (
     InventoryUnitCreate,
     InventoryUnitBatchCreate,
     InventoryUnitUpdate,
+)
+from systems.inventory.schemas.inventory_batch_schemas import (
+    InventoryBatchRead,
+    InventoryBatchCreate,
+    InventoryBatchUpdate,
 )
 from systems.inventory.schemas.inventory_movement_schemas import InventoryMovementRead
 from systems.inventory.schemas.inventory_movement_schemas import (
@@ -70,13 +75,32 @@ async def create_item(
 )
 async def list_items(
     request: Request,
-    skip: int = 0,
-    limit: int = 100,
+    page: int = Query(default=1, ge=1, description="Page number (1-indexed)"),
+    per_page: int = Query(default=20, ge=1, le=500, description="Records per page"),
+    search: Optional[str] = Query(default=None, description="Search by item name (case-insensitive)"),
+    category: Optional[str] = Query(default=None, description="Filter by category (exact match)"),
+    item_type: Optional[str] = Query(default=None, description="Filter by item type (e.g. equipment, consumable)"),
+    classification: Optional[str] = Query(default=None, description="Filter by classification (exact match)"),
+    is_trackable: Optional[bool] = Query(default=None, description="Filter trackable/non-trackable items"),
+    condition: Optional[str] = Query(default=None, description="Filter by condition (e.g. good, damaged)"),
+    include_deleted: bool = Query(default=False, description="Include soft-deleted items"),
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_permission("inventory:items:view")),
 ):
-    items, total = inventory_service.get_all(session, skip=skip, limit=limit)
+    skip = (page - 1) * per_page
+    items, total = inventory_service.get_all(
+        session,
+        skip=skip,
+        limit=per_page,
+        search=search,
+        category=category,
+        item_type=item_type,
+        classification=classification,
+        is_trackable=is_trackable,
+        condition=condition,
+        include_deleted=include_deleted,
+    )
     items_read = []
     for item in items:
         item_read = InventoryItemRead.model_validate(item)
@@ -85,7 +109,7 @@ async def list_items(
 
     return create_success_response(
         data=items_read,
-        meta=PaginationMeta(total=total, limit=limit, offset=skip),
+        meta=make_pagination_meta(total=total, skip=skip, limit=per_page, page=page, per_page=per_page),
         request=request,
     )
 
@@ -168,6 +192,7 @@ async def adjust_stock(
             movement_type=payload.movement_type,
             reason_code=payload.reason_code,
             reference_id=payload.reference_id,
+            batch_id=payload.batch_id,
             note=payload.note,
             actor_id=current_user.id,
         )
@@ -261,26 +286,35 @@ async def restore_item(
 )
 async def get_all_movements_ledger(
     request: Request,
-    skip: int = 0,
-    limit: int = 100,
-    movement_type: Optional[str] = None,
-    inventory_id: Optional[str] = None,
+    page: int = Query(default=1, ge=1, description="Page number"),
+    per_page: int = Query(default=50, ge=1, le=500, description="Records per page"),
+    movement_type: Optional[str] = Query(default=None, description="Filter by movement type (e.g. manual_adjustment, procurement)"),
+    inventory_id: Optional[str] = Query(default=None, description="Filter by inventory item ID"),
+    reason_code: Optional[str] = Query(default=None, description="Filter by reason code (exact match)"),
+    reference_id: Optional[str] = Query(default=None, description="Filter by reference ID (e.g. borrow request ID)"),
+    date_from: Optional[datetime] = Query(default=None, description="Filter movements from this datetime (inclusive)"),
+    date_to: Optional[datetime] = Query(default=None, description="Filter movements up to this datetime (inclusive)"),
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_permission("inventory:movements:view")),
 ):
-    """Get the complete inventory movement ledger across all items with pagination and optional filters."""
+    """Get the complete inventory movement ledger across all items with pagination and filters."""
+    skip = (page - 1) * per_page
     movements, total = inventory_service.get_all_movements(
         session,
         skip=skip,
-        limit=limit,
+        limit=per_page,
         movement_type=movement_type,
         inventory_id=inventory_id,
+        reason_code=reason_code,
+        reference_id=reference_id,
+        date_from=date_from,
+        date_to=date_to,
     )
 
     return create_success_response(
         data=movements,
-        meta=PaginationMeta(total=total, limit=limit, offset=skip),
+        meta=make_pagination_meta(total=total, skip=skip, limit=per_page, page=page, per_page=per_page),
         request=request,
     )
 
@@ -291,14 +325,32 @@ async def get_all_movements_ledger(
 async def get_item_history(
     item_id: str,
     request: Request,
+    page: int = Query(default=1, ge=1, description="Page number"),
+    per_page: int = Query(default=50, ge=1, le=500, description="Records per page"),
+    movement_type: Optional[str] = Query(default=None, description="Filter by movement type"),
+    date_from: Optional[datetime] = Query(default=None, description="Filter from this datetime (inclusive)"),
+    date_to: Optional[datetime] = Query(default=None, description="Filter up to this datetime (inclusive)"),
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_permission("inventory:movements:view")),
 ):
     """Get the stock movement ledger (history) for a specific inventory item."""
-    history = inventory_service.get_history(session, item_id)
+    skip = (page - 1) * per_page
+    history, total = inventory_service.get_history(
+        session,
+        item_id,
+        movement_type=movement_type,
+        date_from=date_from,
+        date_to=date_to,
+        skip=skip,
+        limit=per_page,
+    )
 
-    return create_success_response(data=history, request=request)
+    return create_success_response(
+        data=history,
+        meta=make_pagination_meta(total=total, skip=skip, limit=per_page, page=page, per_page=per_page),
+        request=request,
+    )
 
 
 @router.post(
@@ -332,6 +384,7 @@ async def create_unit(
             serial_number=unit_data.serial_number,
             internal_ref=unit_data.internal_ref,
             expiration_date=unit_data.expiration_date,
+            condition=unit_data.condition,
             actor_id=current_user.id,
         )
         session.commit()
@@ -401,33 +454,40 @@ async def create_units_batch(
 async def list_item_units(
     item_id: str,
     request: Request,
-    skip: int = 0,
-    limit: int = 100,
-    status: Optional[str] = None,
-    expiring_before: Optional[datetime] = None,
-    include_expired: bool = True,
+    page: int = Query(default=1, ge=1, description="Page number"),
+    per_page: int = Query(default=50, ge=1, le=500, description="Records per page"),
+    status: Optional[str] = Query(default=None, description="Filter by unit status (available, borrowed, maintenance, retired)"),
+    condition: Optional[str] = Query(default=None, description="Filter by unit condition (e.g. good, damaged)"),
+    serial_number: Optional[str] = Query(default=None, description="Search by serial number (partial match)"),
+    internal_ref: Optional[str] = Query(default=None, description="Search by internal reference (partial match)"),
+    expiring_before: Optional[datetime] = Query(default=None, description="Filter units expiring before this date"),
+    include_expired: bool = Query(default=True, description="Include expired units in results"),
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_permission("inventory:units:view")),
 ):
     """
-    Get all units for a specific inventory item with optional status filter and pagination.
-    Status filter: 'available', 'borrowed', 'maintenance', 'retired'
+    Get all units for a specific inventory item.
+    Status values: 'available', 'borrowed', 'maintenance', 'retired'
     """
+    skip = (page - 1) * per_page
     units, total = inventory_service.get_units_by_status(
         session,
         item_id=item_id,
         status=status,
+        condition=condition,
+        serial_number=serial_number,
+        internal_ref=internal_ref,
         expiring_before=expiring_before,
         include_expired=include_expired,
         skip=skip,
-        limit=limit,
+        limit=per_page,
     )
     units_read = [InventoryUnitRead.model_validate(u) for u in units]
 
     return create_success_response(
         data=units_read,
-        meta=PaginationMeta(total=total, limit=limit, offset=skip),
+        meta=make_pagination_meta(total=total, skip=skip, limit=per_page, page=page, per_page=per_page),
         request=request,
     )
 
@@ -515,6 +575,111 @@ async def retire_unit(
     except ValueError as e:
         session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get(
+    "/{item_id}/batches",
+    response_model=GenericResponse[list[InventoryBatchRead]],
+    responses={401: {"model": GenericResponse}},
+)
+async def list_item_batches(
+    item_id: str,
+    request: Request,
+    page: int = Query(default=1, ge=1, description="Page number"),
+    per_page: int = Query(default=50, ge=1, le=500, description="Records per page"),
+    status: Optional[str] = Query(default=None, description="Filter by batch status"),
+    include_expired: bool = Query(default=True, description="Include expired batches"),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("inventory:units:view")),
+):
+    """List all batches for a specific inventory item."""
+    skip = (page - 1) * per_page
+    batches, total = inventory_service.get_batches(
+        session,
+        item_id=item_id,
+        status=status,
+        include_expired=include_expired,
+        skip=skip,
+        limit=per_page,
+    )
+    batches_read = [InventoryBatchRead.model_validate(b) for b in batches]
+
+    return create_success_response(
+        data=batches_read,
+        meta=make_pagination_meta(total=total, skip=skip, limit=per_page, page=page, per_page=per_page),
+        request=request,
+    )
+
+
+@router.post(
+    "/{item_id}/batches",
+    response_model=GenericResponse[InventoryBatchRead],
+    status_code=201,
+    responses={400: {"model": GenericResponse}, 401: {"model": GenericResponse}},
+)
+async def create_batch(
+    item_id: str,
+    batch_data: InventoryBatchCreate,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: User = Depends(shift_guard),
+    __: None = Depends(require_permission("inventory:units:manage")),
+):
+    """Create a new batch for an untrackable inventory item (Metadata only)."""
+    try:
+        batch = inventory_service.create_batch(
+            session,
+            item_id=item_id,
+            schema=batch_data,
+            actor_id=current_user.id,
+        )
+        session.commit()
+        session.refresh(batch)
+        batch_read = InventoryBatchRead.model_validate(batch)
+
+        return create_success_response(
+            data=batch_read, message="Batch created successfully", request=request
+        )
+    except ValueError as e:
+        session.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.patch(
+    "/{item_id}/batches/{batch_id}",
+    response_model=GenericResponse[InventoryBatchRead],
+    responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}},
+)
+async def update_batch(
+    item_id: str,
+    batch_id: str,
+    batch_data: InventoryBatchUpdate,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: User = Depends(shift_guard),
+    __: None = Depends(require_permission("inventory:units:manage")),
+):
+    """Update batch metadata (status and/or expiration)."""
+    try:
+        batch = inventory_service.update_batch(
+            session,
+            batch_id=batch_id,
+            schema=batch_data,
+            actor_id=current_user.id,
+        )
+        session.commit()
+        session.refresh(batch)
+        batch_read = InventoryBatchRead.model_validate(batch)
+
+        return create_success_response(
+            data=batch_read, message="Batch updated successfully", request=request
+        )
+    except ValueError as e:
+        session.rollback()
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.post(

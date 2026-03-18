@@ -49,9 +49,14 @@ class DashboardService:
         )
 
     def get_recent_activity(self, session: Session, limit: int = 5) -> list[BorrowRequest]:
+        from sqlalchemy.orm import selectinload
         return session.exec(
             select(BorrowRequest)
             .where(BorrowRequest.is_deleted.is_(False))
+            .options(
+                selectinload(BorrowRequest.items).selectinload(BorrowRequestItem.inventory_item),
+                selectinload(BorrowRequest.events)
+            )
             .order_by(BorrowRequest.request_date.desc())
             .limit(limit)
         ).all()

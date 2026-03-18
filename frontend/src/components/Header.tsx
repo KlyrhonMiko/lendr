@@ -35,7 +35,7 @@ export function Header() {
             </span>
           </div>
           <button 
-            onClick={logout}
+            onClick={() => void logout('/auth/login')}
             className="ml-2 p-2 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all group"
             title="Logout"
           >

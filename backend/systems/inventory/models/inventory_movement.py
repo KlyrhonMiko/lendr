@@ -9,6 +9,7 @@ class InventoryMovement(BaseModel, table=True):
 
     movement_id: str = Field(unique=True, index=True, max_length=50)
     inventory_uuid: UUID | None = Field(default=None, foreign_key="inventory.id", index=True)
+    batch_uuid: UUID | None = Field(default=None, foreign_key="inventory_batches.id", index=True)
     
     actor_id: UUID | None = Field(
         default=None, 

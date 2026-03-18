@@ -11,6 +11,7 @@ export interface User {
 
 
 const TOKEN_KEY = 'lendr_auth_token';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export const auth = {
   setToken: (token: string) => {
@@ -26,10 +27,26 @@ export const auth = {
     return null;
   },
 
-  logout: () => {
+  logout: async (redirectTo = '/auth/login') => {
     if (typeof window !== 'undefined') {
+      const token = localStorage.getItem(TOKEN_KEY);
       localStorage.removeItem(TOKEN_KEY);
-      window.location.href = '/login';
+
+      if (token) {
+        try {
+          await fetch(`${API_BASE_URL}/api/auth/logout`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`
+            },
+            keepalive: true,
+          });
+        } catch {
+          // Ignore network errors during logout and proceed with client redirect.
+        }
+      }
+
+      window.location.href = redirectTo;
     }
   },
 
@@ -64,5 +81,22 @@ export const auth = {
       console.error('Failed to fetch user:', error);
       return null;
     }
+  },
+
+  getRedirectPath: (role?: string): string => {
+    if (!role) return '/auth/login';
+    
+    const ROLE_REDIRECT_MAP: Record<string, string> = {
+      'admin': '/admin/dashboard',
+      'inventory_manager': '/inventory/dashboard',
+      'dispatch': '/inventory/dashboard',
+      'warehouse_manager': '/inventory/dashboard',
+      'borrower': '/borrow_portal/request_form',
+      'finance_manager': '/inventory/dashboard',
+      'accountant': '/inventory/dashboard',
+      'employee': '/borrow_portal/request_form',
+    };
+
+    return ROLE_REDIRECT_MAP[role.toLowerCase()] || '/borrow_portal/request_form';
   }
 };

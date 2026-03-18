@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field, field_serializer
+from pydantic import BaseModel, Field, field_serializer, model_validator
 
 from utils.time_utils import format_datetime
 
@@ -18,6 +18,17 @@ class BorrowRequestItemRead(BaseModel):
 
     item_id: str
     qty_requested: int
+
+    @model_validator(mode="before")
+    @classmethod
+    def resolve_item_id(cls, data):
+        # When validating from model attributes (from_attributes=True),
+        # 'data' will be an object.
+        if hasattr(data, "inventory_item") and data.inventory_item is not None:
+            # Inject item_id from the relationship if it's not present
+            if hasattr(data, "__dict__"):
+                data.__dict__.setdefault("item_id", data.inventory_item.item_id)
+        return data
 
     class Config:
         from_attributes = True

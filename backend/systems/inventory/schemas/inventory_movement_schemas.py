@@ -16,6 +16,7 @@ class InventoryMovementRead(BaseModel):
     user_id: Optional[str] = None
     inventory_id: Optional[str] = None
     
+    is_reversed: bool = False
     occurred_at: datetime
 
     @field_serializer("occurred_at")
@@ -31,6 +32,7 @@ class InventoryMovementAdjust(BaseModel):
     movement_type: str = Field(..., min_length=1, max_length=50)
     reason_code: Optional[str] = Field(default=None, max_length=50)
     reference_id: Optional[str] = Field(default=None, max_length=50)
+    batch_id: Optional[str] = Field(default=None, max_length=50)
     note: str = Field(..., min_length=5, max_length=500)
 
 
@@ -94,7 +96,14 @@ class InventoryMovementSummaryRead(BaseModel):
 
 
 class InventoryMovementAnomalyRead(BaseModel):
+    item_id: str
+    item_name: str
     anomaly_type: str
     severity: Literal["low", "medium", "high", "critical"]
     message: str
     details: dict[str, Any]
+    detected_at: datetime = Field(default_factory=datetime.now)
+
+    @field_serializer("detected_at")
+    def serialize_detected(self, dt: datetime) -> str:
+        return format_datetime(dt)

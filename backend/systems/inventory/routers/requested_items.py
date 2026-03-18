@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlmodel import Session
 
 from core.database import get_session
 from core.deps import get_current_user
-from core.schemas import GenericResponse, PaginationMeta, create_success_response
+from core.schemas import GenericResponse, create_success_response, make_pagination_meta
 from systems.admin.models.user import User
 from systems.inventory.schemas.requested_item_schemas import (
     RequestedItemCreate,
@@ -41,16 +42,28 @@ async def create_requested_item(
 @router.get("", response_model=GenericResponse[list[RequestedItemRead]])
 async def list_requested_items(
     request: Request,
-    skip: int = 0,
-    limit: int = 100,
+    page: int = Query(default=1, ge=1, description="Page number"),
+    per_page: int = Query(default=20, ge=1, le=500, description="Records per page"),
+    search: Optional[str] = Query(default=None, description="Search by item name (case-insensitive)"),
+    status: Optional[str] = Query(default=None, description="Filter by status (pending, procurement, fulfilled, cancelled)"),
+    requested_by: Optional[str] = Query(default=None, description="Filter by requesting user ID (exact match)"),
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_permission("inventory:requested_items:manage")),
 ):
-    items, total = req_service.get_all(session, skip=skip, limit=limit)
+    skip = (page - 1) * per_page
+    items, total = req_service.get_all(
+        session,
+        skip=skip,
+        limit=per_page,
+        search=search,
+        status=status,
+        requested_by=requested_by,
+    )
 
     return create_success_response(
         data=items,
-        meta=PaginationMeta(total=total, limit=limit, offset=skip),
+        meta=make_pagination_meta(total=total, skip=skip, limit=per_page, page=page, per_page=per_page),
         request=request,
     )
+

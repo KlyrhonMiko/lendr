@@ -8,6 +8,7 @@ from .warehouse_approval import WarehouseApproval
 from core.models.audit_log import AuditLog 
 from .inventory import InventoryItem
 from .inventory_unit import InventoryUnit
+from .inventory_batch import InventoryBatch
 from .inventory_movement import InventoryMovement
 from .borrow_participant import BorrowParticipant
 from .borrow_request_unit import BorrowRequestUnit
@@ -23,6 +24,7 @@ __all__ = [
     "RequestedItem",
     "WarehouseApproval",
     "InventoryUnit",
+    "InventoryBatch",
     "InventoryMovement",
     "AuditLog",
     "InventoryConfig",
