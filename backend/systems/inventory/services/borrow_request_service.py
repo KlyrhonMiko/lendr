@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlmodel import Session, select, func
+from sqlmodel import Session, select, func, and_
 from uuid import UUID
 
 from core.base_service import BaseService
@@ -12,6 +12,7 @@ from systems.inventory.models.inventory import InventoryItem
 from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestCreate,
     BorrowRequestEventRead,
+    BorrowRequestEventGlobalRead,
     BorrowRequestRead,
     BorrowRequestUnitReturn,
     BorrowRequestUpdate,
@@ -92,6 +93,52 @@ class BorrowService(
         workflow = self._get_workflow(session)
         return workflow[:-1]
 
+    def _has_identical_active_request(
+        self,
+        session: Session,
+        borrower_uuid: UUID,
+        new_items: list,
+        items_by_id: dict[str, InventoryItem],
+    ) -> bool:
+        """
+        Check if the borrower already has an active request with the exact same
+        items and quantities.
+        """
+        active_requests = session.exec(
+            select(BorrowRequest).where(
+                BorrowRequest.borrower_uuid == borrower_uuid,
+                BorrowRequest.status.in_(self._active_statuses(session)),
+                BorrowRequest.is_deleted.is_(False),
+            )
+        ).all()
+
+        if not active_requests:
+            return False
+
+        # Build signature of the new request: set of (item_uuid, qty)
+        new_signature = frozenset(
+            (items_by_id[item_req.item_id].id, item_req.qty_requested)
+            for item_req in new_items
+        )
+
+        for req in active_requests:
+            # We must fetch the items for each active request
+            req_items = session.exec(
+                select(BorrowRequestItem).where(
+                    BorrowRequestItem.borrow_uuid == req.id,
+                    BorrowRequestItem.is_deleted.is_(False),
+                )
+            ).all()
+
+            existing_signature = frozenset(
+                (item.item_uuid, item.qty_requested) for item in req_items
+            )
+
+            if existing_signature == new_signature:
+                return True
+
+        return False
+
     def _normalize_compliance_fields(self, data: dict) -> dict:
         payload = {**data}
         is_emergency = bool(payload.get("is_emergency"))
@@ -149,9 +196,9 @@ class BorrowService(
         ).all()
         return {user.id: user.user_id for user in users}
 
-    def _build_item_id_map(
+    def _build_item_details_map(
         self, session: Session, item_ids: set[UUID | None]
-    ) -> dict[UUID, str]:
+    ) -> dict[UUID, dict[str, str]]:
         clean_ids = [iid for iid in item_ids if iid is not None]
         if not clean_ids:
             return {}
@@ -162,7 +209,16 @@ class BorrowService(
                 InventoryItem.id.in_(clean_ids),
             )
         ).all()
-        return {item.id: item.item_id for item in items}
+        return {
+            item.id: {
+                "item_id": item.item_id,
+                "name": item.name,
+                "classification": item.classification,
+                "item_type": item.item_type,
+                "is_trackable": item.is_trackable,
+            }
+            for item in items
+        }
 
     def get_all(
         self,
@@ -270,18 +326,24 @@ class BorrowService(
             ).all()
             item_uuids = {item.item_uuid for item in request_items if item.item_uuid}
 
-        item_id_map = self._build_item_id_map(session, item_uuids)
+        item_details_map = self._build_item_details_map(session, item_uuids)
 
         payload = borrow_req.model_dump(mode="json")
         payload["borrower_user_id"] = user_id_map.get(borrow_req.borrower_uuid)
+        payload["closed_by_user_id"] = user_id_map.get(borrow_req.closed_by)
 
         # Populate items list
         payload["items"] = [
             {
-                "item_id": item_id_map.get(item.item_uuid),
+                "item_id": item_details.get("item_id"),
+                "name": item_details.get("name"),
+                "classification": item_details.get("classification"),
+                "item_type": item_details.get("item_type"),
+                "is_trackable": item_details.get("is_trackable", False),
                 "qty_requested": item.qty_requested,
             }
             for item in request_items
+            for item_details in [item_details_map.get(item.item_uuid, {})]
         ]
 
         # Remove legacy fields from payload
@@ -314,15 +376,99 @@ class BorrowService(
     ) -> list[BorrowRequestEventRead]:
         actor_ids = {event.actor_id for event in events if event.actor_id is not None}
         user_id_map = self._build_user_id_map(session, actor_ids)
+
+        # Build map for actor_name
+        user_name_map = {}
+        if actor_ids:
+            users = session.exec(select(User).where(User.id.in_(actor_ids))).all()
+            user_name_map = {u.id: f"{u.last_name}, {u.first_name}" for u in users}
+
         return [
             BorrowRequestEventRead.model_validate(
                 {
                     **event.model_dump(mode="json"),
                     "actor_user_id": user_id_map.get(event.actor_id),
+                    "actor_name": user_name_map.get(event.actor_id, "System"),
                 }
             )
             for event in events
         ]
+
+    def serialize_global_events(
+        self,
+        session: Session,
+        events: list[tuple[BorrowRequestEvent, str, str | None]],
+    ) -> list[BorrowRequestEventGlobalRead]:
+        actor_ids = {event.actor_id for event, _, _ in events if event.actor_id is not None}
+        user_id_map = self._build_user_id_map(session, actor_ids)
+        return [
+            BorrowRequestEventGlobalRead.model_validate(
+                {
+                    **event.model_dump(mode="json"),
+                    "actor_user_id": user_id_map.get(event.actor_id),
+                    "actor_name": actor_full_name or "System",
+                    "request_id": request_id,
+                }
+            )
+            for event, request_id, actor_full_name in events
+        ]
+
+    def get_all_events(
+        self,
+        session: Session,
+        page: int = 1,
+        per_page: int = 20,
+        event_type: str | None = None,
+        request_id: str | None = None,
+        actor_name: str | None = None,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
+    ) -> tuple[list[tuple[BorrowRequestEvent, str, str | None]], int]:
+        # Concatenate first_name and last_name for join and search
+        full_name_col = (User.last_name + ", " + User.first_name).label("actor_full_name")
+
+        statement = (
+            select(BorrowRequestEvent, BorrowRequest.request_id, full_name_col)
+            .join(BorrowRequest, BorrowRequestEvent.borrow_uuid == BorrowRequest.id)
+            .outerjoin(User, BorrowRequestEvent.actor_id == User.id)
+            .order_by(BorrowRequestEvent.occurred_at.desc())
+        )
+
+        filters = []
+        if event_type:
+            filters.append(BorrowRequestEvent.event_type == event_type)
+        if request_id:
+            filters.append(BorrowRequest.request_id.ilike(f"%{request_id}%"))
+        if actor_name:
+            filters.append(full_name_col.ilike(f"%{actor_name}%"))
+        if date_from:
+            filters.append(BorrowRequestEvent.occurred_at >= date_from)
+        if date_to:
+            filters.append(BorrowRequestEvent.occurred_at <= date_to)
+
+        if filters:
+            statement = statement.where(and_(*filters))
+
+        # Count total
+        count_statement = (
+            select(func.count())
+            .select_from(BorrowRequestEvent)
+            .join(BorrowRequest, BorrowRequestEvent.borrow_uuid == BorrowRequest.id)
+        )
+        if actor_name:
+            count_statement = count_statement.outerjoin(
+                User, BorrowRequestEvent.actor_id == User.id
+            )
+
+        if filters:
+            count_statement = count_statement.where(and_(*filters))
+        total = session.exec(count_statement).one()
+
+        # Pagination
+        statement = statement.offset((page - 1) * per_page).limit(per_page)
+        results = session.exec(statement).all()
+
+        return results, total
 
     def _get_borrow_assignments(
         self, session: Session, borrow_request: BorrowRequest
@@ -577,16 +723,13 @@ class BorrowService(
 
             items_by_id[item_req.item_id] = item
 
-        active_request = session.exec(
-            select(BorrowRequest).where(
-                BorrowRequest.borrower_uuid == borrower.id,
-                BorrowRequest.status.in_(self._active_statuses(session)),
-                BorrowRequest.is_deleted.is_(False),
+        if self._has_identical_active_request(
+            session, borrower.id, schema.items, items_by_id
+        ):
+            raise ValueError(
+                "An identical request with the same items and quantities is already active. "
+                "You can only re-submit the same request after the previous one is returned."
             )
-        ).first()
-
-        if active_request:
-            raise ValueError("Borrower already has an active request")
 
         year = get_now_manila().year
         transaction_ref = get_next_sequence(
@@ -1472,6 +1615,86 @@ class BorrowService(
             entity_type="borrow",
             entity_id=db_request.request_id,
             action="warehouse_reject",
+            after=db_request.model_dump(mode="json"),
+            actor_id=actor_id,
+        )
+
+        session.add(event)
+        session.add(db_request)
+        session.commit()
+        session.refresh(db_request)
+        return db_request
+
+    def close_request(
+        self, session: Session, request_id: str, actor_id: UUID, notes: str | None = None
+    ) -> BorrowRequest:
+        db_request = self.get(session, request_id)
+        if not db_request:
+            raise ValueError("Request not found")
+
+        if db_request.status == "closed":
+            raise ValueError("Request is already closed")
+
+        # Determine if closure is allowed
+        # 1. If rejected
+        # 2. If returned
+        # 3. If released and all items are untrackable
+        can_close = False
+        reason = None
+
+        if db_request.status in ["rejected", "warehouse_rejected"]:
+            can_close = True
+            reason = "rejected"
+        elif db_request.status == "returned":
+            can_close = True
+            reason = "returned"
+        elif db_request.status == "released":
+            # Check if all items are untrackable
+            items = session.exec(
+                select(BorrowRequestItem).where(
+                    BorrowRequestItem.borrow_uuid == db_request.id,
+                    BorrowRequestItem.is_deleted.is_(False),
+                )
+            ).all()
+
+            all_untrackable = True
+            for item in items:
+                inv_item = session.get(InventoryItem, item.item_uuid)
+                if inv_item and inv_item.is_trackable:
+                    all_untrackable = False
+                    break
+
+            if all_untrackable:
+                can_close = True
+                reason = "released"
+            else:
+                raise ValueError("Trackable items must be returned before closing")
+        else:
+            raise ValueError(f"Cannot close request in status: {db_request.status}")
+
+        if not can_close:
+            raise ValueError("Conditions for closure not met")
+
+        db_request.status = "closed"
+        db_request.closed_at = get_now_manila()
+        db_request.closed_by = actor_id
+        db_request.close_reason = reason
+
+        # Add event
+        event = BorrowRequestEvent(
+            event_id=get_next_sequence(session, BorrowRequestEvent, "event_id", "BRE"),
+            borrow_uuid=db_request.id,
+            event_type="closed",
+            actor_id=actor_id,
+            note=notes or f"Request closed - {reason}",
+            occurred_at=get_now_manila(),
+        )
+        
+        audit_service.log_action(
+            db=session,
+            entity_type="borrow",
+            entity_id=db_request.request_id,
+            action="close",
             after=db_request.model_dump(mode="json"),
             actor_id=actor_id,
         )

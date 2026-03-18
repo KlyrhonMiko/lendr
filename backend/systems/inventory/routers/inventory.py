@@ -385,6 +385,7 @@ async def create_unit(
             internal_ref=unit_data.internal_ref,
             expiration_date=unit_data.expiration_date,
             condition=unit_data.condition,
+            description=unit_data.description,
             actor_id=current_user.id,
         )
         session.commit()
@@ -523,6 +524,7 @@ async def update_unit(
             status=unit_data.status,
             expiration_date=unit_data.expiration_date,
             condition=unit_data.condition,
+            description=unit_data.description,
             actor_id=current_user.id,
         )
         session.commit()

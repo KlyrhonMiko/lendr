@@ -17,5 +17,6 @@ class InventoryBatch(BaseModel, table=True):
     
     # status: "available", "expired", "recalled", "depleted"
     status: str = Field(default="available", max_length=50)
+    description: str | None = Field(default=None, max_length=1000)
     
     received_at: datetime = Field(default_factory=get_now_manila)

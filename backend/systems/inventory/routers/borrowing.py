@@ -1,7 +1,6 @@
 from datetime import datetime
 from typing import Optional
 from systems.inventory.schemas.warehouse_approval_schemas import WarehouseApprovalRead
-from systems.inventory.schemas.borrow_request_schemas import BorrowRequestEventRead
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlmodel import Session
 
@@ -12,6 +11,7 @@ from systems.admin.models.user import User
 from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestApprove,
     BorrowRequestAutoRouteWarehouse,
+    BorrowRequestClose,
     BorrowRequestCreate,
     BorrowRequestUnitAssign,
     BorrowRequestUnitRead,
@@ -23,6 +23,9 @@ from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestReturn,
     BorrowRequestWarehouseApprove,
     BorrowRequestWarehouseApproveWithProvision,
+    BorrowRequestWarehouseReject,
+    BorrowRequestEventRead,
+    BorrowRequestEventGlobalRead,
 )
 from systems.inventory.dependencies import shift_guard
 from systems.inventory.services.borrow_request_service import BorrowService
@@ -371,6 +374,50 @@ async def get_request_events(
     return create_success_response(data=events, request=request)
 
 
+@router.get(
+    "/events",
+    response_model=GenericResponse[list[BorrowRequestEventGlobalRead]],
+    responses={401: {"model": GenericResponse}},
+)
+async def get_all_request_events(
+    request: Request,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
+    event_type: Optional[str] = Query(None),
+    request_id: Optional[str] = Query(None),
+    actor_name: Optional[str] = Query(None),
+    date_from: Optional[datetime] = Query(None),
+    date_to: Optional[datetime] = Query(None),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("inventory:borrow_requests:manage")),
+):
+    results, total = borrow_service.get_all_events(
+        session,
+        page=page,
+        per_page=per_page,
+        event_type=event_type,
+        request_id=request_id,
+        actor_name=actor_name,
+        date_from=date_from,
+        date_to=date_to,
+    )
+
+    events = borrow_service.serialize_global_events(session, results)
+
+    return create_success_response(
+        data=events,
+        request=request,
+        meta=make_pagination_meta(
+            total=total,
+            skip=(page - 1) * per_page,
+            limit=per_page,
+            page=page,
+            per_page=per_page,
+        ),
+    )
+
+
 @router.post(
     "/requests/{request_id}/send-to-warehouse",
     response_model=GenericResponse[BorrowRequestRead],
@@ -494,8 +541,8 @@ async def warehouse_approve_with_provision(
 )
 async def warehouse_reject(
     request_id: str,
+    payload: BorrowRequestWarehouseReject,
     request: Request,
-    remarks: Optional[str] = None,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: User = Depends(shift_guard),
@@ -506,11 +553,36 @@ async def warehouse_reject(
             session,
             request_id,
             current_user.id,
-            remarks,
+            payload.notes,
         )
         return create_success_response(
             data=borrow_service.serialize_borrow_request(session, updated_req),
             message="Warehouse rejected",
+            request=request,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post(
+    "/requests/{request_id}/close",
+    response_model=GenericResponse[BorrowRequestRead],
+)
+async def close_request(
+    request_id: str,
+    payload: BorrowRequestClose,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("inventory:borrow_requests:manage")),
+):
+    try:
+        updated_req = borrow_service.close_request(
+            session, request_id, current_user.id, notes=payload.notes
+        )
+        return create_success_response(
+            data=borrow_service.serialize_borrow_request(session, updated_req),
+            message="Request closed",
             request=request,
         )
     except ValueError as e:

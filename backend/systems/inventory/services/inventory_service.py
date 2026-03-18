@@ -354,6 +354,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             batch_id=get_next_sequence(session, InventoryBatch, "batch_id", "BATCH"),
             inventory_uuid=item.id,
             expiration_date=schema.expiration_date,
+            description=schema.description,
             available_qty=0,
             total_qty=0,
         )
@@ -394,6 +395,8 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             batch.status = schema.status
         if schema.expiration_date is not None:
             batch.expiration_date = schema.expiration_date
+        if schema.description is not None:
+            batch.description = schema.description
         
         # Auto-recalculate after manual overrides or date changes
         batch.status = self.recalculate_batch_status(session, batch)
@@ -1028,6 +1031,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         internal_ref: str | None = None,
         expiration_date: datetime | None = None,
         condition: str = "good",
+        description: str | None = None,
         actor_id: UUID | None = None,
         actor_user_id: str | None = None,
         actor_employee_id: str | None = None,
@@ -1075,6 +1079,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             status=initial_status,
             expiration_date=expiration_date,
             condition=condition or "good",
+            description=description,
         )
 
         if self._is_consumable_item(item) and unit.status == "borrowed":
@@ -1093,6 +1098,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                 "internal_ref": internal_ref,
                 "status": unit.status,
                 "condition": unit.condition,
+                "description": description,
                 "expiration_date": expiration_date.isoformat() if expiration_date else None,
             },
             actor_id=actor_id,
@@ -1129,6 +1135,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             internal_ref = unit_data.get("internal_ref")
             expiration_date = unit_data.get("expiration_date")
             condition = unit_data.get("condition") or "good"
+            description = unit_data.get("description")
 
             # Check uniqueness within batch
             if serial_number:
@@ -1183,6 +1190,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                 status=initial_status,
                 expiration_date=expiration_date,
                 condition=condition,
+                description=description,
             )
 
             if self._is_consumable_item(item) and unit.status == "borrowed":
@@ -1201,6 +1209,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                     "internal_ref": internal_ref,
                     "status": unit.status,
                     "condition": unit.condition,
+                    "description": description,
                     "expiration_date": expiration_date.isoformat() if expiration_date else None,
                 },
                 actor_id=actor_id,
@@ -1219,6 +1228,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         status: str | None = None,
         expiration_date: datetime | None = None,
         condition: str | None = None,
+        description: str | None = None,
         actor_id: UUID | None = None,
         actor_user_id: str | None = None,
         actor_employee_id: str | None = None,
@@ -1235,6 +1245,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             "status": unit.status,
             "expiration_date": unit.expiration_date.isoformat() if unit.expiration_date else None,
             "condition": unit.condition,
+            "description": unit.description,
         }
 
         # Update only if provided
@@ -1280,11 +1291,15 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                 field_label="inventory unit condition",
             )
             unit.condition = condition
+        
+        if description is not None:
+            unit.description = description
 
         after_state = {
             "status": unit.status,
             "expiration_date": unit.expiration_date.isoformat() if unit.expiration_date else None,
             "condition": unit.condition,
+            "description": unit.description,
         }
 
         # Log audit event
