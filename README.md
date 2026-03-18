@@ -261,22 +261,23 @@ DEBUG=false
 docker compose up --build
 ```
 
-**4. Run database migrations**
+**4. Run database migrations and seed configuration**
 
 In a separate terminal, after the containers are up:
 
 ```bash
 docker compose exec backend alembic upgrade head
+docker compose exec backend python data/seed_configuration.py
 ```
 
 **5. Access the services**
 
-| Service        | URL                          |
-|----------------|------------------------------|
-| Frontend       | http://localhost:3000        |
-| Backend API    | http://localhost:8000        |
-| API Docs       | http://localhost:8000/docs   |
-| Adminer (DB)   | http://localhost:8080        |
+| Service        | URL                          | Login              |
+|----------------|------------------------------|--------------------|
+| Frontend       | http://localhost:3000        | admin123/admin123  |
+| Backend API    | http://localhost:8000        | —                  |
+| API Docs       | http://localhost:8000/docs   | —                  |
+| Adminer (DB)   | http://localhost:8080        | —                  |
 
 ---
 
@@ -334,6 +335,14 @@ DEBUG=true
 alembic upgrade head
 ```
 
+**Seed configuration and create admin user:**
+
+```bash
+python data/seed_configuration.py
+```
+
+This creates the admin123 user and seeds all system configuration settings.
+
 **Start the backend server:**
 
 ```bash
@@ -341,6 +350,10 @@ uvicorn main:app --reload
 ```
 
 The API will be available at http://localhost:8000 and interactive docs at http://localhost:8000/docs.
+
+**Default login credentials:**
+- **Username:** admin123
+- **Password:** admin123
 
 #### Step 3 — Set up the Frontend
 
@@ -412,6 +425,52 @@ alembic history
 docker compose exec backend alembic upgrade head
 docker compose exec backend alembic revision --autogenerate -m "describe your change"
 ```
+
+### System Configuration Seeding (Post-Migration)
+
+After running migrations, populate the system with essential configuration settings:
+
+**Locally:**
+
+```bash
+cd backend
+# Pre-creates admin123 user + seeds all configuration enums
+python data/seed_configuration.py
+```
+
+**With Docker:**
+
+```bash
+docker compose exec backend python data/seed_configuration.py
+```
+
+This script:
+- ✓ **Pre-creates admin123** user directly in the database (if not exists)
+- ✓ **Seeds configuration categories** via API (inventory types, borrow statuses, etc.)
+- ✓ **Idempotent** — safe to run multiple times
+- ✓ **Logs all operations** to `.tests/logs/` for audit trail
+
+**Complete initialization workflow:**
+
+```bash
+# Local development
+cd backend
+alembic upgrade head
+python data/seed_configuration.py
+uvicorn main:app --reload
+
+# Docker
+docker compose up -d
+docker compose exec backend alembic upgrade head
+docker compose exec backend python data/seed_configuration.py
+```
+
+**Access the API:**
+
+Once seeded, login with default credentials:
+- **Username:** admin123
+- **Password:** admin123
+- **Endpoint:** http://localhost:8000/api/auth/login
 
 ---
 
@@ -653,88 +712,151 @@ All dashboard pages are protected by `AuthGuard` and require a valid JWT session
 
 ```
 lendr/
-├── docker-compose.yml              # Orchestrates all services
-├── Dockerfile.frontend             # Frontend container
-├── package.json                    # Frontend dependencies
-├── next.config.ts                  # Next.js configuration
+├── docker-compose.yml              # Orchestrates database, backend, frontend, adminer
+├── .env.local                      # Shared environment values (Docker + local)
+├── README.md
 │
 ├── backend/
-│   ├── main.py                     # FastAPI app entry point, CORS, routers, error handlers
+│   ├── main.py                     # FastAPI app entrypoint and router registration
 │   ├── requirements.txt            # Python dependencies
-│   ├── Dockerfile.backend          # Backend container
-│   ├── alembic.ini                 # Alembic configuration
-│   │
-│   ├── alembic/                    # Database migrations
-│   │   └── versions/               # Migration files
-│   │
-│   ├── core/                       # Shared application core
-│   │   ├── config.py               # Settings via pydantic-settings (.env auto-discovery)
-│   │   ├── database.py             # SQLAlchemy engine & session factory
-│   │   ├── deps.py                 # FastAPI dependencies (JWT auth → current user)
-│   │   ├── base_model.py           # SQLModel base (UUID PK, timestamps, soft-delete)
-│   │   ├── base_service.py         # Generic CRUD service (get, get_all, create, update, delete, restore)
-│   │   └── schemas.py              # GenericResponse envelope + pagination metadata
-│   │
+│   ├── Dockerfile.backend
+│   ├── alembic.ini
+│   ├── alembic/
+│   │   ├── env.py
+│   │   └── versions/               # Full migration history
+│   ├── core/                       # Shared app foundation
+│   │   ├── base_model.py
+│   │   ├── base_service.py
+│   │   ├── config.py
+│   │   ├── database.py
+│   │   ├── deps.py
+│   │   ├── schemas.py
+│   │   └── models/
+│   │       └── audit_log.py
+│   ├── data/
+│   │   └── seed_configuration.py   # Creates admin123 + seeds system settings
 │   ├── systems/
-│   │   └── inventory/              # Main business domain
+│   │   ├── admin/
+│   │   │   ├── models/             # user, settings, backup
+│   │   │   ├── schemas/            # user, role, audit, backup schemas
+│   │   │   ├── services/           # user, config, audit, backup services
+│   │   │   └── routers/            # users, roles, config, audit_log, backup
+│   │   ├── auth/
+│   │   │   ├── models/             # user_session, borrower_session, settings
+│   │   │   ├── schemas/            # auth request/response schemas
+│   │   │   ├── services/           # auth, rbac, config services
+│   │   │   ├── routers/            # auth and auth config endpoints
+│   │   │   └── dependencies.py
+│   │   ├── inventory/
+│   │   │   ├── models/             # inventory, units, movements, borrow workflow models
+│   │   │   ├── schemas/            # inventory/borrow/unit/movement DTOs
+│   │   │   ├── services/           # inventory, borrow_request, dashboard, requested_item
+│   │   │   ├── routers/            # inventory, borrowing, borrower, dashboard, audit, settings
+│   │   │   └── dependencies.py
+│   │   └── operations/
 │   │       ├── models/
-│   │       │   ├── user.py         # User table (user_id, role, hashed_password, …)
-│   │       │   ├── inventory.py    # InventoryItem table (item_id, qty, condition, …)
-│   │       │   ├── borrow_request.py  # BorrowRequest table (lifecycle status, timestamps)
-│   │       │   └── configuration.py   # SystemSetting table (key/value store)
-│   │       ├── schemas/            # Pydantic request/response schemas per model
+│   │       ├── schemas/
 │   │       ├── services/
-│   │       │   ├── auth_service.py         # Login, token creation
-│   │       │   ├── user_service.py         # User CRUD + uniqueness validation
-│   │       │   ├── inventory_service.py    # Item CRUD + stock adjustment + status thresholds
-│   │       │   ├── borrow_request_service.py  # Request lifecycle + stock deduction/restoration
-│   │       │   ├── configuration_service.py   # Key-value config access
-│   │       │   └── dashboard_service.py       # Aggregate stats queries
 │   │       └── routers/
-│   │           ├── auth.py         # /api/auth/*
-│   │           ├── users.py        # /api/users/*
-│   │           ├── inventory.py    # /api/inventory/*
-│   │           ├── borrowing.py    # /api/borrowing/*
-│   │           ├── dashboard.py    # /api/dashboard/*
-│   │           └── configuration.py  # /api/config/*
-│   │
 │   ├── utils/
-│   │   ├── security.py             # Argon2 password hashing + JWT creation/verification
-│   │   ├── id_generator.py         # Sequential prefixed IDs (e.g. ITEM-000001, BRW-000042)
-│   │   └── time_utils.py           # Manila (GMT+8) timezone helpers
-│   │
-│   └── .tests/
-│       ├── test_api.py             # End-to-end smoke tests (single flow per module)
-│       ├── seed_test_data.py       # Seeds realistic dummy data via the live API
-│       └── cleanup_test_data.py    # Hard-deletes all test data directly via SQL
+│   │   ├── id_generator.py
+│   │   ├── security.py
+│   │   └── time_utils.py
+│   ├── .tests/
+│   │   ├── test_api.py
+│   │   ├── seed_test_data.py
+│   │   ├── cleanup_test_data.py
+│   │   └── logs/
+│   ├── .backups/
+│   ├── .documentation/
+│   ├── .logs/
+│   └── .todo/
 │
-└── src/
-    ├── app/
-    │   ├── layout.tsx              # Root layout (AuthProvider, Sonner toaster, fonts)
-    │   ├── globals.css
-    │   ├── (auth)/                 # Unauthenticated route group
-    │   │   ├── layout.tsx          # Centered dark auth shell
-    │   │   ├── login/              # Login page + api.ts
-    │   │   └── register/           # Multi-step register page + api.ts
-    │   └── (dashboard)/            # Authenticated route group (AuthGuard + Sidebar + Header)
-    │       ├── layout.tsx
-    │       ├── page.tsx            # Dashboard — stats + recent activity
-    │       ├── dashboard-api.ts    # Typed API calls for dashboard endpoints
-    │       ├── inventory/          # Inventory CRUD page + api.ts
-    │       ├── borrows/            # Borrow history & workflow page + api.ts
-    │       ├── pos/                # POS batch-borrow page + api.ts
-    │       └── settings/           # System settings page + api.ts
-    ├── components/
-    │   ├── AuthGuard.tsx           # Redirects unauthenticated users to /login
-    │   ├── Sidebar.tsx             # Fixed navigation sidebar
-    │   ├── Header.tsx              # Sticky header (user avatar, role, logout)
-    │   └── ui/                     # Shared UI primitives (shadcn/ui)
-    ├── contexts/
-    │   └── AuthContext.tsx         # React context: current user, loading, logout, refreshUser
-    └── lib/
-        ├── api.ts                  # Fetch wrapper (auto-auth header, 401 handling, typed methods)
-        ├── auth.ts                 # Token storage (localStorage), getUser, isAuthenticated
-        └── utils.ts                # Shared utilities (cn, etc.)
+└── frontend/
+    ├── Dockerfile.frontend
+    ├── package.json
+    ├── next.config.ts
+    ├── components.json
+    ├── public/
+    └── src/
+        ├── app/
+        │   ├── layout.tsx
+        │   ├── page.tsx
+        │   ├── globals.css
+        │   ├── login/
+        │   │   └── page.tsx
+        │   ├── register/
+        │   │   └── page.tsx
+        │   ├── auth/
+        │   │   ├── layout.tsx
+        │   │   └── login/
+        │   │       ├── api.ts
+        │   │       └── page.tsx
+        │   ├── admin/
+        │   │   ├── layout.tsx
+        │   │   ├── page.tsx
+        │   │   ├── dashboard/
+        │   │   │   └── page.tsx
+        │   │   ├── audit_logs/
+        │   │   │   ├── api.ts
+        │   │   │   └── page.tsx
+        │   │   ├── register/
+        │   │   │   ├── api.ts
+        │   │   │   └── page.tsx
+        │   │   └── settings/
+        │   │       ├── api.ts
+        │   │       └── page.tsx
+        │   ├── inventory/
+        │   │   ├── layout.tsx
+        │   │   ├── page.tsx
+        │   │   ├── dashboard/
+        │   │   │   ├── dashboard-api.ts
+        │   │   │   └── page.tsx
+        │   │   ├── items/
+        │   │   │   ├── api.ts
+        │   │   │   ├── page.tsx
+        │   │   │   ├── BatchManagement.tsx
+        │   │   │   ├── UnitManagement.tsx
+        │   │   │   └── ItemHistory.tsx
+        │   │   ├── requests/
+        │   │   │   ├── api.ts
+        │   │   │   └── page.tsx
+        │   │   ├── ledger/
+        │   │   │   ├── api.ts
+        │   │   │   └── page.tsx
+        │   │   ├── audit_logs/
+        │   │   │   ├── api.ts
+        │   │   │   └── page.tsx
+        │   │   └── settings/
+        │   │       ├── api.ts
+        │   │       └── page.tsx
+        │   └── borrow_portal/
+        │       ├── layout.tsx
+        │       ├── login/
+        │       │   ├── api.ts
+        │       │   └── page.tsx
+        │       └── (portal)/
+        │           ├── layout.tsx
+        │           ├── page.tsx
+        │           ├── history/
+        │           │   ├── api.ts
+        │           │   └── page.tsx
+        │           └── request_form/
+        │               ├── api.ts
+        │               └── page.tsx
+        ├── components/
+        │   ├── AuthGuard.tsx
+        │   ├── Header.tsx
+        │   ├── Sidebar.tsx
+        │   └── ui/
+        │       ├── button.tsx
+        │       └── Pagination.tsx
+        ├── contexts/
+        │   └── AuthContext.tsx
+        └── lib/
+            ├── api.ts
+            ├── auth.ts
+            └── utils.ts
 ```
 
 ---
