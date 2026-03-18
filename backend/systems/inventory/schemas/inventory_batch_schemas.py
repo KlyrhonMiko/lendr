@@ -6,6 +6,7 @@ from utils.time_utils import format_datetime
 
 class InventoryBatchBase(BaseModel):
     expiration_date: Optional[datetime] = None
+    description: Optional[str] = Field(default=None, max_length=1000)
 
 class InventoryBatchCreate(InventoryBatchBase):
     """Create a new batch (Metadata only). Initial quantity is 0."""
@@ -15,12 +16,14 @@ class InventoryBatchUpdate(BaseModel):
     """Update batch metadata (status and/or expiration)."""
     expiration_date: Optional[datetime] = None
     status: Optional[str] = Field(default=None, max_length=50)
+    description: Optional[str] = Field(default=None, max_length=1000)
 
 class InventoryBatchRead(InventoryBatchBase):
     """Batch read schema with server-assigned fields."""
     batch_id: str
     inventory_uuid: UUID
     status: str
+    description: Optional[str] = None
     # Actually, in this system, we tend to follow human-readable IDs.
     total_qty: int
     available_qty: int

@@ -33,6 +33,10 @@ class BorrowRequest(BaseModel, table=True):
     returned_at: datetime | None = Field(default=None)
     received_by: UUID | None = Field(default=None, foreign_key="users.id")
 
+    closed_at: datetime | None = Field(default=None)
+    closed_by: UUID | None = Field(default=None, foreign_key="users.id")
+    close_reason: str | None = Field(default=None, max_length=100)
+
     request_date: datetime = Field(default_factory=get_now_manila)
     notes: str | None = Field(default=None, max_length=500)
 
@@ -76,9 +80,8 @@ class BorrowRequest(BaseModel, table=True):
 
     __table_args__ = (
         Index(
-            "ix_active_borrow_request_uuid",
+            "ix_borrow_requests_borrower_active",
             "borrower_uuid",
-            unique=True,
             postgresql_where=text(
                 "status IN ('pending', 'approved', 'released') AND is_deleted IS FALSE"
             ),

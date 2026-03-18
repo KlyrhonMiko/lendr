@@ -18,6 +18,7 @@ class InventoryItem(BaseModel, table=True):
     item_type: str = Field(default="equipment", max_length=50)
     classification: str | None = Field(default=None, max_length=100)
     is_trackable: bool = Field(default=False)
+    description: str | None = Field(default=None, max_length=1000)
 
     __table_args__ = (
         Index(

@@ -14,6 +14,7 @@ const navigation = {
     { name: 'Dashboard', href: '/inventory/dashboard', icon: LayoutDashboard },
     { name: 'Inventory', href: '/inventory/items', icon: Package },
     { name: 'Requests List', href: '/inventory/requests', icon: History },
+    { name: 'Request History', href: '/inventory/requests/history', icon: History },
     { name: 'Audit Logs', href: '/inventory/audit_logs', icon: History },
     { name: 'Movement Ledger', href: '/inventory/ledger', icon: Activity },
     { name: 'Inventory Settings', href: '/inventory/settings', icon: Settings },

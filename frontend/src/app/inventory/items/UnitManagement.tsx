@@ -22,6 +22,7 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
     internal_ref: '',
     expiration_date: '',
     condition: 'good',
+    description: '',
   });
 
   const [batchCount, setBatchCount] = useState(1);
@@ -50,6 +51,7 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
           serial_number: `${formData.serial_number}-${i + 1}`,
           internal_ref: formData.internal_ref ? `${formData.internal_ref}-${i + 1}` : undefined,
           expiration_date: formData.expiration_date || undefined,
+          description: formData.description || undefined,
         }));
         await inventoryApi.createUnitsBatch(itemId, batch);
         toast.success(`${batchCount} units created successfully`);
@@ -57,6 +59,7 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
         const cleanedData = {
           ...formData,
           expiration_date: formData.expiration_date || undefined,
+          description: formData.description || undefined,
         };
         await inventoryApi.createUnit(itemId, cleanedData);
         toast.success('Unit created successfully');
@@ -173,6 +176,16 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
                   />
                 </div>
               </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold uppercase text-muted-foreground">Description</label>
+                <input
+                  type="text"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="w-full h-10 px-3 rounded-lg bg-background border border-border text-sm"
+                  placeholder="Note about this unit..."
+                />
+              </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setIsAdding(false)} className="px-4 py-2 text-sm font-semibold hover:bg-muted rounded-lg">Cancel</button>
                 <button type="submit" className="px-4 py-2 bg-indigo-500 text-white text-sm font-semibold rounded-lg">Create</button>
@@ -185,7 +198,7 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
               <thead className="sticky top-0 bg-background/95 backdrop-blur z-10 text-xs font-bold uppercase text-muted-foreground border-b border-border">
                 <tr>
                   <th className="p-3 pl-4">Serial No.</th>
-                  <th className="p-3">Ref</th>
+                  <th className="p-3">Ref / Note</th>
                   <th className="p-3">Status</th>
                   <th className="p-3 text-right pr-4">Actions</th>
                 </tr>
@@ -198,7 +211,10 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
                 ) : units.map((unit) => (
                   <tr key={unit.unit_id} className="hover:bg-muted/30 group">
                     <td className="p-3 pl-4 text-sm font-mono font-semibold">{unit.serial_number}</td>
-                    <td className="p-3 text-sm text-muted-foreground">{unit.internal_ref || '---'}</td>
+                    <td className="p-3 text-sm text-muted-foreground">
+                      <div>{unit.internal_ref || '---'}</div>
+                      {unit.description && <div className="text-[10px] text-muted-foreground/70 truncate max-w-[150px]">{unit.description}</div>}
+                    </td>
                     <td className="p-3">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                         unit.status === 'available' ? 'bg-emerald-500/10 text-emerald-500' :

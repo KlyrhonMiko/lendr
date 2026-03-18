@@ -22,6 +22,7 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
 
   const [formData, setFormData] = useState({
     expiration_date: '',
+    description: '',
   });
 
   const [adjustData, setAdjustData] = useState<StockAdjustmentPayload>({
@@ -69,7 +70,7 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
     setEditingBatch(null);
     setIsAdjusting(null);
     setIsReduction(false);
-    setFormData({ expiration_date: '' });
+    setFormData({ expiration_date: '', description: '' });
     setAdjustData({
       qty_change: 0,
       movement_type: 'procurement',
@@ -83,6 +84,7 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
     try {
       const payload = {
         expiration_date: formData.expiration_date || undefined,
+        description: formData.description || undefined,
       };
 
       if (editingBatch) {
@@ -129,6 +131,7 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
     setEditingBatch(batch);
     setFormData({
       expiration_date: batch.expiration_date ? batch.expiration_date.split('T')[0] : '',
+      description: batch.description || '',
     });
     setIsAdding(true);
   };
@@ -174,6 +177,16 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
                     value={formData.expiration_date}
                     onChange={(e) => setFormData({ ...formData, expiration_date: e.target.value })}
                     className="w-full h-10 px-3 rounded-lg bg-background border border-border text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold uppercase text-muted-foreground">Description</label>
+                  <input
+                    type="text"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    className="w-full h-10 px-3 rounded-lg bg-background border border-border text-sm"
+                    placeholder="Batch description..."
                   />
                 </div>
               </div>
@@ -283,7 +296,10 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
                     <td className="p-3 pl-4 text-sm font-mono font-semibold">
                       <div className="flex items-center gap-2">
                         <Layers className="w-3.5 h-3.5 text-indigo-400" />
-                        {batch.batch_id}
+                        <div>
+                          <div>{batch.batch_id}</div>
+                          {batch.description && <div className="text-[10px] text-muted-foreground/70 font-sans font-normal truncate max-w-[120px]">{batch.description}</div>}
+                        </div>
                       </div>
                     </td>
                     <td className="p-3 text-sm">

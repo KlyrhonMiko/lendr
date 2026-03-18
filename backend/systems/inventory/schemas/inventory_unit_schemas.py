@@ -11,6 +11,7 @@ class InventoryUnitBase(BaseModel):
     status: str = Field(default="available", max_length=50)
     condition: str = Field(default="good", max_length=100)
     expiration_date: Optional[datetime] = None
+    description: Optional[str] = Field(default=None, max_length=1000)
 
 
 class InventoryUnitCreate(InventoryUnitBase):
@@ -28,12 +29,14 @@ class InventoryUnitUpdate(BaseModel):
     status: Optional[str] = Field(default=None, max_length=50)
     expiration_date: Optional[datetime] = None
     condition: Optional[str] = Field(default=None, max_length=100)
+    description: Optional[str] = Field(default=None, max_length=1000)
 
 
 class InventoryUnitRead(InventoryUnitBase):
     """Unit read schema with server-assigned fields."""
     unit_id: str
     condition: str
+    description: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

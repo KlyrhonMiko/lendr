@@ -17,17 +17,25 @@ class BorrowRequestItemRead(BaseModel):
     """Schema for reading a single item in a borrow request."""
 
     item_id: str
+    name: str
     qty_requested: int
+    classification: Optional[str] = None
+    item_type: Optional[str] = None
+    is_trackable: bool = False
 
     @model_validator(mode="before")
     @classmethod
-    def resolve_item_id(cls, data):
+    def resolve_item_details(cls, data):  # Renamed for clarity
         # When validating from model attributes (from_attributes=True),
         # 'data' will be an object.
         if hasattr(data, "inventory_item") and data.inventory_item is not None:
-            # Inject item_id from the relationship if it's not present
+            # Inject item_id and name from the relationship if they're not present
             if hasattr(data, "__dict__"):
                 data.__dict__.setdefault("item_id", data.inventory_item.item_id)
+                data.__dict__.setdefault("name", data.inventory_item.name)
+                data.__dict__.setdefault("classification", data.inventory_item.classification)
+                data.__dict__.setdefault("item_type", data.inventory_item.item_type)
+                data.__dict__.setdefault("is_trackable", data.inventory_item.is_trackable)
         return data
 
     class Config:
@@ -58,6 +66,7 @@ class BorrowRequestEventRead(BaseModel):
     event_id: str
     event_type: str
     actor_user_id: Optional[str] = None
+    actor_name: Optional[str] = None
     note: Optional[str] = None
     occurred_at: datetime
 
@@ -67,6 +76,10 @@ class BorrowRequestEventRead(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class BorrowRequestEventGlobalRead(BorrowRequestEventRead):
+    request_id: str
 
 
 class BorrowRequestRead(BaseModel):
@@ -90,9 +103,14 @@ class BorrowRequestRead(BaseModel):
     is_emergency: bool = False
     involved_people: Optional[list[dict]] = None
     approval_channel: str = "standard"
+    
+    closed_at: Optional[datetime] = None
+    closed_by_user_id: Optional[str] = None
+    close_reason: Optional[str] = None
+
     events: list["BorrowRequestEventRead"] = []
 
-    @field_serializer("request_date", "return_at")
+    @field_serializer("request_date", "return_at", "closed_at")
     def serialize_dates(self, dt: datetime | None) -> str | None:
         return format_datetime(dt)
 
@@ -185,4 +203,12 @@ class BorrowRequestUnitRead(BaseModel):
 class BatchItem(BaseModel):
     item_id: str
     qty_requested: int
+
+
+class BorrowRequestWarehouseReject(BaseModel):
+    notes: Optional[str] = Field(default=None, max_length=500)
+
+
+class BorrowRequestClose(BaseModel):
+    notes: Optional[str] = Field(default=None, max_length=500)
 

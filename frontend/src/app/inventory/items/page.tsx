@@ -51,6 +51,7 @@ export default function InventoryPage() {
     item_type: '',
     is_trackable: false,
     condition: '',
+    description: '',
   });
   const [classifications, setClassifications] = useState<ConfigRead[]>([]);
   const [itemTypes, setItemTypes] = useState<ConfigRead[]>([]);
@@ -112,7 +113,7 @@ export default function InventoryPage() {
   }, []);
 
   const resetForm = () => {
-    setFormData({ name: '', category: '', classification: '', item_type: '', is_trackable: false, condition: '' });
+    setFormData({ name: '', category: '', classification: '', item_type: '', is_trackable: false, condition: '', description: '' });
     setEditingItem(null);
     setIsModalOpen(false);
     setError(null);
@@ -127,6 +128,7 @@ export default function InventoryPage() {
       item_type: item.item_type || '',
       is_trackable: item.is_trackable ?? false,
       condition: item.condition || '',
+      description: item.description || '',
     });
     setIsModalOpen(true);
   };
@@ -143,6 +145,7 @@ export default function InventoryPage() {
           item_type: formData.item_type,
           is_trackable: formData.is_trackable,
           condition: formData.condition,
+          description: formData.description || undefined,
         });
         toast.success('Equipment updated successfully');
       } else {
@@ -152,6 +155,7 @@ export default function InventoryPage() {
           classification: formData.classification || undefined,
           item_type: formData.item_type,
           is_trackable: formData.is_trackable,
+          description: formData.description || undefined,
         });
         toast.success('New equipment added to catalog');
       }
@@ -339,6 +343,9 @@ export default function InventoryPage() {
                       </div>
                       <div>
                         <p className="font-semibold text-foreground">{item.name}</p>
+                        {item.description && (
+                          <p className="text-xs text-muted-foreground line-clamp-1 max-w-[200px]">{item.description}</p>
+                        )}
                         <p className="text-[10px] text-muted-foreground font-mono">ID: {item.item_id}</p>
                       </div>
                     </div>
@@ -504,6 +511,16 @@ export default function InventoryPage() {
                   />
                   Enable per-unit tracking for this item
                 </label>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-foreground">Description</label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="w-full h-24 p-4 rounded-xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 font-medium transition-all resize-none"
+                  placeholder="Additional information about this item..."
+                />
               </div>
 
               <div className="pt-4 flex gap-3">

@@ -5,7 +5,10 @@ export interface BorrowRequest {
   borrower_user_id?: string;
   items: Array<{
     item_id: string;
+    name: string;
     qty_requested: number;
+    classification?: string;
+    item_type?: string;
   }>;
   status: string;
   notes?: string;
@@ -15,6 +18,9 @@ export interface BorrowRequest {
   returned_at?: string;
   is_emergency?: boolean;
   request_channel?: string;
+  closed_at?: string;
+  closed_by_user_id?: string;
+  close_reason?: string;
 }
 
 export interface BorrowRequestCreate {
@@ -32,6 +38,19 @@ export interface BorrowActionPayload {
   notes?: string;
 }
 
+export interface BorrowRequestEvent {
+  event_id: string;
+  event_type: string;
+  actor_user_id?: string;
+  actor_name?: string;
+  note?: string;
+  occurred_at: string;
+}
+
+export interface BorrowRequestEventGlobal extends BorrowRequestEvent {
+  request_id: string;
+}
+
 export interface BorrowListParams {
   page?: number;
   per_page?: number;
@@ -40,6 +59,16 @@ export interface BorrowListParams {
   is_emergency?: boolean;
   borrower_id?: string;
   returned_on_time?: boolean;
+  date_from?: string;
+  date_to?: string;
+}
+
+export interface BorrowEventsParams {
+  page?: number;
+  per_page?: number;
+  event_type?: string;
+  request_id?: string;
+  actor_name?: string;
   date_from?: string;
   date_to?: string;
 }
@@ -71,8 +100,15 @@ export const borrowApi = {
   warehouseApprove: (id: string, payload: BorrowActionPayload = {}) =>
     api.post(`/inventory/borrowing/requests/${id}/warehouse-approve`, payload),
 
-  warehouseReject: (id: string, remarks?: string) =>
-    api.post<BorrowRequest>(
-      `/inventory/borrowing/requests/${id}/warehouse-reject${remarks ? `?remarks=${encodeURIComponent(remarks)}` : ''}`
-    ),
+  warehouseReject: (id: string, notes?: string) =>
+    api.post<BorrowRequest>(`/inventory/borrowing/requests/${id}/warehouse-reject`, { notes }),
+
+  close: (id: string, payload: BorrowActionPayload = {}) =>
+    api.post<BorrowRequest>(`/inventory/borrowing/requests/${id}/close`, payload),
+
+  getEvents: (id: string) =>
+    api.get<BorrowRequestEvent[]>(`/inventory/borrowing/requests/${id}/events`),
+
+  getAllEvents: (params: BorrowEventsParams = {}) =>
+    api.get<BorrowRequestEventGlobal[]>(`/inventory/borrowing/events${buildQueryString(params as Record<string, unknown>)}`),
 };
