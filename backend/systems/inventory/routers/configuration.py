@@ -13,7 +13,8 @@ from systems.inventory.services.configuration_service import (
     BorrowerConfigService,
     InventoryConfigService,
 )
-from systems.auth.dependencies import require_permission
+from systems.auth.dependencies import require_permission, get_current_user
+from systems.admin.models.user import User
 
 router = APIRouter()
 inventory_service = InventoryConfigService()
@@ -56,6 +57,7 @@ async def create_inventory_setting(
     setting_data: ConfigCreate,
     request: Request,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
     _: None = Depends(require_permission("inventory:config:manage")),
 ):
     inventory_service.set_value(
@@ -64,6 +66,7 @@ async def create_inventory_setting(
         setting_data.value,
         category=setting_data.category,
         description=setting_data.description,
+        actor_id=current_user.id,
     )
     setting = inventory_service.get_by_key(
         session, setting_data.key, category=setting_data.category
@@ -109,6 +112,7 @@ async def create_borrower_setting(
     setting_data: ConfigCreate,
     request: Request,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
     _: None = Depends(require_permission("inventory:config:manage")),
 ):
     borrower_service.set_value(
@@ -117,6 +121,7 @@ async def create_borrower_setting(
         setting_data.value,
         category=setting_data.category,
         description=setting_data.description,
+        actor_id=current_user.id,
     )
     setting = borrower_service.get_by_key(
         session, setting_data.key, category=setting_data.category

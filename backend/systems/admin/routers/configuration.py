@@ -128,6 +128,7 @@ async def create_setting(
         setting_data.value,
         category=setting_data.category,
         description=setting_data.description,
+        actor_id=current_user.id,
     )
 
     return create_success_response(
@@ -179,6 +180,7 @@ async def update_setting(
         setting_data.value,
         category=category,
         description=setting_data.description,
+        actor_id=current_user.id,
     )
 
     return create_success_response(
@@ -208,7 +210,7 @@ async def delete_setting(
             detail=f"Setting '{key}' not found in category '{category}'",
         )
 
-    config_service.delete(session, setting)
+    config_service.delete(session, setting, actor_id=current_user.id)
 
     return create_success_response(
         message=f"Setting '{key}' deleted successfully",
@@ -239,7 +241,7 @@ async def restore_setting(
             detail=f"Setting '{key}' not found in category '{category}'",
         )
 
-    config_service.restore(session, setting)
+    config_service.restore(session, setting, actor_id=current_user.id)
 
     return create_success_response(
         message=f"Setting '{key}' restored successfully",

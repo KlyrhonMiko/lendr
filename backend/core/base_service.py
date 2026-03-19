@@ -245,6 +245,30 @@ class ConfigBaseService(Generic[ConfigModelType]):
     def __init__(self, model: Type[ConfigModelType]):
         self.model = model
 
+    def _log_audit(
+        self,
+        session: Session,
+        action: str,
+        entity_id: str,
+        before: dict | None = None,
+        after: dict | None = None,
+        actor_id: Optional[UUID] = None,
+    ):
+        """Helper to log configuration actions to the audit trial."""
+        from core.models.audit_log import AuditLog
+        
+        audit_id = get_next_sequence(session, AuditLog, "audit_id", "AUDIT")
+        log_entry = AuditLog(
+            audit_id=audit_id,
+            entity_type=getattr(self.model, "__tablename__", "configuration"),
+            entity_id=entity_id,
+            action=action,
+            actor_id=actor_id,
+            before_json=before,
+            after_json=after,
+        )
+        session.add(log_entry)
+
     def get_by_key(
         self,
         session: Session,
@@ -302,14 +326,19 @@ class ConfigBaseService(Generic[ConfigModelType]):
         value: str,
         category: str = "general",
         description: str | None = None,
+        actor_id: Optional[UUID] = None,
     ) -> None:
         setting = self.get_by_key(session, key, category=category)
+        entity_id = f"{category}:{key}"
 
         if setting:
+            before = setting.model_dump(mode="json")
             setting.value = str(value)
             if description:
                 setting.description = description
             session.add(setting)
+            after = setting.model_dump(mode="json")
+            self._log_audit(session, "updated", entity_id, before, after, actor_id)
         else:
             new_setting = self.model(
                 key=key,
@@ -318,6 +347,8 @@ class ConfigBaseService(Generic[ConfigModelType]):
                 description=description,
             )
             session.add(new_setting)
+            after = new_setting.model_dump(mode="json")
+            self._log_audit(session, "created", entity_id, None, after, actor_id)
 
         session.commit()
 
@@ -386,19 +417,31 @@ class ConfigBaseService(Generic[ConfigModelType]):
 
         return sorted(list(session.exec(statement).all()))
 
-    def delete(self, session: Session, db_obj: ConfigModelType) -> ConfigModelType:
+    def delete(
+        self, session: Session, db_obj: ConfigModelType, actor_id: Optional[UUID] = None
+    ) -> ConfigModelType:
+        before = db_obj.model_dump(mode="json")
         db_obj.is_deleted = True
         db_obj.deleted_at = get_now_manila()
         session.add(db_obj)
+        after = db_obj.model_dump(mode="json")
+        entity_id = f"{db_obj.category}:{db_obj.key}"
+        self._log_audit(session, "deleted", entity_id, before, after, actor_id)
         session.commit()
         session.refresh(db_obj)
 
         return db_obj
 
-    def restore(self, session: Session, db_obj: ConfigModelType) -> ConfigModelType:
+    def restore(
+        self, session: Session, db_obj: ConfigModelType, actor_id: Optional[UUID] = None
+    ) -> ConfigModelType:
+        before = db_obj.model_dump(mode="json")
         db_obj.is_deleted = False
         db_obj.deleted_at = None
         session.add(db_obj)
+        after = db_obj.model_dump(mode="json")
+        entity_id = f"{db_obj.category}:{db_obj.key}"
+        self._log_audit(session, "restored", entity_id, before, after, actor_id)
         session.commit()
         session.refresh(db_obj)
 

@@ -16,16 +16,27 @@ export default function AdminAuditLogsPage() {
   const [perPage, setPerPage] = useState(10);
   const [search, setSearch] = useState('');
   const [entityFilter, setEntityFilter] = useState('');
+  const [timeframe, setTimeframe] = useState('all');
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
+      let date_from: string | undefined;
+      if (timeframe !== 'all') {
+        const date = new Date();
+        if (timeframe === '24h') date.setHours(date.getHours() - 24);
+        else if (timeframe === '7d') date.setDate(date.getDate() - 7);
+        else if (timeframe === '30d') date.setDate(date.getDate() - 30);
+        date_from = date.toISOString();
+      }
+
       const params: AuditLogParams = {
         page,
         per_page: perPage,
         actor_id: search || undefined,
         entity_type: entityFilter || undefined,
+        date_from,
       };
       const res = await adminAuditApi.list(params);
       setLogs(res.data);
@@ -35,7 +46,7 @@ export default function AdminAuditLogsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, perPage, search, entityFilter]);
+  }, [page, perPage, search, entityFilter, timeframe]);
 
   useEffect(() => {
     fetchLogs();
@@ -61,17 +72,29 @@ export default function AdminAuditLogsPage() {
             />
           </div>
 
-          <select
-            value={entityFilter}
-            onChange={(e) => setEntityFilter(e.target.value)}
-            className="h-10 px-4 rounded-xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all text-sm font-medium"
-          >
-            <option value="">All Systems</option>
-            <option value="user">User Account</option>
-            <option value="role">Permissions & Roles</option>
-            <option value="config">System Configuration</option>
-            <option value="auth">Security & Session</option>
-          </select>
+            <select
+              value={entityFilter}
+              onChange={(e) => setEntityFilter(e.target.value)}
+              className="h-10 px-4 rounded-xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all text-sm font-medium"
+            >
+              <option value="">All Systems</option>
+              <option value="user">User Account</option>
+              <option value="role">Permissions & Roles</option>
+              <option value="config">System Configuration</option>
+              <option value="auth">Security & Session</option>
+              <option value="session">Login & Sessions</option>
+            </select>
+
+            <select
+              value={timeframe}
+              onChange={(e) => setTimeframe(e.target.value)}
+              className="h-10 px-4 rounded-xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all text-sm font-medium ml-auto"
+            >
+              <option value="all">All Time</option>
+              <option value="24h">Last 24 Hours</option>
+              <option value="7d">Last 7 Days</option>
+              <option value="30d">Last 30 Days</option>
+            </select>
         </div>
 
         <div className="overflow-x-auto">

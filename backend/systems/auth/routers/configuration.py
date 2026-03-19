@@ -10,7 +10,8 @@ from core.schemas import (
     make_pagination_meta,
 )
 from systems.auth.services.configuration_service import AuthConfigService
-from systems.auth.dependencies import require_permission
+from systems.auth.dependencies import require_permission, get_current_user
+from systems.admin.models.user import User
 
 router = APIRouter()
 config_service = AuthConfigService()
@@ -50,6 +51,7 @@ async def create_auth_setting(
     setting_data: ConfigCreate,
     request: Request,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
     _: None = Depends(require_permission("auth:config:manage")),
 ):
     config_service.set_value(
@@ -58,6 +60,7 @@ async def create_auth_setting(
         setting_data.value,
         category=setting_data.category,
         description=setting_data.description,
+        actor_id=current_user.id,
     )
     setting = config_service.get_by_key(
         session, setting_data.key, category=setting_data.category
