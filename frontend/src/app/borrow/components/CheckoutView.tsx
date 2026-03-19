@@ -63,6 +63,7 @@ interface FormInputProps {
   value: string;
   onChange: (v: string) => void;
   autoFocus?: boolean;
+  disabled?: boolean;
 }
 
 function FormInput({
@@ -73,6 +74,7 @@ function FormInput({
   value,
   onChange,
   autoFocus,
+  disabled,
 }: FormInputProps) {
   return (
     <div className="space-y-2">
@@ -88,7 +90,12 @@ function FormInput({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           autoFocus={autoFocus}
-          className="w-full h-14 pl-12 pr-4 rounded-2xl bg-background border-2 border-border/60 text-sm font-medium placeholder:text-muted-foreground/40 focus:outline-none focus:ring-0 focus:border-indigo-500/50 transition-all"
+          disabled={disabled}
+          className={`w-full h-14 pl-12 pr-4 rounded-2xl border-2 text-sm font-medium placeholder:text-muted-foreground/40 focus:outline-none focus:ring-0 focus:border-indigo-500/50 transition-all ${
+            disabled
+              ? 'bg-muted/40 border-border/50 text-muted-foreground cursor-not-allowed'
+              : 'bg-background border-border/60'
+          }`}
         />
       </div>
     </div>
@@ -117,6 +124,7 @@ export function CheckoutView({
   currentUser,
   onOpenPinModal,
 }: CheckoutViewProps) {
+  const isPinVerified = Boolean(employeePin.trim());
   const isFormValid =
     cart.length > 0 &&
     employeeId.trim() &&
@@ -241,7 +249,12 @@ export function CheckoutView({
           {/* Client section */}
           <div>
             <SectionHeader icon={Building2} title="Client Information" subtitle="Who is this request for?" />
-            <div className="space-y-3">
+          <div
+            className={`space-y-3 transition-opacity ${
+              isPinVerified ? 'opacity-100' : 'opacity-50 pointer-events-none'
+            }`}
+            aria-disabled={!isPinVerified}
+          >
               <FormInput
                 icon={Building2}
                 label="Client Name"
@@ -249,6 +262,7 @@ export function CheckoutView({
                 placeholder="Enter client or company name"
                 value={customerName}
                 onChange={onCustomerNameChange}
+              disabled={!isPinVerified}
               />
               <FormInput
                 icon={MapPin}
@@ -257,6 +271,7 @@ export function CheckoutView({
                 placeholder="Enter site location or branch"
                 value={locationName}
                 onChange={onLocationNameChange}
+              disabled={!isPinVerified}
               />
             </div>
           </div>
@@ -266,7 +281,12 @@ export function CheckoutView({
           {/* Additional info */}
           <div>
             <SectionHeader icon={StickyNote} title="Additional Details" subtitle="Optional information" />
-            <div className="space-y-3">
+          <div
+            className={`space-y-3 transition-opacity ${
+              isPinVerified ? 'opacity-100' : 'opacity-50 pointer-events-none'
+            }`}
+            aria-disabled={!isPinVerified}
+          >
               <div className="space-y-2">
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1 flex items-center gap-1.5">
                   Collaborators
@@ -277,7 +297,12 @@ export function CheckoutView({
                     placeholder="Team members working on this project..."
                     value={collaborators}
                     onChange={(e) => onCollaboratorsChange(e.target.value)}
-                    className="w-full min-h-[72px] pl-12 pr-4 py-3.5 rounded-2xl bg-background border-2 border-border/60 text-sm font-medium placeholder:text-muted-foreground/40 focus:outline-none focus:ring-0 focus:border-indigo-500/50 transition-all resize-none"
+                  disabled={!isPinVerified}
+                  className={`w-full min-h-[72px] pl-12 pr-4 py-3.5 rounded-2xl border-2 text-sm font-medium placeholder:text-muted-foreground/40 focus:outline-none focus:ring-0 focus:border-indigo-500/50 transition-all resize-none ${
+                    !isPinVerified
+                      ? 'bg-muted/40 border-border/50 text-muted-foreground cursor-not-allowed'
+                      : 'bg-background border-border/60'
+                  }`}
                   />
                 </div>
               </div>
@@ -291,7 +316,12 @@ export function CheckoutView({
                     placeholder="Any special instructions or notes..."
                     value={notes}
                     onChange={(e) => onNotesChange(e.target.value)}
-                    className="w-full min-h-[90px] pl-12 pr-4 py-3.5 rounded-2xl bg-background border-2 border-border/60 text-sm font-medium placeholder:text-muted-foreground/40 focus:outline-none focus:ring-0 focus:border-indigo-500/50 transition-all resize-none"
+                  disabled={!isPinVerified}
+                  className={`w-full min-h-[90px] pl-12 pr-4 py-3.5 rounded-2xl border-2 text-sm font-medium placeholder:text-muted-foreground/40 focus:outline-none focus:ring-0 focus:border-indigo-500/50 transition-all resize-none ${
+                    !isPinVerified
+                      ? 'bg-muted/40 border-border/50 text-muted-foreground cursor-not-allowed'
+                      : 'bg-background border-border/60'
+                  }`}
                   />
                 </div>
               </div>
