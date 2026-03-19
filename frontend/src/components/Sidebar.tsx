@@ -14,14 +14,12 @@ const navigation = {
     { name: 'Dashboard', href: '/inventory/dashboard', icon: LayoutDashboard },
     { name: 'Inventory', href: '/inventory/items', icon: Package },
     { name: 'Requests List', href: '/inventory/requests', icon: History },
-    { name: 'Request History', href: '/inventory/requests/history', icon: History },
     { name: 'Audit Logs', href: '/inventory/audit_logs', icon: History },
     { name: 'Movement Ledger', href: '/inventory/ledger', icon: Activity },
     { name: 'Inventory Settings', href: '/inventory/settings', icon: Settings },
   ],
   borrow_portal: [
-    { name: 'Request Form', href: '/borrow_portal/request_form', icon: Box },
-    { name: 'Request History', href: '/borrow_portal/history', icon: History },
+    { name: 'Request Form', href: '/borrow', icon: Box },
   ],
 };
 
@@ -31,7 +29,7 @@ export function Sidebar() {
   const getSystem = () => {
     if (pathname.startsWith('/inventory')) return 'inventory';
     if (pathname.startsWith('/admin')) return 'admin';
-    if (pathname.startsWith('/borrow_portal')) return 'borrow_portal';
+    if (pathname.startsWith('/borrow')) return 'borrow_portal';
     return null;
   };
 
