@@ -10,7 +10,7 @@ class AuditLog(BaseModel, table=True):
     audit_id: str = Field(unique=True, index=True, max_length=20)
 
     entity_type: str = Field(index=True, max_length=50) # "inventory", "borrow", etc.
-    entity_id: str = Field(index=True, max_length=50)
+    entity_id: str = Field(index=True, max_length=100)
 
     action: str = Field(max_length=50) # "create", "update", "delete", "restore"
     reason_code: Optional[str] = Field(default=None, index=True, max_length=50)
