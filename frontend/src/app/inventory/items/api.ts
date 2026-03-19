@@ -20,6 +20,7 @@ export interface InventoryItemCreate {
   item_type?: string;
   classification?: string;
   is_trackable?: boolean;
+  condition?: string;
   description?: string;
 }
 
