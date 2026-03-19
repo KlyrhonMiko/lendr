@@ -35,6 +35,7 @@ class UserUpdate(UserBase):
 
 class UserRead(UserBase):
     user_id: str
+    is_deleted: bool
 
     class Config:
         from_attributes = True
