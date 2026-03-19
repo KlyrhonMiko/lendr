@@ -11,6 +11,8 @@ from systems.admin.models.user import User
 from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestApprove,
     BorrowRequestAutoRouteWarehouse,
+    BorrowRequestBatchAssign,
+    BorrowRequestBatchRead,
     BorrowRequestClose,
     BorrowRequestCreate,
     BorrowRequestUnitAssign,
@@ -243,6 +245,53 @@ async def assign_units_to_request(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.patch(
+    "/requests/{request_id}/assign-batches",
+    response_model=GenericResponse[list[BorrowRequestBatchRead]],
+    responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}},
+)
+async def assign_batches_to_request(
+    request_id: str,
+    payload: BorrowRequestBatchAssign,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: User = Depends(shift_guard),
+    __: None = Depends(require_permission("inventory:borrow_requests:manage")),
+):
+    try:
+        assignments = borrow_service.assign_batches(
+            session,
+            request_id=request_id,
+            batch_assignments=payload.assignments,
+            actor_id=current_user.id,
+            item_id=payload.item_id,
+            note=payload.notes,
+        )
+        return create_success_response(
+            data=assignments, message="Batches assigned to request", request=request
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get(
+    "/requests/{request_id}/batches",
+    response_model=GenericResponse[list[BorrowRequestBatchRead]],
+    responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}},
+)
+async def get_assigned_batches(
+    request_id: str,
+    request: Request,
+    session: Session = Depends(get_session),
+):
+    db_request = borrow_service.get(session, request_id)
+    if not db_request:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    return create_success_response(data=db_request.assigned_batches, request=request)
+
+
 @router.get(
     "/requests/{request_id}/units",
     response_model=GenericResponse[list[BorrowRequestUnitRead]],
@@ -255,12 +304,10 @@ async def get_assigned_units(
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_permission("inventory:borrow_requests:manage")),
 ):
-    borrow_req = borrow_service.get(session, request_id)
-    if not borrow_req:
+    db_request = borrow_service.get(session, request_id)
+    if not db_request:
         raise HTTPException(status_code=404, detail="Request not found")
-
-    units = borrow_service.get_assigned_units(session, request_id)
-    return create_success_response(data=units, request=request)
+    return create_success_response(data=db_request.assigned_units, request=request)
 
 
 @router.post(

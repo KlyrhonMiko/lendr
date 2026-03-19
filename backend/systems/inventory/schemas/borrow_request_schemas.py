@@ -25,11 +25,8 @@ class BorrowRequestItemRead(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def resolve_item_details(cls, data):  # Renamed for clarity
-        # When validating from model attributes (from_attributes=True),
-        # 'data' will be an object.
+    def resolve_item_details(cls, data):
         if hasattr(data, "inventory_item") and data.inventory_item is not None:
-            # Inject item_id and name from the relationship if they're not present
             if hasattr(data, "__dict__"):
                 data.__dict__.setdefault("item_id", data.inventory_item.item_id)
                 data.__dict__.setdefault("name", data.inventory_item.name)
@@ -47,15 +44,13 @@ class BorrowRequestBase(BaseModel):
 
 
 class BorrowRequestCreate(BaseModel):
-    # borrower_id and request_channel are now automated in the router
-    
     items: list[BorrowRequestItemCreate] = Field(..., min_length=1)
     notes: Optional[str] = Field(default=None, max_length=500)
-    return_at: Optional[datetime] = None  # Renamed and optional
+    return_at: Optional[datetime] = None
     involved_people: Optional[list[dict]] = Field(default=None)
-
+    customer_name: Optional[str] = Field(default=None, max_length=255)
+    location_name: Optional[str] = Field(default=None, max_length=255)
     is_emergency: bool = False
-
 
 
 class BorrowRequestUpdate(BaseModel):
@@ -82,6 +77,54 @@ class BorrowRequestEventGlobalRead(BorrowRequestEventRead):
     request_id: str
 
 
+class BorrowRequestUnitRead(BaseModel):
+    borrow_unit_id: str
+    unit_id: str
+    assigned_at: Optional[datetime] = None
+    released_at: Optional[datetime] = None
+    returned_at: Optional[datetime] = None
+
+    condition_on_return: str | None = None
+    return_notes: str | None = None
+
+    @field_serializer("assigned_at", "released_at", "returned_at")
+    def serialize_dates(self, dt: datetime | None) -> str | None:
+        return format_datetime(dt)
+
+    class Config:
+        from_attributes = True
+
+
+class BorrowRequestBatchRead(BaseModel):
+    borrow_batch_id: str
+    batch_id: str
+    qty_assigned: int
+    assigned_at: Optional[datetime] = None
+    released_at: Optional[datetime] = None
+    returned_at: Optional[datetime] = None
+
+    @field_serializer("assigned_at", "released_at", "returned_at")
+    def serialize_dates(self, dt: datetime | None) -> str | None:
+        return format_datetime(dt)
+
+    class Config:
+        from_attributes = True
+
+
+class WarehouseApprovalRead(BaseModel):
+    approval_id: str
+    approved_by_user_id: Optional[str] = None
+    approved_at: datetime
+    remarks: Optional[str] = None
+
+    @field_serializer("approved_at")
+    def serialize_date(self, dt: datetime) -> str:
+        return format_datetime(dt)
+
+    class Config:
+        from_attributes = True
+
+
 class BorrowRequestRead(BaseModel):
     request_id: str
     transaction_ref: str
@@ -90,15 +133,13 @@ class BorrowRequestRead(BaseModel):
     borrower_user_id: Optional[str] = None
     request_channel: str = "inventory_manager"
     
-    # Keep these for internal status tracking!
     compliance_followup_required: bool = False
     compliance_followup_notes: Optional[str] = None
     
     notes: Optional[str] = None
-    items: list[BorrowRequestItemRead] = []
-
+    customer_name: Optional[str] = None
+    location_name: Optional[str] = None
     return_at: Optional[datetime] = None
-    returned_on_time: Optional[bool] = None
     
     is_emergency: bool = False
     involved_people: Optional[list[dict]] = None
@@ -108,12 +149,16 @@ class BorrowRequestRead(BaseModel):
     closed_by_user_id: Optional[str] = None
     close_reason: Optional[str] = None
 
-    events: list["BorrowRequestEventRead"] = []
+    events: list[BorrowRequestEventRead] = []
+    items: list[BorrowRequestItemRead] = []
+    assigned_units: list[BorrowRequestUnitRead] = []
+    assigned_batches: list[BorrowRequestBatchRead] = []
+    warehouse_approval: Optional[WarehouseApprovalRead] = None
+    returned_on_time: Optional[bool] = None
 
     @field_serializer("request_date", "return_at", "closed_at")
     def serialize_dates(self, dt: datetime | None) -> str | None:
         return format_datetime(dt)
-
 
 
 class BorrowRequestApprove(BaseModel):
@@ -177,27 +222,15 @@ class BorrowRequestUnitAssign(BaseModel):
     item_id: Optional[str] = Field(default=None, max_length=50)
 
 
-class BorrowRequestUnitRead(BaseModel):
-    borrow_unit_id: str
-    unit_id: str | None = None
+class BorrowRequestBatchAssignment(BaseModel):
+    batch_id: str
+    qty: int = Field(gt=0)
 
-    requested_at: datetime | None = None
-    approved_at: datetime | None = None
-    assigned_at: datetime | None = None
-    released_at: datetime | None = None
-    returned_at: datetime | None = None
 
-    condition_on_return: str | None = None
-    return_notes: str | None = None
-
-    @field_serializer(
-        "requested_at", "approved_at", "assigned_at", "released_at", "returned_at"
-    )
-    def serialize_dates(self, dt: datetime | None) -> str | None:
-        return format_datetime(dt)
-
-    class Config:
-        from_attributes = True
+class BorrowRequestBatchAssign(BaseModel):
+    assignments: list[BorrowRequestBatchAssignment] = Field(min_length=1)
+    notes: Optional[str] = Field(default=None, max_length=500)
+    item_id: str
 
 
 class BatchItem(BaseModel):
@@ -211,4 +244,3 @@ class BorrowRequestWarehouseReject(BaseModel):
 
 class BorrowRequestClose(BaseModel):
     notes: Optional[str] = Field(default=None, max_length=500)
-

@@ -17,6 +17,8 @@ export interface BorrowerBorrowRequest {
   }>;
   status: string;
   notes?: string;
+  customer_name?: string;
+  location_name?: string;
   request_date: string; // Pre-formatted datetime string: MM/DD/YYYY - HH:MM:SS AM/PM
   events?: BorrowRequestEvent[];
 }

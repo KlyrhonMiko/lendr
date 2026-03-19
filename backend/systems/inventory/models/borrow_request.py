@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from .borrow_request_event import BorrowRequestEvent
     from .borrow_participant import BorrowParticipant
     from .borrow_request_unit import BorrowRequestUnit
+    from .borrow_request_batch import BorrowRequestBatch
     from .borrow_request_item import BorrowRequestItem
     from .warehouse_approval import WarehouseApproval
 
@@ -40,6 +41,9 @@ class BorrowRequest(BaseModel, table=True):
     request_date: datetime = Field(default_factory=get_now_manila)
     notes: str | None = Field(default=None, max_length=500)
 
+    customer_name: str | None = Field(default=None, max_length=255)
+    location_name: str | None = Field(default=None, max_length=255)
+
     transaction_ref: str = Field(unique=True, index=True, max_length=50)
     release_employee_id: str | None = Field(default=None, max_length=50)
     involved_people: list[dict] | None = Field(default=None, sa_column=Column(JSON))
@@ -69,6 +73,10 @@ class BorrowRequest(BaseModel, table=True):
     assigned_units: list["BorrowRequestUnit"] = Relationship(
         back_populates="borrow_request",
         sa_relationship_kwargs={"foreign_keys": "[BorrowRequestUnit.borrow_uuid]"},
+    )
+    assigned_batches: list["BorrowRequestBatch"] = Relationship(
+        back_populates="borrow_request",
+        sa_relationship_kwargs={"foreign_keys": "[BorrowRequestBatch.borrow_uuid]"},
     )
     warehouse_approval: Optional["WarehouseApproval"] = Relationship(
         back_populates="borrow_request",

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Search, Calendar, Package, AlertCircle, CheckCircle2, Clock, Loader2, ArrowLeft } from 'lucide-react';
+import { Search, Calendar, Package, AlertCircle, CheckCircle2, Clock, Loader2, ArrowLeft, Building2, MapPin } from 'lucide-react';
 import { borrowerHistoryApi, type BorrowerBorrowRequest } from './api';
 import { toast } from "sonner";
 import { AuthGuard } from '@/components/AuthGuard';
@@ -186,6 +186,22 @@ export default function BorrowerHistoryPage() {
                               <p className="text-sm text-muted-foreground">{request.request_date || 'Date unavailable'}</p>
                             </div>
                           </div>
+                          {(request.customer_name || request.location_name) && (
+                            <div className="flex flex-wrap gap-3 mt-2">
+                              {request.customer_name && (
+                                <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-background/50 border border-border/50 text-xs font-medium text-muted-foreground">
+                                  <Building2 className="w-3 h-3" />
+                                  {request.customer_name}
+                                </div>
+                              )}
+                              {request.location_name && (
+                                <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-background/50 border border-border/50 text-xs font-medium text-muted-foreground">
+                                  <MapPin className="w-3 h-3" />
+                                  {request.location_name}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                         <div className={`px-4 py-2 rounded-xl border font-bold text-sm flex items-center gap-2 ${statusColor.bg} ${statusColor.text} ${statusColor.border}`}>
                           {getStatusIcon(request.status)}

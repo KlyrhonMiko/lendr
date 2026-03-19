@@ -12,6 +12,7 @@ from .inventory_batch import InventoryBatch
 from .inventory_movement import InventoryMovement
 from .borrow_participant import BorrowParticipant
 from .borrow_request_unit import BorrowRequestUnit
+from .borrow_request_batch import BorrowRequestBatch
 from .settings import InventoryConfig, BorrowerConfig 
 
 __all__ = [
@@ -21,6 +22,7 @@ __all__ = [
     "BorrowRequestItem",
     "BorrowParticipant",
     "BorrowRequestUnit",
+    "BorrowRequestBatch",
     "RequestedItem",
     "WarehouseApproval",
     "InventoryUnit",
