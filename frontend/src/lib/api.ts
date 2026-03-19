@@ -50,11 +50,6 @@ async function request<T>(
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-
-    if (response.status === 401) {
-      auth.logout();
-    }
-
     throw new Error(errorData.message || errorData.detail || 'An error occurred during the request');
   }
 
