@@ -35,7 +35,7 @@ from systems.inventory.schemas.inventory_movement_schemas import (
 from systems.inventory.services.inventory_service import InventoryService
 from systems.inventory.dependencies import shift_guard
 
-from systems.auth.dependencies import require_permission
+from systems.auth.dependencies import require_permission, require_system_access
 
 router = APIRouter()
 inventory_service = InventoryService()
@@ -54,6 +54,7 @@ async def create_item(
     current_user: User = Depends(get_current_user),
     _: User = Depends(shift_guard),
     __: None = Depends(require_permission("inventory:items:manage")),
+    ___: None = Depends(require_system_access("inventory")),
 ):
     item = inventory_service.create(
         session, 
@@ -85,8 +86,6 @@ async def list_items(
     condition: Optional[str] = Query(default=None, description="Filter by condition (e.g. good, damaged)"),
     include_deleted: bool = Query(default=False, description="Include soft-deleted items"),
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permission("inventory:items:view")),
 ):
     skip = (page - 1) * per_page
     items, total = inventory_service.get_all(
@@ -123,8 +122,6 @@ async def get_item(
     item_id: str,
     request: Request,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permission("inventory:items:view")),
 ):
     item = inventory_service.get(session, item_id)
     if not item:
@@ -148,6 +145,7 @@ async def update_item(
     current_user: User = Depends(get_current_user),
     _: User = Depends(shift_guard),
     __: None = Depends(require_permission("inventory:items:manage")),
+    ___: None = Depends(require_system_access("inventory")),
 ):
     item = inventory_service.get(session, item_id)
     if not item:
@@ -179,6 +177,7 @@ async def adjust_stock(
     current_user: User = Depends(get_current_user),
     _: User = Depends(shift_guard),
     __: None = Depends(require_permission("inventory:items:manage")),
+    ___: None = Depends(require_system_access("inventory")),
 ):
     """
     Transactional stock adjustment.
@@ -224,6 +223,7 @@ async def delete_item(
     current_user: User = Depends(get_current_user),
     _: User = Depends(shift_guard),
     __: None = Depends(require_permission("inventory:items:manage")),
+    ___: None = Depends(require_system_access("inventory")),
 ):
     item = inventory_service.get(session, item_id)
     if not item:
@@ -255,6 +255,7 @@ async def restore_item(
     current_user: User = Depends(get_current_user),
     _: User = Depends(shift_guard),
     __: None = Depends(require_permission("inventory:items:manage")),
+    ___: None = Depends(require_system_access("inventory")),
 ):
     item = inventory_service.get(session, item_id, include_deleted=True)
     
@@ -297,6 +298,7 @@ async def get_all_movements_ledger(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_permission("inventory:movements:view")),
+    __: None = Depends(require_system_access("inventory")),
 ):
     """Get the complete inventory movement ledger across all items with pagination and filters."""
     skip = (page - 1) * per_page
@@ -333,6 +335,7 @@ async def get_item_history(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_permission("inventory:movements:view")),
+    __: None = Depends(require_system_access("inventory")),
 ):
     """Get the stock movement ledger (history) for a specific inventory item."""
     skip = (page - 1) * per_page
@@ -371,6 +374,7 @@ async def create_unit(
     current_user: User = Depends(get_current_user),
     _: User = Depends(shift_guard),
     __: None = Depends(require_permission("inventory:units:manage")),
+    ___: None = Depends(require_system_access("inventory")),
 ):
     """
     Create a single unit for a trackable inventory item.
@@ -418,6 +422,7 @@ async def create_units_batch(
     current_user: User = Depends(get_current_user),
     _: User = Depends(shift_guard),
     __: None = Depends(require_permission("inventory:units:manage")),
+    ___: None = Depends(require_system_access("inventory")),
 ):
     """
     Batch create multiple units for a trackable inventory item.
@@ -466,6 +471,7 @@ async def list_item_units(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_permission("inventory:units:view")),
+    __: None = Depends(require_system_access("inventory")),
 ):
     """
     Get all units for a specific inventory item.
@@ -511,6 +517,7 @@ async def update_unit(
     current_user: User = Depends(get_current_user),
     _: User = Depends(shift_guard),
     __: None = Depends(require_permission("inventory:units:manage")),
+    ___: None = Depends(require_system_access("inventory")),
 ):
     """
     Update unit status and/or condition.
@@ -556,6 +563,7 @@ async def retire_unit(
     current_user: User = Depends(get_current_user),
     _: User = Depends(shift_guard),
     __: None = Depends(require_permission("inventory:units:manage")),
+    ___: None = Depends(require_system_access("inventory")),
 ):
     """
     Retire (soft delete) a unit. Once retired, a unit cannot be borrowed or used.
@@ -594,6 +602,7 @@ async def list_item_batches(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_permission("inventory:units:view")),
+    __: None = Depends(require_system_access("inventory")),
 ):
     """List all batches for a specific inventory item."""
     skip = (page - 1) * per_page
@@ -628,6 +637,7 @@ async def create_batch(
     current_user: User = Depends(get_current_user),
     _: User = Depends(shift_guard),
     __: None = Depends(require_permission("inventory:units:manage")),
+    ___: None = Depends(require_system_access("inventory")),
 ):
     """Create a new batch for an untrackable inventory item (Metadata only)."""
     try:
@@ -663,6 +673,7 @@ async def update_batch(
     current_user: User = Depends(get_current_user),
     _: User = Depends(shift_guard),
     __: None = Depends(require_permission("inventory:units:manage")),
+    ___: None = Depends(require_system_access("inventory")),
 ):
     """Update batch metadata (status and/or expiration)."""
     try:
@@ -696,6 +707,7 @@ async def reconcile_item_movements(
     current_user: User = Depends(get_current_user),
     _: User = Depends(shift_guard),
     __: None = Depends(require_permission("inventory:movements:manage")),
+    ___: None = Depends(require_system_access("inventory")),
 ):
     try:
         result = inventory_service.reconcile_movements(session, item_id)
@@ -727,6 +739,7 @@ async def reverse_movement(
     current_user: User = Depends(get_current_user),
     _: User = Depends(shift_guard),
     __: None = Depends(require_permission("inventory:movements:manage")),
+    ___: None = Depends(require_system_access("inventory")),
 ):
     try:
         original = inventory_service.get_movement(session, movement_id)
@@ -780,6 +793,7 @@ async def get_item_movement_summary(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_permission("inventory:movements:view")),
+    __: None = Depends(require_system_access("inventory")),
 ):
     try:
         summary = inventory_service.get_movements_summary(session, item_id)
@@ -803,6 +817,7 @@ async def get_movement_anomalies(
     current_user: User = Depends(get_current_user),
     _: User = Depends(shift_guard),
     __: None = Depends(require_permission("inventory:movements:view")),
+    ___: None = Depends(require_system_access("inventory")),
 ):
     try:
         anomalies = inventory_service.get_movement_anomalies(

@@ -16,6 +16,7 @@ from systems.auth.dependencies import get_current_user, require_permission
 from systems.auth.schemas.auth_schemas import RolePolicyRead, Token
 from systems.auth.services.auth_service import AuthService
 from systems.auth.services.rbac_service import rbac_service
+from systems.admin.services.audit_service import audit_service
 
 router = APIRouter()
 auth_service = AuthService()
@@ -55,6 +56,14 @@ async def login_for_access_token(
         expires_delta=access_token_expires
     )
 
+    audit_service.log_action(
+        db=session,
+        entity_type="session",
+        entity_id=db_session.session_id,
+        action="login",
+        actor_id=user.id
+    )
+
     return Token(access_token=access_token, token_type="bearer")
 
 
@@ -89,6 +98,14 @@ async def borrower_login(
     access_token = auth_service.create_access_token(
         data={"sub": user.user_id, "session_id": db_session.session_id}, 
         expires_delta=access_token_expires
+    )
+
+    audit_service.log_action(
+        db=session,
+        entity_type="session",
+        entity_id=db_session.session_id,
+        action="login",
+        actor_id=user.id
     )
 
     return Token(access_token=access_token, token_type="bearer")
@@ -145,6 +162,14 @@ async def logout(
                 auth_service.revoke_borrower_session(session, session_id)
             else:
                 auth_service.revoke_user_session(session, session_id)
+
+            audit_service.log_action(
+                db=session,
+                entity_type="session",
+                entity_id=session_id,
+                action="logout",
+                actor_id=user.id
+            )
                 
         return create_success_response(
             message="Successfully logged out",

@@ -15,6 +15,7 @@ class InventoryItemBase(BaseModel):
 class InventoryItemCreate(InventoryItemBase):
     name: str = Field(..., max_length=255)
     category: Optional[str] = Field(default=None, max_length=100)
+    condition: Optional[str] = Field(default="good", max_length=100)
 
 class InventoryItemUpdate(InventoryItemBase):
     condition: Optional[str] = Field(default=None, max_length=100)

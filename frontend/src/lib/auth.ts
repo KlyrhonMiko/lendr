@@ -27,6 +27,12 @@ export const auth = {
     return null;
   },
 
+  clearToken: () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(TOKEN_KEY);
+    }
+  },
+
   logout: async (redirectTo = '/auth/login') => {
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem(TOKEN_KEY);

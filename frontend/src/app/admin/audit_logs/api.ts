@@ -18,6 +18,8 @@ export interface AuditLogParams {
   entity_id?: string;
   action?: string;
   actor_id?: string;
+  date_from?: string;
+  date_to?: string;
 }
 
 export const adminAuditApi = {

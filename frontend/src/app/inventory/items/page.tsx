@@ -56,6 +56,7 @@ export default function InventoryPage() {
   const [classifications, setClassifications] = useState<ConfigRead[]>([]);
   const [itemTypes, setItemTypes] = useState<ConfigRead[]>([]);
   const [conditions, setConditions] = useState<ConfigRead[]>([]);
+  const [categories, setCategories] = useState<ConfigRead[]>([]);
 
   const [unitManagementItemId, setUnitManagementItemId] = useState<string | null>(null);
   const [batchManagementItemId, setBatchManagementItemId] = useState<string | null>(null);
@@ -97,14 +98,16 @@ export default function InventoryPage() {
   useEffect(() => {
     const fetchConfigs = async () => {
       try {
-        const [classRes, typeRes, condRes] = await Promise.all([
+        const [classRes, typeRes, condRes, catRes] = await Promise.all([
           inventoryApi.getConfigs('inventory_classification'),
           inventoryApi.getConfigs('inventory_item_type'),
           inventoryApi.getConfigs('inventory_condition'),
+          inventoryApi.getConfigs('inventory_category'),
         ]);
         setClassifications(classRes.data);
         setItemTypes(typeRes.data);
         setConditions(condRes.data);
+        setCategories(catRes.data);
       } catch (err) {
         console.error('Failed to fetch configurations', err);
       }
@@ -155,6 +158,7 @@ export default function InventoryPage() {
           classification: formData.classification || undefined,
           item_type: formData.item_type,
           is_trackable: formData.is_trackable,
+          condition: formData.condition || undefined,
           description: formData.description || undefined,
         });
         toast.success('New equipment added to catalog');
@@ -238,13 +242,16 @@ export default function InventoryPage() {
           </button>
 
           {/* Inline category input */}
-          <input
-            type="text"
-            placeholder="Category..."
+          <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="h-10 px-4 rounded-xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all text-sm font-medium w-40"
-          />
+            className="h-10 px-4 rounded-xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all text-sm font-medium w-48 cursor-pointer appearance-none"
+          >
+            <option value="">All Categories</option>
+            {categories.map((c) => (
+              <option key={c.key} value={c.key}>{c.value}</option>
+            ))}
+          </select>
 
           {/* Count badge */}
           {meta && (
@@ -477,13 +484,16 @@ export default function InventoryPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-foreground">Category</label>
-                  <input
-                    type="text"
+                  <select
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full h-11 px-4 rounded-xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 font-medium transition-all"
-                    placeholder="e.g. IT Equipment (Optional)"
-                  />
+                    className="w-full h-11 px-4 rounded-xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 font-medium transition-all cursor-pointer"
+                  >
+                    <option value="">Select Category</option>
+                    {categories.map((c) => (
+                      <option key={c.key} value={c.key}>{c.value}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-foreground">Condition</label>

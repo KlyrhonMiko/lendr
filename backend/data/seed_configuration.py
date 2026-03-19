@@ -477,9 +477,15 @@ def seed_inventory_configurations(headers: dict[str, str]) -> None:
     # inventory_category (business grouping used by item create payloads)
     print(f"\n  {CYAN}Category: inventory_category{RESET}")
     categories = [
-        ("electronics", "Electronics", "Electronic equipment and accessories"),
-        ("office", "Office", "Office and workplace assets"),
-        ("operations", "Operations", "Operations and field support assets"),
+        ("administrative_office", "Administrative & Office", "General office supplies, furniture, and administrative support assets"),
+        ("operational_field", "Operational & Field", "Field operations, site equipment, and operational tools"),
+        ("it_communications", "IT & Communications", "IT infrastructure, networking, and communication systems"),
+        ("facility_maintenance", "Facility & Maintenance", "Building maintenance, facility management, and utility support"),
+        ("safety_security", "Safety & Security", "Health, safety, security gear, and protective equipment"),
+        ("laboratory_research", "Laboratory & Research", "Scientific research equipment and laboratory operations"),
+        ("marketing_events", "Marketing & Events", "Brand marketing materials and event staging support"),
+        ("logistics_supply", "Logistics & Supply Chain", "Warehouse, shipping, and logistics management assets"),
+        ("medical_clinical", "Medical & Clinical", "Clinical support and medical-related equipment"),
     ]
     for key, value, desc in categories:
         create_setting(

@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Package, History, Settings, Box, Activity } from 'lucide-react';
+import { LayoutDashboard, Package, History, Settings, Box, Activity, UserCircle } from 'lucide-react';
 
 const navigation = {
   admin: [
     { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
+    { name: 'User Management', href: '/admin/users', icon: UserCircle },
     { name: 'System Logs', href: '/admin/audit_logs', icon: History },
     { name: 'System Settings', href: '/admin/settings', icon: Settings },
   ],
