@@ -93,7 +93,6 @@ app.include_router(
     inventory,
     prefix="/api/inventory/items",
     tags=["Inventory - Items"],
-    dependencies=inventory_access,
 )
 app.include_router(
     borrowing,

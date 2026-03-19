@@ -6,6 +6,8 @@ import { inventoryApi, InventoryItem } from '@/app/inventory/items/api';
 import { posApi } from './api';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { auth } from '@/lib/auth';
+import { api } from '@/lib/api';
 import { CartItem } from './lib/types';
 import { SelectionView } from './components/SelectionView';
 import { CheckoutView } from './components/CheckoutView';
@@ -224,6 +226,16 @@ export default function BorrowPage() {
     setIsSubmitting(true);
 
     try {
+      // 1. Validate credentials (Login) as borrower
+      const loginRes = await api.borrowerLogin({
+        username: employeeId.trim(),
+        password: employeePin.trim(),
+      });
+
+      // 2. Set token temporarily for the borrow request
+      auth.setToken(loginRes.access_token);
+
+      // 3. Submit borrow request
       await posApi.createBatchBorrow({
         items: cart.map((i) => ({ item_id: i.item_id, qty_requested: i.cartQty })),
         notes: [
@@ -237,6 +249,9 @@ export default function BorrowPage() {
         location_name: locationName.trim(),
       });
 
+      // 4. Clear token (Security - shared kiosk)
+      auth.clearToken();
+
       setSuccess(true);
       toast.success(`Borrow request submitted for ${cart.length} item(s)`);
 
@@ -246,6 +261,8 @@ export default function BorrowPage() {
         fetchData();
       }, 3000);
     } catch (error: unknown) {
+      // Ensure token is cleared even on error
+      auth.clearToken();
       const message =
         error instanceof Error ? error.message : 'Failed to process borrow request';
       toast.error(message);
