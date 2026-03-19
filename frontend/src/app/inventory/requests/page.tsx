@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback, Fragment } from 'react';
 import { Search, CheckCircle2, AlertCircle, Clock, Loader2, Info, ChevronDown, ChevronRight, History } from 'lucide-react';
-import { borrowApi, BorrowListParams, BorrowRequestEvent } from './api';
+import { borrowApi, BorrowListParams, BorrowRequestEvent, BorrowRequest } from './api';
 import { Pagination } from '@/components/ui/Pagination';
+import { UnitSelectionModal } from './UnitSelectionModal';
 import type { PaginationMeta } from '@/lib/api';
 import { toast } from 'sonner';
 
@@ -62,7 +63,9 @@ export default function BorrowsPage() {
     requestId: string;
     actionLabel: string;
   } | null>(null);
+  const [assigningRequest, setAssigningRequest] = useState<BorrowRecord | null>(null);
   const [actionNotes, setActionNotes] = useState('');
+  const [assignmentsMap, setAssignmentsMap] = useState<Record<string, { units: any[], batches: any[] }>>({});
 
   const debouncedSearch = useDebounce(searchInput, 400);
 
@@ -100,6 +103,40 @@ export default function BorrowsPage() {
     }
   }, [requestEvents]);
 
+  const fetchAssignments = useCallback(async (requestId: string) => {
+    try {
+      const [units, batches] = await Promise.all([
+        borrowApi.getAssignedUnits(requestId),
+        borrowApi.getAssignedBatches(requestId)
+      ]);
+      setAssignmentsMap(prev => ({
+        ...prev,
+        [requestId]: { units: units.data, batches: batches.data }
+      }));
+    } catch (err) {
+      console.error('Failed to fetch assignments:', err);
+    }
+  }, []);
+
+  const isFullyAssigned = useCallback((record: BorrowRecord) => {
+    const assignments = assignmentsMap[record.request_id];
+    if (!assignments) return false;
+    
+    const totalRequested = record.items.reduce((sum, item) => sum + item.qty_requested, 0);
+    const totalAssignedUnits = assignments.units.length;
+    const totalAssignedBatches = assignments.batches.reduce((sum, b) => sum + b.qty_assigned, 0);
+    
+    return (totalAssignedUnits + totalAssignedBatches) >= totalRequested;
+  }, [assignmentsMap]);
+
+  useEffect(() => {
+    records.forEach(record => {
+      if (['approved', 'warehouse_approved'].includes(record.status) && !assignmentsMap[record.request_id]) {
+        fetchAssignments(record.request_id);
+      }
+    });
+  }, [records, fetchAssignments, assignmentsMap]);
+
   // Reset to page 1 on filter changes
   useEffect(() => {
     setPage(1);
@@ -119,6 +156,7 @@ export default function BorrowsPage() {
     warehouse_approve: borrowApi.warehouseApprove,
     warehouse_reject: (id: string) => borrowApi.warehouseReject(id),
     close: borrowApi.close,
+    assign: () => Promise.resolve(), // Handled by separate modal
   } as const;
 
   type BorrowAction = keyof typeof actionHandlers;
@@ -300,7 +338,15 @@ export default function BorrowsPage() {
                           )}
                           {record.status === 'approved' && (
                             <>
-                              <button onClick={() => setConfirmingAction({ action: 'release', requestId: record.request_id, actionLabel: 'Release' })} className="px-4 py-1.5 text-xs font-bold bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 rounded-lg transition-all border border-blue-500/20">Release</button>
+                              <button 
+                                onClick={() => setAssigningRequest(record)} 
+                                className="px-4 py-1.5 text-xs font-bold bg-indigo-500/10 text-indigo-500 hover:bg-indigo-500/20 rounded-lg transition-all border border-indigo-500/20"
+                              >
+                                {isFullyAssigned(record) ? 'Reassign Inventory' : 'Assign Inventory'}
+                              </button>
+                              {isFullyAssigned(record) && (
+                                <button onClick={() => setConfirmingAction({ action: 'release', requestId: record.request_id, actionLabel: 'Release' })} className="px-4 py-1.5 text-xs font-bold bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 rounded-lg transition-all border border-blue-500/20">Release</button>
+                              )}
                               <button onClick={() => setConfirmingAction({ action: 'send_to_warehouse', requestId: record.request_id, actionLabel: 'Send to Warehouse' })} className="px-4 py-1.5 text-xs font-bold bg-violet-500/10 text-violet-500 hover:bg-violet-500/20 rounded-lg transition-all border border-violet-500/20">Send Warehouse</button>
                             </>
                           )}
@@ -311,7 +357,17 @@ export default function BorrowsPage() {
                             </>
                           )}
                           {record.status === 'warehouse_approved' && (
-                            <button onClick={() => setConfirmingAction({ action: 'release', requestId: record.request_id, actionLabel: 'Release' })} className="px-4 py-1.5 text-xs font-bold bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 rounded-lg transition-all border border-blue-500/20">Release</button>
+                            <div className="flex gap-2">
+                              <button 
+                                onClick={() => setAssigningRequest(record)} 
+                                className="px-4 py-1.5 text-xs font-bold bg-indigo-500/10 text-indigo-500 hover:bg-indigo-500/20 rounded-lg transition-all border border-indigo-500/20"
+                              >
+                                {isFullyAssigned(record) ? 'Reassign Inventory' : 'Assign Inventory'}
+                              </button>
+                              {isFullyAssigned(record) && (
+                                <button onClick={() => setConfirmingAction({ action: 'release', requestId: record.request_id, actionLabel: 'Release' })} className="px-4 py-1.5 text-xs font-bold bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 rounded-lg transition-all border border-blue-500/20">Release</button>
+                              )}
+                            </div>
                           )}
                           {record.status === 'released' && (
                             <button onClick={() => setConfirmingAction({ action: 'return', requestId: record.request_id, actionLabel: 'Return' })} className="px-4 py-1.5 text-xs font-bold bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 rounded-lg transition-all border border-emerald-500/20">Return</button>
@@ -400,7 +456,7 @@ export default function BorrowsPage() {
                                           <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest whitespace-nowrap">By: {event.actor_user_id || 'System'}</span>
                                           {event.note && (
                                             <span className="text-xs text-muted-foreground italic line-clamp-2 bg-muted/30 px-2 py-0.5 rounded border border-border/20">
-                                              "{event.note}"
+                                              &quot;{event.note}&quot;
                                             </span>
                                           )}
                                         </div>
@@ -491,6 +547,19 @@ export default function BorrowsPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {assigningRequest && (
+          <UnitSelectionModal
+            request={assigningRequest as unknown as BorrowRequest}
+            onClose={() => setAssigningRequest(null)}
+            onSuccess={() => {
+              setAssigningRequest(null);
+              fetchRecords();
+              fetchAssignments(assigningRequest.request_id);
+              fetchRequestEvents(assigningRequest.request_id);
+            }}
+          />
         )}
       </div>
   );

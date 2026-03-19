@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Search, ShoppingCart, Plus, Minus, Trash2, CheckCircle2, UserCircle2, Loader2, Package2, ShieldAlert, LogOut, History } from 'lucide-react';
+import { Search, ShoppingCart, Plus, Minus, Trash2, CheckCircle2, UserCircle2, Loader2, Package2, ShieldAlert, LogOut, History, Building2, MapPin } from 'lucide-react';
 import { inventoryApi, InventoryItem } from '@/app/inventory/items/api';
 import { posApi } from './api';
 import { toast } from "sonner";
@@ -22,6 +22,8 @@ export default function POSPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [notes, setNotes] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [locationName, setLocationName] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -82,6 +84,8 @@ export default function POSPage() {
   const handleClear = () => {
     setCart([]);
     setNotes('');
+    setCustomerName('');
+    setLocationName('');
   };
 
   const handleCheckout = async () => {
@@ -91,7 +95,9 @@ export default function POSPage() {
     try {
       await posApi.createBatchBorrow({
         items: cart.map(i => ({ item_id: i.item_id, qty_requested: i.cartQty })),
-        notes: notes || `Request submitted by ${currentUser?.first_name} ${currentUser?.last_name}`
+        notes: notes || `Request submitted by ${currentUser?.first_name} ${currentUser?.last_name}`,
+        customer_name: customerName || undefined,
+        location_name: locationName || undefined
       });
       
       setSuccess(true);
@@ -281,6 +287,50 @@ export default function POSPage() {
               </div>
             ))
           )}
+        </div>
+
+        {/* Transaction Details */}
+        <div className="p-6 bg-muted/30 border-t border-border/50 space-y-4">
+          <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Transaction Details</h3>
+          
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Customer / Store</label>
+              <div className="relative">
+                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input 
+                  type="text"
+                  placeholder="Optional"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  className="w-full h-10 pl-9 pr-3 rounded-xl bg-background border border-border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-sm transition-all"
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Location / Branch</label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input 
+                  type="text"
+                  placeholder="Optional"
+                  value={locationName}
+                  onChange={(e) => setLocationName(e.target.value)}
+                  className="w-full h-10 pl-9 pr-3 rounded-xl bg-background border border-border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-sm transition-all"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Notes</label>
+            <textarea 
+              placeholder="Add any additional notes here..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full h-20 p-3 rounded-xl bg-background border border-border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-sm transition-all resize-none"
+            />
+          </div>
         </div>
 
         {/* Footer / Checkout */}

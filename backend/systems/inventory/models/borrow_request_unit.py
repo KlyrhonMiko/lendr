@@ -44,3 +44,9 @@ class BorrowRequestUnit(BaseModel, table=True):
         back_populates="borrow_assignments",
         sa_relationship_kwargs={"foreign_keys": "[BorrowRequestUnit.unit_uuid]"},
     )
+
+    @property
+    def unit_id(self) -> str:
+        if self.inventory_unit:
+            return self.inventory_unit.unit_id
+        return ""

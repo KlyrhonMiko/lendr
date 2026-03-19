@@ -11,6 +11,8 @@ export interface BatchBorrowRequest {
   return_at?: string;
   involved_people?: Record<string, unknown>[];
   is_emergency?: boolean;
+  customer_name?: string;
+  location_name?: string;
 }
 
 export const posApi = {

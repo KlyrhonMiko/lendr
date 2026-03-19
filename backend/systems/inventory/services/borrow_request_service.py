@@ -8,6 +8,7 @@ from systems.inventory.models.borrow_request import BorrowRequest
 from systems.inventory.models.borrow_request_event import BorrowRequestEvent
 from systems.inventory.models.borrow_request_item import BorrowRequestItem
 from systems.inventory.models.borrow_request_unit import BorrowRequestUnit
+from systems.inventory.models.borrow_request_batch import BorrowRequestBatch
 from systems.inventory.models.inventory import InventoryItem
 from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestCreate,
@@ -16,6 +17,7 @@ from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestRead,
     BorrowRequestUnitReturn,
     BorrowRequestUpdate,
+    BorrowRequestBatchAssignment,
 )
 from systems.inventory.models.borrow_participant import BorrowParticipant
 from systems.inventory.models.warehouse_approval import WarehouseApproval
@@ -512,6 +514,33 @@ class BorrowService(
 
         return assignments
 
+    def _validate_batch_assignment_prerequisites(
+        self,
+        session: Session,
+        db_request: BorrowRequest,
+        borrow_item: BorrowRequestItem,
+    ) -> list[BorrowRequestBatch]:
+        """Ensures that non-trackable items have all requested quantity assigned to batches."""
+        item = borrow_item.inventory_item
+        if item.is_trackable:
+            return []
+
+        # Filter assignments that belong to this specific item
+        assignments = [
+            a
+            for a in db_request.assigned_batches
+            if a.inventory_batch and a.inventory_batch.inventory_uuid == item.id
+        ]
+
+        total_assigned = sum(a.qty_assigned for a in assignments)
+
+        if total_assigned != borrow_item.qty_requested:
+            raise ValueError(
+                f"Non-trackable item '{item.item_id}' requires {borrow_item.qty_requested} assigned units before release, but found {total_assigned} assigned in batches."
+            )
+
+        return assignments
+
     def _set_sent_to_warehouse(
         self,
         session: Session,
@@ -572,6 +601,7 @@ class BorrowService(
         request_id: str,
         unit_ids: list[str],
         actor_id: UUID,
+        item_id: str | None = None,
         note: str | None = None,
     ) -> list[BorrowRequestUnit]:
         db_request = self.get(session, request_id)
@@ -605,18 +635,27 @@ class BorrowService(
         if len(set(normalized_unit_ids)) != len(normalized_unit_ids):
             raise ValueError("unit_ids must be unique")
 
-        # Get first unit to determine which item we are assigning to
-        first_unit = self.inventory_service.get_unit(session, normalized_unit_ids[0])
-        if not first_unit:
-            raise ValueError(f"Unit {normalized_unit_ids[0]} not found")
+        # Determine which item we are assigning to
+        item_uuid = None
+        if item_id:
+            # Look up item by item_id string (e.g. 'ITEM-001')
+            item_obj = self.inventory_service.get(session, item_id)
+            if not item_obj:
+                raise ValueError(f"Item {item_id} not found")
+            item_uuid = item_obj.id
+        else:
+            # Fallback: Infer from first unit
+            first_unit = self.inventory_service.get_unit(session, normalized_unit_ids[0])
+            if not first_unit:
+                raise ValueError(f"Unit {normalized_unit_ids[0]} not found")
+            item_uuid = first_unit.inventory_uuid
 
-        item_uuid = first_unit.inventory_uuid
         borrow_item = next(
             (i for i in db_request.items if i.item_uuid == item_uuid), None
         )
         if not borrow_item:
             raise ValueError(
-                f"Item linked to unit {first_unit.unit_id} is not part of this borrow request"
+                f"Item {item_id or 'shared by units'} is not part of this borrow request"
             )
 
         item = borrow_item.inventory_item
@@ -694,7 +733,124 @@ class BorrowService(
 
         session.commit()
         for assignment in created_assignments:
-            session.refresh(assignment)
+            session.refresh(assignment, ["inventory_unit"])
+        return created_assignments
+
+    def assign_batches(
+        self,
+        session: Session,
+        request_id: str,
+        batch_assignments: list[BorrowRequestBatchAssignment],
+        actor_id: UUID,
+        item_id: str,
+        note: str | None = None,
+    ) -> list[BorrowRequestBatch]:
+        """Assign specific inventory batches and quantities to a borrow request item."""
+        db_request = self.get(session, request_id)
+        if not db_request:
+            raise ValueError("Request not found")
+
+        if db_request.status not in {
+            "approved",
+            "sent_to_warehouse",
+            "warehouse_approved",
+        }:
+            raise ValueError(
+                "Batches can only be assigned when request is approved, sent_to_warehouse, or warehouse_approved"
+            )
+
+        self._require_setting(
+            session,
+            key="units_assigned",
+            table_name="borrow_request_events",
+            field_name="event_type",
+            field_label="borrow request event type",
+        )
+
+        # Look up item
+        item_obj = self.inventory_service.get(session, item_id)
+        if not item_obj:
+            raise ValueError(f"Item {item_id} not found")
+        
+        borrow_item = next(
+            (i for i in db_request.items if i.item_uuid == item_obj.id), None
+        )
+        if not borrow_item:
+            raise ValueError(f"Item {item_id} is not part of this borrow request")
+
+        if item_obj.is_trackable:
+            raise ValueError("Batch assignment is only applicable to non-trackable items")
+
+        total_to_assign = sum(ba.qty for ba in batch_assignments)
+        if total_to_assign != borrow_item.qty_requested:
+            raise ValueError(
+                f"Expected to assign {borrow_item.qty_requested} units, but got assignments for {total_to_assign}"
+            )
+
+        # Clear existing assignments for this item
+        existing_assignments = [
+            ba for ba in db_request.assigned_batches 
+            if ba.inventory_batch and ba.inventory_batch.inventory_uuid == item_obj.id
+        ]
+        for ba in existing_assignments:
+            session.delete(ba)
+        
+        now = get_now_manila()
+        created_assignments: list[BorrowRequestBatch] = []
+
+        from systems.inventory.models import InventoryBatch
+        for ba_data in batch_assignments:
+            batch = session.exec(
+                select(InventoryBatch).where(
+                    InventoryBatch.batch_id == ba_data.batch_id,
+                    InventoryBatch.inventory_uuid == item_obj.id
+                )
+            ).first()
+
+            if not batch:
+                raise ValueError(f"Batch {ba_data.batch_id} not found for item {item_id}")
+
+            if batch.available_qty < ba_data.qty:
+                raise ValueError(f"Batch {ba_data.batch_id} only has {batch.available_qty} available")
+
+            assignment = BorrowRequestBatch(
+                borrow_batch_id=get_next_sequence(
+                    session, BorrowRequestBatch, "borrow_batch_id", "BRB"
+                ),
+                borrow_uuid=db_request.id,
+                batch_uuid=batch.id,
+                qty_assigned=ba_data.qty,
+                assigned_at=now,
+            )
+            session.add(assignment)
+            created_assignments.append(assignment)
+
+        # Log event
+        event = BorrowRequestEvent(
+            event_id=get_next_sequence(session, BorrowRequestEvent, "event_id", "BRE"),
+            borrow_uuid=db_request.id,
+            event_type="units_assigned",
+            actor_id=actor_id,
+            note=f"Assigned {total_to_assign} units from batches for item {item_id}. {note or ''}",
+        )
+        session.add(event)
+
+        audit_service.log_action(
+            db=session,
+            entity_type="borrow",
+            entity_id=db_request.request_id,
+            action="assign_batches",
+            after={
+                "request_id": db_request.request_id,
+                "item_id": item_id,
+                "assignments": [ba.model_dump() for ba in batch_assignments],
+            },
+            actor_id=actor_id,
+        )
+
+        session.commit()
+        for assignment in created_assignments:
+            session.refresh(assignment, ["inventory_batch"])
         return created_assignments
 
     def create_request(
@@ -1047,33 +1203,34 @@ class BorrowService(
 
                     session.add(unit)
                     session.add(assignment)
-            else:
-                self._require_setting(
-                    session,
-                    key="unit_assignment_skipped",
-                    table_name="borrow_request_events",
-                    field_name="event_type",
-                    field_label="borrow request event type",
-                )
-                skip_event = BorrowRequestEvent(
-                    event_id=get_next_sequence(
-                        session, BorrowRequestEvent, "event_id", "BRE"
-                    ),
-                    borrow_uuid=db_request.id,
-                    event_type="unit_assignment_skipped",
-                    actor_id=actor_id,
-                    note=f"Unit assignment skipped for non-trackable item {item.item_id}",
-                )
-                session.add(skip_event)
 
-            self.inventory_service.adjust_stock(
-                session,
-                item.item_id,
-                -borrow_item.qty_requested,
-                movement_type="borrow_release",
-                reference_id=db_request.request_id,
-                actor_id=actor_id,
-            )
+                self.inventory_service.adjust_stock(
+                    session,
+                    item.item_id,
+                    -borrow_item.qty_requested,
+                    movement_type="borrow_release",
+                    reference_id=db_request.request_id,
+                    actor_id=actor_id,
+                )
+            else:
+                # Enforce batch assignments for non-trackable items
+                batch_assignments = self._validate_batch_assignment_prerequisites(
+                    session, db_request, borrow_item
+                )
+
+                for ba in batch_assignments:
+                    ba.released_at = now
+                    session.add(ba)
+
+                    self.inventory_service.adjust_stock(
+                        session,
+                        item.item_id,
+                        -ba.qty_assigned,
+                        movement_type="borrow_release",
+                        reference_id=db_request.request_id,
+                        actor_id=actor_id,
+                        batch_id=ba.inventory_batch.batch_id,
+                    )
 
         self._require_borrow_status(session, stage_released)
         self._require_setting(
@@ -1204,14 +1361,46 @@ class BorrowService(
                     session.add(unit)
                     session.add(assignment)
 
-            self.inventory_service.adjust_stock(
-                session,
-                item.item_id,
-                borrow_item.qty_requested,
-                movement_type="borrow_return",
-                reference_id=db_request.request_id,
-                actor_id=actor_id,
-            )
+                self.inventory_service.adjust_stock(
+                    session,
+                    item.item_id,
+                    borrow_item.qty_requested,
+                    movement_type="borrow_return",
+                    reference_id=db_request.request_id,
+                    actor_id=actor_id,
+                )
+            else:
+                # Check for batch assignments
+                batch_assignments = [
+                    a for a in db_request.assigned_batches 
+                    if a.inventory_batch and a.inventory_batch.inventory_uuid == item.id
+                    and a.released_at is not None and a.returned_at is None
+                ]
+                
+                if batch_assignments:
+                    for ba in batch_assignments:
+                        ba.returned_at = get_now_manila()
+                        session.add(ba)
+                        
+                        self.inventory_service.adjust_stock(
+                            session,
+                            item.item_id,
+                            ba.qty_assigned,
+                            movement_type="borrow_return",
+                            reference_id=db_request.request_id,
+                            actor_id=actor_id,
+                            batch_id=ba.inventory_batch.batch_id,
+                        )
+                else:
+                    # Fallback to general stock adjustment
+                    self.inventory_service.adjust_stock(
+                        session,
+                        item.item_id,
+                        borrow_item.qty_requested,
+                        movement_type="borrow_return",
+                        reference_id=db_request.request_id,
+                        actor_id=actor_id,
+                    )
 
         now = get_now_manila()
         self._require_borrow_status(session, stage_5)

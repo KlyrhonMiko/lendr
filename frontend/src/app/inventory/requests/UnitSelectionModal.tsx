@@ -1,0 +1,408 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { X, Loader2, CheckCircle2, AlertCircle, Info, Layers } from 'lucide-react';
+import { borrowApi, BorrowRequest } from './api';
+import { inventoryApi } from '../items/api';
+import { toast } from 'sonner';
+
+interface UnitSelectionModalProps {
+  request: BorrowRequest;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+interface BatchAvailability {
+  batch_id: string;
+  available_qty: number;
+  expiration_date?: string;
+}
+
+interface ItemAssignmentData {
+  itemId: string;
+  name: string;
+  qtyRequested: number;
+  isTrackable: boolean;
+  // For trackable
+  availableUnits: {
+    unit_id: string;
+    serial_number: string;
+    internal_ref?: string;
+  }[];
+  selectedUnitIds: string[];
+  // For untrackable
+  availableBatches: BatchAvailability[];
+  selectedBatches: { batch_id: string; qty: number }[];
+  
+  loading: boolean;
+  error: string | null;
+}
+
+export function UnitSelectionModal({ request, onClose, onSuccess }: UnitSelectionModalProps) {
+  const [itemsData, setItemsData] = useState<ItemAssignmentData[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [notes, setNotes] = useState('');
+
+  // Initialize all items in the request
+  useEffect(() => {
+    const allItems = request.items.map(item => ({
+      itemId: item.item_id,
+      name: item.name,
+      qtyRequested: item.qty_requested,
+      isTrackable: !!(item as any).is_trackable,
+      availableUnits: [],
+      selectedUnitIds: [],
+      availableBatches: [],
+      selectedBatches: [],
+      loading: true,
+      error: null,
+    }));
+    setItemsData(allItems);
+
+    // Fetch units/batches for each item
+    allItems.forEach(item => {
+      if (item.isTrackable) {
+        fetchUnitsForItem(item.itemId);
+      } else {
+        fetchBatchesForItem(item.itemId);
+      }
+    });
+  }, [request]);
+
+  const fetchUnitsForItem = async (itemId: string) => {
+    try {
+      const res = await inventoryApi.listUnits(itemId, { status: 'available', per_page: 100 });
+      setItemsData(prev => prev.map(item => 
+        item.itemId === itemId 
+          ? { ...item, availableUnits: res.data as ItemAssignmentData['availableUnits'], loading: false } 
+          : item
+      ));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch units';
+      setItemsData(prev => prev.map(item => 
+        item.itemId === itemId 
+          ? { ...item, loading: false, error: message } 
+          : item
+      ));
+    }
+  };
+
+  const fetchBatchesForItem = async (itemId: string) => {
+    try {
+      const res = await inventoryApi.listBatches(itemId, { include_expired: false });
+      // Filter out batches with 0 quantity
+      const activeBatches = (res.data as BatchAvailability[]).filter(b => b.available_qty > 0);
+      setItemsData(prev => prev.map(item => 
+        item.itemId === itemId 
+          ? { ...item, availableBatches: activeBatches, loading: false } 
+          : item
+      ));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch batches';
+      setItemsData(prev => prev.map(item => 
+        item.itemId === itemId 
+          ? { ...item, loading: false, error: message } 
+          : item
+      ));
+    }
+  };
+
+  const toggleUnitSelection = (itemId: string, unitId: string) => {
+    setItemsData(prev => prev.map(item => {
+      if (item.itemId !== itemId) return item;
+
+      const isSelected = item.selectedUnitIds.includes(unitId);
+      if (!isSelected && item.selectedUnitIds.length >= item.qtyRequested) {
+        toast.error(`Already selected ${item.qtyRequested} units for ${item.name}`);
+        return item;
+      }
+
+      const nextSelection = isSelected
+        ? item.selectedUnitIds.filter(id => id !== unitId)
+        : [...item.selectedUnitIds, unitId];
+
+      return { ...item, selectedUnitIds: nextSelection };
+    }));
+  };
+
+  const handleBatchQtyChange = (itemId: string, batchId: string, qty: number) => {
+    setItemsData(prev => prev.map(item => {
+      if (item.itemId !== itemId) return item;
+
+      const batch = item.availableBatches.find(b => b.batch_id === batchId);
+      if (!batch) return item;
+
+      // Ensure qty doesn't exceed available or requested (requested is more of a validation later)
+      const sanitizedQty = Math.max(0, Math.min(qty, batch.available_qty));
+      
+      const otherAssignmentsTotal = item.selectedBatches
+        .filter(b => b.batch_id !== batchId)
+        .reduce((sum, b) => sum + b.qty, 0);
+        
+      if (otherAssignmentsTotal + sanitizedQty > item.qtyRequested) {
+        const allowedQty = Math.max(0, item.qtyRequested - otherAssignmentsTotal);
+        toast.error(`Cannot exceed requested quantity (${item.qtyRequested}) for ${item.name}`);
+        
+        const nextBatches = item.selectedBatches.filter(b => b.batch_id !== batchId);
+        if (allowedQty > 0) nextBatches.push({ batch_id: batchId, qty: allowedQty });
+        return { ...item, selectedBatches: nextBatches };
+      }
+
+      const nextBatches = item.selectedBatches.filter(b => b.batch_id !== batchId);
+      if (sanitizedQty > 0) {
+        nextBatches.push({ batch_id: batchId, qty: sanitizedQty });
+      }
+
+      return { ...item, selectedBatches: nextBatches };
+    }));
+  };
+
+  const handleAssign = async () => {
+    // Validate all items have enough units/qty selected
+    for (const item of itemsData) {
+      if (item.isTrackable) {
+        if (item.selectedUnitIds.length < item.qtyRequested) {
+          toast.error(`Please select ${item.qtyRequested} units for ${item.name}`);
+          return;
+        }
+      } else {
+        const total = item.selectedBatches.reduce((sum, b) => sum + b.qty, 0);
+        if (total < item.qtyRequested) {
+          toast.error(`Please assign ${item.qtyRequested} total quantity for ${item.name}`);
+          return;
+        }
+      }
+    }
+
+    setSubmitting(true);
+    try {
+      for (const item of itemsData) {
+        if (item.isTrackable) {
+          await borrowApi.assignUnits(request.request_id, {
+            unit_ids: item.selectedUnitIds,
+            item_id: item.itemId,
+            notes: notes || undefined,
+          });
+        } else {
+          await borrowApi.assignBatches(request.request_id, {
+            assignments: item.selectedBatches.map(b => ({
+              batch_id: b.batch_id,
+              qty: b.qty
+            })),
+            item_id: item.itemId,
+            notes: notes || undefined,
+          });
+        }
+      }
+      toast.success('Inventory assigned successfully');
+      onSuccess();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to assign inventory';
+      toast.error(message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const getPercentageSelected = (item: ItemAssignmentData) => {
+    if (item.isTrackable) {
+      return (item.selectedUnitIds.length / item.qtyRequested) * 100;
+    }
+    const totalSelected = item.selectedBatches.reduce((sum, b) => sum + b.qty, 0);
+    return (totalSelected / item.qtyRequested) * 100;
+  };
+
+  const isValid = itemsData.length > 0 && itemsData.every(item => {
+    if (item.isTrackable) {
+      return item.selectedUnitIds.length === item.qtyRequested;
+    }
+    const total = item.selectedBatches.reduce((sum, b) => sum + b.qty, 0);
+    return total === item.qtyRequested;
+  });
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+      <div className="w-full max-w-4xl bg-card border border-border rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between p-6 border-b border-border/50">
+          <div>
+            <h2 className="text-xl font-bold font-heading uppercase tracking-tight">Assign Inventory</h2>
+            <p className="text-sm text-muted-foreground font-medium">Request ID: <span className="text-indigo-400 font-mono">{request.request_id}</span></p>
+          </div>
+          <button onClick={onClose} className="p-2 text-muted-foreground hover:bg-secondary rounded-full transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-8">
+          {itemsData.length === 0 ? (
+            <div className="text-center py-12">
+              <Info className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-20" />
+              <p className="text-muted-foreground font-medium">No items in this request.</p>
+            </div>
+          ) : itemsData.map((item) => (
+            <div key={item.itemId} className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-foreground flex items-center gap-2">
+                    {item.name}
+                    <span className="text-xs font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded">{item.itemId}</span>
+                    {item.isTrackable ? (
+                      <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded uppercase tracking-wider">Trackable</span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded uppercase tracking-wider">Untrackable</span>
+                    )}
+                  </h3>
+                  <p className="text-xs text-muted-foreground font-medium">Requested: <span className="text-foreground">{item.qtyRequested}</span> unit{item.qtyRequested !== 1 ? 's' : ''}</p>
+                </div>
+                <div className={`text-xs font-bold px-3 py-1 rounded-full border transition-all ${
+                  getPercentageSelected(item) === 100 
+                    ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' 
+                    : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                }`}>
+                  {item.isTrackable 
+                    ? `${item.selectedUnitIds.length} / ${item.qtyRequested} Selected`
+                    : `${item.selectedBatches.reduce((sum, b) => sum + b.qty, 0)} / ${item.qtyRequested} Allocated`
+                  }
+                </div>
+              </div>
+
+              {item.loading ? (
+                <div className="p-8 text-center bg-muted/20 rounded-2xl border border-dashed border-border/50">
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-indigo-500" />
+                  <p className="text-xs text-muted-foreground mt-2 font-medium">Fetching {item.isTrackable ? 'units' : 'batches'}...</p>
+                </div>
+              ) : item.error ? (
+                <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center gap-3 text-rose-500 text-sm">
+                  <AlertCircle className="w-4 h-4" />
+                  <p>{item.error}</p>
+                </div>
+              ) : item.isTrackable ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {item.availableUnits.length === 0 ? (
+                    <div className="col-span-full p-6 text-center bg-muted/10 rounded-2xl border border-dashed border-border/50">
+                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">No available units found.</p>
+                    </div>
+                  ) : item.availableUnits.map((unit) => {
+                    const isSelected = item.selectedUnitIds.includes(unit.unit_id);
+                    return (
+                      <button
+                        key={unit.unit_id}
+                        onClick={() => toggleUnitSelection(item.itemId, unit.unit_id)}
+                        className={`p-4 rounded-2xl border transition-all text-left flex flex-col gap-1 group ${
+                          isSelected
+                            ? 'bg-indigo-500/10 border-indigo-500 shadow-sm'
+                            : 'hover:bg-background/50 border-border group-hover:border-indigo-500/50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className={`text-xs font-mono font-bold ${isSelected ? 'text-indigo-400' : 'text-foreground'}`}>
+                            {unit.serial_number}
+                          </span>
+                          {isSelected && <CheckCircle2 className="w-4 h-4 text-indigo-500 animate-in zoom-in-50 duration-200" />}
+                        </div>
+                        <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">{unit.internal_ref || 'No Ref'}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {item.availableBatches.length === 0 ? (
+                    <div className="p-6 text-center bg-muted/10 rounded-2xl border border-dashed border-border/50">
+                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">No available batches found.</p>
+                    </div>
+                  ) : item.availableBatches.map((batch) => {
+                    const selected = item.selectedBatches.find(b => b.batch_id === batch.batch_id);
+                    const qty = selected?.qty || 0;
+                    return (
+                      <div
+                        key={batch.batch_id}
+                        className={`p-4 rounded-2xl border transition-all flex items-center justify-between gap-4 ${
+                          qty > 0 ? 'bg-indigo-500/10 border-indigo-500' : 'bg-card border-border'
+                        }`}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className={`p-2 rounded-xl ${qty > 0 ? 'bg-indigo-500/20 text-indigo-500' : 'bg-muted text-muted-foreground'}`}>
+                            <Layers className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-bold font-mono">{batch.batch_id}</span>
+                              {batch.expiration_date && (
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                                  new Date(batch.expiration_date) < new Date() ? 'bg-rose-500 text-rose-50' : 'bg-amber-500/10 text-amber-500'
+                                }`}>
+                                  Exp: {new Date(batch.expiration_date).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground font-medium">Available: <span className="text-foreground">{batch.available_qty}</span></p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={() => handleBatchQtyChange(item.itemId, batch.batch_id, qty - 1)}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-secondary hover:bg-muted font-bold transition-colors"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            value={qty}
+                            onChange={(e) => handleBatchQtyChange(item.itemId, batch.batch_id, parseInt(e.target.value) || 0)}
+                            className="w-16 h-8 text-center bg-transparent border-b-2 border-indigo-500/50 focus:border-indigo-500 outline-none text-sm font-bold"
+                          />
+                          <button 
+                            onClick={() => handleBatchQtyChange(item.itemId, batch.batch_id, qty + 1)}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-secondary hover:bg-muted font-bold transition-colors"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="p-6 border-t border-border/50 bg-background/50 space-y-4">
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-1">Assignment Notes (Optional)</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Add some context to this assignment..."
+              className="w-full h-20 p-3 rounded-xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all text-sm font-medium resize-none shadow-inner"
+            />
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="flex-1 h-12 rounded-2xl border border-border font-bold text-sm hover:bg-muted/50 transition-all uppercase tracking-wider"
+            >
+              Cancel
+            </button>
+            <button
+              disabled={!isValid || submitting}
+              onClick={handleAssign}
+              className="flex-1 h-12 rounded-2xl bg-indigo-500 text-indigo-50 text-sm font-bold shadow-lg shadow-indigo-500/20 hover:bg-indigo-600 disabled:opacity-50 disabled:grayscale transition-all flex items-center justify-center gap-2 uppercase tracking-wider"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                'Confirm Assignment'
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
