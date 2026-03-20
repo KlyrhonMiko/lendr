@@ -27,8 +27,6 @@ export default function UsersPage() {
     setStatusFilter,
     page,
     setPage,
-    perPage,
-    setPerPage,
     isModalOpen,
     selectedUser,
     closeUserModal,
@@ -41,39 +39,46 @@ export default function UsersPage() {
   } = useUsersManagement();
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500 pb-12">
+    <div className="w-full max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300 pb-12">
       <UsersPageHeader onAdd={handleAdd} />
 
       {error && (
-        <div className="bg-rose-500/10 border border-rose-500/20 text-rose-500 px-4 py-3 rounded-2xl text-sm flex items-center gap-3 animate-in slide-in-from-top-2">
-          <AlertCircle className="w-4 h-4" />
+        <div className="bg-red-500/10 border border-red-500/20 text-red-600 px-4 py-3 rounded-lg text-sm flex items-center gap-2.5">
+          <AlertCircle className="w-4 h-4 shrink-0" />
           <p>{error}</p>
         </div>
       )}
 
-      <UsersToolbar
-        search={search}
-        onSearchChange={setSearch}
-        roles={roles}
-        roleFilter={roleFilter}
-        onRoleFilterChange={setRoleFilter}
-        shifts={shifts}
-        shiftFilter={shiftFilter}
-        onShiftFilterChange={setShiftFilter}
-        statusFilter={statusFilter}
-        onStatusFilterChange={setStatusFilter}
-      />
+      <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+        <UsersToolbar
+          search={search}
+          onSearchChange={setSearch}
+          roles={roles}
+          roleFilter={roleFilter}
+          onRoleFilterChange={setRoleFilter}
+          shifts={shifts}
+          shiftFilter={shiftFilter}
+          onShiftFilterChange={setShiftFilter}
+          statusFilter={statusFilter}
+          onStatusFilterChange={setStatusFilter}
+        />
 
-      <UsersTable
-        users={users}
-        roles={roles}
-        shifts={shifts}
-        loading={loading}
-        onEdit={handleEdit}
-        onRequestAction={(action) => setIsConfirmingAction(action)}
-      />
+        <UsersTable
+          users={users}
+          roles={roles}
+          shifts={shifts}
+          loading={loading}
+          onEdit={handleEdit}
+          onRequestAction={(action) => setIsConfirmingAction(action)}
+        />
 
-      {meta && <Pagination meta={meta} onPageChange={setPage} onPerPageChange={setPerPage} />}
+        {meta && (
+          <Pagination
+            meta={meta}
+            onPageChange={setPage}
+          />
+        )}
+      </div>
 
       {isConfirmingAction && (
         <ConfirmActionModal
@@ -96,4 +101,3 @@ export default function UsersPage() {
     </div>
   );
 }
-

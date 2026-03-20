@@ -1,25 +1,8 @@
 import { api, buildQueryString } from '@/lib/api';
 
-export interface SystemSetting {
-  key: string;
-  value: string;
-  category: string;
-  description: string | null;
-}
+import type { SettingsListParams, SystemSetting, SystemSettingCreate } from './lib/types';
 
-export interface SystemSettingCreate {
-  key: string;
-  value: string;
-  category?: string;
-  description?: string;
-}
-
-export interface SettingsListParams {
-  page?: number;
-  per_page?: number;
-  key?: string;
-  category?: string;
-}
+export type { SettingsListParams, SystemSetting, SystemSettingCreate } from './lib/types';
 
 export const inventorySettingsApi = {
   // Inventory Config

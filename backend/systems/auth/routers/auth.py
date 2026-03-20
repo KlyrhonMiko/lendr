@@ -111,6 +111,33 @@ async def borrower_login(
     return Token(access_token=access_token, token_type="bearer")
 
 
+@router.post("/borrower/verify-pin", response_model=GenericResponse)
+async def borrower_verify_pin(
+    request: Request,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    session: Session = Depends(get_session),
+):
+    """
+    Verify a borrow/employee PIN without creating a borrower session.
+    This is used to gate the borrower portal UI.
+    """
+    user = auth_service.authenticate_user(session, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect PIN",
+        )
+
+    # Ensure the authenticated user is allowed to access the borrower portal.
+    if not rbac_service.has_permission(session, user, "inventory:borrower_portal:access"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect PIN",
+        )
+
+    return create_success_response(data=None, message="PIN verified", request=request)
+
+
 @router.get("/me", response_model=GenericResponse[UserRead], responses={401: {"model": GenericResponse}})
 async def read_users_me(
     request: Request,

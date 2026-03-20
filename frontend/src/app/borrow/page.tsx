@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { ShieldCheck, CheckCircle2, X, Delete } from 'lucide-react';
+import { ShieldCheck, CheckCircle2, X, Delete, Loader2 } from 'lucide-react';
 import { inventoryApi, InventoryItem } from '@/app/inventory/items/api';
 import { posApi } from './api';
 import { toast } from 'sonner';
@@ -31,6 +31,7 @@ export default function BorrowPage() {
   const [collaborators, setCollaborators] = useState('');
   const [notes, setNotes] = useState('');
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [isPinVerifying, setIsPinVerifying] = useState(false);
   const [pinDraft, setPinDraft] = useState('');
 
   useEffect(() => {
@@ -117,6 +118,7 @@ export default function BorrowPage() {
     setEmployeeId('');
     setEmployeePin('');
     setIsPinModalOpen(false);
+    setIsPinVerifying(false);
     setPinDraft('');
     setStep('selection');
   };
@@ -128,13 +130,18 @@ export default function BorrowPage() {
   }, [pinDraft]);
 
   const handleOpenPinModal = () => {
-    setPinDraft(employeePin);
+    // Invalidate any previously verified PIN while re-entering.
+    const currentDraft = employeePin;
+    setEmployeePin('');
+    setPinDraft(currentDraft);
     setIsPinModalOpen(true);
-    setTimeout(() => pinInputRefs.current[employeePin ? 5 : 0]?.focus(), 100);
+    setIsPinVerifying(false);
+    setTimeout(() => pinInputRefs.current[currentDraft ? 5 : 0]?.focus(), 100);
   };
 
   const handleClosePinModal = () => {
     setIsPinModalOpen(false);
+    setIsPinVerifying(false);
     setPinDraft('');
   };
 
@@ -177,15 +184,34 @@ export default function BorrowPage() {
     setTimeout(() => pinInputRefs.current[focusIdx]?.focus(), 0);
   }, []);
 
-  const handleConfirmPin = () => {
+  const handleConfirmPin = async () => {
     const cleaned = pinDraft.replace(/\D/g, '');
     if (cleaned.length !== 6) {
       toast.error('Employee PIN must be 6 digits');
       return;
     }
-    setEmployeePin(cleaned);
-    setIsPinModalOpen(false);
-    toast.success('Employee PIN captured');
+    if (!employeeId.trim()) {
+      toast.error('Employee ID is required to verify PIN');
+      return;
+    }
+
+    setIsPinVerifying(true);
+    try {
+      await api.borrowerVerifyPin({
+        username: employeeId.trim(),
+        password: cleaned,
+      });
+
+      setEmployeePin(cleaned);
+      setIsPinModalOpen(false);
+      setPinDraft('');
+      toast.success('PIN verified');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Invalid PIN';
+      toast.error(message);
+    } finally {
+      setIsPinVerifying(false);
+    }
   };
 
   const handleClearPin = () => {
@@ -397,11 +423,15 @@ export default function BorrowPage() {
               </button>
               <button
                 onClick={handleConfirmPin}
-                disabled={pinDraft.replace(/\D/g, '').length !== 6}
+                disabled={pinDraft.replace(/\D/g, '').length !== 6 || isPinVerifying}
                 className="flex-1 h-12 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-sm font-bold text-white disabled:opacity-30 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-indigo-500/25 transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
               >
-                <CheckCircle2 className="w-4.5 h-4.5" />
-                Confirm PIN
+                {isPinVerifying ? (
+                  <Loader2 className="w-4.5 h-4.5 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="w-4.5 h-4.5" />
+                )}
+                {isPinVerifying ? 'Verifying...' : 'Confirm PIN'}
               </button>
             </div>
           </div>

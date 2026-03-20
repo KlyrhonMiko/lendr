@@ -2,8 +2,7 @@
 
 import {
   User as UserIcon,
-  Mail,
-  Edit2,
+  Pencil,
   Trash2,
   RotateCcw,
   Shield,
@@ -30,137 +29,202 @@ export function UsersTable({
   onEdit: (user: User) => void;
   onRequestAction: (action: UserConfirmAction) => void;
 }) {
+  const getRoleLabel = (key: string) => roles.find((r) => r.key === key)?.value || key;
+  const getShiftLabel = (key: string) => shifts.find((s) => s.key === key)?.value || key;
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-3 text-muted-foreground">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-500/60" />
+        <p className="text-sm font-medium">Loading users...</p>
+      </div>
+    );
+  }
+
+  if (users.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-3">
+        <UserIcon className="w-12 h-12 text-muted-foreground/20" />
+        <p className="text-base font-medium text-muted-foreground">No users found</p>
+        <p className="text-sm text-muted-foreground/60">Try adjusting your search or filters above.</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left border-collapse">
-        <thead>
-          <tr className="border-b border-border/50 text-[10px] uppercase tracking-[0.2em] text-muted-foreground bg-background/30 font-bold">
-            <th className="p-6 pl-8">User Info</th>
-            <th className="p-6">Employee & ID</th>
-            <th className="p-6">Role</th>
-            <th className="p-6">Shift</th>
-            <th className="p-6">Status</th>
-            <th className="p-6 pr-8 text-right">Actions</th>
-          </tr>
-        </thead>
+    <div className="divide-y divide-border/60">
+      {/* Column labels - visible on larger screens */}
+      <div className="hidden md:grid md:grid-cols-[1fr_140px_120px_120px_100px_200px] gap-4 px-6 py-3 text-xs font-medium text-muted-foreground bg-muted/20">
+        <span>User</span>
+        <span>Employee ID</span>
+        <span>Role</span>
+        <span>Shift</span>
+        <span>Status</span>
+        <span className="text-right">Actions</span>
+      </div>
 
-        <tbody className="divide-y divide-border/50">
-          {loading ? (
-            <tr>
-              <td colSpan={6} className="p-20 text-center">
-                <div className="flex flex-col items-center gap-4 text-muted-foreground">
-                  <Loader2 className="w-10 h-10 animate-spin text-indigo-500" />
-                  <p className="font-semibold text-lg">Synchronizing user directory...</p>
+      {users.map((user) => (
+        <div
+          key={user.user_id}
+          className="group px-6 py-4 hover:bg-muted/20 transition-colors"
+        >
+          {/* Desktop layout */}
+          <div className="hidden md:grid md:grid-cols-[1fr_140px_120px_120px_100px_200px] gap-4 items-center">
+            {/* User info */}
+            <div className="flex items-center gap-3 min-w-0">
+              <div
+                className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 ${
+                  !user.is_deleted
+                    ? 'bg-indigo-500/10 text-indigo-600'
+                    : 'bg-muted text-muted-foreground'
+                }`}
+              >
+                {user.first_name[0]}{user.last_name[0]}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">
+                  {user.first_name} {user.last_name}
+                </p>
+                <p className="text-xs text-muted-foreground truncate mt-0.5">{user.email}</p>
+              </div>
+            </div>
+
+            {/* Employee ID */}
+            <span className="text-sm font-mono text-muted-foreground">
+              {user.employee_id || '—'}
+            </span>
+
+            {/* Role */}
+            <div className="flex items-center gap-1.5">
+              <Shield className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
+              <span className="text-sm">{getRoleLabel(user.role)}</span>
+            </div>
+
+            {/* Shift */}
+            <div className="flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
+              <span className="text-sm text-muted-foreground">{getShiftLabel(user.shift_type)}</span>
+            </div>
+
+            {/* Status */}
+            {!user.is_deleted ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 w-fit">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Active
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-500 w-fit">
+                <XCircle className="w-3.5 h-3.5" />
+                Inactive
+              </span>
+            )}
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={() => onEdit(user)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-muted-foreground hover:text-indigo-600 hover:bg-indigo-500/10 rounded-lg transition-colors"
+              >
+                <Pencil className="w-4 h-4" />
+                <span className="hidden lg:inline">Edit</span>
+              </button>
+
+              {!user.is_deleted ? (
+                <button
+                  onClick={() => onRequestAction({ type: 'delete', user })}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span className="hidden lg:inline">Deactivate</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => onRequestAction({ type: 'restore', user })}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-muted-foreground hover:text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition-colors"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  <span className="hidden lg:inline">Restore</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Mobile card layout */}
+          <div className="md:hidden space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 ${
+                    !user.is_deleted
+                      ? 'bg-indigo-500/10 text-indigo-600'
+                      : 'bg-muted text-muted-foreground'
+                  }`}
+                >
+                  {user.first_name[0]}{user.last_name[0]}
                 </div>
-              </td>
-            </tr>
-          ) : users.length === 0 ? (
-            <tr>
-              <td colSpan={6} className="p-20 text-center text-muted-foreground">
-                <UserIcon className="w-16 h-16 mx-auto mb-4 opacity-10" />
-                <p className="font-bold text-xl mb-1">No users found</p>
-                <p className="text-sm">Try adjusting your filters or search terms.</p>
-              </td>
-            </tr>
-          ) : (
-            users.map((user) => (
-              <tr key={user.user_id} className="hover:bg-muted/30 transition-colors group">
-                <td className="p-6 pl-8">
-                  <div className="flex items-center gap-4">
-                    <div
-                      className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg shadow-sm ${
-                        !user.is_deleted ? 'bg-indigo-500/10 text-indigo-500' : 'bg-muted text-muted-foreground'
-                      }`}
-                    >
-                      {user.first_name[0]}
-                      {user.last_name[0]}
-                    </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    {user.first_name} {user.last_name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{user.email}</p>
+                </div>
+              </div>
 
-                    <div className="flex flex-col">
-                      <span className="font-bold text-foreground text-base tracking-tight leading-none mb-1">
-                        {user.first_name} {user.last_name}
-                      </span>
-                      <span className="text-xs text-muted-foreground flex items-center gap-1.5 font-medium">
-                        <UserIcon className="w-3 h-3 opacity-50" />
-                        @{user.username} · <Mail className="w-3 h-3 opacity-50 ml-1" /> {user.email}
-                      </span>
-                    </div>
-                  </div>
-                </td>
+              {!user.is_deleted ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Active
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-500">
+                  <XCircle className="w-3.5 h-3.5" />
+                  Inactive
+                </span>
+              )}
+            </div>
 
-                <td className="p-6">
-                  <div className="flex flex-col gap-1">
-                    <span className="font-mono text-[11px] text-indigo-400 font-bold bg-indigo-500/5 px-2 py-0.5 rounded w-fit">
-                      {user.user_id}
-                    </span>
-                    <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">
-                      {user.employee_id || 'No Employee ID'}
-                    </span>
-                  </div>
-                </td>
+            <div className="flex items-center gap-4 text-sm text-muted-foreground pl-[52px]">
+              <span className="font-mono">{user.employee_id || '—'}</span>
+              <span className="flex items-center gap-1">
+                <Shield className="w-3.5 h-3.5" />
+                {getRoleLabel(user.role)}
+              </span>
+              <span className="flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5" />
+                {getShiftLabel(user.shift_type)}
+              </span>
+            </div>
 
-                <td className="p-6">
-                  <span className="text-xs font-bold text-foreground uppercase tracking-tight flex items-center gap-2">
-                    <Shield className="w-3.5 h-3.5 text-indigo-400" />
-                    {roles.find((r) => r.key === user.role)?.value || user.role}
-                  </span>
-                </td>
+            <div className="flex items-center gap-2 pl-[52px]">
+              <button
+                onClick={() => onEdit(user)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-500/10 rounded-lg transition-colors hover:bg-indigo-500/20"
+              >
+                <Pencil className="w-4 h-4" />
+                Edit
+              </button>
 
-                <td className="p-6">
-                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-tight flex items-center gap-2">
-                    <Clock className="w-3.5 h-3.5 opacity-50" />
-                    {shifts.find((s) => s.key === user.shift_type)?.value || user.shift_type}
-                  </span>
-                </td>
-
-                <td className="p-6">
-                  <span
-                    className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 w-fit border ${
-                      !user.is_deleted
-                        ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                        : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
-                    }`}
-                  >
-                    {!user.is_deleted ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                    {!user.is_deleted ? 'Active' : 'Deactivated'}
-                  </span>
-                </td>
-
-                <td className="p-6 pr-8 text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    <button
-                      onClick={() => onEdit(user)}
-                      className="p-2.5 text-muted-foreground hover:text-indigo-500 hover:bg-indigo-500/10 rounded-xl transition-all border border-transparent hover:border-indigo-500/20"
-                      title="Edit User"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-
-                    {!user.is_deleted ? (
-                      <button
-                        onClick={() => onRequestAction({ type: 'delete', user })}
-                        className="p-2.5 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all border border-transparent hover:border-rose-500/20"
-                        title="Deactivate User"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => onRequestAction({ type: 'restore', user })}
-                        className="p-2.5 text-muted-foreground hover:text-emerald-500 hover:bg-emerald-500/10 rounded-xl transition-all border border-transparent hover:border-emerald-500/20"
-                        title="Restore User"
-                      >
-                        <RotateCcw className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+              {!user.is_deleted ? (
+                <button
+                  onClick={() => onRequestAction({ type: 'delete', user })}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-red-500 bg-red-500/10 rounded-lg transition-colors hover:bg-red-500/20"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Deactivate
+                </button>
+              ) : (
+                <button
+                  onClick={() => onRequestAction({ type: 'restore', user })}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-emerald-500 bg-emerald-500/10 rounded-lg transition-colors hover:bg-emerald-500/20"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Restore
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
-

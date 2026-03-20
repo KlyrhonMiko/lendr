@@ -1,7 +1,10 @@
 'use client';
 
-import { Search, Shield, Clock } from 'lucide-react';
+import { useState } from 'react';
+import { Search, X, Check, ChevronDown } from 'lucide-react';
 import type { AuthConfig } from '../api';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 
 export function UsersToolbar({
   search,
@@ -26,72 +29,147 @@ export function UsersToolbar({
   statusFilter: 'all' | 'active' | 'inactive';
   onStatusFilterChange: (v: 'all' | 'active' | 'inactive') => void;
 }) {
+  const [roleFilterOpen, setRoleFilterOpen] = useState(false);
+  const [shiftFilterOpen, setShiftFilterOpen] = useState(false);
+  const hasActiveFilters = roleFilter || shiftFilter || statusFilter !== 'all';
+
   return (
-    <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-sm">
-      <div className="p-6 border-b border-border bg-background/50 flex flex-wrap items-center gap-4">
-        <div className="relative flex-1 min-w-[300px]">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search by ID, name, email or username..."
-            value={search}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full h-12 pl-12 pr-4 rounded-2xl bg-input/30 border border-border focus:ring-2 focus:ring-indigo-500/30 outline-none transition-all text-sm font-medium"
-          />
-        </div>
+    <div className="flex flex-col gap-3 p-4 border-b border-border">
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+        <input
+          type="text"
+          placeholder="Type a name, email, or employee ID to search..."
+          value={search}
+          onChange={(e) => onSearchChange(e.target.value)}
+          className="w-full h-11 pl-12 pr-4 rounded-lg bg-muted/50 border border-border text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/40 transition-all"
+        />
+        {search && (
+          <button
+            type="button"
+            onClick={() => onSearchChange('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
 
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <Shield className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-            <select
-              value={roleFilter}
-              onChange={(e) => onRoleFilterChange(e.target.value)}
-              className="h-12 pl-11 pr-10 rounded-2xl bg-input/30 border border-border focus:ring-2 focus:ring-indigo-500/30 outline-none transition-all text-xs font-bold appearance-none min-w-[160px]"
+      {/* Filters row */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <span className="text-xs font-medium text-muted-foreground mr-1">Filter by:</span>
+
+        <Popover open={roleFilterOpen} onOpenChange={setRoleFilterOpen}>
+          <PopoverTrigger
+            type="button"
+            className="h-10 px-3 rounded-lg bg-muted/50 border border-border text-sm font-medium cursor-pointer flex items-center gap-2"
+          >
+            <span className="truncate">
+              {roleFilter ? roles.find(r => r.key === roleFilter)?.value || roleFilter : 'All Roles'}
+            </span>
+            <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+          </PopoverTrigger>
+          <PopoverContent align="start" sideOffset={4} className="w-48 p-1 max-h-60 overflow-y-auto">
+            <button
+              type="button"
+              onClick={() => { onRoleFilterChange(''); setRoleFilterOpen(false); }}
+              className={cn(
+                "w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left",
+                !roleFilter ? "bg-indigo-500/10 text-indigo-600 font-medium" : "hover:bg-muted"
+              )}
             >
-              <option value="">All Roles</option>
-              {roles.map((r) => (
-                <option key={r.key} value={r.key}>
-                  {r.value}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="relative">
-            <Clock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-            <select
-              value={shiftFilter}
-              onChange={(e) => onShiftFilterChange(e.target.value)}
-              className="h-12 pl-11 pr-10 rounded-2xl bg-input/30 border border-border focus:ring-2 focus:ring-indigo-500/30 outline-none transition-all text-xs font-bold appearance-none min-w-[160px]"
-            >
-              <option value="">All Shifts</option>
-              {shifts.map((s) => (
-                <option key={s.key} value={s.key}>
-                  {s.value}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex bg-input/30 p-1 rounded-2xl border border-border">
-            {(['all', 'active', 'inactive'] as const).map((s) => (
+              <Check className={cn("w-4 h-4 shrink-0", !roleFilter ? "opacity-100" : "opacity-0")} />
+              All Roles
+            </button>
+            {roles.map((r) => (
               <button
-                key={s}
+                key={r.key}
                 type="button"
-                onClick={() => onStatusFilterChange(s)}
-                className={`px-4 py-1.5 text-[10px] font-bold rounded-xl transition-all uppercase tracking-wider ${
-                  statusFilter === s
-                    ? 'bg-background shadow-sm text-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
+                onClick={() => { onRoleFilterChange(r.key); setRoleFilterOpen(false); }}
+                className={cn(
+                  "w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left",
+                  roleFilter === r.key ? "bg-indigo-500/10 text-indigo-600 font-medium" : "hover:bg-muted"
+                )}
               >
-                {s}
+                <Check className={cn("w-4 h-4 shrink-0", roleFilter === r.key ? "opacity-100" : "opacity-0")} />
+                {r.value}
               </button>
             ))}
-          </div>
+          </PopoverContent>
+        </Popover>
+
+        <Popover open={shiftFilterOpen} onOpenChange={setShiftFilterOpen}>
+          <PopoverTrigger
+            type="button"
+            className="h-10 px-3 rounded-lg bg-muted/50 border border-border text-sm font-medium cursor-pointer flex items-center gap-2"
+          >
+            <span className="truncate">
+              {shiftFilter ? shifts.find(s => s.key === shiftFilter)?.value || shiftFilter : 'All Shifts'}
+            </span>
+            <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+          </PopoverTrigger>
+          <PopoverContent align="start" sideOffset={4} className="w-48 p-1 max-h-60 overflow-y-auto">
+            <button
+              type="button"
+              onClick={() => { onShiftFilterChange(''); setShiftFilterOpen(false); }}
+              className={cn(
+                "w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left",
+                !shiftFilter ? "bg-indigo-500/10 text-indigo-600 font-medium" : "hover:bg-muted"
+              )}
+            >
+              <Check className={cn("w-4 h-4 shrink-0", !shiftFilter ? "opacity-100" : "opacity-0")} />
+              All Shifts
+            </button>
+            {shifts.map((s) => (
+              <button
+                key={s.key}
+                type="button"
+                onClick={() => { onShiftFilterChange(s.key); setShiftFilterOpen(false); }}
+                className={cn(
+                  "w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left",
+                  shiftFilter === s.key ? "bg-indigo-500/10 text-indigo-600 font-medium" : "hover:bg-muted"
+                )}
+              >
+                <Check className={cn("w-4 h-4 shrink-0", shiftFilter === s.key ? "opacity-100" : "opacity-0")} />
+                {s.value}
+              </button>
+            ))}
+          </PopoverContent>
+        </Popover>
+
+        <div className="flex bg-muted/50 rounded-lg border border-border p-1">
+          {(['all', 'active', 'inactive'] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => onStatusFilterChange(s)}
+              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all capitalize ${
+                statusFilter === s
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {s}
+            </button>
+          ))}
         </div>
+
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={() => {
+              onRoleFilterChange('');
+              onShiftFilterChange('');
+              onStatusFilterChange('all');
+            }}
+            className="h-10 px-4 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-border transition-colors flex items-center gap-2"
+          >
+            <X className="w-4 h-4" />
+            Clear Filters
+          </button>
+        )}
       </div>
     </div>
   );
 }
-

@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Loader2, Mail, Shield, Clock, Hash, Phone, UserCircle } from 'lucide-react';
+import { X, Loader2, Mail, Shield, Clock, Hash, Phone, UserCircle, Check, ChevronDown } from 'lucide-react';
 import { userApi, User, UserCreate, UserUpdate, AuthConfig } from './api';
 import { toast } from 'sonner';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 
 interface UserModalProps {
-  user?: User; // If provided, we are in Edit mode
+  user?: User;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -17,6 +19,8 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
   const [configsLoading, setConfigsLoading] = useState(true);
   const [roles, setRoles] = useState<AuthConfig[]>([]);
   const [shifts, setShifts] = useState<AuthConfig[]>([]);
+  const [roleOpen, setRoleOpen] = useState(false);
+  const [shiftOpen, setShiftOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     username: user?.username || '',
@@ -40,8 +44,7 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
         ]);
         setRoles(rolesRes.data);
         setShifts(shiftsRes.data);
-        
-        // If creating and no role selected, pick first role as default
+
         if (!isEdit && !formData.role && rolesRes.data.length > 0) {
           setFormData(prev => ({ ...prev, role: rolesRes.data[0].key }));
         }
@@ -62,29 +65,23 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
       const pin = (formData.password || '').trim();
       const pinRegex = /^\d{6}$/;
 
-      // Backend requires `username`; per requirement, it should be equal to employee id.
       const effectiveUsername = employeeId || (formData.username || '').trim();
 
       if (isEdit) {
-        // When updating, only validate the PIN if the user provided a new one.
         if (pin && !pinRegex.test(pin)) {
           toast.error('PIN must be exactly 6 digits');
           return;
         }
-        // Deep copy of formData
         const updateData: UserUpdate = { ...formData };
-        // Keep username aligned to employee id when provided (UI no longer exposes username).
         if (employeeId) {
           updateData.username = employeeId;
           updateData.employee_id = employeeId;
         } else {
-          // Avoid sending empty username which would violate backend constraints.
           updateData.username = effectiveUsername;
-          // Avoid sending empty employee_id value; keep backend value intact.
           delete (updateData as any).employee_id;
         }
         if (!updateData.password) {
-            delete (updateData as any).password;
+          delete (updateData as any).password;
         }
         await userApi.update(user.user_id, updateData);
         toast.success('User updated successfully');
@@ -101,7 +98,6 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
         const createPayload: UserCreate = {
           ...(formData as Omit<UserCreate, 'username'>),
           username: employeeId,
-          // Ensure both fields match to satisfy uniqueness/index expectations.
           employee_id: employeeId,
         };
 
@@ -121,220 +117,289 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const inputClassName =
+    'w-full h-11 px-4 rounded-lg bg-muted/40 border border-border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/25 focus:border-indigo-500/40 transition-all placeholder:text-muted-foreground/40';
+
+  const inputWithIconClassName =
+    'w-full h-11 pl-10 pr-4 rounded-lg bg-muted/40 border border-border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/25 focus:border-indigo-500/40 transition-all placeholder:text-muted-foreground/40';
+
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
-      <div className="w-full max-w-2xl bg-card border border-border rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[90vh]">
-        <div className="flex items-center justify-between p-6 border-b border-border/50 bg-background/50">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div
+        className="w-full max-w-xl bg-card border border-border rounded-xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
-              <UserCircle className="w-6 h-6" />
+            <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+              <UserCircle className="w-5 h-5 text-indigo-500" />
             </div>
             <div>
-              <h2 className="text-xl font-bold font-heading uppercase tracking-tight">
-                {isEdit ? 'Edit User' : 'Register New User'}
+              <h2 className="text-lg font-semibold tracking-tight">
+                {isEdit ? 'Edit User' : 'Add New User'}
               </h2>
-              <p className="text-xs text-muted-foreground font-medium">
-                {isEdit ? `Updating profile for ${user.username}` : 'Create a new system user account'}
+              <p className="text-sm text-muted-foreground mt-0.5">
+                {isEdit
+                  ? `Updating ${user.first_name} ${user.last_name}'s profile`
+                  : 'Fill in the details to create a new user account'}
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 text-muted-foreground hover:bg-secondary rounded-full transition-colors">
+          <button
+            onClick={onClose}
+            className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Identity Group */}
-            <div className="col-span-full">
-              <h3 className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                <UserCircle className="w-3 h-3" />
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
+          <div className="p-6 space-y-6">
+            {/* Personal Information */}
+            <section>
+              <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+                <UserCircle className="w-4 h-4 text-indigo-500" />
                 Personal Information
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-1">First Name</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    First Name <span className="text-red-400">*</span>
+                  </label>
                   <input
                     required
                     name="first_name"
                     value={formData.first_name}
                     onChange={handleChange}
-                    className="w-full h-11 px-4 rounded-xl bg-input/30 border border-border focus:ring-2 focus:ring-indigo-500/30 outline-none transition-all text-sm font-medium"
-                    placeholder="Enter first name"
+                    className={inputClassName}
+                    placeholder="e.g. Juan"
                   />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-1">Middle Name</label>
-                  <input
-                    name="middle_name"
-                    value={formData.middle_name}
-                    onChange={handleChange}
-                    className="w-full h-11 px-4 rounded-xl bg-input/30 border border-border focus:ring-2 focus:ring-indigo-500/30 outline-none transition-all text-sm font-medium"
-                    placeholder="Optional"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-1">Last Name</label>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Last Name <span className="text-red-400">*</span>
+                  </label>
                   <input
                     required
                     name="last_name"
                     value={formData.last_name}
                     onChange={handleChange}
-                    className="w-full h-11 px-4 rounded-xl bg-input/30 border border-border focus:ring-2 focus:ring-indigo-500/30 outline-none transition-all text-sm font-medium"
-                    placeholder="Enter last name"
+                    className={inputClassName}
+                    placeholder="e.g. Dela Cruz"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Middle Name <span className="text-muted-foreground font-normal">(optional)</span>
+                  </label>
+                  <input
+                    name="middle_name"
+                    value={formData.middle_name}
+                    onChange={handleChange}
+                    className={inputClassName}
+                    placeholder="e.g. Santos"
                   />
                 </div>
               </div>
-            </div>
+            </section>
 
-            {/* Account Group */}
-            <div className="space-y-4">
-              <h3 className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                <Shield className="w-3 h-3" />
-                Account Credentials
+            <hr className="border-border" />
+
+            {/* Account & Contact */}
+            <section>
+              <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+                <Mail className="w-4 h-4 text-indigo-500" />
+                Account & Contact
               </h3>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-1">
-                    PIN (6 digits) {isEdit && <span className="text-[9px] lowercase italic text-amber-500">(leave blank to keep current)</span>}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Employee ID <span className="text-red-400">{!isEdit ? '*' : ''}</span>
+                  </label>
+                  <div className="relative">
+                    <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 pointer-events-none" />
+                    <input
+                      name="employee_id"
+                      value={formData.employee_id}
+                      onChange={handleChange}
+                      required={!isEdit}
+                      className={inputWithIconClassName}
+                      placeholder="e.g. EMP-001"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    PIN Code <span className="text-red-400">{!isEdit ? '*' : ''}</span>
+                    {isEdit && (
+                      <span className="text-muted-foreground font-normal text-xs ml-1">(leave blank to keep current)</span>
+                    )}
                   </label>
                   <input
                     required={!isEdit}
-                      type="password"
+                    type="password"
                     name="password"
                     value={formData.password}
                     onChange={handleChange}
                     inputMode="numeric"
-                    pattern="^\\d{6}$"
+                    pattern="^\d{6}$"
                     minLength={6}
                     maxLength={6}
-                    className="w-full h-11 px-4 rounded-xl bg-input/30 border border-border focus:ring-2 focus:ring-indigo-500/30 outline-none transition-all text-sm font-medium"
-                    placeholder="••••••"
+                    className={inputClassName}
+                    placeholder="Enter 6-digit PIN"
                   />
                 </div>
-              </div>
-            </div>
-
-            {/* Contact Group */}
-            <div className="space-y-4">
-              <h3 className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                <Mail className="w-3 h-3" />
-                Contact & ID
-              </h3>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-1">Email Address</label>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Email Address <span className="text-red-400">*</span>
+                  </label>
                   <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 pointer-events-none" />
                     <input
                       required
                       type="email"
                       name="email"
                       value={formData.email}
                       onChange={handleChange}
-                      className="w-full h-11 pl-11 pr-4 rounded-xl bg-input/30 border border-border focus:ring-2 focus:ring-indigo-500/30 outline-none transition-all text-sm font-medium"
-                      placeholder="email@example.com"
+                      className={inputWithIconClassName}
+                      placeholder="e.g. juan@company.com"
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-1">Contact No.</label>
-                    <div className="relative">
-                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-                      <input
-                        name="contact_number"
-                        value={formData.contact_number}
-                        onChange={handleChange}
-                        className="w-full h-11 pl-11 pr-4 rounded-xl bg-input/30 border border-border focus:ring-2 focus:ring-indigo-500/30 outline-none transition-all text-sm font-medium"
-                        placeholder="0912..."
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-1">Employee ID</label>
-                    <div className="relative">
-                      <Hash className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-                      <input
-                        name="employee_id"
-                        value={formData.employee_id}
-                        onChange={handleChange}
-                        required={!isEdit}
-                        className="w-full h-11 pl-11 pr-4 rounded-xl bg-input/30 border border-border focus:ring-2 focus:ring-indigo-500/30 outline-none transition-all text-sm font-medium"
-                        placeholder="EMP-001"
-                      />
-                    </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Contact Number <span className="text-muted-foreground font-normal">(optional)</span>
+                  </label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 pointer-events-none" />
+                    <input
+                      name="contact_number"
+                      value={formData.contact_number}
+                      onChange={handleChange}
+                      className={inputWithIconClassName}
+                      placeholder="e.g. 09123456789"
+                    />
                   </div>
                 </div>
               </div>
-            </div>
+            </section>
 
-            {/* System Group */}
-            <div className="col-span-full">
-              <h3 className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                <Shield className="w-3 h-3" />
+            <hr className="border-border" />
+
+            {/* System Configuration */}
+            <section>
+              <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+                <Shield className="w-4 h-4 text-indigo-500" />
                 System Configuration
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-1">System Role</label>
-                  <div className="relative">
-                    <Shield className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-                    <select
-                      required
-                      name="role"
-                      value={formData.role}
-                      onChange={handleChange}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Role <span className="text-red-400">*</span>
+                  </label>
+                  <Popover open={roleOpen} onOpenChange={setRoleOpen}>
+                    <PopoverTrigger
+                      type="button"
                       disabled={configsLoading}
-                      className="w-full h-11 pl-11 pr-10 rounded-xl bg-input/30 border border-border focus:ring-2 focus:ring-indigo-500/30 outline-none transition-all text-sm font-bold appearance-none disabled:opacity-50"
+                      className="relative w-full h-11 pl-10 pr-8 rounded-lg bg-muted/40 border border-border text-sm text-left focus:outline-none focus:ring-2 focus:ring-indigo-500/25 focus:border-indigo-500/40 transition-all disabled:opacity-50 cursor-pointer"
                     >
-                      <option value="" disabled>Select Role</option>
+                      <Shield className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 pointer-events-none" />
+                      <span className={cn("block truncate", !formData.role && "text-muted-foreground/40")}>
+                        {formData.role
+                          ? `${roles.find(r => r.key === formData.role)?.value || formData.role} (${formData.role})`
+                          : 'Select a role...'}
+                      </span>
+                      {configsLoading ? (
+                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground pointer-events-none" />
+                      ) : (
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                      )}
+                    </PopoverTrigger>
+                    <PopoverContent align="start" sideOffset={4} className="w-[var(--anchor-width)] p-1 max-h-60 overflow-y-auto">
                       {roles.map(r => (
-                        <option key={r.key} value={r.key}>{r.value} ({r.key})</option>
+                        <button
+                          key={r.key}
+                          type="button"
+                          onClick={() => {
+                            setFormData(prev => ({ ...prev, role: r.key }));
+                            setRoleOpen(false);
+                          }}
+                          className={cn(
+                            "w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left",
+                            formData.role === r.key
+                              ? "bg-indigo-500/10 text-indigo-600 font-medium"
+                              : "hover:bg-muted text-foreground"
+                          )}
+                        >
+                          <Check className={cn("w-4 h-4 shrink-0", formData.role === r.key ? "opacity-100" : "opacity-0")} />
+                          {r.value} ({r.key})
+                        </button>
                       ))}
-                    </select>
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                      {configsLoading ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /> : <Shield className="w-4 h-4 text-muted-foreground opacity-20" />}
-                    </div>
-                  </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-1">Shift Assignment</label>
-                  <div className="relative">
-                    <Clock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-                    <select
-                      required
-                      name="shift_type"
-                      value={formData.shift_type}
-                      onChange={handleChange}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Shift <span className="text-red-400">*</span>
+                  </label>
+                  <Popover open={shiftOpen} onOpenChange={setShiftOpen}>
+                    <PopoverTrigger
+                      type="button"
                       disabled={configsLoading}
-                      className="w-full h-11 pl-11 pr-10 rounded-xl bg-input/30 border border-border focus:ring-2 focus:ring-indigo-500/30 outline-none transition-all text-sm font-bold appearance-none disabled:opacity-50"
+                      className="relative w-full h-11 pl-10 pr-8 rounded-lg bg-muted/40 border border-border text-sm text-left focus:outline-none focus:ring-2 focus:ring-indigo-500/25 focus:border-indigo-500/40 transition-all disabled:opacity-50 cursor-pointer"
                     >
+                      <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 pointer-events-none" />
+                      <span className="block truncate">
+                        {shifts.find(s => s.key === formData.shift_type)?.value || formData.shift_type}
+                      </span>
+                      {configsLoading ? (
+                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground pointer-events-none" />
+                      ) : (
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                      )}
+                    </PopoverTrigger>
+                    <PopoverContent align="start" sideOffset={4} className="w-[var(--anchor-width)] p-1 max-h-60 overflow-y-auto">
                       {shifts.map(s => (
-                        <option key={s.key} value={s.key}>{s.value}</option>
+                        <button
+                          key={s.key}
+                          type="button"
+                          onClick={() => {
+                            setFormData(prev => ({ ...prev, shift_type: s.key }));
+                            setShiftOpen(false);
+                          }}
+                          className={cn(
+                            "w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left",
+                            formData.shift_type === s.key
+                              ? "bg-indigo-500/10 text-indigo-600 font-medium"
+                              : "hover:bg-muted text-foreground"
+                          )}
+                        >
+                          <Check className={cn("w-4 h-4 shrink-0", formData.shift_type === s.key ? "opacity-100" : "opacity-0")} />
+                          {s.value}
+                        </button>
                       ))}
-                    </select>
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                     {configsLoading ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /> : <Clock className="w-4 h-4 text-muted-foreground opacity-20" />}
-                    </div>
-                  </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
-            </div>
+            </section>
           </div>
 
-          <div className="mt-8 flex gap-3">
+          {/* Footer */}
+          <div className="flex items-center gap-3 px-6 py-4 border-t border-border bg-muted/20">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 h-12 rounded-2xl border border-border font-bold text-sm hover:bg-muted/50 transition-all uppercase tracking-wider"
+              className="flex-1 h-11 rounded-lg border border-border text-sm font-medium hover:bg-muted transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading || configsLoading}
-              className="flex-1 h-12 rounded-2xl bg-indigo-500 text-indigo-50 text-sm font-bold shadow-lg shadow-indigo-500/20 hover:bg-indigo-600 disabled:opacity-50 disabled:grayscale transition-all flex items-center justify-center gap-2 uppercase tracking-wider"
+              className="flex-1 h-11 rounded-lg bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
@@ -342,7 +407,7 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
                   Saving...
                 </>
               ) : (
-                isEdit ? 'Update Profile' : 'Register User'
+                isEdit ? 'Save Changes' : 'Create User'
               )}
             </button>
           </div>
