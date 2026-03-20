@@ -1722,7 +1722,6 @@ class BorrowService(
                 "provisioned_units": [
                     {
                         "serial_number": u.get("serial_number"),
-                        "internal_ref": u.get("internal_ref"),
                         "condition": u.get("condition", "good"),
                     }
                     for u in (units_data or [])

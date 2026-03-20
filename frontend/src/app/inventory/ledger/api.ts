@@ -11,12 +11,29 @@ export interface MovementLedgerParams {
   date_to?: string;
 }
 
+export interface AnomalyDetail {
+  ledger_balance: number;
+  actual_balance: number;
+  delta: number;
+  movement_count: number;
+}
+
+export interface Anomaly {
+  item_id: string;
+  item_name: string;
+  anomaly_type: string;
+  severity: 'high' | 'medium' | 'low';
+  message: string;
+  details: AnomalyDetail;
+  detected_at: string;
+}
+
 export const ledgerApi = {
   list: (params: MovementLedgerParams = {}) =>
     api.get<any[]>(`/inventory/items/movements/ledger${buildQueryString(params as Record<string, unknown>)}`),
 
   getAnomalies: (params: { severity?: string; skip?: number; limit?: number } = {}) =>
-    api.get<any[]>(`/inventory/items/movements/anomalies${buildQueryString(params as Record<string, unknown>)}`),
+    api.get<Anomaly[]>(`/inventory/items/movements/anomalies${buildQueryString(params as Record<string, unknown>)}`),
 
   reverse: (movementId: string, reason: string, reason_code?: string) =>
     api.post<any>(`/inventory/items/movements/${movementId}/reverse`, { reason, reason_code }),

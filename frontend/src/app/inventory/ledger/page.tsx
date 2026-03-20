@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Activity, Search, Filter, Loader2, TrendingUp, TrendingDown, RefreshCw, AlertTriangle, ChevronRight, X, FileText, CheckCircle2 } from 'lucide-react';
-import { ledgerApi, MovementLedgerParams } from './api';
+import { useState, useEffect, useCallback, Fragment } from 'react';
+import { Activity, Search, Filter, Loader2, TrendingUp, TrendingDown, RefreshCw, AlertTriangle, ChevronRight, X, FileText, CheckCircle2, ChevronDown, ChevronUp, BarChart3 } from 'lucide-react';
+import { ledgerApi, MovementLedgerParams, Anomaly } from './api';
 import { inventorySettingsApi } from '../settings/api';
 import { Pagination } from '@/components/ui/Pagination';
 import type { PaginationMeta } from '@/lib/api';
@@ -10,8 +10,13 @@ import { toast } from 'sonner';
 
 export default function MovementLedgerPage() {
   const [movements, setMovements] = useState<any[]>([]);
-  const [anomalies, setAnomalies] = useState<any[]>([]);
+  const [anomalies, setAnomalies] = useState<Anomaly[]>([]);
   const [activeTab, setActiveTab] = useState<'ledger' | 'anomalies'>('ledger');
+  const [expandedAnomalyId, setExpandedAnomalyId] = useState<string | null>(null);
+
+  const toggleAnomalyExpand = (id: string) => {
+    setExpandedAnomalyId(expandedAnomalyId === id ? null : id);
+  };
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -181,90 +186,152 @@ export default function MovementLedgerPage() {
               ) : activeTab === 'anomalies' && anomalies.length === 0 ? (
                 <tr><td colSpan={6} className="p-16 text-center text-muted-foreground"><ShieldCheck className="w-12 h-12 mx-auto mb-4 opacity-10 text-emerald-500" />System reconciled. No anomalies detected.</td></tr>
               ) : (activeTab === 'ledger' ? movements : anomalies).map((move) => (
-                <tr key={move.movement_id || `${move.item_id}-${move.anomaly_type}`} className="hover:bg-muted/30 transition-colors group">
-                  <td className="p-4 pl-6 text-center">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center mx-auto relative ${
-                      move.is_reversed ? 'bg-muted text-muted-foreground border border-border opacity-50' :
-                      move.qty_change > 0 ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 
-                      move.qty_change < 0 ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20' :
-                      'bg-amber-500/10 text-amber-500 border border-amber-500/20'
-                    }`}>
-                      {move.qty_change > 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
-                      {move.is_reversed && (
-                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-background border border-border rounded-full flex items-center justify-center">
-                          <X className="w-2.5 h-2.5 text-muted-foreground" />
+                <Fragment key={move.movement_id || `${move.item_id}-${move.anomaly_type}`}>
+                  <tr 
+                    onClick={() => activeTab === 'anomalies' && toggleAnomalyExpand(`${move.item_id}-${move.anomaly_type}`)}
+                    className={`hover:bg-muted/30 transition-colors group ${activeTab === 'anomalies' ? 'cursor-pointer' : ''} ${expandedAnomalyId === `${move.item_id}-${move.anomaly_type}` ? 'bg-muted/50' : ''}`}
+                  >
+                    <td className="p-4 pl-6 text-center">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center mx-auto relative ${
+                        move.is_reversed ? 'bg-muted text-muted-foreground border border-border opacity-50' :
+                        move.qty_change > 0 || (activeTab === 'anomalies' && move.details?.delta > 0) ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 
+                        move.qty_change < 0 || (activeTab === 'anomalies' && move.details?.delta < 0) ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20' :
+                        'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                      }`}>
+                        {(move.qty_change > 0 || move.details?.delta > 0) ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
+                        {move.is_reversed && (
+                          <div className="absolute -top-1 -right-1 w-4 h-4 bg-background border border-border rounded-full flex items-center justify-center">
+                            <X className="w-2.5 h-2.5 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-foreground line-clamp-1">{move.item_name || 'System Item'}</span>
+                        <span className="text-[10px] font-mono text-muted-foreground">{move.inventory_id || move.item_id}</span>
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex flex-col">
+                        <span className={`text-lg font-bold ${
+                          move.is_reversed ? 'text-muted-foreground line-through opacity-50' : 
+                          (move.qty_change > 0 || move.details?.delta > 0) ? 'text-emerald-500' : 'text-rose-500'
+                        }`}>
+                          {activeTab === 'anomalies' ? (
+                            <>{move.details?.delta > 0 ? '+' : ''}{move.details?.delta}</>
+                          ) : (
+                            <>{move.qty_change > 0 ? '+' : ''}{move.qty_change}</>
+                          )}
+                        </span>
+                        <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest flex items-center gap-1">
+                          {move.movement_type === 'reversal' && <RefreshCw className="w-2 h-2" />}
+                          {activeTab === 'anomalies' ? 'Balance Mismatch' : move.movement_type?.replace('_', ' ')}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="p-4 max-w-md">
+                      <div className="flex flex-col">
+                        <span className={`text-sm text-foreground line-clamp-1 ${move.is_reversed ? 'italic text-muted-foreground' : ''}`}>
+                          {move.is_reversed ? `[VOIDED] ${move.note || move.message}` : (move.note || move.message || 'Standard transaction recorded.')}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-muted-foreground">{move.occurred_at || move.detected_at}</span>
+                          {move.reference_id && move.movement_type === 'reversal' && (
+                            <span className="text-[9px] font-mono bg-indigo-500/5 text-indigo-400 px-1.5 py-0.5 rounded border border-indigo-500/10">
+                              Ref: {move.reference_id}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <span className="text-sm font-medium text-foreground">{move.actor_id || 'SYSTEM'}</span>
+                    </td>
+                    <td className="p-4 pr-6 text-right">
+                      {activeTab === 'ledger' && (
+                        <div className="flex items-center justify-end gap-2">
+                          {move.is_reversed && (
+                            <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-rose-500/5 text-rose-500 border border-rose-500/10 uppercase tracking-tighter">
+                              Voided
+                            </span>
+                          )}
+                          {move.movement_type === 'reversal' && !move.is_reversed && (
+                            <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 uppercase tracking-tighter">
+                              Correction
+                            </span>
+                          )}
+                          {!move.is_reversed && move.movement_type !== 'reversal' && (
+                            <button 
+                              onClick={() => openReversalModal(move)} 
+                              className="p-2 opacity-0 group-hover:opacity-100 hover:bg-rose-500/10 rounded-xl text-rose-500 transition-all"
+                              title="Reverse movement"
+                            >
+                              <RefreshCw className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       )}
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex flex-col">
-                      <span className="text-sm font-bold text-foreground line-clamp-1">{move.item_name || 'System Item'}</span>
-                      <span className="text-[10px] font-mono text-muted-foreground">{move.inventory_id || move.item_id}</span>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex flex-col">
-                      <span className={`text-lg font-bold ${move.is_reversed ? 'text-muted-foreground line-through opacity-50' : move.qty_change > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                        {move.qty_change > 0 ? '+' : ''}{move.qty_change}
-                      </span>
-                      <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest flex items-center gap-1">
-                        {move.movement_type === 'reversal' && <RefreshCw className="w-2 h-2" />}
-                        {move.movement_type?.replace('_', ' ')}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="p-4 max-w-md">
-                    <div className="flex flex-col">
-                      <span className={`text-sm text-foreground line-clamp-1 ${move.is_reversed ? 'italic text-muted-foreground' : ''}`}>
-                        {move.is_reversed ? `[VOIDED] ${move.note || move.message}` : (move.note || move.message || 'Standard transaction recorded.')}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-muted-foreground">{move.occurred_at || move.detected_at}</span>
-                        {move.reference_id && move.movement_type === 'reversal' && (
-                          <span className="text-[9px] font-mono bg-indigo-500/5 text-indigo-400 px-1.5 py-0.5 rounded border border-indigo-500/10">
-                            Ref: {move.reference_id}
+                      {activeTab === 'anomalies' && (
+                        <div className="flex items-center justify-end gap-3">
+                          <span className={`text-[10px] font-bold px-2 py-1 rounded-lg border uppercase ${
+                            move.severity === 'high' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                          }`}>
+                            {move.severity} RISK
                           </span>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <span className="text-sm font-medium text-foreground">{move.actor_id || 'SYSTEM'}</span>
-                  </td>
-                  <td className="p-4 pr-6 text-right">
-                    {activeTab === 'ledger' && (
-                      <div className="flex items-center justify-end gap-2">
-                        {move.is_reversed && (
-                          <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-rose-500/5 text-rose-500 border border-rose-500/10 uppercase tracking-tighter">
-                            Voided
-                          </span>
-                        )}
-                        {move.movement_type === 'reversal' && !move.is_reversed && (
-                          <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 uppercase tracking-tighter">
-                            Correction
-                          </span>
-                        )}
-                        {!move.is_reversed && move.movement_type !== 'reversal' && (
-                          <button 
-                            onClick={() => openReversalModal(move)} 
-                            className="p-2 opacity-0 group-hover:opacity-100 hover:bg-rose-500/10 rounded-xl text-rose-500 transition-all"
-                            title="Reverse movement"
-                          >
-                            <RefreshCw className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    )}
-                    {activeTab === 'anomalies' && (
-                      <span className={`text-[10px] font-bold px-2 py-1 rounded-lg border uppercase ${
-                        move.severity === 'high' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
-                      }`}>
-                        {move.severity} RISK
-                      </span>
-                    )}
-                  </td>
-                </tr>
+                          <div className="text-muted-foreground/50 group-hover:text-rose-500 transition-colors">
+                            {expandedAnomalyId === `${move.item_id}-${move.anomaly_type}` ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          </div>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                  {activeTab === 'anomalies' && expandedAnomalyId === `${move.item_id}-${move.anomaly_type}` && (
+                    <tr className="bg-muted/20 border-t border-border/50 animate-in slide-in-from-top-4 duration-300">
+                      <td colSpan={6} className="p-0">
+                        <div className="p-8 grid grid-cols-1 md:grid-cols-4 gap-6">
+                          <div className="space-y-2 p-4 rounded-2xl bg-background/50 border border-border/50 shadow-sm transition-all hover:shadow-md">
+                            <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                              <BarChart3 className="w-3 h-3 text-indigo-400" />
+                              Ledger Balance
+                            </div>
+                            <p className="text-2xl font-bold font-heading text-indigo-400">{move.details?.ledger_balance}</p>
+                            <p className="text-[10px] text-muted-foreground italic leading-tight">Derived from transaction history</p>
+                          </div>
+                          
+                          <div className="space-y-2 p-4 rounded-2xl bg-background/50 border border-border/50 shadow-sm transition-all hover:shadow-md">
+                            <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                              <Activity className="w-3 h-3 text-emerald-400" />
+                              Actual Balance
+                            </div>
+                            <p className="text-2xl font-bold font-heading text-emerald-400">{move.details?.actual_balance}</p>
+                            <p className="text-[10px] text-muted-foreground italic leading-tight">Current verified on-hand quantity</p>
+                          </div>
+
+                          <div className="space-y-2 p-4 rounded-2xl bg-background/50 border border-border/50 shadow-sm transition-all hover:shadow-md">
+                            <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                              <AlertTriangle className={`w-3 h-3 ${move.details?.delta < 0 ? 'text-rose-400' : 'text-amber-400'}`} />
+                              Variance (Delta)
+                            </div>
+                            <p className={`text-2xl font-bold font-heading ${move.details?.delta < 0 ? 'text-rose-400' : 'text-amber-400'}`}>
+                              {move.details?.delta > 0 ? '+' : ''}{move.details?.delta}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground italic leading-tight">Discrepancy needing investigation</p>
+                          </div>
+
+                          <div className="space-y-2 p-4 rounded-2xl bg-background/50 border border-border/50 shadow-sm transition-all hover:shadow-md">
+                            <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                              <RefreshCw className="w-3 h-3 text-blue-400" />
+                              Movements
+                            </div>
+                            <p className="text-2xl font-bold font-heading text-blue-400">{move.details?.movement_count}</p>
+                            <p className="text-[10px] text-muted-foreground italic leading-tight">Total transactions in ledger</p>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
             </tbody>
           </table>

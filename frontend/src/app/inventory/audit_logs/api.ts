@@ -9,6 +9,8 @@ export interface AuditLog {
   user_id?: string;
   employee_id?: string;
   created_at: string;
+  before_json?: Record<string, any>;
+  after_json?: Record<string, any>;
 }
 
 export interface AuditLogParams {

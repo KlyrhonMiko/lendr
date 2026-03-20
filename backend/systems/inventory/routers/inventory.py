@@ -379,14 +379,13 @@ async def create_unit(
     """
     Create a single unit for a trackable inventory item.
     Item must exist and be marked as trackable (is_trackable=true).
-    Serial number and internal_ref must be unique across all units.
+    Serial number must be unique across all units.
     """
     try:
         unit = inventory_service.create_unit(
             session,
             item_id=item_id,
             serial_number=unit_data.serial_number,
-            internal_ref=unit_data.internal_ref,
             expiration_date=unit_data.expiration_date,
             condition=unit_data.condition,
             description=unit_data.description,
@@ -465,7 +464,6 @@ async def list_item_units(
     status: Optional[str] = Query(default=None, description="Filter by unit status (available, borrowed, maintenance, retired)"),
     condition: Optional[str] = Query(default=None, description="Filter by unit condition (e.g. good, damaged)"),
     serial_number: Optional[str] = Query(default=None, description="Search by serial number (partial match)"),
-    internal_ref: Optional[str] = Query(default=None, description="Search by internal reference (partial match)"),
     expiring_before: Optional[datetime] = Query(default=None, description="Filter units expiring before this date"),
     include_expired: bool = Query(default=True, description="Include expired units in results"),
     session: Session = Depends(get_session),
@@ -484,7 +482,6 @@ async def list_item_units(
         status=status,
         condition=condition,
         serial_number=serial_number,
-        internal_ref=internal_ref,
         expiring_before=expiring_before,
         include_expired=include_expired,
         skip=skip,
@@ -521,7 +518,7 @@ async def update_unit(
 ):
     """
     Update unit status and/or condition.
-    Serial number and internal_ref are immutable and cannot be modified.
+    Serial number is immutable and cannot be modified.
     Status values: 'available', 'borrowed', 'maintenance', 'retired'
     """
     try:
