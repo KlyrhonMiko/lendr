@@ -50,3 +50,9 @@ class BorrowRequestUnit(BaseModel, table=True):
         if self.inventory_unit:
             return self.inventory_unit.unit_id
         return ""
+
+    @property
+    def serial_number(self) -> str | None:
+        if self.inventory_unit:
+            return self.inventory_unit.serial_number
+        return None

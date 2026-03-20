@@ -38,6 +38,18 @@ export interface BorrowActionPayload {
   notes?: string;
 }
 
+export interface BorrowUnitReturn {
+  unit_id: string;
+  condition?: string;
+  notes?: string;
+  status_on_return?: string;
+}
+
+export interface BorrowReturnPayload {
+  notes?: string;
+  unit_returns?: BorrowUnitReturn[];
+}
+
 export interface BorrowBatchAssignment {
   batch_id: string;
   qty: number;
@@ -65,9 +77,12 @@ export interface BorrowRequestEventGlobal extends BorrowRequestEvent {
 export interface BorrowRequestUnit {
   borrow_unit_id: string;
   unit_id: string;
+  serial_number?: string;
   assigned_at?: string;
   released_at?: string;
   returned_at?: string;
+  condition_on_return?: string;
+  return_notes?: string;
 }
 
 export interface BorrowUnitAssignPayload {
@@ -122,7 +137,7 @@ export const borrowApi = {
   release: (id: string, payload: BorrowActionPayload = {}) =>
     api.post<BorrowRequest>(`/inventory/borrowing/requests/${id}/release`, payload),
 
-  return: (id: string, payload: BorrowActionPayload = {}) =>
+  return: (id: string, payload: BorrowReturnPayload = {}) =>
     api.post<BorrowRequest>(`/inventory/borrowing/requests/${id}/return`, payload),
 
   reopen: (id: string, payload: BorrowActionPayload = {}) =>

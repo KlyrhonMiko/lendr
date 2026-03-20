@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Loader2, CheckCircle2, AlertCircle, Info, Layers } from 'lucide-react';
+import { X, Loader2, CheckCircle2, AlertCircle, Info, Layers, Sparkles } from 'lucide-react';
 import { borrowApi, BorrowRequest } from './api';
 import { inventoryApi } from '../items/api';
 import { toast } from 'sonner';
@@ -156,6 +156,41 @@ export function UnitSelectionModal({ request, onClose, onSuccess }: UnitSelectio
     }));
   };
 
+  const autoAssignTrackable = (itemId: string) => {
+    setItemsData(prev => prev.map(item => {
+      if (item.itemId !== itemId || !item.isTrackable) return item;
+      const autoSelected = item.availableUnits
+        .slice(0, item.qtyRequested)
+        .map(u => u.unit_id);
+      return { ...item, selectedUnitIds: autoSelected };
+    }));
+  };
+
+  const autoAssignUntrackable = (itemId: string) => {
+    setItemsData(prev => prev.map(item => {
+      if (item.itemId !== itemId || item.isTrackable) return item;
+      let remaining = item.qtyRequested;
+      const batches: { batch_id: string; qty: number }[] = [];
+      for (const batch of item.availableBatches) {
+        if (remaining <= 0) break;
+        const take = Math.min(remaining, batch.available_qty);
+        batches.push({ batch_id: batch.batch_id, qty: take });
+        remaining -= take;
+      }
+      return { ...item, selectedBatches: batches };
+    }));
+  };
+
+  const autoAssignAll = () => {
+    itemsData.forEach(item => {
+      if (item.isTrackable) {
+        autoAssignTrackable(item.itemId);
+      } else {
+        autoAssignUntrackable(item.itemId);
+      }
+    });
+  };
+
   const handleAssign = async () => {
     // Validate all items have enough units/qty selected
     for (const item of itemsData) {
@@ -227,9 +262,20 @@ export function UnitSelectionModal({ request, onClose, onSuccess }: UnitSelectio
             <h2 className="text-xl font-bold font-heading uppercase tracking-tight">Assign Inventory</h2>
             <p className="text-sm text-muted-foreground font-medium">Request ID: <span className="text-indigo-400 font-mono">{request.request_id}</span></p>
           </div>
-          <button onClick={onClose} className="p-2 text-muted-foreground hover:bg-secondary rounded-full transition-colors">
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {itemsData.length > 0 && (
+              <button
+                onClick={autoAssignAll}
+                className="flex items-center gap-1.5 px-3 h-9 rounded-xl bg-indigo-500/10 text-indigo-500 text-xs font-bold hover:bg-indigo-500/20 transition-colors uppercase tracking-wider"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                Auto Assign All
+              </button>
+            )}
+            <button onClick={onClose} className="p-2 text-muted-foreground hover:bg-secondary rounded-full transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-8">
@@ -253,15 +299,26 @@ export function UnitSelectionModal({ request, onClose, onSuccess }: UnitSelectio
                   </h3>
                   <p className="text-xs text-muted-foreground font-medium">Requested: <span className="text-foreground">{item.qtyRequested}</span> unit{item.qtyRequested !== 1 ? 's' : ''}</p>
                 </div>
-                <div className={`text-xs font-bold px-3 py-1 rounded-full border transition-all ${
-                  getPercentageSelected(item) === 100 
-                    ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' 
-                    : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
-                }`}>
-                  {item.isTrackable 
-                    ? `${item.selectedUnitIds.length} / ${item.qtyRequested} Selected`
-                    : `${item.selectedBatches.reduce((sum, b) => sum + b.qty, 0)} / ${item.qtyRequested} Allocated`
-                  }
+                <div className="flex items-center gap-2">
+                  {!item.loading && !item.error && getPercentageSelected(item) < 100 && (
+                    <button
+                      onClick={() => item.isTrackable ? autoAssignTrackable(item.itemId) : autoAssignUntrackable(item.itemId)}
+                      className="flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-500/10 text-indigo-400 text-[10px] font-bold hover:bg-indigo-500/20 transition-colors uppercase tracking-wider"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      Auto
+                    </button>
+                  )}
+                  <div className={`text-xs font-bold px-3 py-1 rounded-full border transition-all ${
+                    getPercentageSelected(item) === 100 
+                      ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' 
+                      : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                  }`}>
+                    {item.isTrackable 
+                      ? `${item.selectedUnitIds.length} / ${item.qtyRequested} Selected`
+                      : `${item.selectedBatches.reduce((sum, b) => sum + b.qty, 0)} / ${item.qtyRequested} Allocated`
+                    }
+                  </div>
                 </div>
               </div>
 

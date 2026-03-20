@@ -1,7 +1,66 @@
 'use client';
 
 import type { BorrowAction } from '../lib/types';
-import { Info } from 'lucide-react';
+import {
+  CheckCircle2,
+  XCircle,
+  PackageOpen,
+  Undo2,
+  Send,
+  Warehouse,
+  Archive,
+  RotateCcw,
+  AlertTriangle,
+} from 'lucide-react';
+import type { ReactNode } from 'react';
+
+const ACTION_CONFIG: Record<string, { icon: ReactNode; color: string; btnClass: string }> = {
+  approve: {
+    icon: <CheckCircle2 className="w-5 h-5" />,
+    color: 'text-emerald-600 bg-emerald-50',
+    btnClass: 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm',
+  },
+  reject: {
+    icon: <XCircle className="w-5 h-5" />,
+    color: 'text-rose-600 bg-rose-50',
+    btnClass: 'bg-rose-600 hover:bg-rose-700 text-white shadow-sm',
+  },
+  release: {
+    icon: <PackageOpen className="w-5 h-5" />,
+    color: 'text-sky-600 bg-sky-50',
+    btnClass: 'bg-sky-600 hover:bg-sky-700 text-white shadow-sm',
+  },
+  return: {
+    icon: <Undo2 className="w-5 h-5" />,
+    color: 'text-emerald-600 bg-emerald-50',
+    btnClass: 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm',
+  },
+  reopen: {
+    icon: <RotateCcw className="w-5 h-5" />,
+    color: 'text-primary bg-primary/10',
+    btnClass: 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm',
+  },
+  send_to_warehouse: {
+    icon: <Send className="w-5 h-5" />,
+    color: 'text-violet-600 bg-violet-50',
+    btnClass: 'bg-violet-600 hover:bg-violet-700 text-white shadow-sm',
+  },
+  warehouse_approve: {
+    icon: <Warehouse className="w-5 h-5" />,
+    color: 'text-emerald-600 bg-emerald-50',
+    btnClass: 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm',
+  },
+  warehouse_reject: {
+    icon: <AlertTriangle className="w-5 h-5" />,
+    color: 'text-rose-600 bg-rose-50',
+    btnClass: 'bg-rose-600 hover:bg-rose-700 text-white shadow-sm',
+  },
+  close: {
+    icon: <Archive className="w-5 h-5" />,
+    color: 'text-slate-600 bg-slate-100',
+    btnClass: 'bg-slate-700 hover:bg-slate-800 text-white shadow-sm',
+  },
+};
 
 export function ConfirmBorrowActionModal({
   confirmingAction,
@@ -18,58 +77,58 @@ export function ConfirmBorrowActionModal({
 }) {
   if (!confirmingAction) return null;
 
+  const config = ACTION_CONFIG[confirmingAction.action] ?? ACTION_CONFIG.approve;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/30 backdrop-blur-sm"
         onClick={onCancel}
       />
-      <div className="w-full max-w-md bg-card border border-border rounded-3xl shadow-2xl relative z-10 animate-in zoom-in-95 duration-200">
-        <div className="p-8">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
-              <Info className="w-6 h-6" />
+      <div className="w-full max-w-md bg-card border border-border rounded-2xl shadow-xl relative z-10 animate-in zoom-in-95 fade-in duration-200">
+        <div className="p-6">
+          <div className="flex items-start gap-3 mb-5">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${config.color}`}>
+              {config.icon}
             </div>
-            <div>
-              <h3 className="text-xl font-bold font-heading">
+            <div className="min-w-0">
+              <h3 className="text-lg font-semibold font-heading">
                 {confirmingAction.actionLabel} Request
               </h3>
-              <p className="text-sm text-muted-foreground">
-                Are you sure you want to{' '}
-                {confirmingAction.actionLabel.toLowerCase()} this borrow request?
+              <p className="text-sm text-muted-foreground mt-0.5">
+                This will {confirmingAction.actionLabel.toLowerCase()} request{' '}
+                <span className="font-mono text-xs text-primary">{confirmingAction.requestId}</span>.
               </p>
             </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">
-                Notes / Remarks (Optional)
-              </label>
-              <textarea
-                autoFocus
-                value={actionNotes}
-                onChange={(e) => onActionNotesChange(e.target.value)}
-                placeholder={`Provide a reason for this ${confirmingAction.actionLabel.toLowerCase()}...`}
-                className="w-full h-32 p-4 rounded-2xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all text-sm font-medium resize-none"
-              />
-            </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">
+              Notes (optional)
+            </label>
+            <textarea
+              autoFocus
+              value={actionNotes}
+              onChange={(e) => onActionNotesChange(e.target.value)}
+              placeholder={`Add a note for this ${confirmingAction.actionLabel.toLowerCase()}...`}
+              className="w-full h-24 p-3 rounded-lg bg-muted/30 border border-border focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all text-sm resize-none"
+            />
           </div>
 
-          <div className="flex gap-3 mt-8">
+          <div className="flex gap-2.5 mt-5">
             <button
               onClick={onCancel}
-              className="flex-1 h-12 rounded-2xl border border-border font-bold text-sm hover:bg-muted/50 transition-all"
+              className="flex-1 h-10 rounded-lg border border-border font-medium text-sm hover:bg-muted/50 transition-all text-muted-foreground"
               type="button"
             >
               Cancel
             </button>
             <button
               onClick={onConfirm}
-              className="flex-1 h-12 rounded-2xl bg-indigo-500 text-indigo-50 text-sm font-bold shadow-lg shadow-indigo-500/20 hover:bg-indigo-600 transition-all"
+              className={`flex-1 h-10 rounded-lg text-sm font-medium transition-all ${config.btnClass}`}
               type="button"
             >
-              Confirm {confirmingAction.actionLabel}
+              {confirmingAction.actionLabel}
             </button>
           </div>
         </div>
@@ -77,4 +136,3 @@ export function ConfirmBorrowActionModal({
     </div>
   );
 }
-

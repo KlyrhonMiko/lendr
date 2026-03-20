@@ -80,6 +80,7 @@ class BorrowRequestEventGlobalRead(BorrowRequestEventRead):
 class BorrowRequestUnitRead(BaseModel):
     borrow_unit_id: str
     unit_id: str
+    serial_number: str | None = None
     assigned_at: Optional[datetime] = None
     released_at: Optional[datetime] = None
     returned_at: Optional[datetime] = None
