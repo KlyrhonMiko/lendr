@@ -59,7 +59,15 @@ class BorrowService(
         field_name: str,
         field_label: str,
     ) -> None:
-        self.config_service.require_table_field_key(
+        """Helper to ensure a configuration setting exists for a given table/field."""
+        # Use inventory config service for inventory-related settings
+        config_service = (
+            self.inventory_config_service
+            if table_name.startswith("inventory_")
+            else self.config_service
+        )
+
+        config_service.require_table_field_key(
             session,
             key=key,
             table_name=table_name,
@@ -1323,39 +1331,40 @@ class BorrowService(
                         )
 
                     return_data = unit_return_map.get(unit.unit_id)
-                    status_on_return = (
-                        return_data.status_on_return if return_data else None
+                    condition_on_return = (
+                        return_data.condition_on_return if return_data else None
                     )
-                    if status_on_return is None:
-                        if (
-                            return_data
-                            and return_data.condition
-                            and return_data.condition.lower()
-                            in {"damaged", "for_repair", "repair"}
-                        ):
+
+                    # Auto-determine status based on condition
+                    status_on_return = "available"
+                    if condition_on_return:
+                        if condition_on_return.lower() in {
+                            "damaged",
+                            "for_repair",
+                            "repair",
+                            "poor",
+                            "unusable",
+                        }:
                             status_on_return = "maintenance"
-                        else:
-                            status_on_return = "available"
 
                     self.inventory_service._validate_status_transition(
                         session, unit.status, status_on_return
                     )
                     unit.status = status_on_return
-                    if return_data and return_data.condition is not None:
+
+                    if condition_on_return:
                         self._require_setting(
                             session,
-                            key=return_data.condition,
+                            key=condition_on_return,
                             table_name="inventory_units",
                             field_name="condition",
                             field_label="inventory unit condition",
                         )
-                        unit.condition = return_data.condition
+                        unit.condition = condition_on_return
 
                     assignment.returned_at = get_now_manila()
                     assignment.returned_by = actor_id
-                    assignment.condition_on_return = (
-                        return_data.condition if return_data else None
-                    )
+                    assignment.condition_on_return = condition_on_return
                     assignment.return_notes = return_data.notes if return_data else None
 
                     session.add(unit)

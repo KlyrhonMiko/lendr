@@ -177,9 +177,8 @@ class BorrowRequestRelease(BaseModel):
 
 class BorrowRequestUnitReturn(BaseModel):
     unit_id: str = Field(..., max_length=50)
-    condition: Optional[str] = Field(default=None, max_length=100)
+    condition_on_return: Optional[str] = Field(default=None, max_length=100)
     notes: Optional[str] = Field(default=None, max_length=500)
-    status_on_return: Optional[str] = Field(default=None, max_length=50)
 
 
 class BorrowRequestReturn(BaseModel):
