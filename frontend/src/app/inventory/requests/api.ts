@@ -40,9 +40,8 @@ export interface BorrowActionPayload {
 
 export interface BorrowUnitReturn {
   unit_id: string;
-  condition?: string;
+  condition_on_return?: string;
   notes?: string;
-  status_on_return?: string;
 }
 
 export interface BorrowReturnPayload {
