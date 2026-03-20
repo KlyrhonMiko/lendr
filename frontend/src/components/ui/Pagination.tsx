@@ -48,7 +48,7 @@ export function Pagination({
             <select
               value={perPage}
               onChange={(e) => {
-                onPerPageChange(Number(e.target.value));
+                onPerPageChange(Number(e.target.value) || 0);
                 onPageChange(1);
               }}
               className="h-8 px-2 rounded-lg bg-input/30 border border-border text-foreground text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/30 cursor-pointer"

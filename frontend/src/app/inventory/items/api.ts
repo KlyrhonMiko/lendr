@@ -98,7 +98,16 @@ export const inventoryApi = {
   restore: (id: string) => api.post<InventoryItem>(`/inventory/items/${id}/restore`, {}),
 
   // Units
-  listUnits: (itemId: string, params: { page?: number; per_page?: number; status?: string; search?: string } = {}) =>
+  listUnits: (itemId: string, params: { 
+    page?: number; 
+    per_page?: number; 
+    status?: string; 
+    condition?: string;
+    serial_number?: string;
+    expiring_before?: string;
+    include_expired?: boolean;
+    search?: string; 
+  } = {}) =>
     api.get<any[]>(`/inventory/items/${itemId}/units${buildQueryString(params as Record<string, unknown>)}`),
 
   createUnit: (itemId: string, data: { serial_number: string; expiration_date?: string; condition?: string; description?: string }) =>
