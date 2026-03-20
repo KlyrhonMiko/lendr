@@ -172,6 +172,7 @@ async def logout(
             )
                 
         return create_success_response(
+            data=None,
             message="Successfully logged out",
             request=request
         )
