@@ -16,8 +16,6 @@ class InventoryUnit(BaseModel, table=True):
     
     serial_number: str | None = Field(default=None, unique=True, index=True, max_length=100)
     
-    internal_ref: str | None = Field(default=None, unique=True, index=True, max_length=100)
-    
     # status: "available", "borrowed", "maintenance", "retired"
     status: str = Field(default="available", max_length=50)
 

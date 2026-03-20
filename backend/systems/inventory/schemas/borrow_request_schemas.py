@@ -200,7 +200,6 @@ class BorrowRequestWarehouseApprove(BaseModel):
 
 class WarehouseProvisionUnit(BaseModel):
     serial_number: Optional[str] = Field(default=None, max_length=100)
-    internal_ref: Optional[str] = Field(default=None, max_length=100)
     expiration_date: Optional[datetime] = None
     condition: Optional[str] = Field(default=None, max_length=100)
 

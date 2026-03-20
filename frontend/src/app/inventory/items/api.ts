@@ -101,10 +101,10 @@ export const inventoryApi = {
   listUnits: (itemId: string, params: { page?: number; per_page?: number; status?: string; search?: string } = {}) =>
     api.get<any[]>(`/inventory/items/${itemId}/units${buildQueryString(params as Record<string, unknown>)}`),
 
-  createUnit: (itemId: string, data: { serial_number: string; internal_ref?: string; expiration_date?: string; condition?: string; description?: string }) =>
+  createUnit: (itemId: string, data: { serial_number: string; expiration_date?: string; condition?: string; description?: string }) =>
     api.post<any>(`/inventory/items/${itemId}/units`, data),
 
-  createUnitsBatch: (itemId: string, units: Array<{ serial_number: string; internal_ref?: string; expiration_date?: string; condition?: string; description?: string }>) =>
+  createUnitsBatch: (itemId: string, units: Array<{ serial_number: string; expiration_date?: string; condition?: string; description?: string }>) =>
     api.post<any[]>(`/inventory/items/${itemId}/units/batch`, { units }),
 
   updateUnit: (itemId: string, unitId: string, data: { status?: string; condition?: string; expiration_date?: string; description?: string }) =>

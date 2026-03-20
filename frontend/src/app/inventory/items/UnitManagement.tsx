@@ -19,7 +19,6 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
 
   const [formData, setFormData] = useState({
     serial_number: '',
-    internal_ref: '',
     expiration_date: '',
     condition: 'good',
     description: '',
@@ -49,19 +48,18 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
       if (isBatch) {
         const batch = Array.from({ length: batchCount }).map((_, i) => ({
           serial_number: `${formData.serial_number}-${i + 1}`,
-          internal_ref: formData.internal_ref ? `${formData.internal_ref}-${i + 1}` : undefined,
           expiration_date: formData.expiration_date || undefined,
           description: formData.description || undefined,
         }));
         await inventoryApi.createUnitsBatch(itemId, batch);
         toast.success(`${batchCount} units created successfully`);
       } else {
-        const cleanedData = {
-          ...formData,
+        const { ...cleanedData } = formData;
+        await inventoryApi.createUnit(itemId, {
+          ...cleanedData,
           expiration_date: formData.expiration_date || undefined,
           description: formData.description || undefined,
-        };
-        await inventoryApi.createUnit(itemId, cleanedData);
+        });
         toast.success('Unit created successfully');
       }
       setIsAdding(false);
@@ -116,17 +114,18 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
           {isAdding && (
             <form onSubmit={handleCreate} className="mb-8 p-4 bg-muted/30 rounded-2xl border border-border/50 space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold uppercase text-muted-foreground">Serial Prefix</label>
+                <div className={isBatch ? "space-y-1" : "col-span-2 space-y-1"}>
+                  <label className="text-xs font-bold uppercase text-muted-foreground">Serial {isBatch ? 'Prefix' : 'Number'}</label>
                   <input
                     required
                     type="text"
                     value={formData.serial_number}
                     onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
                     className="w-full h-10 px-3 rounded-lg bg-background border border-border text-sm"
+                    placeholder={isBatch ? "e.g. SN-2024" : "e.g. SN-001"}
                   />
                 </div>
-                {isBatch ? (
+                {isBatch && (
                   <div className="space-y-1">
                     <label className="text-xs font-bold uppercase text-muted-foreground">Quantity</label>
                     <input
@@ -136,16 +135,6 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
                       max="100"
                       value={batchCount}
                       onChange={(e) => setBatchCount(parseInt(e.target.value))}
-                      className="w-full h-10 px-3 rounded-lg bg-background border border-border text-sm"
-                    />
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold uppercase text-muted-foreground">Internal Ref</label>
-                    <input
-                      type="text"
-                      value={formData.internal_ref}
-                      onChange={(e) => setFormData({ ...formData, internal_ref: e.target.value })}
                       className="w-full h-10 px-3 rounded-lg bg-background border border-border text-sm"
                     />
                   </div>
@@ -192,13 +181,12 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
               </div>
             </form>
           )}
-
           <div className="max-h-[400px] overflow-y-auto rounded-xl border border-border">
             <table className="w-full text-left">
               <thead className="sticky top-0 bg-background/95 backdrop-blur z-10 text-xs font-bold uppercase text-muted-foreground border-b border-border">
                 <tr>
                   <th className="p-3 pl-4">Serial No.</th>
-                  <th className="p-3">Ref / Note</th>
+                  <th className="p-3">Condition / Note</th>
                   <th className="p-3">Status</th>
                   <th className="p-3 text-right pr-4">Actions</th>
                 </tr>
@@ -212,7 +200,7 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
                   <tr key={unit.unit_id} className="hover:bg-muted/30 group">
                     <td className="p-3 pl-4 text-sm font-mono font-semibold">{unit.serial_number}</td>
                     <td className="p-3 text-sm text-muted-foreground">
-                      <div>{unit.internal_ref || '---'}</div>
+                      <div className="capitalize">{unit.condition?.replace('_', ' ') || 'Good'}</div>
                       {unit.description && <div className="text-[10px] text-muted-foreground/70 truncate max-w-[150px]">{unit.description}</div>}
                     </td>
                     <td className="p-3">

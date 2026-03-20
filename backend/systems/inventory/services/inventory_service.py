@@ -987,13 +987,12 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         session: Session,
         item_id: str,
         serial_number: str | None,
-        internal_ref: str | None,
         expiration_date: datetime | None = None,
     ) -> InventoryItem:
         """
         Validate prerequisites for unit creation:
         - Item exists and is marked as trackable
-        - Serial number and internal_ref are unique (if provided)
+        - Serial number is unique (if provided)
         """
         item = self.get(session, item_id)
         if not item:
@@ -1009,14 +1008,6 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             ).first()
             if existing:
                 raise ValueError(f"Serial number '{serial_number}' already exists")
-        
-        # Check for unique internal_ref
-        if internal_ref:
-            existing = session.exec(
-                select(InventoryUnit).where(InventoryUnit.internal_ref == internal_ref)
-            ).first()
-            if existing:
-                raise ValueError(f"Internal reference '{internal_ref}' already exists")
 
         if self._is_consumable_item(item) and expiration_date is None:
             raise ValueError(f"Item {item_id} is consumable/perishable and requires expiration_date")
@@ -1028,7 +1019,6 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         session: Session,
         item_id: str,
         serial_number: str | None = None,
-        internal_ref: str | None = None,
         expiration_date: datetime | None = None,
         condition: str = "good",
         description: str | None = None,
@@ -1045,7 +1035,6 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             session,
             item_id,
             serial_number,
-            internal_ref,
             expiration_date,
         )
 
@@ -1075,7 +1064,6 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             unit_id=get_next_sequence(session, InventoryUnit, "unit_id", "UNT"),
             inventory_uuid=item.id,
             serial_number=serial_number,
-            internal_ref=internal_ref,
             status=initial_status,
             expiration_date=expiration_date,
             condition=condition or "good",
@@ -1095,7 +1083,6 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             after={
                 "unit_id": unit.unit_id,
                 "serial_number": serial_number,
-                "internal_ref": internal_ref,
                 "status": unit.status,
                 "condition": unit.condition,
                 "description": description,
@@ -1106,6 +1093,18 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
 
         session.add(unit)
         self._sync_item_quantities(session, item_id)
+
+        # Record procurement movement for the new unit
+        movement = InventoryMovement(
+            movement_id=get_next_sequence(session, InventoryMovement, "movement_id", "MOV"),
+            inventory_uuid=item.id,
+            qty_change=1,
+            movement_type="procurement",
+            note=f"Initial unit creation: {unit.unit_id}",
+            actor_id=actor_id,
+        )
+        session.add(movement)
+
         return unit
 
     def create_units_batch(
@@ -1128,11 +1127,9 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
 
         created_units = []
         serial_numbers_in_batch = set()
-        internal_refs_in_batch = set()
 
         for unit_data in units_data:
             serial_number = unit_data.get("serial_number")
-            internal_ref = unit_data.get("internal_ref")
             expiration_date = unit_data.get("expiration_date")
             condition = unit_data.get("condition") or "good"
             description = unit_data.get("description")
@@ -1143,17 +1140,11 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                     raise ValueError(f"Duplicate serial_number in batch: '{serial_number}'")
                 serial_numbers_in_batch.add(serial_number)
 
-            if internal_ref:
-                if internal_ref in internal_refs_in_batch:
-                    raise ValueError(f"Duplicate internal_ref in batch: '{internal_ref}'")
-                internal_refs_in_batch.add(internal_ref)
-
             # Validate against database (uniqueness)
             item = self._validate_unit_creation(
                 session,
                 item_id,
                 serial_number,
-                internal_ref,
                 expiration_date,
             )
 
@@ -1181,12 +1172,10 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                     field_label="inventory unit condition",
                 )
 
-            # Create unit
             unit = InventoryUnit(
                 unit_id=get_next_sequence(session, InventoryUnit, "unit_id", "UNT"),
                 inventory_uuid=item.id,
                 serial_number=serial_number,
-                internal_ref=internal_ref,
                 status=initial_status,
                 expiration_date=expiration_date,
                 condition=condition,
@@ -1206,7 +1195,6 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                 after={
                     "unit_id": unit.unit_id,
                     "serial_number": serial_number,
-                    "internal_ref": internal_ref,
                     "status": unit.status,
                     "condition": unit.condition,
                     "description": description,
@@ -1219,6 +1207,19 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             created_units.append(unit)
 
         self._sync_item_quantities(session, item_id)
+
+        # Record procurement movement for the entire batch
+        if created_units:
+            movement = InventoryMovement(
+                movement_id=get_next_sequence(session, InventoryMovement, "movement_id", "MOV"),
+                inventory_uuid=item.id,
+                qty_change=len(created_units),
+                movement_type="procurement",
+                note=f"Batch unit creation: {len(created_units)} units",
+                actor_id=actor_id,
+            )
+            session.add(movement)
+
         return created_units
 
     def update_unit(
@@ -1235,7 +1236,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
     ) -> InventoryUnit:
         """
         Update unit status and/or condition.
-        Serial number and internal_ref are immutable after creation.
+        Serial number is immutable after creation.
         """
         unit = self.get_unit(session, unit_id)
         if not unit:
@@ -1386,7 +1387,6 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         include_expired: bool = True,
         condition: str | None = None,
         serial_number: str | None = None,
-        internal_ref: str | None = None,
         skip: int = 0,
         limit: int = 100,
     ) -> tuple[list[InventoryUnit], int]:
@@ -1426,8 +1426,6 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             statement = statement.where(InventoryUnit.condition == condition)
         if serial_number is not None:
             statement = statement.where(InventoryUnit.serial_number.ilike(f"%{serial_number}%"))
-        if internal_ref is not None:
-            statement = statement.where(InventoryUnit.internal_ref.ilike(f"%{internal_ref}%"))
 
         count_statement = select(func.count()).select_from(statement.subquery())
         total_count = session.exec(count_statement).one()

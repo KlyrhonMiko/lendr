@@ -27,7 +27,6 @@ interface ItemAssignmentData {
   availableUnits: {
     unit_id: string;
     serial_number: string;
-    internal_ref?: string;
   }[];
   selectedUnitIds: string[];
   // For untrackable
@@ -300,7 +299,7 @@ export function UnitSelectionModal({ request, onClose, onSuccess }: UnitSelectio
                           </span>
                           {isSelected && <CheckCircle2 className="w-4 h-4 text-indigo-500 animate-in zoom-in-50 duration-200" />}
                         </div>
-                        <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">{unit.internal_ref || 'No Ref'}</span>
+                        <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Available</span>
                       </button>
                     );
                   })}

@@ -93,7 +93,7 @@ The system consists of three main domains:
 
 - **inventory_units**: Individual tracked items (when is_trackable=true)
   - Auto-generated `unit_id` (e.g., "UNT-XYZ789")
-  - Fields: serial_number, internal_ref (both unique), status, condition, expiration_date
+  - Fields: serial_number (unique), status, condition, expiration_date
   - Statuses: available, borrowed, maintenance, retired, consumed, expired, discarded
   - Status transitions validated by business rules (not all transitions allowed)
   - Expiration dates for consumable/perishable item types
@@ -548,7 +548,7 @@ pending → approved → released → returned
 
 - **Trackable items**: Individual unit tracking with serial numbers (e.g., equipment, tools)
   - Requires InventoryUnit entries per physical item
-  - Each unit has optional serial_number and internal_ref (both unique)
+  - Each unit has an optional serial_number (unique)
   - Support for condition and status tracking per unit
   - Expiration dates for consumable/perishable item types
 

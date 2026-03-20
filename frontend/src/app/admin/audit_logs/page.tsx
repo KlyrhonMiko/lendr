@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { History, Search, Loader2, AlertCircle, ShieldCheck } from 'lucide-react';
+import { useState, useEffect, useCallback, Fragment } from 'react';
+import { History, Search, Loader2, AlertCircle, ShieldCheck, ChevronDown, ChevronUp } from 'lucide-react';
 import { adminAuditApi, AuditLog, AuditLogParams } from './api';
 import { Pagination } from '@/components/ui/Pagination';
+import { DataDiffView } from '@/components/ui/DataDiffView';
 import type { PaginationMeta } from '@/lib/api';
 
 export default function AdminAuditLogsPage() {
@@ -17,6 +18,11 @@ export default function AdminAuditLogsPage() {
   const [search, setSearch] = useState('');
   const [entityFilter, setEntityFilter] = useState('');
   const [timeframe, setTimeframe] = useState('all');
+  const [expandedAuditId, setExpandedAuditId] = useState<string | null>(null);
+
+  const toggleExpand = (id: string) => {
+    setExpandedAuditId(expandedAuditId === id ? null : id);
+  };
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
@@ -125,34 +131,51 @@ export default function AdminAuditLogsPage() {
                 </tr>
               ) : (
                 logs.map((log) => (
-                  <tr key={log.audit_id} className="hover:bg-muted/30 transition-colors group">
-                    <td className="p-4 pl-6">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium text-foreground">{log.created_at.split(' - ')[0]}</span>
-                        <span className="text-xs text-muted-foreground">{log.created_at.split(' - ')[1]}</span>
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-bold tracking-tight text-foreground">{log.entity_id}</span>
-                        <span className="text-[10px] uppercase font-bold text-indigo-400">{log.entity_type}</span>
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <span className="text-sm font-medium text-foreground">{log.action.replace('_', ' ')}</span>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium text-foreground">{log.user_id || 'Master'}</span>
-                        <span className="text-[10px] text-muted-foreground">ID: {log.employee_id || 'ADM-001'}</span>
-                      </div>
-                    </td>
-                    <td className="p-4 pr-6">
-                      <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 uppercase">
-                        Verified
-                      </span>
-                    </td>
-                  </tr>
+                  <Fragment key={log.audit_id}>
+                    <tr 
+                      onClick={() => toggleExpand(log.audit_id)}
+                      className={`hover:bg-muted/30 transition-colors group cursor-pointer ${expandedAuditId === log.audit_id ? 'bg-muted/50' : ''}`}
+                    >
+                      <td className="p-4 pl-6">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium text-foreground">{log.created_at.split(' - ')[0]}</span>
+                          <span className="text-xs text-muted-foreground">{log.created_at.split(' - ')[1]}</span>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-bold tracking-tight text-foreground">{log.entity_id}</span>
+                          <span className="text-[10px] uppercase font-bold text-indigo-400">{log.entity_type}</span>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <span className="text-sm font-medium text-foreground">{log.action.replace('_', ' ')}</span>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium text-foreground">{log.user_id || 'Master'}</span>
+                          <span className="text-[10px] text-muted-foreground">ID: {log.employee_id || 'ADM-001'}</span>
+                        </div>
+                      </td>
+                      <td className="p-4 pr-6">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 uppercase">
+                            Verified
+                          </span>
+                          <div className="text-muted-foreground/50 group-hover:text-indigo-500 transition-colors">
+                            {expandedAuditId === log.audit_id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                    {expandedAuditId === log.audit_id && (
+                      <tr className="bg-muted/20">
+                        <td colSpan={5} className="p-0">
+                          <DataDiffView before={log.before_json} after={log.after_json} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))
               )}
             </tbody>
