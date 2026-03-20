@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Loader2, User as UserIcon, Mail, Shield, Clock, Hash, Phone, UserCircle } from 'lucide-react';
+import { X, Loader2, Mail, Shield, Clock, Hash, Phone, UserCircle } from 'lucide-react';
 import { userApi, User, UserCreate, UserUpdate, AuthConfig } from './api';
 import { toast } from 'sonner';
 
@@ -58,16 +58,54 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
     e.preventDefault();
     setLoading(true);
     try {
+      const employeeId = (formData.employee_id || '').trim();
+      const pin = (formData.password || '').trim();
+      const pinRegex = /^\d{6}$/;
+
+      // Backend requires `username`; per requirement, it should be equal to employee id.
+      const effectiveUsername = employeeId || (formData.username || '').trim();
+
       if (isEdit) {
+        // When updating, only validate the PIN if the user provided a new one.
+        if (pin && !pinRegex.test(pin)) {
+          toast.error('PIN must be exactly 6 digits');
+          return;
+        }
         // Deep copy of formData
         const updateData: UserUpdate = { ...formData };
+        // Keep username aligned to employee id when provided (UI no longer exposes username).
+        if (employeeId) {
+          updateData.username = employeeId;
+          updateData.employee_id = employeeId;
+        } else {
+          // Avoid sending empty username which would violate backend constraints.
+          updateData.username = effectiveUsername;
+          // Avoid sending empty employee_id value; keep backend value intact.
+          delete (updateData as any).employee_id;
+        }
         if (!updateData.password) {
             delete (updateData as any).password;
         }
         await userApi.update(user.user_id, updateData);
         toast.success('User updated successfully');
       } else {
-        await userApi.register(formData as UserCreate);
+        if (!employeeId) {
+          toast.error('Employee ID is required');
+          return;
+        }
+        if (!pinRegex.test(pin)) {
+          toast.error('PIN must be exactly 6 digits');
+          return;
+        }
+
+        const createPayload: UserCreate = {
+          ...(formData as Omit<UserCreate, 'username'>),
+          username: employeeId,
+          // Ensure both fields match to satisfy uniqueness/index expectations.
+          employee_id: employeeId,
+        };
+
+        await userApi.register(createPayload);
         toast.success('User registered successfully');
       }
       onSuccess();
@@ -89,7 +127,7 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
         <div className="flex items-center justify-between p-6 border-b border-border/50 bg-background/50">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
-              <UserIcon className="w-6 h-6" />
+              <UserCircle className="w-6 h-6" />
             </div>
             <div>
               <h2 className="text-xl font-bold font-heading uppercase tracking-tight">
@@ -157,31 +195,21 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
               </h3>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-1">Username</label>
-                  <div className="relative">
-                    <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-                    <input
-                      required
-                      name="username"
-                      value={formData.username}
-                      onChange={handleChange}
-                      className="w-full h-11 pl-11 pr-4 rounded-xl bg-input/30 border border-border focus:ring-2 focus:ring-indigo-500/30 outline-none transition-all text-sm font-medium"
-                      placeholder="username123"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
                   <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-1">
-                    Password {isEdit && <span className="text-[9px] lowercase italic text-amber-500">(leave blank to keep current)</span>}
+                    PIN (6 digits) {isEdit && <span className="text-[9px] lowercase italic text-amber-500">(leave blank to keep current)</span>}
                   </label>
                   <input
                     required={!isEdit}
-                    type="password"
+                      type="password"
                     name="password"
                     value={formData.password}
                     onChange={handleChange}
+                    inputMode="numeric"
+                    pattern="^\\d{6}$"
+                    minLength={6}
+                    maxLength={6}
                     className="w-full h-11 px-4 rounded-xl bg-input/30 border border-border focus:ring-2 focus:ring-indigo-500/30 outline-none transition-all text-sm font-medium"
-                    placeholder="••••••••"
+                    placeholder="••••••"
                   />
                 </div>
               </div>
@@ -231,6 +259,7 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
                         name="employee_id"
                         value={formData.employee_id}
                         onChange={handleChange}
+                        required={!isEdit}
                         className="w-full h-11 pl-11 pr-4 rounded-xl bg-input/30 border border-border focus:ring-2 focus:ring-indigo-500/30 outline-none transition-all text-sm font-medium"
                         placeholder="EMP-001"
                       />
