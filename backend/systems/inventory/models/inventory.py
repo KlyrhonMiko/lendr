@@ -14,6 +14,7 @@ class InventoryItem(BaseModel, table=True):
     available_qty: int = Field(default=0, ge=0) 
     
     condition: str = Field(default="good", max_length=100)
+    status: str = Field(default="healthy", max_length=50)
 
     item_type: str = Field(default="equipment", max_length=50)
     classification: str | None = Field(default=None, max_length=100)

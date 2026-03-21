@@ -40,7 +40,7 @@ from uuid import uuid4
 
 import requests
 from sqlmodel import Session, select
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 
 # Import settings and models from the backend
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -601,6 +601,61 @@ def seed_inventory_batch_configurations(headers: dict[str, str]) -> None:
         create_setting(headers, key=key, value=value, category="inventory_batches_condition", description=desc, endpoint="/api/inventory/config/inventory")
 
 
+def seed_inventory_weight_configurations(headers: dict[str, str]) -> None:
+    """Seed inventory status and condition weights."""
+    section("INVENTORY WEIGHT CONFIGURATIONS")
+    
+    # inventory_units_status_weights
+    print(f"\n  {CYAN}Category: inventory_units_status_weights{RESET}")
+    unit_status_weights = [
+        ("expired", "100", "Weight for expired unit status"),
+        ("discarded", "100", "Weight for discarded unit status"),
+        ("retired", "100", "Weight for retired unit status"),
+        ("consumed", "90", "Weight for consumed unit status"),
+        ("maintenance", "80", "Weight for maintenance unit status"),
+        ("available", "20", "Weight for available unit status"),
+        ("borrowed", "20", "Weight for borrowed unit status"),
+    ]
+    for key, value, desc in unit_status_weights:
+        create_setting(headers, key=key, value=value, category="inventory_units_status_weights", description=desc, endpoint="/api/inventory/config/inventory")
+
+    # inventory_units_condition_weights
+    print(f"\n  {CYAN}Category: inventory_units_condition_weights{RESET}")
+    unit_condition_weights = [
+        ("unusable", "100", "Weight for unusable unit condition"),
+        ("poor", "80", "Weight for poor unit condition"),
+        ("fair", "30", "Weight for fair unit condition"),
+        ("good", "20", "Weight for good unit condition"),
+        ("excellent", "20", "Weight for excellent unit condition"),
+    ]
+    for key, value, desc in unit_condition_weights:
+        create_setting(headers, key=key, value=value, category="inventory_units_condition_weights", description=desc, endpoint="/api/inventory/config/inventory")
+
+    # inventory_batches_status_weights
+    print(f"\n  {CYAN}Category: inventory_batches_status_weights{RESET}")
+    batch_status_weights = [
+        ("expired", "100", "Weight for expired batch status"),
+        ("near_expiry", "60", "Weight for near_expiry batch status"),
+        ("out_of_stock", "50", "Weight for out_of_stock batch status"),
+        ("low_stock", "40", "Weight for low_stock batch status"),
+        ("healthy", "20", "Weight for healthy batch status"),
+    ]
+    for key, value, desc in batch_status_weights:
+        create_setting(headers, key=key, value=value, category="inventory_batches_status_weights", description=desc, endpoint="/api/inventory/config/inventory")
+
+    # inventory_batches_condition_weights
+    print(f"\n  {CYAN}Category: inventory_batches_condition_weights{RESET}")
+    batch_condition_weights = [
+        ("unusable", "100", "Weight for unusable batch condition"),
+        ("poor", "80", "Weight for poor batch condition"),
+        ("fair", "30", "Weight for fair batch condition"),
+        ("good", "20", "Weight for good batch condition"),
+        ("excellent", "20", "Weight for excellent batch condition"),
+    ]
+    for key, value, desc in batch_condition_weights:
+        create_setting(headers, key=key, value=value, category="inventory_batches_condition_weights", description=desc, endpoint="/api/inventory/config/inventory")
+
+
 def seed_borrow_request_configurations(headers: dict[str, str]) -> None:
     """Seed borrow request workflow, channels, and events."""
     section("BORROW REQUEST CONFIGURATIONS")
@@ -950,6 +1005,7 @@ def main() -> int:
         seed_inventory_configurations(admin_headers)
         seed_inventory_unit_configurations(admin_headers)
         seed_inventory_batch_configurations(admin_headers)
+        seed_inventory_weight_configurations(admin_headers)
         seed_inventory_movement_configurations(admin_headers)
         seed_borrow_request_configurations(admin_headers)
         seed_requested_item_configurations(admin_headers)

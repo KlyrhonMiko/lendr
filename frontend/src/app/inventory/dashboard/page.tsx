@@ -9,6 +9,8 @@ import type {
   LowStockItem,
   PendingCounts,
   CategoryBreakdown,
+  InventoryHealth,
+  BorrowingTrend,
 } from './lib/types';
 import { DashboardHeader } from './components/DashboardHeader';
 import { InventoryStatsGrid } from './components/InventoryStatsGrid';
@@ -17,6 +19,7 @@ import { QuickActionsPanel } from './components/QuickActionsPanel';
 import { LowStockPanel } from './components/LowStockPanel';
 import { RequestsPipelinePanel } from './components/RequestsPipelinePanel';
 import { InventoryBreakdownPanel } from './components/InventoryBreakdownPanel';
+import { InventoryHealthPanel, BorrowingTrendsPanel } from './components/ActivityCharts';
 
 export default function InventoryDashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -24,22 +27,29 @@ export default function InventoryDashboard() {
   const [lowStock, setLowStock] = useState<LowStockItem[]>([]);
   const [pendingCounts, setPendingCounts] = useState<PendingCounts>({});
   const [breakdown, setBreakdown] = useState<CategoryBreakdown[]>([]);
+  const [health, setHealth] = useState<InventoryHealth | null>(null);
+  const [trends, setTrends] = useState<BorrowingTrend[]>([]);
   const [loading, setLoading] = useState(true);
+
   const fetchDashboardData = useCallback(async () => {
     try {
-      const [statsRes, recentRes, lowStockRes, pendingRes, breakdownRes] =
+      const [statsRes, recentRes, lowStockRes, pendingRes, breakdownRes, healthRes, trendsRes] =
         await Promise.all([
           dashboardApi.getStats(),
           dashboardApi.getRecent(),
           dashboardApi.getLowStock(),
           dashboardApi.getPendingCounts(),
           dashboardApi.getInventoryBreakdown(),
+          dashboardApi.getHealth(),
+          dashboardApi.getTrends(),
         ]);
       setStats(statsRes.data);
       setRecent(recentRes.data);
       setLowStock(lowStockRes.data);
       setPendingCounts(pendingRes.data);
       setBreakdown(breakdownRes.data);
+      setHealth(healthRes.data);
+      setTrends(trendsRes.data);
     } catch {
       toast.error('Failed to load dashboard data');
     } finally {
@@ -56,6 +66,15 @@ export default function InventoryDashboard() {
       <DashboardHeader />
 
       <InventoryStatsGrid stats={stats} loading={loading} />
+      
+      <div className="grid lg:grid-cols-5 gap-4">
+        <div className="lg:col-span-3">
+          <BorrowingTrendsPanel trends={trends} loading={loading} />
+        </div>
+        <div className="lg:col-span-2">
+          <InventoryHealthPanel health={health} loading={loading} />
+        </div>
+      </div>
 
       <div className="grid lg:grid-cols-5 gap-4">
         <div className="lg:col-span-3 min-h-0">

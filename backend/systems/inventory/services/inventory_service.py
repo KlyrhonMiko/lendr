@@ -247,9 +247,100 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             
         return "healthy"
 
+    def _sync_item_condition(self, session: Session, item: InventoryItem) -> None:
+        """
+        Derive the parent item's physical condition from its units/batches.
+        Hierarchy (Weight) is fetched dynamically from the configuration system.
+        Only uses 'condition' weights.
+        """
+        # 1. Fetch dynamic condition weights
+        config_service = InventoryConfigService()
+        unit_cond_weights = config_service.get_weights(session, "inventory_units_condition_weights")
+        batch_cond_weights = config_service.get_weights(session, "inventory_batches_condition_weights")
+
+        max_weight = 0
+        winning_condition = "good"
+
+        if item.is_trackable:
+            # Aggregate from InventoryUnit
+            units = session.exec(
+                select(InventoryUnit).where(
+                    InventoryUnit.inventory_uuid == item.id,
+                    InventoryUnit.is_deleted.is_(False),
+                    InventoryUnit.status != "retired"
+                )
+            ).all()
+            for unit in units:
+                # Check individual unit condition
+                condition_weight = unit_cond_weights.get((unit.condition or "").lower(), 0)
+                if condition_weight > max_weight:
+                    max_weight = condition_weight
+                    winning_condition = unit.condition or winning_condition
+        else:
+            # Aggregate from InventoryBatch
+            batches = session.exec(
+                select(InventoryBatch).where(
+                    InventoryBatch.inventory_uuid == item.id,
+                    InventoryBatch.is_deleted.is_(False)
+                )
+            ).all()
+            for batch in batches:
+                # Batch condition is usually not tracked individually but can be added here
+                condition_weight = batch_cond_weights.get((batch.condition or "").lower() if hasattr(batch, 'condition') else "", 0)
+                if condition_weight > max_weight:
+                    max_weight = condition_weight
+                    winning_condition = batch.condition if hasattr(batch, 'condition') else winning_condition
+
+        item.condition = winning_condition
+
+    def _sync_item_status(self, session: Session, item: InventoryItem) -> None:
+        """
+        Derive the parent item's operational status from its units/batches.
+        Only uses 'status' weights.
+        """
+        # 1. Fetch dynamic status weights
+        config_service = InventoryConfigService()
+        unit_status_weights = config_service.get_weights(session, "inventory_units_status_weights")
+        batch_status_weights = config_service.get_weights(session, "inventory_batches_status_weights")
+
+        max_weight = 0
+        winning_status = "healthy"
+
+        if item.is_trackable:
+            # Aggregate from InventoryUnit
+            units = session.exec(
+                select(InventoryUnit).where(
+                    InventoryUnit.inventory_uuid == item.id,
+                    InventoryUnit.is_deleted.is_(False),
+                    InventoryUnit.status != "retired"
+                )
+            ).all()
+            for unit in units:
+                # Check status
+                status_weight = unit_status_weights.get(unit.status.lower() if unit.status else "", 0)
+                if status_weight > max_weight:
+                    max_weight = status_weight
+                    winning_status = unit.status
+        else:
+            # Aggregate from InventoryBatch
+            batches = session.exec(
+                select(InventoryBatch).where(
+                    InventoryBatch.inventory_uuid == item.id,
+                    InventoryBatch.is_deleted.is_(False)
+                )
+            ).all()
+            for batch in batches:
+                # Aggregate batch status weights
+                status_weight = batch_status_weights.get(batch.status.lower() if batch.status else "", 0)
+                if status_weight > max_weight:
+                    max_weight = status_weight
+                    winning_status = batch.status
+
+        item.status = winning_status
+
     def _sync_item_quantities(self, session: Session, item_id: str) -> InventoryItem:
         """
-        Purely aggregate quantities from children (Units/Batches) and update parent InventoryItem.
+        Aggregate quantities and condition from children (Units/Batches) and update parent InventoryItem.
         """
         item = self.get(session, item_id)
         if not item:
@@ -288,6 +379,10 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             
             item.total_qty = total_sum if total_sum is not None else 0
             item.available_qty = avail_sum if avail_sum is not None else 0
+
+        # Sync condition and status as well
+        self._sync_item_condition(session, item)
+        self._sync_item_status(session, item)
 
         session.add(item)
         return item
@@ -408,12 +503,16 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         audit_service.log_action(
             db=session,
             entity_type="inventory_batch",
-            entity_id=batch.batch_id,
+            entity_id=batch.id, # Fixed audit entity_id to use UUID for consistency if needed, but router uses batch_id
             action="updated",
             before=before,
             after=batch.model_dump(mode="json"),
             actor_id=actor_id,
         )
+
+        item = session.exec(select(InventoryItem).where(InventoryItem.id == batch.inventory_uuid)).first()
+        if item:
+            self._sync_item_quantities(session, item.item_id)
         
         return batch
 
@@ -533,6 +632,25 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
 
 
     def get_item_status(self, session: Session, item: InventoryItem) -> str:
+        """
+        Determine the displayed status of an item.
+        Priority: Critical Condition (Aggregated) > Quantity Thresholds.
+        """
+        # 1. Prioritize critical operational status from aggregated status field
+        # We consider anything with weight > 30 as critical for status display
+        config_service = InventoryConfigService()
+        unit_weights = config_service.get_weights(session, "inventory_units_status_weights")
+        batch_weights = config_service.get_weights(session, "inventory_batches_status_weights")
+        
+        # Combine weights for evaluation (highest wins)
+        all_weights = {**unit_weights, **batch_weights}
+        
+        if item.status and item.status.lower() in all_weights:
+            weight = all_weights.get(item.status.lower(), 0)
+            if weight > 30: # Only override if it's a "warning" or "critical" status
+                return item.status.upper()
+
+        # 2. Fallback to quantity-based status
         config_service = InventoryConfigService()
 
         status_settings = config_service.get_by_category(
