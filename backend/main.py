@@ -11,6 +11,7 @@ from systems.admin.routers.configuration import router as config
 from systems.admin.routers.users import router as users
 from systems.admin.routers.roles import router as roles_config
 from systems.admin.routers.audit_log import router as admin_audit_log
+from systems.admin.routers.dashboard import router as admin_dashboard
 
 from systems.auth.dependencies import require_system_access
 from systems.auth.routers.auth import router as auth
@@ -81,6 +82,7 @@ app.include_router(users, prefix="/api/admin/users", tags=["Admin - Users"], dep
 app.include_router(config, prefix="/api/admin/config", tags=["Admin - Configuration"], dependencies=admin_access)
 app.include_router(roles_config, prefix="/api/admin/roles", tags=["Admin - Roles"], dependencies=admin_access)
 app.include_router(admin_audit_log, prefix="/api/admin/audit-log", tags=["Admin - Audit Logs"], dependencies=admin_access)
+app.include_router(admin_dashboard, prefix="/api/admin/dashboard", tags=["Admin - Dashboard"], dependencies=admin_access)
 app.include_router(auth, prefix="/api/auth", tags=["Auth"])
 app.include_router(auth_config, prefix="/api/auth/config", tags=["Auth - Configuration"], dependencies=admin_access)
 
