@@ -728,7 +728,6 @@ def seed_user_configurations(headers: dict[str, str]) -> None:
         ("admin", "ADMIN", "Complete authority over user management, system configuration, and data overrides."),
         ("inventory_manager", "IVTM", "Owns inventory lifecycle, borrowing workflow approvals, stock controls, and inventory configuration management."),
         ("dispatch", "DSPT", "Operates release and return flow, validates units, and performs operational hand-offs."),
-        ("warehouse_manager", "WHSM", "Handles warehouse routing, warehouse approval/rejection, and stock provisioning during warehouse processing."),
         ("borrower", "BRWR", "Uses the borrower portal to submit borrowing requests and track assigned inventory usage."),
         ("finance_manager", "FINM", "Monitors inventory performance, dashboard KPIs, and financial-impact configuration with read-heavy access."),
         ("accountant", "ACCT", "Reconciles inventory movements, reviews anomalies, and performs audit-ledger verification."),
@@ -789,18 +788,6 @@ def seed_rbac_role_permissions(headers: dict[str, str]) -> None:
                 "inventory:units:manage",
                 "inventory:borrow_requests:manage",
                 "inventory:borrower_portal:access",
-            ],
-        },
-        {
-            "role": "warehouse_manager",
-            "display_name": "Warehouse Manager",
-            "systems": ["inventory"],
-            "permissions": [
-                "auth:session:manage",
-                "inventory:items:view",
-                "inventory:units:view",
-                "inventory:borrow_requests:manage",
-                "inventory:warehouse:manage",
             ],
         },
         {

@@ -177,6 +177,48 @@ async def get_my_policy(
     return create_success_response(data=data, request=request)
 
 
+@router.post("/refresh", response_model=Token)
+async def refresh_token(
+    request: Request,
+    session: Session = Depends(get_session),
+    token: str = Depends(reusable_oauth2),
+):
+    try:
+        # Decode token to get session_id and user payload
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        session_id = payload.get("session_id")
+        user_id = payload.get("sub")
+        
+        if not session_id or not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+        user = auth_service.user_service.get(session, user_id)
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+            
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        
+        if user.role == "borrower":
+            if not auth_service.is_borrower_session_valid(session, session_id):
+                raise HTTPException(status_code=401, detail="Session expired or invalid")
+            auth_service.extend_borrower_session(session, session_id, access_token_expires)
+        else:
+            if not auth_service.is_user_session_valid(session, session_id):
+                raise HTTPException(status_code=401, detail="Session expired or invalid")
+            auth_service.extend_user_session(session, session_id, access_token_expires)
+
+        # Generate new token
+        access_token = auth_service.create_access_token(
+            data={"sub": user.user_id, "session_id": session_id}, 
+            expires_delta=access_token_expires
+        )
+        
+        return Token(access_token=access_token, token_type="bearer")
+        
+    except jwt.JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+
 @router.post("/logout", response_model=GenericResponse)
 async def logout(
     request: Request,

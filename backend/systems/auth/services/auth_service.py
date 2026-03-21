@@ -75,6 +75,17 @@ class AuthService:
             session.add(db_session)
             session.commit()
 
+    def extend_borrower_session(self, session: Session, session_id: str, expires_delta: timedelta):
+        from systems.auth.models.borrower_session import BorrowerSession
+        from utils.time_utils import get_now_manila
+        
+        statement = select(BorrowerSession).where(BorrowerSession.session_id == session_id)
+        db_session = session.exec(statement).first()
+        if db_session:
+            db_session.expires_at = get_now_manila() + expires_delta
+            session.add(db_session)
+            session.commit()
+
     def create_user_session(
         self,
         session: Session,
@@ -118,5 +129,15 @@ class AuthService:
             session.add(db_session)
             session.commit()
 
+    def extend_user_session(self, session: Session, session_id: str, expires_delta: timedelta):
+        from systems.auth.models.user_session import UserSession
+        from utils.time_utils import get_now_manila
+        
+        statement = select(UserSession).where(UserSession.session_id == session_id)
+        db_session = session.exec(statement).first()
+        if db_session:
+            db_session.expires_at = get_now_manila() + expires_delta
+            session.add(db_session)
+            session.commit()
 
 auth_service = AuthService()

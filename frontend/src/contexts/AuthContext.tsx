@@ -40,6 +40,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      const token = auth.getToken();
+      if (token) {
+        auth.setupTokenTimer(token);
+      }
+      
       const userData = await auth.getUser();
       if (mounted) {
         setUser(userData);
