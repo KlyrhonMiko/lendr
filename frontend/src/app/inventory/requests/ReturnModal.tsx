@@ -17,7 +17,7 @@ interface ReturnModalProps {
 interface UnitReturnState {
   unit_id: string;
   serial_number?: string;
-  condition: string;
+  condition_on_return: string;
   notes: string;
 }
 
@@ -61,7 +61,7 @@ export function ReturnModal({ request, onClose, onSuccess }: ReturnModalProps) {
         setUnitReturns(units.map(u => ({
           unit_id: u.unit_id,
           serial_number: u.serial_number,
-          condition: '',
+          condition_on_return: '',
           notes: '',
         })));
       } catch (err) {
@@ -74,7 +74,7 @@ export function ReturnModal({ request, onClose, onSuccess }: ReturnModalProps) {
     fetchData();
   }, [request.request_id]);
 
-  const updateUnitReturn = (unitId: string, field: 'condition' | 'notes', value: string) => {
+  const updateUnitReturn = (unitId: string, field: 'condition_on_return' | 'notes', value: string) => {
     setUnitReturns(prev => prev.map(u =>
       u.unit_id === unitId ? { ...u, [field]: value } : u
     ));
@@ -82,29 +82,21 @@ export function ReturnModal({ request, onClose, onSuccess }: ReturnModalProps) {
 
   const applyGlobalCondition = () => {
     if (!globalCondition) return;
-    setUnitReturns(prev => prev.map(u => ({ ...u, condition: globalCondition })));
+    setUnitReturns(prev => prev.map(u => ({ ...u, condition_on_return: globalCondition })));
     toast.success(`Set all units to "${globalCondition}"`);
   };
 
-  const getStatusFromCondition = (condition: string): string | undefined => {
-    const maintenanceConditions = ['damaged', 'for_repair', 'repair', 'poor'];
-    if (maintenanceConditions.includes(condition.toLowerCase())) {
-      return 'maintenance';
-    }
-    return undefined;
-  };
 
   const handleReturn = async () => {
     setSubmitting(true);
     try {
       const unit_returns: BorrowUnitReturn[] = unitReturns.map(u => ({
         unit_id: u.unit_id,
-        condition: u.condition || undefined,
+        condition_on_return: u.condition_on_return || undefined,
         notes: u.notes || undefined,
-        status_on_return: u.condition ? getStatusFromCondition(u.condition) : undefined,
       }));
 
-      const hasUnitData = unit_returns.some(u => u.condition || u.notes);
+      const hasUnitData = unit_returns.some(u => u.condition_on_return || u.notes);
       await borrowApi.return(request.request_id, {
         notes: globalNotes || undefined,
         unit_returns: hasUnitData ? unit_returns : undefined,
@@ -223,27 +215,27 @@ export function ReturnModal({ request, onClose, onSuccess }: ReturnModalProps) {
                                 type="button"
                                 className={cn(
                                   "relative h-9 pl-3 pr-8 rounded-xl border text-xs font-bold text-left focus:outline-none focus:ring-2 focus:ring-indigo-500/25 transition-all cursor-pointer min-w-[120px]",
-                                  conditionStyle(unitReturn.condition)
+                                  conditionStyle(unitReturn.condition_on_return)
                                 )}
                               >
-                                <span className="block truncate">{conditionLabel(unitReturn.condition)}</span>
+                                <span className="block truncate">{conditionLabel(unitReturn.condition_on_return)}</span>
                                 <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none opacity-60" />
                               </PopoverTrigger>
                               <PopoverContent align="end" sideOffset={4} className="w-44 p-1 max-h-60 overflow-y-auto">
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    updateUnitReturn(unitReturn.unit_id, 'condition', '');
+                                    updateUnitReturn(unitReturn.unit_id, 'condition_on_return', '');
                                     setOpenConditionUnit(null);
                                   }}
                                   className={cn(
                                     "w-full flex items-center gap-2 px-3 py-2 text-xs rounded-md transition-colors text-left",
-                                    !unitReturn.condition
+                                    !unitReturn.condition_on_return
                                       ? "bg-indigo-500/10 text-indigo-500 font-bold"
                                       : "hover:bg-muted text-muted-foreground"
                                   )}
                                 >
-                                  <Check className={cn("w-3.5 h-3.5 shrink-0", !unitReturn.condition ? "opacity-100" : "opacity-0")} />
+                                  <Check className={cn("w-3.5 h-3.5 shrink-0", !unitReturn.condition_on_return ? "opacity-100" : "opacity-0")} />
                                   No change
                                 </button>
                                 {conditions.map(c => (
@@ -251,17 +243,17 @@ export function ReturnModal({ request, onClose, onSuccess }: ReturnModalProps) {
                                     key={c.key}
                                     type="button"
                                     onClick={() => {
-                                      updateUnitReturn(unitReturn.unit_id, 'condition', c.key);
+                                      updateUnitReturn(unitReturn.unit_id, 'condition_on_return', c.key);
                                       setOpenConditionUnit(null);
                                     }}
                                     className={cn(
                                       "w-full flex items-center gap-2 px-3 py-2 text-xs rounded-md transition-colors text-left",
-                                      unitReturn.condition === c.key
+                                      unitReturn.condition_on_return === c.key
                                         ? "bg-indigo-500/10 text-indigo-500 font-bold"
                                         : "hover:bg-muted text-foreground"
                                     )}
                                   >
-                                    <Check className={cn("w-3.5 h-3.5 shrink-0", unitReturn.condition === c.key ? "opacity-100" : "opacity-0")} />
+                                    <Check className={cn("w-3.5 h-3.5 shrink-0", unitReturn.condition_on_return === c.key ? "opacity-100" : "opacity-0")} />
                                     {c.value}
                                   </button>
                                 ))}
@@ -270,8 +262,8 @@ export function ReturnModal({ request, onClose, onSuccess }: ReturnModalProps) {
                           ) : (
                             <input
                               type="text"
-                              value={unitReturn.condition}
-                              onChange={(e) => updateUnitReturn(unitReturn.unit_id, 'condition', e.target.value)}
+                              value={unitReturn.condition_on_return}
+                              onChange={(e) => updateUnitReturn(unitReturn.unit_id, 'condition_on_return', e.target.value)}
                               placeholder="Condition (optional)"
                               className="h-9 w-36 px-3 rounded-xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all text-xs font-medium"
                             />

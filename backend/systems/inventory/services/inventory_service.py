@@ -1414,6 +1414,17 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         if item:
             self._sync_item_quantities(session, item.item_id)
             
+            # Record retirement movement in the ledger
+            movement = InventoryMovement(
+                movement_id=get_next_sequence(session, InventoryMovement, "movement_id", "MOV"),
+                inventory_uuid=item.id,
+                qty_change=-1,
+                movement_type="retirement",
+                note=f"Unit retired: {unit.unit_id}",
+                actor_id=actor_id,
+            )
+            session.add(movement)
+            
         return unit
 
     def get_units_by_status(
