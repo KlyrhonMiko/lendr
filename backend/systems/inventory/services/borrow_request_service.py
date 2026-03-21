@@ -198,6 +198,24 @@ class BorrowService(
         ).all()
         return {user.id: user.user_id for user in users}
 
+    def _build_user_name_map(
+        self, session: Session, user_ids: set[UUID | None]
+    ) -> dict[UUID, str]:
+        clean_ids = [uid for uid in user_ids if uid is not None]
+        if not clean_ids:
+            return {}
+
+        users = session.exec(
+            select(User).where(
+                User.is_deleted.is_(False),
+                User.id.in_(clean_ids),
+            )
+        ).all()
+        return {
+            user.id: f"{user.last_name}, {user.first_name}"
+            for user in users
+        }
+
     def _build_item_details_map(
         self, session: Session, item_ids: set[UUID | None]
     ) -> dict[UUID, dict[str, str]]:
@@ -231,12 +249,22 @@ class BorrowService(
         request_channel: str | None = None,
         is_emergency: bool | None = None,
         borrower_id: str | None = None,
+        search: str | None = None,
         date_from: datetime | None = None,
         date_to: datetime | None = None,
         returned_on_time: bool | None = None,
     ) -> tuple[list[BorrowRequest], int]:
         """Get all borrow requests with optional filters and pagination."""
-        statement = select(BorrowRequest).where(BorrowRequest.is_deleted.is_(False))
+        needs_user_join = search is not None
+
+        if needs_user_join:
+            statement = (
+                select(BorrowRequest)
+                .outerjoin(User, BorrowRequest.borrower_uuid == User.id)
+                .where(BorrowRequest.is_deleted.is_(False))
+            )
+        else:
+            statement = select(BorrowRequest).where(BorrowRequest.is_deleted.is_(False))
 
         if status is not None:
             statement = statement.where(BorrowRequest.status == status)
@@ -251,11 +279,24 @@ class BorrowService(
         if date_to is not None:
             statement = statement.where(BorrowRequest.request_date <= date_to)
         if borrower_id is not None:
-            # Resolve borrower_id string to a UUID via join
             borrower = self.user_service.get(session, borrower_id)
             if not borrower:
                 return [], 0
             statement = statement.where(BorrowRequest.borrower_uuid == borrower.id)
+        if search is not None:
+            term = f"%{search}%"
+            borrower_full_name = (User.first_name + " " + User.last_name).label("borrower_full_name")
+            borrower_full_name_rev = (User.last_name + ", " + User.first_name).label("borrower_full_name_rev")
+            statement = statement.where(
+                BorrowRequest.request_id.ilike(term)
+                | BorrowRequest.customer_name.ilike(term)
+                | BorrowRequest.location_name.ilike(term)
+                | User.user_id.ilike(term)
+                | User.first_name.ilike(term)
+                | User.last_name.ilike(term)
+                | borrower_full_name.ilike(term)
+                | borrower_full_name_rev.ilike(term)
+            )
 
         count_statement = select(func.count()).select_from(statement.subquery())
         total_count = session.exec(count_statement).one()
@@ -313,6 +354,7 @@ class BorrowService(
         }
         actor_ids.add(borrow_req.borrower_uuid)
         user_id_map = self._build_user_id_map(session, actor_ids)
+        user_name_map = self._build_user_name_map(session, {borrow_req.borrower_uuid})
 
         # Get all items for this request
         request_items = []
@@ -332,6 +374,7 @@ class BorrowService(
 
         payload = borrow_req.model_dump(mode="json")
         payload["borrower_user_id"] = user_id_map.get(borrow_req.borrower_uuid)
+        payload["borrower_name"] = user_name_map.get(borrow_req.borrower_uuid)
         payload["closed_by_user_id"] = user_id_map.get(borrow_req.closed_by)
 
         # Populate items list
@@ -360,6 +403,84 @@ class BorrowService(
             for event in (borrow_req.events or [])
         ]
         return BorrowRequestRead.model_validate(payload)
+
+    def generate_release_receipt(
+        self, session: Session, request_id: str
+    ) -> dict:
+        from systems.inventory.schemas.borrow_request_schemas import (
+            ReleaseReceiptRead,
+            ReleaseReceiptItemRead,
+        )
+
+        db_request = self.get(session, request_id)
+        if not db_request:
+            raise ValueError("Request not found")
+        if db_request.status not in ("released", "returned", "closed"):
+            raise ValueError("Receipt is only available for released requests")
+
+        user_id_map = self._build_user_id_map(
+            session, {db_request.borrower_uuid, db_request.released_by}
+        )
+        user_name_map = self._build_user_name_map(
+            session, {db_request.borrower_uuid, db_request.released_by}
+        )
+
+        request_items = session.exec(
+            select(BorrowRequestItem)
+            .where(
+                BorrowRequestItem.borrow_uuid == db_request.id,
+                BorrowRequestItem.is_deleted.is_(False),
+            )
+            .order_by(BorrowRequestItem.created_at.asc())
+        ).all()
+
+        item_uuids = {item.item_uuid for item in request_items if item.item_uuid}
+        item_details_map = self._build_item_details_map(session, item_uuids)
+
+        receipt_items = []
+        for borrow_item in request_items:
+            details = item_details_map.get(borrow_item.item_uuid, {})
+            serial_numbers = []
+            if details.get("is_trackable"):
+                units = session.exec(
+                    select(BorrowRequestUnit).where(
+                        BorrowRequestUnit.borrow_uuid == db_request.id,
+                        BorrowRequestUnit.is_deleted.is_(False),
+                    )
+                ).all()
+                serial_numbers = [
+                    u.inventory_unit.serial_number
+                    for u in units
+                    if u.inventory_unit and u.inventory_unit.serial_number
+                ]
+
+            receipt_items.append(
+                ReleaseReceiptItemRead(
+                    item_id=details.get("item_id", ""),
+                    name=details.get("name", ""),
+                    classification=details.get("classification"),
+                    qty_released=borrow_item.qty_requested,
+                    serial_numbers=serial_numbers,
+                )
+            )
+
+        receipt = ReleaseReceiptRead(
+            request_id=db_request.request_id,
+            transaction_ref=db_request.transaction_ref,
+            receipt_number=f"RCT-{db_request.request_id}",
+            borrower_name=user_name_map.get(db_request.borrower_uuid),
+            borrower_user_id=user_id_map.get(db_request.borrower_uuid),
+            customer_name=db_request.customer_name,
+            location_name=db_request.location_name,
+            released_at=db_request.released_at,
+            released_by_name=user_name_map.get(db_request.released_by),
+            expected_return_at=db_request.return_at,
+            is_emergency=db_request.is_emergency or False,
+            approval_channel=db_request.approval_channel or "standard",
+            notes=db_request.notes,
+            items=receipt_items,
+        )
+        return receipt
 
     def serialize_borrow_requests(
         self,

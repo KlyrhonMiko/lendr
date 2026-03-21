@@ -1,45 +1,79 @@
 'use client';
-import { useEffect, useState } from 'react';
+
+import { useEffect, useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { dashboardApi } from './dashboard-api';
-import type { DashboardStats, RecentTransaction } from './lib/types';
+import type {
+  DashboardStats,
+  RecentTransaction,
+  LowStockItem,
+  PendingCounts,
+  CategoryBreakdown,
+} from './lib/types';
 import { DashboardHeader } from './components/DashboardHeader';
 import { InventoryStatsGrid } from './components/InventoryStatsGrid';
 import { RecentTransactionsPanel } from './components/RecentTransactionsPanel';
 import { QuickActionsPanel } from './components/QuickActionsPanel';
+import { LowStockPanel } from './components/LowStockPanel';
+import { RequestsPipelinePanel } from './components/RequestsPipelinePanel';
+import { InventoryBreakdownPanel } from './components/InventoryBreakdownPanel';
 
 export default function InventoryDashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recent, setRecent] = useState<RecentTransaction[]>([]);
+  const [lowStock, setLowStock] = useState<LowStockItem[]>([]);
+  const [pendingCounts, setPendingCounts] = useState<PendingCounts>({});
+  const [breakdown, setBreakdown] = useState<CategoryBreakdown[]>([]);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
-      const [statsRes, recentRes] = await Promise.all([
-        dashboardApi.getStats(),
-        dashboardApi.getRecent()
-      ]);
+      const [statsRes, recentRes, lowStockRes, pendingRes, breakdownRes] =
+        await Promise.all([
+          dashboardApi.getStats(),
+          dashboardApi.getRecent(),
+          dashboardApi.getLowStock(),
+          dashboardApi.getPendingCounts(),
+          dashboardApi.getInventoryBreakdown(),
+        ]);
       setStats(statsRes.data);
       setRecent(recentRes.data);
+      setLowStock(lowStockRes.data);
+      setPendingCounts(pendingRes.data);
+      setBreakdown(breakdownRes.data);
     } catch {
-      toast.error("Failed to load dashboard metrics");
+      toast.error('Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   return (
-    <div className="w-full h-full max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="w-full max-w-6xl mx-auto space-y-4 animate-in fade-in duration-500">
       <DashboardHeader />
+
       <InventoryStatsGrid stats={stats} loading={loading} />
 
-      <div className="grid md:grid-cols-3 gap-6">
-        <RecentTransactionsPanel recent={recent} loading={loading} />
-        <QuickActionsPanel />
+      <div className="grid lg:grid-cols-5 gap-4">
+        <div className="lg:col-span-3 min-h-0">
+          <RecentTransactionsPanel recent={recent} loading={loading} />
+        </div>
+        <div className="lg:col-span-2 flex flex-col gap-4 min-h-0">
+          <RequestsPipelinePanel counts={pendingCounts} loading={loading} />
+          <QuickActionsPanel />
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-5 gap-4 items-start">
+        <div className="lg:col-span-3">
+          <LowStockPanel items={lowStock} loading={loading} />
+        </div>
+        <div className="lg:col-span-2">
+          <InventoryBreakdownPanel breakdown={breakdown} loading={loading} />
+        </div>
       </div>
     </div>
   );

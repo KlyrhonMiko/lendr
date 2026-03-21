@@ -3,6 +3,9 @@ import { api, buildQueryString } from '@/lib/api';
 export interface BorrowRequest {
   request_id: string;
   borrower_user_id?: string;
+  borrower_name?: string;
+  customer_name?: string;
+  location_name?: string;
   items: Array<{
     item_id: string;
     name: string;
@@ -98,6 +101,7 @@ export interface BorrowListParams {
   request_channel?: string;
   is_emergency?: boolean;
   borrower_id?: string;
+  search?: string;
   returned_on_time?: boolean;
   date_from?: string;
   date_to?: string;
@@ -120,6 +124,32 @@ export interface BorrowRequestBatch {
   assigned_at?: string;
   released_at?: string;
   returned_at?: string;
+}
+
+export interface ReleaseReceiptItem {
+  item_id: string;
+  name: string;
+  classification?: string;
+  qty_released: number;
+  serial_numbers: string[];
+}
+
+export interface ReleaseReceipt {
+  request_id: string;
+  transaction_ref: string;
+  receipt_number: string;
+  borrower_name?: string;
+  borrower_user_id?: string;
+  customer_name?: string;
+  location_name?: string;
+  released_at?: string;
+  released_by_name?: string;
+  expected_return_at?: string;
+  is_emergency: boolean;
+  approval_channel: string;
+  notes?: string;
+  items: ReleaseReceiptItem[];
+  borrower_signature?: string;
 }
 
 export const borrowApi = {
@@ -172,4 +202,7 @@ export const borrowApi = {
 
   getAssignedBatches: (id: string) =>
     api.get<BorrowRequestBatch[]>(`/inventory/borrowing/requests/${id}/batches`),
+
+  getReleaseReceipt: (id: string) =>
+    api.get<ReleaseReceipt>(`/inventory/borrowing/requests/${id}/release-receipt`),
 };

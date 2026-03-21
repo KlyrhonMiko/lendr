@@ -27,6 +27,7 @@ interface ItemAssignmentData {
   availableUnits: {
     unit_id: string;
     serial_number: string;
+    condition: string;
   }[];
   selectedUnitIds: string[];
   // For untrackable
@@ -340,11 +341,16 @@ export function UnitSelectionModal({ request, onClose, onSuccess }: UnitSelectio
                     </div>
                   ) : item.availableUnits.map((unit) => {
                     const isSelected = item.selectedUnitIds.includes(unit.unit_id);
+                    const conditionColor = unit.condition === 'good' || unit.condition === 'excellent'
+                      ? 'text-emerald-500 bg-emerald-500/10'
+                      : unit.condition === 'fair'
+                        ? 'text-amber-500 bg-amber-500/10'
+                        : 'text-rose-500 bg-rose-500/10';
                     return (
                       <button
                         key={unit.unit_id}
                         onClick={() => toggleUnitSelection(item.itemId, unit.unit_id)}
-                        className={`p-4 rounded-2xl border transition-all text-left flex flex-col gap-1 group ${
+                        className={`p-4 rounded-2xl border transition-all text-left flex flex-col gap-1.5 group ${
                           isSelected
                             ? 'bg-indigo-500/10 border-indigo-500 shadow-sm'
                             : 'hover:bg-background/50 border-border group-hover:border-indigo-500/50'
@@ -356,7 +362,11 @@ export function UnitSelectionModal({ request, onClose, onSuccess }: UnitSelectio
                           </span>
                           {isSelected && <CheckCircle2 className="w-4 h-4 text-indigo-500 animate-in zoom-in-50 duration-200" />}
                         </div>
-                        <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Available</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded ${conditionColor}`}>
+                            {unit.condition}
+                          </span>
+                        </div>
                       </button>
                     );
                   })}

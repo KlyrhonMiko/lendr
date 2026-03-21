@@ -19,17 +19,17 @@ export function SettingsHeader({
       <div className="flex gap-3">
         <button
           onClick={onOpenRestore}
-          className="px-6 py-2.5 bg-secondary text-foreground font-semibold rounded-full hover:bg-secondary/80 transition-all flex items-center gap-2 border border-border"
+          className="flex items-center gap-2.5 px-6 py-3 bg-secondary text-secondary-foreground rounded-lg text-sm font-semibold border border-border hover:bg-secondary/80 transition-colors active:scale-[0.98]"
         >
-          <RefreshCw className="w-4 h-4" />
+          <RefreshCw className="w-5 h-5" strokeWidth={2.5} />
           Restore Setting
         </button>
 
         <button
           onClick={onOpenNew}
-          className="px-6 py-2.5 bg-indigo-500 text-white font-semibold rounded-full hover:bg-indigo-600 transition-all flex items-center gap-2 shadow-lg shadow-indigo-500/25"
+          className="flex items-center gap-2.5 px-6 py-3 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-sm font-semibold shadow-sm transition-colors active:scale-[0.98]"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-5 h-5" strokeWidth={2.5} />
           Update Param
         </button>
       </div>

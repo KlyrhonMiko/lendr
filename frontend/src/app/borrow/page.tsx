@@ -5,7 +5,6 @@ import { ShieldCheck, CheckCircle2, X, Delete, Loader2 } from 'lucide-react';
 import { inventoryApi, InventoryItem } from '@/app/inventory/items/api';
 import { posApi } from './api';
 import { toast } from 'sonner';
-import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/auth';
 import { api } from '@/lib/api';
 import { CartItem } from './lib/types';
@@ -15,7 +14,6 @@ import { CheckoutView } from './components/CheckoutView';
 type Step = 'selection' | 'checkout';
 
 export default function BorrowPage() {
-  const { user: currentUser } = useAuth();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -33,6 +31,7 @@ export default function BorrowPage() {
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [isPinVerifying, setIsPinVerifying] = useState(false);
   const [pinDraft, setPinDraft] = useState('');
+  const [submittedByEmployeeName, setSubmittedByEmployeeName] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -117,6 +116,7 @@ export default function BorrowPage() {
     setCollaborators('');
     setEmployeeId('');
     setEmployeePin('');
+    setSubmittedByEmployeeName(null);
     setIsPinModalOpen(false);
     setIsPinVerifying(false);
     setPinDraft('');
@@ -275,9 +275,16 @@ export default function BorrowPage() {
         location_name: locationName.trim(),
       });
 
-      // 4. Clear token (Security - shared kiosk)
+      // 4. Fetch borrower profile for success message (before clearing token)
+      const borrowerUser = await auth.getUser();
+      const displayName = borrowerUser
+        ? [borrowerUser.first_name, borrowerUser.last_name].filter(Boolean).join(' ').trim() || borrowerUser.username
+        : employeeId.trim();
+
+      // 5. Clear token (Security - shared kiosk)
       auth.clearToken();
 
+      setSubmittedByEmployeeName(displayName);
       setSuccess(true);
       toast.success(`Borrow request submitted for ${cart.length} item(s)`);
 
@@ -337,7 +344,7 @@ export default function BorrowPage() {
           onSubmit={handleSubmit}
           isSubmitting={isSubmitting}
           success={success}
-          currentUser={currentUser}
+          submittedByEmployeeName={submittedByEmployeeName}
           onOpenPinModal={handleOpenPinModal}
         />
       )}

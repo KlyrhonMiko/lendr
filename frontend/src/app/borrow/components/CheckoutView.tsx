@@ -37,7 +37,7 @@ interface CheckoutViewProps {
   onSubmit: () => void;
   isSubmitting: boolean;
   success: boolean;
-  currentUser: { username?: string; first_name?: string; last_name?: string } | null;
+  submittedByEmployeeName: string | null;
   onOpenPinModal: () => void;
 }
 
@@ -121,7 +121,7 @@ export function CheckoutView({
   onSubmit,
   isSubmitting,
   success,
-  currentUser,
+  submittedByEmployeeName,
   onOpenPinModal,
 }: CheckoutViewProps) {
   const isPinVerified = Boolean(employeePin.trim());
@@ -357,7 +357,7 @@ export function CheckoutView({
             <p className="text-sm text-muted-foreground mt-2 text-center max-w-[260px]">
               Borrow request for{' '}
               <span className="text-indigo-500 font-semibold">
-                {currentUser?.username ?? 'user'}
+                {submittedByEmployeeName ?? 'you'}
               </span>{' '}
               has been successfully sent.
             </p>

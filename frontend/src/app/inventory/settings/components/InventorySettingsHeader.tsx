@@ -11,10 +11,10 @@ export function InventorySettingsHeader({ onUpdate }: { onUpdate: () => void }) 
       </div>
       <button
         onClick={onUpdate}
-        className="px-6 py-2.5 bg-indigo-500 text-white font-semibold rounded-full hover:bg-indigo-600 transition-all flex items-center gap-2 shadow-lg shadow-indigo-500/25"
         type="button"
+        className="flex items-center gap-2.5 px-6 py-3 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-sm font-semibold shadow-sm transition-colors active:scale-[0.98]"
       >
-        <Plus className="w-4 h-4" />
+        <Plus className="w-5 h-5" strokeWidth={2.5} />
         Update Setting
       </button>
     </div>

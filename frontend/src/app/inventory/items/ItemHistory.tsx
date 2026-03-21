@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { inventoryApi } from './api';
-import { X, History, Activity, TrendingUp, TrendingDown, RefreshCcw, Loader2 } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface ItemHistoryProps {
@@ -12,18 +12,13 @@ interface ItemHistoryProps {
 
 export function ItemHistory({ itemId, onClose }: ItemHistoryProps) {
   const [history, setHistory] = useState<any[]>([]);
-  const [summary, setSummary] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [historyRes, summaryRes] = await Promise.all([
-        inventoryApi.getHistory(itemId),
-        inventoryApi.getSummary(itemId)
-      ]);
+      const historyRes = await inventoryApi.getHistory(itemId);
       setHistory(historyRes.data);
-      setSummary(summaryRes.data);
     } catch (err: any) {
       toast.error('Failed to load item activity');
     } finally {
@@ -34,16 +29,6 @@ export function ItemHistory({ itemId, onClose }: ItemHistoryProps) {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
-  const handleReconcile = async () => {
-    try {
-      const res = await inventoryApi.reconcile(itemId);
-      toast.success(res.message || 'Reconciliation complete');
-      fetchData();
-    } catch (err: any) {
-      toast.error('Reconciliation failed');
-    }
-  };
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
@@ -59,34 +44,6 @@ export function ItemHistory({ itemId, onClose }: ItemHistoryProps) {
         </div>
 
         <div className="p-6 h-[600px] overflow-y-auto">
-          {summary && (
-            <div className="grid grid-cols-3 gap-4 mb-8">
-              <div className="p-4 rounded-2xl bg-muted/50 border border-border">
-                <p className="text-xs font-bold uppercase text-muted-foreground mb-1">Total Inflow</p>
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-emerald-500" />
-                  <span className="text-2xl font-bold">+{summary.total_inflow}</span>
-                </div>
-              </div>
-              <div className="p-4 rounded-2xl bg-muted/50 border border-border">
-                <p className="text-xs font-bold uppercase text-muted-foreground mb-1">Total Outflow</p>
-                <div className="flex items-center gap-2">
-                  <TrendingDown className="w-4 h-4 text-rose-500" />
-                  <span className="text-2xl font-bold">-{summary.total_outflow}</span>
-                </div>
-              </div>
-              <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
-                <p className="text-xs font-bold uppercase mb-1 opacity-70">Calculated Stock</p>
-                <div className="flex items-center justify-between">
-                  <span className="text-2xl font-bold">{summary.calculated_stock}</span>
-                  <button onClick={handleReconcile} className="p-2 hover:bg-indigo-500/20 rounded-lg transition-colors" title="Trigger Reconciliation">
-                    <RefreshCcw className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
           <div className="relative">
             <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border/50" />
             <div className="space-y-6">
@@ -112,6 +69,13 @@ export function ItemHistory({ itemId, onClose }: ItemHistoryProps) {
                       <span className="text-[10px] text-muted-foreground font-medium">{move.occurred_at}</span>
                     </div>
                     <p className="text-sm text-foreground mb-1">{move.note || `Movement entry for ${move.movement_type}.`}</p>
+                    {(move.borrower_name || move.customer_name || move.location_name) && (
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 mb-2 text-xs text-muted-foreground">
+                        {move.borrower_name && <span><span className="font-medium text-foreground/80">Borrowed by:</span> {move.borrower_name}</span>}
+                        {move.customer_name && <span><span className="font-medium text-foreground/80">Client:</span> {move.customer_name}</span>}
+                        {move.location_name && <span><span className="font-medium text-foreground/80">Location:</span> {move.location_name}</span>}
+                      </div>
+                    )}
                     <div className="flex items-center gap-3 text-[10px] text-muted-foreground font-mono">
                       <span>ID: {move.movement_id}</span>
                       {move.reference_id && <span>REF: {move.reference_id}</span>}

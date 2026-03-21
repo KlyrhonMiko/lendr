@@ -1,6 +1,5 @@
 import { AuthGuard } from "@/components/AuthGuard";
-import { Sidebar } from "@/components/Sidebar";
-import { Header } from "@/components/Header";
+import { AppShell } from "@/components/AppShell";
 
 export default function AdminLayout({
   children,
@@ -9,13 +8,7 @@ export default function AdminLayout({
 }>) {
   return (
     <AuthGuard>
-      <div className="flex min-h-screen bg-background w-full">
-        <Sidebar />
-        <div className="flex w-full flex-col pl-64 min-h-screen">
-          <Header />
-          <main className="flex-1 p-8">{children}</main>
-        </div>
-      </div>
+      <AppShell>{children}</AppShell>
     </AuthGuard>
   );
 }

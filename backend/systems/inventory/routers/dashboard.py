@@ -8,6 +8,8 @@ from systems.inventory.schemas.borrow_request_schemas import BorrowRequestRead
 from systems.inventory.services.dashboard_service import (
     DashboardService,
     DashboardStats,
+    LowStockItemRead,
+    InventoryCategoryBreakdown,
 )
 from systems.inventory.services.borrow_request_service import BorrowService
 from systems.auth.dependencies import require_permission
@@ -25,7 +27,6 @@ async def get_dashboard_stats(
     _: None = Depends(require_permission("inventory:dashboard:view")),
 ):
     stats = dashboard_service.get_stats(session)
-
     return create_success_response(data=stats, request=request)
 
 
@@ -39,5 +40,40 @@ async def get_recent_activity(
 ):
     recent = dashboard_service.get_recent_activity(session, limit)
     recent_read = borrow_service.serialize_borrow_requests(session, recent)
-
     return create_success_response(data=recent_read, request=request)
+
+
+@router.get("/low-stock", response_model=GenericResponse[list[LowStockItemRead]])
+async def get_low_stock_items(
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("inventory:dashboard:view")),
+):
+    items = dashboard_service.get_low_stock_items(session)
+    return create_success_response(data=items, request=request)
+
+
+@router.get("/pending-counts", response_model=GenericResponse[dict[str, int]])
+async def get_pending_counts(
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("inventory:dashboard:view")),
+):
+    counts = dashboard_service.get_pending_counts(session)
+    return create_success_response(data=counts, request=request)
+
+
+@router.get(
+    "/inventory-breakdown",
+    response_model=GenericResponse[list[InventoryCategoryBreakdown]],
+)
+async def get_inventory_breakdown(
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("inventory:dashboard:view")),
+):
+    breakdown = dashboard_service.get_inventory_by_category(session)
+    return create_success_response(data=breakdown, request=request)

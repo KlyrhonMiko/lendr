@@ -1,6 +1,6 @@
 'use client';
 
-import { Loader2, CheckCircle2, RefreshCw, X, FileText, AlertTriangle } from 'lucide-react';
+import { Loader2, Undo2, X, FileText, AlertCircle } from 'lucide-react';
 import type { LedgerMovement } from '../lib/types';
 
 export function ReversalMovementModal({
@@ -29,68 +29,84 @@ export function ReversalMovementModal({
   if (!open || !selectedMovement) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-lg bg-card border border-border rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-        <div className="flex items-center justify-between p-6 border-b border-border/50 bg-rose-500/5">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-500 border border-rose-500/20">
-              <RefreshCw className="w-5 h-5" />
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="reversal-modal-title"
+    >
+      <div className="w-full max-w-lg bg-card border border-border rounded-2xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="flex items-start justify-between p-5 sm:p-6 border-b border-border">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-xl bg-rose-500/15 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
+              <Undo2 className="w-6 h-6" aria-hidden />
             </div>
             <div>
-              <h2 className="text-xl font-bold font-heading text-foreground">Reverse Transaction</h2>
-              <p className="text-xs text-muted-foreground font-mono">{selectedMovement.movement_id}</p>
+              <h2 id="reversal-modal-title" className="text-lg font-semibold text-foreground">
+                Reverse transaction
+              </h2>
+              <p className="text-sm text-muted-foreground font-mono mt-0.5">
+                {selectedMovement.movement_id}
+              </p>
             </div>
           </div>
           <button
             onClick={onCancel}
-            className="p-2 text-muted-foreground hover:bg-secondary rounded-full transition-colors"
+            className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             type="button"
+            aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={onSubmit} className="p-6 space-y-6">
-          <div className="p-4 rounded-2xl bg-muted/30 border border-border/50 space-y-3">
-            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Original Movement Details</p>
+        <form onSubmit={onSubmit} className="p-5 sm:p-6 space-y-6">
+          <div className="p-4 rounded-xl bg-muted/40 border border-border space-y-3">
+            <p className="text-sm font-medium text-muted-foreground">Original transaction</p>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <p className="text-[10px] text-muted-foreground">Equipment</p>
-                <p className="text-sm font-semibold truncate">{selectedMovement.item_name || 'System Item'}</p>
+              <div>
+                <p className="text-xs text-muted-foreground">Equipment</p>
+                <p className="text-sm font-medium truncate">{selectedMovement.item_name || 'Unknown'}</p>
               </div>
-              <div className="space-y-1">
-                <p className="text-[10px] text-muted-foreground">Qty Change</p>
+              <div>
+                <p className="text-xs text-muted-foreground">Quantity</p>
                 <p
-                  className={`text-sm font-bold ${
-                    selectedMovement.qty_change > 0 ? 'text-emerald-500' : 'text-rose-500'
+                  className={`text-sm font-semibold ${
+                    selectedMovement.qty_change > 0 ? 'text-emerald-600' : 'text-rose-600'
                   }`}
                 >
                   {selectedMovement.qty_change > 0 ? '+' : ''}
                   {selectedMovement.qty_change}
                 </p>
               </div>
-              <div className="space-y-1">
-                <p className="text-[10px] text-muted-foreground">Occurrence</p>
-                <p className="text-sm font-medium">{selectedMovement.occurred_at}</p>
+              <div className="col-span-2">
+                <p className="text-xs text-muted-foreground">Date</p>
+                <p className="text-sm">{selectedMovement.occurred_at}</p>
               </div>
-              <div className="space-y-1">
-                <p className="text-[10px] text-muted-foreground">Original Note</p>
-                <p className="text-sm italic truncate">"{selectedMovement.note || 'No note available.'}"</p>
-              </div>
+              {selectedMovement.note && (
+                <div className="col-span-2">
+                  <p className="text-xs text-muted-foreground">Note</p>
+                  <p className="text-sm italic">&quot;{selectedMovement.note}&quot;</p>
+                </div>
+              )}
             </div>
           </div>
 
           <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-bold flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-500" />
-                Reason Code
+            <div>
+              <label
+                htmlFor="reversal-reason-code"
+                className="flex items-center gap-2 text-sm font-medium text-foreground mb-2"
+              >
+                <AlertCircle className="w-4 h-4 text-amber-500" aria-hidden />
+                Reason type
               </label>
               <select
+                id="reversal-reason-code"
                 required
                 value={reversalReasonCode}
                 onChange={(e) => onReversalReasonCodeChange(e.target.value)}
-                className="w-full h-11 px-4 rounded-xl bg-input/30 border border-border focus:ring-2 focus:ring-indigo-500/30 transition-all font-medium text-sm"
+                className="w-full h-12 px-4 rounded-lg border border-border bg-background text-base focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               >
                 {reasonCodes.map((code) => (
                   <option key={code} value={code}>
@@ -100,43 +116,47 @@ export function ReversalMovementModal({
               </select>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-bold flex items-center gap-2">
-                <FileText className="w-4 h-4 text-indigo-500" />
+            <div>
+              <label
+                htmlFor="reversal-reason"
+                className="flex items-center gap-2 text-sm font-medium text-foreground mb-2"
+              >
+                <FileText className="w-4 h-4 text-primary" aria-hidden />
                 Explain why you are reversing this
               </label>
               <textarea
+                id="reversal-reason"
                 required
                 value={reversalReason}
                 onChange={(e) => onReversalReasonChange(e.target.value)}
-                placeholder="Provide a detailed explanation for this reversal..."
-                className="w-full h-32 p-4 rounded-2xl bg-input/30 border border-border focus:ring-2 focus:ring-indigo-500/30 transition-all font-medium text-sm resize-none"
+                placeholder="e.g. Wrong quantity entered, duplicate entry..."
+                className="w-full min-h-[100px] p-4 rounded-lg border border-border bg-background text-base placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none"
               />
-              <p className="text-[10px] text-muted-foreground italic">
-                This action will create a counter-transaction and update the item's current stock balance.
+              <p className="text-sm text-muted-foreground mt-1.5">
+                This will create a counter-transaction and update the stock balance.
               </p>
             </div>
           </div>
 
-          <div className="pt-2 flex gap-3">
+          <div className="flex flex-col-reverse sm:flex-row gap-3 pt-2">
             <button
               type="button"
               onClick={onCancel}
-              className="flex-1 py-3 rounded-xl font-bold bg-secondary hover:bg-secondary/80 transition-colors"
+              className="flex-1 h-12 px-4 rounded-lg font-medium bg-muted hover:bg-muted/80 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting || !reversalReason}
-              className="flex-[1.5] py-3 rounded-xl font-bold bg-rose-500 text-white hover:bg-rose-600 shadow-lg shadow-rose-500/25 transition-all flex items-center justify-center gap-2"
+              className="flex-1 h-12 px-4 rounded-lg font-medium bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
             >
               {isSubmitting ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <Loader2 className="w-5 h-5 animate-spin" aria-hidden />
               ) : (
                 <>
-                  <CheckCircle2 className="w-5 h-5" />
-                  Execute Reversal
+                  <Undo2 className="w-4 h-4" aria-hidden />
+                  Reverse transaction
                 </>
               )}
             </button>
@@ -146,4 +166,3 @@ export function ReversalMovementModal({
     </div>
   );
 }
-

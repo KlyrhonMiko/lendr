@@ -132,6 +132,7 @@ class BorrowRequestRead(BaseModel):
     status: str
     request_date: datetime
     borrower_user_id: Optional[str] = None
+    borrower_name: Optional[str] = None
     request_channel: str = "inventory_manager"
     
     compliance_followup_required: bool = False
@@ -244,3 +245,37 @@ class BorrowRequestWarehouseReject(BaseModel):
 
 class BorrowRequestClose(BaseModel):
     notes: Optional[str] = Field(default=None, max_length=500)
+
+
+class ReleaseReceiptItemRead(BaseModel):
+    item_id: str
+    name: str
+    classification: Optional[str] = None
+    qty_released: int
+    serial_numbers: list[str] = []
+
+
+class ReleaseReceiptRead(BaseModel):
+    request_id: str
+    transaction_ref: str
+    receipt_number: str
+    borrower_name: Optional[str] = None
+    borrower_user_id: Optional[str] = None
+    customer_name: Optional[str] = None
+    location_name: Optional[str] = None
+    released_at: Optional[datetime] = None
+    released_by_name: Optional[str] = None
+    expected_return_at: Optional[datetime] = None
+    is_emergency: bool = False
+    approval_channel: str = "standard"
+    notes: Optional[str] = None
+    items: list[ReleaseReceiptItemRead] = []
+    borrower_signature: Optional[str] = None
+
+    @field_serializer("released_at", "expected_return_at")
+    def serialize_dates(self, dt: datetime | None) -> str | None:
+        return format_datetime(dt)
+
+
+class ReleaseReceiptSignature(BaseModel):
+    signature_data: str = Field(..., description="Base64-encoded signature image")

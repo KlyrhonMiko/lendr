@@ -1,6 +1,9 @@
 export interface BorrowRecord {
   request_id: string;
   borrower_user_id?: string;
+  borrower_name?: string;
+  customer_name?: string;
+  location_name?: string;
   items: Array<{
     item_id: string;
     name: string;

@@ -15,6 +15,7 @@ import { RequestsHeader } from './components/RequestsHeader';
 import { RequestsToolbar } from './components/RequestsToolbar';
 import { RequestsTable } from './components/RequestsTable';
 import { ConfirmBorrowActionModal } from './components/ConfirmBorrowActionModal';
+import { ReleaseReceiptModal } from './components/ReleaseReceiptModal';
 
 export default function BorrowsPage() {
   const [records, setRecords] = useState<BorrowRecord[]>([]);
@@ -39,6 +40,7 @@ export default function BorrowsPage() {
   const [returningRequest, setReturningRequest] = useState<BorrowRecord | null>(null);
   const [actionNotes, setActionNotes] = useState('');
   const [assignmentsMap, setAssignmentsMap] = useState<Record<string, { units: any[], batches: any[] }>>({});
+  const [receiptRequestId, setReceiptRequestId] = useState<string | null>(null);
 
   const debouncedSearch = useDebounce(searchInput, 400);
 
@@ -50,7 +52,7 @@ export default function BorrowsPage() {
         page,
         per_page: perPage,
         status: statusFilter !== 'ALL' ? statusFilter : undefined,
-        borrower_id: debouncedSearch || undefined,
+        search: debouncedSearch || undefined,
       };
       const res = await borrowApi.list(params);
       setRecords(res.data);
@@ -139,12 +141,15 @@ export default function BorrowsPage() {
       }
       toast.success(`Request ${action.replaceAll('_', ' ')}d successfully`);
       fetchRecords();
-      // If the row is expanded, refresh its activity timeline right away.
       if (expandedIds.has(requestId)) {
         void fetchRequestEvents(requestId, true);
       }
       setConfirmingAction(null);
       setActionNotes('');
+
+      if (action === 'release') {
+        setReceiptRequestId(requestId);
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : `Failed to ${action} request`;
       setError(msg);
@@ -197,6 +202,7 @@ export default function BorrowsPage() {
           onSetAssigningRequest={(record) => setAssigningRequest(record)}
           onSetReturningRequest={(record) => setReturningRequest(record)}
           isFullyAssigned={isFullyAssigned}
+          onShowReceipt={(requestId) => setReceiptRequestId(requestId)}
         />
 
         {meta && (
@@ -224,7 +230,7 @@ export default function BorrowsPage() {
             setAssigningRequest(null);
             fetchRecords();
             fetchAssignments(requestId);
-            fetchRequestEvents(requestId);
+            void fetchRequestEvents(requestId, true);
           }}
         />
       )}
@@ -241,6 +247,13 @@ export default function BorrowsPage() {
               void fetchRequestEvents(requestId, true);
             }
           }}
+        />
+      )}
+
+      {receiptRequestId && (
+        <ReleaseReceiptModal
+          requestId={receiptRequestId}
+          onClose={() => setReceiptRequestId(null)}
         />
       )}
     </div>

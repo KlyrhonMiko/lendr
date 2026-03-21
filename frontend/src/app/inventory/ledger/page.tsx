@@ -110,7 +110,7 @@ export default function MovementLedgerPage() {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="w-full max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500">
       <MovementLedgerHeader
         activeTab={activeTab}
         anomalies={anomalies}
@@ -120,13 +120,17 @@ export default function MovementLedgerPage() {
         }}
       />
 
-      <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-sm">
+      <section
+        className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm"
+        aria-label={activeTab === 'ledger' ? 'Movement history' : 'Detected issues'}
+      >
         {activeTab === 'ledger' && (
           <LedgerFiltersBar
             itemId={itemId}
             onItemIdChange={setItemId}
             movementType={movementType}
             onMovementTypeChange={setMovementType}
+            meta={meta}
           />
         )}
 
@@ -143,7 +147,7 @@ export default function MovementLedgerPage() {
         {meta && activeTab === 'ledger' && (
           <Pagination meta={meta} onPageChange={setPage} onPerPageChange={setPerPage} />
         )}
-      </div>
+      </section>
 
       <ReversalMovementModal
         open={isReversalModalOpen}

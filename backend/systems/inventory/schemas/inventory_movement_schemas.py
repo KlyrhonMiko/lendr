@@ -14,10 +14,17 @@ class InventoryMovementRead(BaseModel):
     note: Optional[str] = None
     
     user_id: Optional[str] = None
+    actor_name: Optional[str] = None
     inventory_id: Optional[str] = None
+    item_name: Optional[str] = None
     
     is_reversed: bool = False
     occurred_at: datetime
+
+    # Borrow context (when reference_id links to a borrow request)
+    borrower_name: Optional[str] = None
+    customer_name: Optional[str] = None
+    location_name: Optional[str] = None
 
     @field_serializer("occurred_at")
     def serialize_date(self, dt: datetime) -> str:

@@ -28,6 +28,7 @@ from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestWarehouseReject,
     BorrowRequestEventRead,
     BorrowRequestEventGlobalRead,
+    ReleaseReceiptRead,
 )
 from systems.inventory.dependencies import shift_guard
 from systems.inventory.services.borrow_request_service import BorrowService
@@ -80,6 +81,7 @@ async def list_requests(
     request_channel: Optional[str] = Query(default=None, description="Filter by request channel (inventory_manager, borrower_portal)"),
     is_emergency: Optional[bool] = Query(default=None, description="Filter by emergency flag"),
     borrower_id: Optional[str] = Query(default=None, description="Filter by borrower user ID (e.g. ST-001)"),
+    search: Optional[str] = Query(default=None, description="Search across borrower name, client, location, request ID"),
     returned_on_time: Optional[bool] = Query(default=None, description="Filter by on-time return status"),
     date_from: Optional[datetime] = Query(default=None, description="Filter requests from this date (inclusive)"),
     date_to: Optional[datetime] = Query(default=None, description="Filter requests up to this date (inclusive)"),
@@ -96,6 +98,7 @@ async def list_requests(
         request_channel=request_channel,
         is_emergency=is_emergency,
         borrower_id=borrower_id,
+        search=search,
         returned_on_time=returned_on_time,
         date_from=date_from,
         date_to=date_to,
@@ -607,6 +610,25 @@ async def warehouse_reject(
             message="Warehouse rejected",
             request=request,
         )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get(
+    "/requests/{request_id}/release-receipt",
+    response_model=GenericResponse[ReleaseReceiptRead],
+    responses={404: {"model": GenericResponse}, 400: {"model": GenericResponse}},
+)
+async def get_release_receipt(
+    request_id: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("inventory:borrow_requests:manage")),
+):
+    try:
+        receipt = borrow_service.generate_release_receipt(session, request_id)
+        return create_success_response(data=receipt, request=request)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

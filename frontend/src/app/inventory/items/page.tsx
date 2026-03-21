@@ -33,7 +33,6 @@ export default function InventoryPage() {
   const [conditionFilter, setConditionFilter] = useState('');
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(DEFAULT_PER_PAGE);
-  const [showFilters, setShowFilters] = useState(false);
 
   const debouncedSearch = useDebounce(search, 400);
   const debouncedCategory = useDebounce(categoryFilter, 400);
@@ -182,26 +181,21 @@ export default function InventoryPage() {
     }
   };
 
-  const hasActiveFilters = classificationFilter || itemTypeFilter || conditionFilter || debouncedCategory;
-
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="w-full max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500">
       <InventoryItemsHeader onAdd={() => setIsModalOpen(true)} />
 
       {error && (
-        <div className="bg-rose-500/10 border border-rose-500/20 text-rose-500 px-4 py-3 rounded-xl text-sm flex items-center gap-3 animate-in slide-in-from-top-2">
-          <AlertCircle className="w-4 h-4" />
+        <div className="bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 px-4 py-3 rounded-xl text-sm flex items-center gap-3 animate-in slide-in-from-top-2">
+          <AlertCircle className="w-4 h-4 shrink-0" />
           <p>{error}</p>
         </div>
       )}
 
-      <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-sm">
+      <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
         <InventoryItemsToolbar
           search={search}
           onSearchChange={setSearch}
-          showFilters={showFilters}
-          onShowFiltersChange={setShowFilters}
-          hasActiveFilters={hasActiveFilters}
           categoryFilter={categoryFilter}
           onCategoryFilterChange={setCategoryFilter}
           categories={categories}
@@ -232,7 +226,6 @@ export default function InventoryPage() {
           onDelete={handleDelete}
         />
 
-        {/* Pagination */}
         {meta && (
           <Pagination
             meta={meta}

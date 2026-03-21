@@ -1,11 +1,21 @@
 'use client';
 
+import { History } from 'lucide-react';
+
 export function AuditLogsHeader() {
   return (
-    <div>
-      <h1 className="text-4xl font-bold font-heading mb-2">Inventory Audit Logs</h1>
-      <p className="text-muted-foreground text-lg">Monitor all equipment movements, unit adjustments, and borrow requests.</p>
+    <div className="flex items-end justify-between gap-4">
+      <div className="flex items-center gap-4">
+        <div className="hidden sm:flex w-12 h-12 rounded-xl bg-indigo-500/10 items-center justify-center shrink-0">
+          <History className="w-6 h-6 text-indigo-500" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Inventory Audit Logs</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Monitor equipment movements, unit adjustments, and borrow requests.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
-

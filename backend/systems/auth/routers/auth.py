@@ -35,6 +35,13 @@ async def login_for_access_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Borrower accounts must use the Borrow portal (/borrow), not this login page
+    if user.role and user.role.lower() in ("borrower", "brwr"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Borrower accounts cannot sign in here. Please use the Borrow portal instead.",
+        )
+
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
     if user.role == "borrower":

@@ -117,7 +117,7 @@ function ExpandedDetails({
 
   return (
     <tr className="border-b border-border/30">
-      <td className="p-0" colSpan={7}>
+      <td className="p-0" colSpan={8}>
         <div className="px-6 py-5 pl-14 bg-muted/20 animate-in slide-in-from-top-1 duration-200">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-5xl">
             {/* Items table */}
@@ -224,6 +224,7 @@ export function RequestsTable({
   onSetAssigningRequest,
   onSetReturningRequest,
   isFullyAssigned,
+  onShowReceipt,
 }: {
   records: BorrowRecord[];
   loading: boolean;
@@ -237,6 +238,7 @@ export function RequestsTable({
   onSetAssigningRequest: (record: BorrowRecord) => void;
   onSetReturningRequest: (record: BorrowRecord) => void;
   isFullyAssigned: (record: BorrowRecord) => boolean;
+  onShowReceipt: (requestId: string) => void;
 }) {
   const renderActions = (record: BorrowRecord) => {
     const actions: ReactNode[] = [];
@@ -282,6 +284,7 @@ export function RequestsTable({
 
     if (record.status === 'released') {
       actions.push(
+        <ActionButton key="receipt" label="Receipt" variant="default" onClick={() => onShowReceipt(record.request_id)} />,
         <ActionButton key="return" label="Return" variant="success" onClick={() => onSetReturningRequest(record)} />,
       );
       if (record.items.every((it) => !it.is_trackable)) {
@@ -293,6 +296,7 @@ export function RequestsTable({
 
     if (record.status === 'returned') {
       actions.push(
+        <ActionButton key="receipt" label="Receipt" variant="default" onClick={() => onShowReceipt(record.request_id)} />,
         <ActionButton key="close" label="Close" variant="secondary" onClick={() => onSetConfirmingAction({ action: 'close', requestId: record.request_id, actionLabel: 'Close' })} />,
       );
     }
@@ -323,6 +327,7 @@ export function RequestsTable({
             <th className="py-3 pl-5 w-8" />
             <th className="py-3 px-4">Request ID</th>
             <th className="py-3 px-4">Item & Borrower</th>
+            <th className="py-3 px-4">Client / Location</th>
             <th className="py-3 px-4 text-center">Qty</th>
             <th className="py-3 px-4">Status</th>
             <th className="py-3 px-4">Requested</th>
@@ -332,7 +337,7 @@ export function RequestsTable({
         <tbody>
           {loading ? (
             <tr>
-              <td colSpan={7} className="py-16 text-center">
+              <td colSpan={8} className="py-16 text-center">
                 <div className="flex flex-col items-center gap-2 text-muted-foreground">
                   <Loader2 className="w-6 h-6 animate-spin text-primary" />
                   <p className="text-sm">Loading requests...</p>
@@ -341,7 +346,7 @@ export function RequestsTable({
             </tr>
           ) : records.length === 0 ? (
             <tr>
-              <td colSpan={7} className="py-16 text-center">
+              <td colSpan={8} className="py-16 text-center">
                 <div className="flex flex-col items-center gap-2">
                   <PackageOpen className="w-8 h-8 text-muted-foreground/40" />
                   <p className="text-sm font-medium text-muted-foreground">No requests found</p>
@@ -396,8 +401,24 @@ export function RequestsTable({
                         {record.items.map((item) => item.name || item.item_id).join(', ') || 'No Items'}
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                        {record.borrower_user_id ?? 'Unknown user'}
+                        {record.borrower_name ?? record.borrower_user_id ?? 'Unknown user'}
+                        {record.borrower_name && record.borrower_user_id && (
+                          <span className="text-muted-foreground/60"> ({record.borrower_user_id})</span>
+                        )}
                       </p>
+                    </div>
+                  </td>
+
+                  <td className="py-3.5 px-4">
+                    <div className="min-w-0">
+                      {record.customer_name ? (
+                        <p className="text-sm text-foreground truncate">{record.customer_name}</p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground/50">—</p>
+                      )}
+                      {record.location_name && (
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{record.location_name}</p>
+                      )}
                     </div>
                   </td>
 

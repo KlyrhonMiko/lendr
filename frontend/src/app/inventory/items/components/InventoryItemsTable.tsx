@@ -1,7 +1,124 @@
 'use client';
 
-import { Activity, Edit2, History as HistoryIcon, Layers, Loader2, Package, ShieldCheck, Trash2 } from 'lucide-react';
+import { Edit2, History as HistoryIcon, Layers, Loader2, MoreHorizontal, Package, ShieldCheck, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import type { InventoryItem } from '../api';
+
+function conditionStyle(condition?: string) {
+  switch (condition?.toLowerCase()) {
+    case 'good':
+      return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20';
+    case 'damaged':
+      return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20';
+    default:
+      return 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20';
+  }
+}
+
+function statusStyle(status?: string) {
+  switch (status?.toUpperCase()) {
+    case 'AVAILABLE':
+      return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400';
+    case 'LOW_STOCK':
+      return 'bg-amber-500/10 text-amber-600 dark:text-amber-400';
+    default:
+      return 'bg-rose-500/10 text-rose-600 dark:text-rose-400';
+  }
+}
+
+function formatStatus(status?: string) {
+  if (!status) return '';
+  return status
+    .split('_')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function QuantityBar({ available, total }: { available: number; total: number }) {
+  const pct = total > 0 ? Math.round((available / total) * 100) : 0;
+  const barColor = pct > 50 ? 'bg-emerald-500' : pct > 20 ? 'bg-amber-500' : 'bg-rose-500';
+
+  return (
+    <div className="flex items-center gap-3 min-w-[120px]">
+      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+        <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+      </div>
+      <span className="text-sm tabular-nums font-medium whitespace-nowrap">
+        <span className="text-foreground">{available}</span>
+        <span className="text-muted-foreground">/{total}</span>
+      </span>
+    </div>
+  );
+}
+
+function ActionMenu({
+  item,
+  onOpenHistory,
+  onOpenUnitManagement,
+  onOpenBatchManagement,
+  onOpenEdit,
+  onDelete,
+}: {
+  item: InventoryItem;
+  onOpenHistory: (itemId: string) => void;
+  onOpenUnitManagement: (itemId: string) => void;
+  onOpenBatchManagement: (itemId: string) => void;
+  onOpenEdit: (item: InventoryItem) => void;
+  onDelete: (itemId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const menuItems = [
+    { label: 'View History', icon: HistoryIcon, onClick: () => onOpenHistory(item.item_id) },
+    ...(item.is_trackable
+      ? [{ label: 'Manage Units', icon: ShieldCheck, onClick: () => onOpenUnitManagement(item.item_id) }]
+      : [{ label: 'Manage Batches', icon: Layers, onClick: () => onOpenBatchManagement(item.item_id) }]),
+    { label: 'Edit', icon: Edit2, onClick: () => onOpenEdit(item) },
+  ];
+
+  return (
+    <div className="flex items-center gap-1">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger
+          type="button"
+          title="More actions"
+          className={`p-2 rounded-lg transition-colors ${open ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+        >
+          <MoreHorizontal className="w-4 h-4" />
+        </PopoverTrigger>
+        <PopoverContent align="end" sideOffset={4} className="w-48 p-1">
+          {menuItems.map((mi) => (
+            <button
+              key={mi.label}
+              onClick={() => {
+                mi.onClick();
+                setOpen(false);
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm rounded-md text-foreground hover:bg-muted transition-colors"
+              type="button"
+            >
+              <mi.icon className="w-4 h-4 text-muted-foreground" />
+              {mi.label}
+            </button>
+          ))}
+          <div className="my-1 border-t border-border" />
+          <button
+            onClick={() => {
+              onDelete(item.item_id);
+              setOpen(false);
+            }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm rounded-md text-rose-500 hover:bg-rose-500/10 transition-colors"
+            type="button"
+          >
+            <Trash2 className="w-4 h-4" />
+            Delete
+          </button>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
 
 export function InventoryItemsTable({
   items,
@@ -20,145 +137,100 @@ export function InventoryItemsTable({
   onOpenEdit: (item: InventoryItem) => void;
   onDelete: (itemId: string) => void;
 }) {
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-3">
+        <Loader2 className="w-7 h-7 animate-spin text-indigo-500" />
+        <p className="text-sm text-muted-foreground font-medium">Loading equipment...</p>
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-muted/80 flex items-center justify-center mb-4">
+          <Package className="w-8 h-8 text-muted-foreground/50" />
+        </div>
+        <h3 className="text-base font-semibold text-foreground mb-1">No equipment found</h3>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          Try adjusting your search or filters, or add new equipment to get started.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-left border-collapse">
+      <table className="w-full text-left">
         <thead>
-          <tr className="border-b border-border/50 text-xs uppercase tracking-wider text-muted-foreground bg-background/30 font-semibold font-heading">
-            <th className="p-4 pl-6">Equipment Name</th>
-            <th className="p-4">Classification</th>
-            <th className="p-4">Type</th>
-            <th className="p-4">Condition</th>
-            <th className="p-4">Status</th>
-            <th className="p-4 text-right">Available / Total</th>
-            <th className="p-4 pr-6 text-right">Actions</th>
+          <tr className="border-b border-border">
+            <th className="px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Equipment</th>
+            <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Classification</th>
+            <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden md:table-cell">Type</th>
+            <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Condition</th>
+            <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Status</th>
+            <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Availability</th>
+            <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-right w-[100px]">Actions</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-border/50">
-          {loading ? (
-            <tr>
-              <td colSpan={7} className="p-12 text-center">
-                <div className="flex flex-col items-center gap-3 text-muted-foreground">
-                  <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
-                  <p className="font-medium">Loading inventory...</p>
+        <tbody>
+          {items.map((item, idx) => (
+            <tr
+              key={item.item_id}
+              className={`border-b border-border/50 hover:bg-muted/30 transition-colors ${idx % 2 === 0 ? '' : 'bg-muted/10'}`}
+            >
+              <td className="px-5 py-3.5">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-indigo-500/8 flex items-center justify-center text-indigo-500 shrink-0">
+                    <Package className="w-4.5 h-4.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-sm text-foreground truncate">{item.name}</p>
+                    {item.description && (
+                      <p className="text-xs text-muted-foreground truncate max-w-[220px] mt-0.5">{item.description}</p>
+                    )}
+                    <p className="text-[11px] text-muted-foreground/60 font-mono mt-0.5 lg:hidden">
+                      {item.classification && <span className="uppercase">{item.classification}</span>}
+                      {item.classification && item.item_type && <span className="mx-1">·</span>}
+                      {item.item_type && <span className="uppercase">{item.item_type}</span>}
+                    </p>
+                  </div>
                 </div>
               </td>
-            </tr>
-          ) : (
-            items.map((item) => (
-              <tr key={item.item_id} className="hover:bg-muted/30 transition-colors group">
-                <td className="p-4 pl-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/10 to-purple-500/10 flex items-center justify-center border border-indigo-500/20 text-indigo-400">
-                      <Package className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-foreground">{item.name}</p>
-                      {item.description && (
-                        <p className="text-xs text-muted-foreground line-clamp-1 max-w-[200px]">
-                          {item.description}
-                        </p>
-                      )}
-                      <p className="text-[10px] text-muted-foreground font-mono">ID: {item.item_id}</p>
-                    </div>
-                  </div>
-                </td>
-                <td className="p-4 text-sm font-medium text-muted-foreground uppercase tracking-tight">
-                  {item.classification}
-                </td>
-                <td className="p-4 text-sm font-medium text-muted-foreground uppercase tracking-tight">
-                  {item.item_type}
-                </td>
-                <td className="p-4">
-                  <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
-                      item.condition?.toLowerCase() === 'good'
-                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500'
-                        : item.condition?.toLowerCase() === 'damaged'
-                          ? 'bg-amber-500/10 border-amber-500/20 text-amber-500'
-                          : 'bg-rose-500/10 border-rose-500/20 text-rose-500'
-                    }`}
-                  >
-                    {item.condition}
-                  </span>
-                </td>
-                <td className="p-4">
-                  <span
-                    className={`text-xs font-bold px-3 py-1 rounded-full ${
-                      item.status_condition?.toUpperCase() === 'AVAILABLE'
-                        ? 'bg-emerald-500/10 text-emerald-500'
-                        : item.status_condition?.toUpperCase() === 'LOW_STOCK'
-                          ? 'bg-amber-500/10 text-amber-500'
-                          : 'bg-rose-500/10 text-rose-500'
-                    }`}
-                  >
-                    {item.status_condition}
-                  </span>
-                </td>
-                <td className="p-4 text-right font-medium">
-                  <span className="text-foreground">{item.available_qty}</span>
-                  <span className="text-muted-foreground"> / {item.total_qty}</span>
-                </td>
-                <td className="p-4 pr-6 text-right">
-                  <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => onOpenHistory(item.item_id)}
-                      title="View History"
-                      className="p-2 hover:bg-secondary rounded-lg text-muted-foreground hover:text-indigo-400 transition-colors"
-                      type="button"
-                    >
-                      <HistoryIcon className="w-4 h-4" />
-                    </button>
-                    {item.is_trackable && (
-                      <button
-                        onClick={() => onOpenUnitManagement(item.item_id)}
-                        title="Manage Units"
-                        className="p-2 hover:bg-secondary rounded-lg text-muted-foreground hover:text-indigo-400 transition-colors"
-                        type="button"
-                      >
-                        <ShieldCheck className="w-4 h-4" />
-                      </button>
-                    )}
-                    {!item.is_trackable && (
-                      <button
-                        onClick={() => onOpenBatchManagement(item.item_id)}
-                        title="Manage Batches"
-                        className="p-2 hover:bg-secondary rounded-lg text-muted-foreground hover:text-indigo-400 transition-colors"
-                        type="button"
-                      >
-                        <Layers className="w-4 h-4" />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => onOpenEdit(item)}
-                      className="p-2 hover:bg-secondary rounded-lg text-muted-foreground hover:text-indigo-400 transition-colors"
-                      type="button"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => onDelete(item.item_id)}
-                      className="p-2 hover:bg-rose-500/10 rounded-lg text-muted-foreground hover:text-rose-400 transition-colors"
-                      type="button"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))
-          )}
-          {!loading && items.length === 0 && (
-            <tr>
-              <td colSpan={7} className="p-12 text-center text-muted-foreground font-medium">
-                <Package className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                No items found in inventory.
+              <td className="px-4 py-3.5 hidden lg:table-cell">
+                <span className="text-sm text-muted-foreground capitalize">{item.classification}</span>
+              </td>
+              <td className="px-4 py-3.5 hidden md:table-cell">
+                <span className="text-sm text-muted-foreground capitalize">{item.item_type}</span>
+              </td>
+              <td className="px-4 py-3.5">
+                <span className={`inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-md border capitalize ${conditionStyle(item.condition)}`}>
+                  {item.condition}
+                </span>
+              </td>
+              <td className="px-4 py-3.5 hidden sm:table-cell">
+                <span className={`inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full ${statusStyle(item.status_condition)}`}>
+                  {formatStatus(item.status_condition)}
+                </span>
+              </td>
+              <td className="px-4 py-3.5">
+                <QuantityBar available={item.available_qty} total={item.total_qty} />
+              </td>
+              <td className="px-4 py-3.5 text-right">
+                <ActionMenu
+                  item={item}
+                  onOpenHistory={onOpenHistory}
+                  onOpenUnitManagement={onOpenUnitManagement}
+                  onOpenBatchManagement={onOpenBatchManagement}
+                  onOpenEdit={onOpenEdit}
+                  onDelete={onDelete}
+                />
               </td>
             </tr>
-          )}
+          ))}
         </tbody>
       </table>
     </div>
   );
 }
-

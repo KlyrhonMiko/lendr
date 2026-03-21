@@ -40,6 +40,8 @@ export interface LedgerMovement {
   occurred_at?: string;
   detected_at?: string;
   reference_id?: string;
+  user_id?: string;
+  actor_name?: string;
   actor_id?: string;
   // Some server responses use nested details (especially for anomalies, which are fetched separately).
   details?: Partial<{

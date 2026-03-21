@@ -24,6 +24,7 @@ from systems.inventory.schemas.inventory_movement_schemas import (
     InventoryMovementSummaryRead,
 )
 from systems.inventory.models.inventory_batch import InventoryBatch
+from systems.inventory.models.borrow_request import BorrowRequest
 from systems.inventory.schemas.inventory_batch_schemas import (
     InventoryBatchCreate,
     InventoryBatchUpdate,
@@ -618,12 +619,44 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         ).all()
         reversed_ids = set(reversals)
 
+        # Enrich borrow movements with borrower, customer, location from BorrowRequest
+        borrow_ref_ids = [
+            m.reference_id
+            for m, _, _ in results
+            if m.reference_id
+            and m.movement_type in ("borrow_release", "borrow_return")
+        ]
+        borrow_map: dict[str, dict[str, Any]] = {}
+        if borrow_ref_ids:
+            borrow_requests = session.exec(
+                select(BorrowRequest, User)
+                .outerjoin(User, BorrowRequest.borrower_uuid == User.id)
+                .where(
+                    BorrowRequest.request_id.in_(borrow_ref_ids),
+                    BorrowRequest.is_deleted.is_(False),
+                )
+            ).all()
+            for br, borrower_user in borrow_requests:
+                borrower_name = None
+                if borrower_user:
+                    borrower_name = f"{borrower_user.last_name}, {borrower_user.first_name}"
+                borrow_map[br.request_id] = {
+                    "borrower_name": borrower_name,
+                    "customer_name": br.customer_name,
+                    "location_name": br.location_name,
+                }
+
         formatted_results = []
         for movement, user_id, inv_item_id in results:
             m_dict = movement.model_dump()
             m_dict["user_id"] = user_id
             m_dict["inventory_id"] = inv_item_id
             m_dict["is_reversed"] = movement.movement_id in reversed_ids
+            borrow_ctx = borrow_map.get(movement.reference_id or "")
+            if borrow_ctx:
+                m_dict["borrower_name"] = borrow_ctx.get("borrower_name")
+                m_dict["customer_name"] = borrow_ctx.get("customer_name")
+                m_dict["location_name"] = borrow_ctx.get("location_name")
             formatted_results.append(m_dict)
 
         return formatted_results, total_count
@@ -878,10 +911,13 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         date_to: Optional[datetime] = None,
     ) -> tuple[list[dict[str, Any]], int]:
         """Get all inventory movements across all items with optional filtering and pagination."""
+        actor_name_expr = func.concat(User.first_name, " ", User.last_name).label("actor_name")
         statement = select(
             InventoryMovement,
             User.user_id,
+            actor_name_expr,
             InventoryItem.item_id,
+            InventoryItem.name.label("item_name"),
         ).outerjoin(
             User, InventoryMovement.actor_id == User.id
         ).outerjoin(
@@ -913,7 +949,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         ).all()
 
         # Identify reversed movements
-        moved_ids = [m.movement_id for m, _, _ in results]
+        moved_ids = [m.movement_id for m, _, _, _, _ in results]
         reversals = session.exec(
             select(InventoryMovement.reference_id)
             .where(
@@ -924,10 +960,12 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         reversed_ids = set(reversals)
 
         formatted_results = []
-        for movement, user_id, item_id in results:
+        for movement, user_id, actor_name, item_id, item_name in results:
             m_dict = movement.model_dump()
             m_dict["user_id"] = user_id
+            m_dict["actor_name"] = actor_name
             m_dict["inventory_id"] = item_id
+            m_dict["item_name"] = item_name
             m_dict["is_reversed"] = movement.movement_id in reversed_ids
             formatted_results.append(m_dict)
 

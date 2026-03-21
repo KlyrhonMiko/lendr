@@ -29,11 +29,11 @@ export function RequestsToolbar({
 }) {
   return (
     <div className="px-5 py-3 border-b border-border flex items-center gap-3">
-      <div className="relative w-64 shrink-0">
+      <div className="relative w-80 shrink-0">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
         <input
           type="text"
-          placeholder="Search by borrower ID..."
+          placeholder="Search borrower, client, location..."
           value={searchInput}
           onChange={(e) => onSearchInputChange(e.target.value)}
           className="w-full h-9 pl-9 pr-8 rounded-lg bg-muted/40 border border-border/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all text-sm placeholder:text-muted-foreground/60"
