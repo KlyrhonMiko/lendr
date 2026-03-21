@@ -129,13 +129,12 @@ export function SelectionView({
                 return (
                   <button
                     key={item.item_id}
-                    disabled={outOfStock}
                     onClick={() => onAddToCart(item)}
                     className={`relative text-left p-5 rounded-2xl border-2 transition-all group flex flex-col justify-between min-h-[10.5rem] ${
-                      outOfStock
-                        ? 'opacity-35 cursor-not-allowed bg-muted/20 border-border/40'
-                        : inCart
-                          ? 'border-indigo-500/50 bg-indigo-500/[0.04] shadow-sm'
+                      inCart
+                        ? 'border-indigo-500/50 bg-indigo-500/[0.04] shadow-sm'
+                        : outOfStock 
+                          ? 'bg-card border-border/60 hover:border-orange-500/40 hover:shadow-lg active:scale-[0.97] opacity-80'
                           : 'bg-card border-border/60 hover:border-indigo-500/40 hover:shadow-lg active:scale-[0.97]'
                     }`}
                   >
@@ -158,7 +157,7 @@ export function SelectionView({
                       <div className="flex items-baseline gap-1.5">
                         <span
                           className={`text-xl font-extrabold tabular-nums ${
-                            outOfStock ? 'text-destructive' : 'text-foreground'
+                            outOfStock ? 'text-orange-500' : 'text-foreground'
                           }`}
                         >
                           {item.available_qty}
@@ -167,17 +166,17 @@ export function SelectionView({
                           avail
                         </span>
                       </div>
-                      {!outOfStock && (
-                        <span
-                          className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
-                            inCart
-                              ? 'bg-indigo-500 text-white shadow-sm shadow-indigo-500/20'
+                      <span
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
+                          inCart
+                            ? 'bg-indigo-500 text-white shadow-sm shadow-indigo-500/20'
+                            : outOfStock
+                              ? 'bg-orange-500/20 text-orange-600 group-hover:bg-orange-500 group-hover:text-white group-hover:shadow-md group-hover:shadow-orange-500/20'
                               : 'bg-secondary/80 text-muted-foreground group-hover:bg-indigo-500 group-hover:text-white group-hover:shadow-md group-hover:shadow-indigo-500/20'
-                          }`}
-                        >
-                          <Plus className="w-5 h-5" />
-                        </span>
-                      )}
+                        }`}
+                      >
+                        <Plus className="w-5 h-5" />
+                      </span>
                     </div>
                   </button>
                 );
@@ -239,7 +238,7 @@ export function SelectionView({
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-foreground truncate">{item.name}</p>
                   <p className="text-[11px] text-muted-foreground/60 mt-0.5 font-medium">
-                    {item.available_qty} in stock
+                    {item.available_qty} in stock {item.available_qty <= 0 && '(Pre-Request)'}
                   </p>
                 </div>
                 <div className="flex items-center gap-1 bg-secondary/60 rounded-xl p-1 shrink-0">

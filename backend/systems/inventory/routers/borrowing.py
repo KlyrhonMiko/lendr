@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from systems.inventory.schemas.warehouse_approval_schemas import WarehouseApprovalRead
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlmodel import Session
 
@@ -10,7 +10,6 @@ from core.schemas import GenericResponse, create_success_response, make_paginati
 from systems.admin.models.user import User
 from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestApprove,
-    BorrowRequestAutoRouteWarehouse,
     BorrowRequestBatchAssign,
     BorrowRequestBatchRead,
     BorrowRequestClose,
@@ -21,11 +20,7 @@ from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestRead,
     BorrowRequestReopen,
     BorrowRequestRelease,
-    BorrowRequestSendToWarehouse,
     BorrowRequestReturn,
-    BorrowRequestWarehouseApprove,
-    BorrowRequestWarehouseApproveWithProvision,
-    BorrowRequestWarehouseReject,
     BorrowRequestEventRead,
     BorrowRequestEventGlobalRead,
     ReleaseReceiptRead,
@@ -135,7 +130,6 @@ async def approve_request(
             request_id,
             current_user.id,
             note=payload.notes,
-            auto_route_shortage=payload.auto_route_shortage,
         )
         return create_success_response(
             data=borrow_service.serialize_borrow_request(session, updated_req),
@@ -466,152 +460,6 @@ async def get_all_request_events(
             per_page=per_page,
         ),
     )
-
-
-@router.post(
-    "/requests/{request_id}/send-to-warehouse",
-    response_model=GenericResponse[BorrowRequestRead],
-)
-async def send_to_warehouse(
-    request_id: str,
-    payload: BorrowRequestSendToWarehouse,
-    request: Request,
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-    _: User = Depends(shift_guard),
-    __: None = Depends(require_permission("inventory:warehouse:manage")),
-):
-    try:
-        updated_req = borrow_service.send_to_warehouse(
-            session,
-            request_id,
-            current_user.id,
-            note=payload.notes,
-        )
-        return create_success_response(
-            data=borrow_service.serialize_borrow_request(session, updated_req),
-            message="Sent to warehouse",
-            request=request,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.patch(
-    "/requests/{request_id}/auto-route-warehouse",
-    response_model=GenericResponse[BorrowRequestRead],
-)
-async def auto_route_warehouse(
-    request_id: str,
-    payload: BorrowRequestAutoRouteWarehouse,
-    request: Request,
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-    _: User = Depends(shift_guard),
-    __: None = Depends(require_permission("inventory:warehouse:manage")),
-):
-    try:
-        updated_req = borrow_service.auto_route_to_warehouse(
-            session,
-            request_id,
-            current_user.id,
-            note=payload.notes,
-        )
-        return create_success_response(
-            data=borrow_service.serialize_borrow_request(session, updated_req),
-            message="Routed to warehouse",
-            request=request,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.post(
-    "/requests/{request_id}/warehouse-approve",
-    response_model=GenericResponse[WarehouseApprovalRead],
-)
-async def warehouse_approve(
-    request_id: str,
-    payload: BorrowRequestWarehouseApprove,
-    request: Request,
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-    _: User = Depends(shift_guard),
-    __: None = Depends(require_permission("inventory:warehouse:manage")),
-):
-    try:
-        approval = borrow_service.warehouse_approve(
-            session,
-            request_id,
-            current_user.id,
-            remarks=payload.notes,
-        )
-        return create_success_response(
-            data=approval, message="Warehouse approved", request=request
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.post(
-    "/requests/{request_id}/warehouse-approve-with-provision",
-    response_model=GenericResponse[WarehouseApprovalRead],
-)
-async def warehouse_approve_with_provision(
-    request_id: str,
-    payload: BorrowRequestWarehouseApproveWithProvision,
-    request: Request,
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-    _: User = Depends(shift_guard),
-    __: None = Depends(require_permission("inventory:warehouse:manage")),
-):
-    try:
-        approval = borrow_service.warehouse_approve_with_provision(
-            session=session,
-            request_id=request_id,
-            actor_id=current_user.id,
-            remarks=payload.notes,
-            provision_qty=payload.provision_qty,
-            units_data=[unit.model_dump() for unit in payload.units],
-            item_id=payload.item_id,
-        )
-        return create_success_response(
-            data=approval,
-            message="Warehouse approved with provisioning",
-            request=request,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.post(
-    "/requests/{request_id}/warehouse-reject",
-    response_model=GenericResponse[BorrowRequestRead],
-)
-async def warehouse_reject(
-    request_id: str,
-    payload: BorrowRequestWarehouseReject,
-    request: Request,
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-    _: User = Depends(shift_guard),
-    __: None = Depends(require_permission("inventory:warehouse:manage")),
-):
-    try:
-        updated_req = borrow_service.warehouse_reject(
-            session,
-            request_id,
-            current_user.id,
-            payload.notes,
-        )
-        return create_success_response(
-            data=borrow_service.serialize_borrow_request(session, updated_req),
-            message="Warehouse rejected",
-            request=request,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get(

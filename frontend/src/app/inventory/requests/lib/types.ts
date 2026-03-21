@@ -30,21 +30,15 @@ export type BorrowAction =
   | 'release'
   | 'return'
   | 'reopen'
-  | 'send_to_warehouse'
-  | 'warehouse_approve'
-  | 'warehouse_reject'
   | 'close';
 
 export const STATUS_TABS = [
   'ALL',
   'pending',
   'approved',
-  'sent_to_warehouse',
-  'warehouse_approved',
   'released',
   'returned',
   'rejected',
-  'warehouse_rejected',
 ] as const;
 
 export type StatusTab = (typeof STATUS_TABS)[number];

@@ -20,7 +20,7 @@ from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestBatchAssignment,
 )
 from systems.inventory.models.borrow_participant import BorrowParticipant
-from systems.inventory.models.warehouse_approval import WarehouseApproval
+
 from systems.inventory.services.inventory_service import InventoryService
 from systems.inventory.services.configuration_service import (
     BorrowerConfigService,
@@ -34,8 +34,6 @@ from utils.time_utils import get_now_manila
 _DEFAULT_STATUSES = [
     "pending",
     "approved",
-    "sent_to_warehouse",
-    "warehouse_approved",
     "released",
     "returned",
 ]
@@ -670,51 +668,7 @@ class BorrowService(
 
         return assignments
 
-    def _set_sent_to_warehouse(
-        self,
-        session: Session,
-        db_request: BorrowRequest,
-        actor_id: UUID,
-        note: str | None = None,
-        approval_channel: str = "warehouse_manual",
-    ) -> None:
-        self._require_borrow_status(session, "sent_to_warehouse")
-        self._require_setting(
-            session,
-            key=approval_channel,
-            table_name="borrow_requests",
-            field_name="approval_channel",
-            field_label="borrow approval channel",
-        )
-        self._require_setting(
-            session,
-            key="sent_to_warehouse",
-            table_name="borrow_request_events",
-            field_name="event_type",
-            field_label="borrow request event type",
-        )
 
-        db_request.status = "sent_to_warehouse"
-        db_request.approval_channel = approval_channel
-
-        event = BorrowRequestEvent(
-            event_id=get_next_sequence(session, BorrowRequestEvent, "event_id", "BRE"),
-            borrow_uuid=db_request.id,
-            event_type="sent_to_warehouse",
-            actor_id=actor_id,
-            note=note,
-        )
-
-        audit_service.log_action(
-            db=session,
-            entity_type="borrow",
-            entity_id=db_request.request_id,
-            action="warehouse_send",
-            after=db_request.model_dump(mode="json"),
-            actor_id=actor_id,
-        )
-        session.add(event)
-        session.add(db_request)
 
     def get_assigned_units(
         self, session: Session, request_id: str
@@ -737,14 +691,8 @@ class BorrowService(
         if not db_request:
             raise ValueError("Request not found")
 
-        if db_request.status not in {
-            "approved",
-            "sent_to_warehouse",
-            "warehouse_approved",
-        }:
-            raise ValueError(
-                "Units can only be assigned when request is approved, sent_to_warehouse, or warehouse_approved"
-            )
+        if db_request.status != "approved":
+            raise ValueError("Units can only be assigned when request is approved")
 
         self._require_setting(
             session,
@@ -879,14 +827,8 @@ class BorrowService(
         if not db_request:
             raise ValueError("Request not found")
 
-        if db_request.status not in {
-            "approved",
-            "sent_to_warehouse",
-            "warehouse_approved",
-        }:
-            raise ValueError(
-                "Batches can only be assigned when request is approved, sent_to_warehouse, or warehouse_approved"
-            )
+        if db_request.status != "approved":
+            raise ValueError("Batches can only be assigned when request is approved")
 
         self._require_setting(
             session,
@@ -1001,11 +943,6 @@ class BorrowService(
             if not item:
                 raise ValueError(f"Item {item_req.item_id} not found")
 
-            if item.available_qty < item_req.qty_requested:
-                raise ValueError(
-                    f"Insufficient stock for {item_req.item_id}. Available: {item.available_qty}"
-                )
-
             items_by_id[item_req.item_id] = item
 
         if self._has_identical_active_request(
@@ -1119,42 +1056,12 @@ class BorrowService(
         request: str,
         actor_id: UUID,
         note: str | None = None,
-        auto_route_shortage: bool = True,
     ) -> BorrowRequest:
         stage_0 = self._stage(session, 0)
         stage_1 = self._stage(session, 1)
-        stage_2 = self._stage(session, 2)
         db_request = self.get(session, request)
         if not db_request or db_request.status != stage_0:
             raise ValueError(f"Request not found or not in '{stage_0}' status")
-
-        # Check stock for all items
-        shortages = []
-        for borrow_item in db_request.items:
-            item = borrow_item.inventory_item
-            if not item:
-                raise ValueError(f"Item record for {borrow_item.item_uuid} not found")
-
-            if item.available_qty < borrow_item.qty_requested:
-                shortages.append(
-                    {
-                        "item_id": item.item_id,
-                        "requested": borrow_item.qty_requested,
-                        "available": item.available_qty,
-                        "shortage": borrow_item.qty_requested - item.available_qty,
-                    }
-                )
-
-        if shortages and not auto_route_shortage:
-            shortage_msg = "; ".join(
-                [
-                    f"{s['item_id']}: req {s['requested']}, avail {s['available']}"
-                    for s in shortages
-                ]
-            )
-            raise ValueError(
-                f"Insufficient stock for approval: {shortage_msg}. Route to warehouse first."
-            )
 
         self._require_borrow_status(session, stage_1)
         self._require_setting(
@@ -1176,24 +1083,6 @@ class BorrowService(
         db_request.approval_channel = "standard"
         db_request.approved_by = actor_id
         db_request.approved_at = get_now_manila()
-
-        if shortages:
-            self._require_borrow_status(session, stage_2)
-            db_request.status = stage_2
-            shortage_info = ", ".join(
-                [f"{s['item_id']} (shortage: {s['shortage']})" for s in shortages]
-            )
-            warehouse_note = (
-                note or f"Auto-routed to warehouse due to shortages: {shortage_info}"
-            )
-
-            self._set_sent_to_warehouse(
-                session,
-                db_request,
-                actor_id,
-                note=warehouse_note,
-                approval_channel="warehouse_shortage_auto",
-            )
 
         # Log event
         event = BorrowRequestEvent(
@@ -1218,6 +1107,7 @@ class BorrowService(
         session.commit()
         session.refresh(db_request)
         return db_request
+
 
     def reject_request(
         self,
@@ -1272,7 +1162,6 @@ class BorrowService(
         note: str | None = None,
     ) -> BorrowRequest:
         stage_approved = self._stage(session, 1)
-        stage_warehouse_approved = self._stage(session, 3)
         stage_released = self._stage(session, 4)
         db_request = self.get(session, request_id)
         if not db_request:
@@ -1284,10 +1173,9 @@ class BorrowService(
         is_direct_release = (
             db_request.status == stage_approved and not db_request.is_emergency
         )
-        is_warehouse_release = db_request.status == stage_warehouse_approved
-        if not (is_emergency_bypass or is_direct_release or is_warehouse_release):
+        if not (is_emergency_bypass or is_direct_release):
             raise ValueError(
-                f"Request not found or not in '{stage_approved}' or '{stage_warehouse_approved}' status"
+                f"Request not found or not in '{stage_approved}' status"
             )
 
         now = get_now_manila()
@@ -1585,13 +1473,8 @@ class BorrowService(
     ) -> BorrowRequest:
         pending_stage = self._stage(session, 0)
         db_request = self.get(session, request_id)
-        if not db_request or db_request.status not in {
-            "rejected",
-            "warehouse_rejected",
-        }:
-            raise ValueError(
-                "Request must be in 'rejected' or 'warehouse_rejected' status"
-            )
+        if not db_request or db_request.status != "rejected":
+            raise ValueError("Request must be in 'rejected' status")
 
         duplicate_active_request = session.exec(
             select(BorrowRequest).where(
@@ -1639,309 +1522,7 @@ class BorrowService(
         session.refresh(db_request)
         return db_request
 
-    def send_to_warehouse(
-        self,
-        session: Session,
-        request_id: str,
-        actor_id: UUID,
-        note: str | None = None,
-    ) -> BorrowRequest:
-        stage_1 = self._stage(session, 1)
-        db_request = self.get(session, request_id)
-        if not db_request or db_request.status != stage_1:
-            raise ValueError(
-                f"Request must be in '{stage_1}' status to be sent to warehouse"
-            )
 
-        self._set_sent_to_warehouse(
-            session,
-            db_request,
-            actor_id,
-            note=note,
-            approval_channel="warehouse_manual",
-        )
-        session.commit()
-        session.refresh(db_request)
-        return db_request
-
-    def auto_route_to_warehouse(
-        self,
-        session: Session,
-        request_id: str,
-        actor_id: UUID,
-        note: str | None = None,
-    ) -> BorrowRequest:
-        stage_1 = self._stage(session, 1)
-        db_request = self.get(session, request_id)
-        if not db_request or db_request.status != stage_1:
-            raise ValueError(f"Request must be in '{stage_1}' status")
-
-        # Check all items for shortages
-        shortages = []
-        for borrow_item in db_request.items:
-            item = borrow_item.inventory_item
-            if item and item.available_qty < borrow_item.qty_requested:
-                shortages.append(
-                    {
-                        "item_id": item.item_id,
-                        "requested": borrow_item.qty_requested,
-                        "available": item.available_qty,
-                        "shortage": borrow_item.qty_requested - item.available_qty,
-                    }
-                )
-
-        if not shortages:
-            # If no shortages, don't route automatically
-            return db_request
-
-        self._require_borrow_status(session, "sent_to_warehouse")
-        shortage_info = ", ".join(
-            [f"{s['item_id']} (shortage: {s['shortage']})" for s in shortages]
-        )
-        final_note = (
-            note or f"Auto-routed to warehouse due to shortages: {shortage_info}"
-        )
-        self._set_sent_to_warehouse(
-            session,
-            db_request,
-            actor_id,
-            note=final_note,
-            approval_channel="warehouse_shortage_auto",
-        )
-        session.commit()
-        session.refresh(db_request)
-        return db_request
-
-    def warehouse_approve(
-        self,
-        session: Session,
-        request_id: str,
-        actor_id: UUID,
-        remarks: str | None = None,
-    ) -> WarehouseApproval:
-        return self.warehouse_approve_with_provision(
-            session=session,
-            request_id=request_id,
-            actor_id=actor_id,
-            remarks=remarks,
-            provision_qty=0,
-            units_data=None,
-        )
-
-    def warehouse_approve_with_provision(
-        self,
-        session: Session,
-        request_id: str,
-        actor_id: UUID,
-        remarks: str | None = None,
-        provision_qty: int = 0,
-        units_data: list[dict] | None = None,
-        item_id: str | None = None,  # Added to disambiguate provisioning
-    ) -> WarehouseApproval:
-        db_request = self.get(session, request_id)
-        if not db_request or db_request.status != "sent_to_warehouse":
-            raise ValueError("Request must be in 'sent_to_warehouse' status")
-
-        item = None
-        if provision_qty > 0:
-            if item_id:
-                borrow_item = next(
-                    (
-                        i
-                        for i in db_request.items
-                        if i.inventory_item and i.inventory_item.item_id == item_id
-                    ),
-                    None,
-                )
-                if not borrow_item:
-                    raise ValueError(
-                        f"Item {item_id} is not part of this borrow request"
-                    )
-                item = borrow_item.inventory_item
-            else:
-                if len(db_request.items) == 1:
-                    item = db_request.items[0].inventory_item
-                else:
-                    raise ValueError(
-                        "item_id must be provided for provisioning in a multi-item request"
-                    )
-
-        if item:
-            if provision_qty < 0:
-                raise ValueError("provision_qty cannot be negative")
-
-            provision_units = units_data or []
-            if (
-                item.is_trackable
-                and provision_qty > 0
-                and len(provision_units) != provision_qty
-            ):
-                raise ValueError(
-                    f"Trackable item provisioning requires exactly {provision_qty} unit records"
-                )
-            if not item.is_trackable and provision_units:
-                raise ValueError("Units payload is only valid for trackable items")
-
-            if provision_qty > 0:
-                self.inventory_service.adjust_stock(
-                    session,
-                    item.item_id,
-                    provision_qty,
-                    movement_type="procurement",
-                    reference_id=db_request.request_id,
-                    note=remarks
-                    or f"Warehouse provisioned {provision_qty} units during approval",
-                    actor_id=actor_id,
-                )
-
-                if item.is_trackable:
-                    self.inventory_service.create_units_batch(
-                        session,
-                        item_id=item.item_id,
-                        units_data=provision_units,
-                        actor_id=actor_id,
-                    )
-
-                next_channel = (
-                    "warehouse_provisioned"
-                    if provision_qty > 0
-                    else "warehouse_standard"
-                )
-                self._require_setting(
-                    session,
-                    key=next_channel,
-                    table_name="borrow_requests",
-                    field_name="approval_channel",
-                    field_label="borrow approval channel",
-                )
-                db_request.approval_channel = next_channel
-
-        session.flush()
-        borrower = self._get_user_by_uuid(session, db_request.borrower_uuid)
-
-        # Build multi-item snapshot
-        items_snapshot = []
-        for b_item in db_request.items:
-            inv_item = b_item.inventory_item
-            if inv_item:
-                items_snapshot.append(
-                    {
-                        "item_id": inv_item.item_id,
-                        "item_name": inv_item.name,
-                        "qty_requested": b_item.qty_requested,
-                        "available_qty": inv_item.available_qty,
-                        "total_qty": inv_item.total_qty,
-                        "is_trackable": inv_item.is_trackable,
-                    }
-                )
-
-        approval = WarehouseApproval(
-            approval_id=get_next_sequence(session, WarehouseApproval, "approval_id", "WAP"),
-            request_id=request_id,
-            borrow_uuid=db_request.id,
-            approved_by=actor_id,
-            remarks=remarks,
-            printable_payload_json={
-                "request_id": db_request.request_id,
-                "borrower_id": borrower.user_id if borrower else None,
-                "approval_channel": db_request.approval_channel or "warehouse_standard",
-                "is_emergency": db_request.is_emergency,
-                "items": items_snapshot,
-                "provisioned_item_id": item.item_id if item else None,
-                "provision_qty": provision_qty,
-                "provisioned_units": [
-                    {
-                        "serial_number": u.get("serial_number"),
-                        "condition": u.get("condition", "good"),
-                    }
-                    for u in (units_data or [])
-                ],
-                "approved_at": get_now_manila().isoformat(),
-                "remarks": remarks,
-                "snapshot_version": "2.0",
-                "snapshot_type": "warehouse_approval_compliance_receipt_multi_item",
-            },
-        )
-
-        self._require_borrow_status(session, "warehouse_approved")
-        self._require_setting(
-            session,
-            key="warehouse_approved",
-            table_name="borrow_request_events",
-            field_name="event_type",
-            field_label="borrow request event type",
-        )
-        db_request.status = "warehouse_approved"
-
-        # Log event
-        event = BorrowRequestEvent(
-            event_id=get_next_sequence(session, BorrowRequestEvent, "event_id", "BRE"),
-            borrow_uuid=db_request.id,
-            event_type="warehouse_approved",
-            actor_id=actor_id,
-            note=remarks
-            or (
-                f"Provisioned quantity: {provision_qty}" if provision_qty > 0 else None
-            ),
-        )
-        audit_service.log_action(
-            db=session,
-            entity_type="borrow",
-            entity_id=db_request.request_id,
-            action="warehouse_approve",
-            after=db_request.model_dump(mode="json"),
-            actor_id=actor_id,
-        )
-
-        session.add(approval)
-        session.add(event)
-        session.add(db_request)
-        session.commit()
-        session.refresh(approval)
-        return approval
-
-    def warehouse_reject(
-        self,
-        session: Session,
-        request_id: str,
-        actor_id: UUID,
-        remarks: str | None = None,
-    ) -> BorrowRequest:
-        db_request = self.get(session, request_id)
-        if not db_request or db_request.status != "sent_to_warehouse":
-            raise ValueError("Request must be in 'sent_to_warehouse' status")
-
-        self._require_borrow_status(session, "warehouse_rejected")
-        self._require_setting(
-            session,
-            key="warehouse_rejected",
-            table_name="borrow_request_events",
-            field_name="event_type",
-            field_label="borrow request event type",
-        )
-        db_request.status = "warehouse_rejected"
-
-        event = BorrowRequestEvent(
-            event_id=get_next_sequence(session, BorrowRequestEvent, "event_id", "BRE"),
-            borrow_uuid=db_request.id,
-            event_type="warehouse_rejected",
-            actor_id=actor_id,
-            note=remarks,
-        )
-        audit_service.log_action(
-            db=session,
-            entity_type="borrow",
-            entity_id=db_request.request_id,
-            action="warehouse_reject",
-            after=db_request.model_dump(mode="json"),
-            actor_id=actor_id,
-        )
-
-        session.add(event)
-        session.add(db_request)
-        session.commit()
-        session.refresh(db_request)
-        return db_request
 
     def close_request(
         self, session: Session, request_id: str, actor_id: UUID, notes: str | None = None
@@ -1960,7 +1541,7 @@ class BorrowService(
         can_close = False
         reason = None
 
-        if db_request.status in ["rejected", "warehouse_rejected"]:
+        if db_request.status == "rejected":
             can_close = True
             reason = "rejected"
         elif db_request.status == "returned":
