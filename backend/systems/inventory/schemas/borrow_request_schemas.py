@@ -112,20 +112,6 @@ class BorrowRequestBatchRead(BaseModel):
         from_attributes = True
 
 
-class WarehouseApprovalRead(BaseModel):
-    approval_id: str
-    approved_by_user_id: Optional[str] = None
-    approved_at: datetime
-    remarks: Optional[str] = None
-
-    @field_serializer("approved_at")
-    def serialize_date(self, dt: datetime) -> str:
-        return format_datetime(dt)
-
-    class Config:
-        from_attributes = True
-
-
 class BorrowRequestRead(BaseModel):
     request_id: str
     transaction_ref: str
@@ -155,7 +141,6 @@ class BorrowRequestRead(BaseModel):
     items: list[BorrowRequestItemRead] = []
     assigned_units: list[BorrowRequestUnitRead] = []
     assigned_batches: list[BorrowRequestBatchRead] = []
-    warehouse_approval: Optional[WarehouseApprovalRead] = None
     returned_on_time: Optional[bool] = None
 
     @field_serializer("request_date", "return_at", "closed_at")
@@ -165,7 +150,6 @@ class BorrowRequestRead(BaseModel):
 
 class BorrowRequestApprove(BaseModel):
     notes: Optional[str] = Field(default=None, max_length=500)
-    auto_route_shortage: bool = Field(default=True)
 
 
 class BorrowRequestReject(BaseModel):
@@ -191,31 +175,6 @@ class BorrowRequestReopen(BaseModel):
     notes: Optional[str] = Field(default=None, max_length=500)
 
 
-class BorrowRequestSendToWarehouse(BaseModel):
-    notes: Optional[str] = Field(default=None, max_length=500)
-
-
-class BorrowRequestWarehouseApprove(BaseModel):
-    notes: Optional[str] = Field(default=None, max_length=500)
-
-
-class WarehouseProvisionUnit(BaseModel):
-    serial_number: Optional[str] = Field(default=None, max_length=100)
-    expiration_date: Optional[datetime] = None
-    condition: Optional[str] = Field(default=None, max_length=100)
-
-
-class BorrowRequestWarehouseApproveWithProvision(BaseModel):
-    notes: Optional[str] = Field(default=None, max_length=500)
-    provision_qty: int = Field(default=0, ge=0)
-    units: list[WarehouseProvisionUnit] = Field(default_factory=list, max_length=500)
-    item_id: Optional[str] = Field(default=None, max_length=50)
-
-
-class BorrowRequestAutoRouteWarehouse(BaseModel):
-    notes: Optional[str] = Field(default=None, max_length=500)
-
-
 class BorrowRequestUnitAssign(BaseModel):
     unit_ids: list[str] = Field(min_length=1)
     notes: Optional[str] = Field(default=None, max_length=500)
@@ -236,10 +195,6 @@ class BorrowRequestBatchAssign(BaseModel):
 class BatchItem(BaseModel):
     item_id: str
     qty_requested: int
-
-
-class BorrowRequestWarehouseReject(BaseModel):
-    notes: Optional[str] = Field(default=None, max_length=500)
 
 
 class BorrowRequestClose(BaseModel):

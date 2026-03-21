@@ -9,8 +9,6 @@ import {
   Loader2,
   PackageOpen,
   AlertTriangle,
-  Send,
-  Warehouse,
   XCircle,
   Archive,
 } from 'lucide-react';
@@ -21,12 +19,9 @@ function StatusBadge({ status, closeReason }: { status: string; closeReason?: st
   const config: Record<string, { bg: string; text: string; icon: ReactNode }> = {
     pending: { bg: 'bg-amber-50 border-amber-200', text: 'text-amber-700', icon: <Clock className="w-3 h-3" /> },
     approved: { bg: 'bg-blue-50 border-blue-200', text: 'text-blue-700', icon: <CheckCircle2 className="w-3 h-3" /> },
-    sent_to_warehouse: { bg: 'bg-violet-50 border-violet-200', text: 'text-violet-700', icon: <Send className="w-3 h-3" /> },
-    warehouse_approved: { bg: 'bg-cyan-50 border-cyan-200', text: 'text-cyan-700', icon: <Warehouse className="w-3 h-3" /> },
     released: { bg: 'bg-sky-50 border-sky-200', text: 'text-sky-700', icon: <PackageOpen className="w-3 h-3" /> },
     returned: { bg: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-700', icon: <CheckCircle2 className="w-3 h-3" /> },
     rejected: { bg: 'bg-rose-50 border-rose-200', text: 'text-rose-700', icon: <XCircle className="w-3 h-3" /> },
-    warehouse_rejected: { bg: 'bg-rose-50 border-rose-200', text: 'text-rose-700', icon: <XCircle className="w-3 h-3" /> },
     closed: { bg: 'bg-slate-50 border-slate-200', text: 'text-slate-600', icon: <Archive className="w-3 h-3" /> },
   };
 
@@ -259,27 +254,7 @@ export function RequestsTable({
           <ActionButton key="release" label="Release" variant="success" onClick={() => onSetConfirmingAction({ action: 'release', requestId: record.request_id, actionLabel: 'Release' })} />,
         );
       }
-      actions.push(
-        <ActionButton key="send_wh" label="Send to WH" variant="secondary" onClick={() => onSetConfirmingAction({ action: 'send_to_warehouse', requestId: record.request_id, actionLabel: 'Send to Warehouse' })} />,
-      );
-    }
 
-    if (record.status === 'sent_to_warehouse') {
-      actions.push(
-        <ActionButton key="wh_approve" label="WH Approve" variant="success" onClick={() => onSetConfirmingAction({ action: 'warehouse_approve', requestId: record.request_id, actionLabel: 'Warehouse Approve' })} />,
-        <ActionButton key="wh_reject" label="WH Reject" variant="danger" onClick={() => onSetConfirmingAction({ action: 'warehouse_reject', requestId: record.request_id, actionLabel: 'Warehouse Reject' })} />,
-      );
-    }
-
-    if (record.status === 'warehouse_approved') {
-      actions.push(
-        <ActionButton key="assign" label={isFullyAssigned(record) ? 'Reassign' : 'Assign'} onClick={() => onSetAssigningRequest(record)} />,
-      );
-      if (isFullyAssigned(record)) {
-        actions.push(
-          <ActionButton key="release" label="Release" variant="success" onClick={() => onSetConfirmingAction({ action: 'release', requestId: record.request_id, actionLabel: 'Release' })} />,
-        );
-      }
     }
 
     if (record.status === 'released') {
@@ -301,7 +276,7 @@ export function RequestsTable({
       );
     }
 
-    if (record.status === 'rejected' || record.status === 'warehouse_rejected') {
+    if (record.status === 'rejected') {
       actions.push(
         <ActionButton key="reopen" label="Reopen" onClick={() => onSetConfirmingAction({ action: 'reopen', requestId: record.request_id, actionLabel: 'Reopen' })} />,
         <ActionButton key="close" label="Close" variant="secondary" onClick={() => onSetConfirmingAction({ action: 'close', requestId: record.request_id, actionLabel: 'Close' })} />,

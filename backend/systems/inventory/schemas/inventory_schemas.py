@@ -25,6 +25,7 @@ class InventoryItemRead(InventoryItemBase):
     total_qty: int
     available_qty: int
     condition: str
+    status: str
     description: Optional[str] = None
     status_condition: Optional[str] = None
     

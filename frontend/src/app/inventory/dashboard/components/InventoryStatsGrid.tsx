@@ -39,11 +39,53 @@ export function InventoryStatsGrid({
 }) {
   const cards: Omit<StatCardProps, 'loading'>[] = [
     {
+      label: 'Active Requests',
+      value: stats?.active_requests ?? 0,
+      icon: ArrowRightLeft,
+      accent: 'text-blue-600 dark:text-blue-400',
+      iconBg: 'bg-blue-50 dark:bg-blue-500/10',
+    },
+    {
+      label: 'Overdue Returns',
+      value: stats?.overdue_returns ?? 0,
+      icon: AlertTriangle,
+      accent: 'text-red-600 dark:text-red-400',
+      iconBg: 'bg-red-50 dark:bg-red-500/10',
+    },
+    {
+      label: 'Expiring Items',
+      value: stats?.expiring_items ?? 0,
+      icon: Package,
+      accent: 'text-amber-600 dark:text-amber-400',
+      iconBg: 'bg-amber-50 dark:bg-amber-500/10',
+    },
+    {
+      label: 'In Maintenance',
+      value: stats?.items_in_maintenance ?? 0,
+      icon: AlertTriangle,
+      accent: 'text-amber-600 dark:text-amber-400',
+      iconBg: 'bg-amber-50 dark:bg-amber-500/10',
+    },
+    {
+      label: 'Poor Condition',
+      value: stats?.items_with_poor_condition ?? 0,
+      icon: AlertTriangle,
+      accent: 'text-red-600 dark:text-red-400',
+      iconBg: 'bg-red-50 dark:bg-red-500/10',
+    },
+    {
+      label: 'Low Stock',
+      value: stats?.low_stock_items ?? 0,
+      icon: Package,
+      accent: 'text-orange-600 dark:text-orange-400',
+      iconBg: 'bg-orange-50 dark:bg-orange-500/10',
+    },
+    {
       label: 'Total Equipment',
       value: stats?.total_equipment ?? 0,
       icon: Package,
-      accent: 'text-blue-600 dark:text-blue-400',
-      iconBg: 'bg-blue-50 dark:bg-blue-500/10',
+      accent: 'text-slate-600 dark:text-slate-400',
+      iconBg: 'bg-slate-50 dark:bg-slate-500/10',
     },
     {
       label: 'Items Borrowed',
@@ -60,11 +102,11 @@ export function InventoryStatsGrid({
       iconBg: 'bg-emerald-50 dark:bg-emerald-500/10',
     },
     {
-      label: 'Low Stock Items',
-      value: stats?.low_stock_items ?? 0,
+      label: 'Emergency',
+      value: stats?.emergency_requests ?? 0,
       icon: AlertTriangle,
-      accent: 'text-amber-600 dark:text-amber-400',
-      iconBg: 'bg-amber-50 dark:bg-amber-500/10',
+      accent: 'text-rose-600 dark:text-rose-400',
+      iconBg: 'bg-rose-50 dark:bg-rose-500/10',
     },
   ];
 

@@ -49,6 +49,11 @@ async function request<T>(
   });
 
   if (!response.ok) {
+    if (response.status === 401) {
+      if (typeof window !== 'undefined') {
+        auth.logout();
+      }
+    }
     const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.message || errorData.detail || 'An error occurred during the request');
   }

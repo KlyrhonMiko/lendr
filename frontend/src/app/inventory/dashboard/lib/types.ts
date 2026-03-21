@@ -3,6 +3,34 @@ export interface DashboardStats {
   items_borrowed: number;
   active_users: number;
   low_stock_items: number;
+  
+  active_requests: number;
+  overdue_returns: number;
+  expiring_items: number;
+  emergency_requests: number;
+  compliance_followup: number;
+  
+  items_in_maintenance: number;
+  items_with_poor_condition: number;
+}
+
+export interface MetricCount {
+  label: string;
+  count: number;
+}
+
+export interface InventoryHealth {
+  item_statuses: MetricCount[];
+  item_conditions: MetricCount[];
+  unit_statuses: MetricCount[];
+  unit_conditions: MetricCount[];
+  batch_statuses: MetricCount[];
+  batch_conditions: MetricCount[];
+}
+
+export interface BorrowingTrend {
+  date: string;
+  count: number;
 }
 
 export interface RecentTransactionItem {

@@ -71,17 +71,9 @@ export default function BorrowPage() {
   const totalCartItems = cart.reduce((acc, curr) => acc + curr.cartQty, 0);
 
   const addToCart = (item: InventoryItem) => {
-    if (item.available_qty <= 0) {
-      toast.error(`${item.name} is out of stock`);
-      return;
-    }
     setCart((prev) => {
       const existing = prev.find((i) => i.item_id === item.item_id);
       if (existing) {
-        if (existing.cartQty >= item.available_qty) {
-          toast.warning(`Maximum available stock reached for ${item.name}`);
-          return prev;
-        }
         return prev.map((i) =>
           i.item_id === item.item_id ? { ...i, cartQty: i.cartQty + 1 } : i,
         );
@@ -95,7 +87,7 @@ export default function BorrowPage() {
       prev.map((i) => {
         if (i.item_id === id) {
           const newQty = i.cartQty + delta;
-          if (newQty > 0 && newQty <= i.available_qty) {
+          if (newQty > 0) {
             return { ...i, cartQty: newQty };
           }
         }

@@ -172,14 +172,6 @@ export const borrowApi = {
   reopen: (id: string, payload: BorrowActionPayload = {}) =>
     api.post<BorrowRequest>(`/inventory/borrowing/requests/${id}/reopen`, payload),
 
-  sendToWarehouse: (id: string, payload: BorrowActionPayload = {}) =>
-    api.post<BorrowRequest>(`/inventory/borrowing/requests/${id}/send-to-warehouse`, payload),
-
-  warehouseApprove: (id: string, payload: BorrowActionPayload = {}) =>
-    api.post(`/inventory/borrowing/requests/${id}/warehouse-approve`, payload),
-
-  warehouseReject: (id: string, notes?: string) =>
-    api.post<BorrowRequest>(`/inventory/borrowing/requests/${id}/warehouse-reject`, { notes }),
 
   close: (id: string, payload: BorrowActionPayload = {}) =>
     api.post<BorrowRequest>(`/inventory/borrowing/requests/${id}/close`, payload),

@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     APP_HOST: str = "0.0.0.0"
     APP_PORT: int = 5000
     DEBUG: bool = False
+    SQL_ECHO: bool = False
+    LOG_LEVEL: str = "INFO"
+    LOG_DIR: str = ".logs"
 
     SECRET_KEY: str
     ALGORITHM: str = "HS256"

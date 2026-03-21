@@ -126,19 +126,13 @@ export default function BorrowsPage() {
     release: borrowApi.release,
     return: borrowApi.return,
     reopen: borrowApi.reopen,
-    send_to_warehouse: borrowApi.sendToWarehouse,
-    warehouse_approve: borrowApi.warehouseApprove,
-    warehouse_reject: (id: string) => borrowApi.warehouseReject(id),
+
     close: borrowApi.close,
   } as const;
 
   const handleAction = async (action: BorrowAction, requestId: string, notes?: string) => {
     try {
-      if (action === 'warehouse_reject') {
-        await borrowApi.warehouseReject(requestId, notes);
-      } else {
-        await actionHandlers[action](requestId, { notes });
-      }
+      await actionHandlers[action](requestId, { notes });
       toast.success(`Request ${action.replaceAll('_', ' ')}d successfully`);
       fetchRecords();
       if (expandedIds.has(requestId)) {

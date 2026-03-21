@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Package, Settings, Activity,
-  Users, ScrollText, ClipboardList, Box, X,
+  Users, ScrollText, ClipboardList, Box, X, Database
 } from 'lucide-react';
 
 const systemMeta: Record<string, string> = {
@@ -18,6 +18,7 @@ const navigation = {
     { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
     { name: 'User Management', href: '/admin/users', icon: Users },
     { name: 'System Logs', href: '/admin/audit_logs', icon: ScrollText },
+    { name: 'Backup', href: '/admin/backup', icon: Database },
     { name: 'Settings', href: '/admin/settings', icon: Settings },
   ],
   inventory: [

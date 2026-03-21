@@ -6,6 +6,8 @@ import type {
   LowStockItem,
   PendingCounts,
   CategoryBreakdown,
+  InventoryHealth,
+  BorrowingTrend,
 } from './lib/types';
 
 export type {
@@ -14,6 +16,8 @@ export type {
   LowStockItem,
   PendingCounts,
   CategoryBreakdown,
+  InventoryHealth,
+  BorrowingTrend,
 } from './lib/types';
 
 export const dashboardApi = {
@@ -22,4 +26,6 @@ export const dashboardApi = {
   getLowStock: () => api.get<LowStockItem[]>('/inventory/dashboard/low-stock'),
   getPendingCounts: () => api.get<PendingCounts>('/inventory/dashboard/pending-counts'),
   getInventoryBreakdown: () => api.get<CategoryBreakdown[]>('/inventory/dashboard/inventory-breakdown'),
+  getHealth: () => api.get<InventoryHealth>('/inventory/dashboard/health'),
+  getTrends: () => api.get<BorrowingTrend[]>('/inventory/dashboard/trends'),
 };

@@ -10,6 +10,8 @@ from systems.inventory.services.dashboard_service import (
     DashboardStats,
     LowStockItemRead,
     InventoryCategoryBreakdown,
+    InventoryHealthBreakdown,
+    BorrowingTrend,
 )
 from systems.inventory.services.borrow_request_service import BorrowService
 from systems.auth.dependencies import require_permission
@@ -77,3 +79,25 @@ async def get_inventory_breakdown(
 ):
     breakdown = dashboard_service.get_inventory_by_category(session)
     return create_success_response(data=breakdown, request=request)
+
+
+@router.get("/health", response_model=GenericResponse[InventoryHealthBreakdown])
+async def get_inventory_health(
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("inventory:dashboard:view")),
+):
+    health = dashboard_service.get_inventory_health_distribution(session)
+    return create_success_response(data=health, request=request)
+
+
+@router.get("/trends", response_model=GenericResponse[list[BorrowingTrend]])
+async def get_borrowing_trends(
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("inventory:dashboard:view")),
+):
+    trends = dashboard_service.get_borrowing_trends(session)
+    return create_success_response(data=trends, request=request)

@@ -5,7 +5,7 @@ from sqlmodel import Session, SQLModel, create_engine
 from .config import settings
 
 assert settings.DATABASE_URL, "DATABASE_URL is required"
-engine = create_engine(settings.DATABASE_URL, echo=settings.DEBUG)
+engine = create_engine(settings.DATABASE_URL, echo=settings.SQL_ECHO)
 
 
 def init_db() -> None:
