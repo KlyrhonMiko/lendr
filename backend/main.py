@@ -38,9 +38,12 @@ logger = get_logger("app")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # System Initialization
-    with Session(engine) as session:
-        init_service = InitializationService()
-        init_service.run(session)
+    if not settings.SKIP_INIT:
+        with Session(engine) as session:
+            init_service = InitializationService()
+            init_service.run(session)
+    else:
+        logger.warning("System Initialization SKIPPED (SKIP_INIT=True)")
     yield
 
 

@@ -8,6 +8,7 @@ from systems.admin.models.settings import AdminConfig
 from utils.security import get_password_hash
 from data.system_init_data import SYSTEM_CONFIGS, RBAC_ROLES
 from utils.logging import get_logger
+from utils.migrations import run_migrations
 
 logger = get_logger("core.init")
 
@@ -97,6 +98,10 @@ class InitializationService:
 
     def run(self, session: Session):
         """Run all initialization steps in sequence."""
+        # 1. Automate Database Migrations
+        run_migrations()
+
+        # 2. Seed Data
         logger.info("Starting System Initialization Registry check...")
         self.ensure_admin_user(session)
         self.seed_configurations(session)
