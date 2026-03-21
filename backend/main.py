@@ -1,11 +1,18 @@
 from contextlib import asynccontextmanager
+import time
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from sqlmodel import Session
 
+from core.database import engine
+from core.config import settings
+from core.initialization_service import InitializationService
 from core.schemas import create_error_response
+from utils.logging import setup_logging, get_logger
 
+# Routers
 from systems.admin.routers.backup import router as backup
 from systems.admin.routers.configuration import router as config
 from systems.admin.routers.users import router as users
@@ -24,8 +31,16 @@ from systems.inventory.routers.audit_log import router as audit_log
 from systems.inventory.routers.borrower import router as borrower
 from systems.inventory.routers.configuration import router as inv_config
 
+# Initialize System-wide Logging
+setup_logging(log_level=settings.LOG_LEVEL, log_dir=settings.LOG_DIR)
+logger = get_logger("app")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # System Initialization
+    with Session(engine) as session:
+        init_service = InitializationService()
+        init_service.run(session)
     yield
 
 
@@ -38,6 +53,29 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def logging_middleware(request: Request, call_next):
+    """Global middleware to log every request and its outcome."""
+    start_time = time.time()
+    
+    try:
+        response = await call_next(request)
+        process_time = round((time.time() - start_time) * 1000, 2)
+        
+        # Log basic request info
+        logger.info(
+            f"{request.method} {request.url.path} - {response.status_code} ({process_time}ms)"
+        )
+        return response
+    except Exception as e:
+        process_time = round((time.time() - start_time) * 1000, 2)
+        # Detailed error logging for backend failures
+        logger.error(
+            f"{request.method} {request.url.path} - FAILED ({process_time}ms) - Error: {str(e)}",
+            exc_info=True
+        )
+        raise e
 
 # Global Exception Handlers
 @app.exception_handler(HTTPException)
