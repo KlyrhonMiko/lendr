@@ -30,7 +30,9 @@ config = context.config
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # Avoid resetting logging if programmatically called with skip_logging=true
+    if config.get_main_option("skip_logging") != "true":
+        fileConfig(config.config_file_name)
 
 # Pull DATABASE_URL from app settings so there is a single source of truth.
 assert settings.DATABASE_URL, "DATABASE_URL is required"

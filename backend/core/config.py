@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     SQL_ECHO: bool = False
     LOG_LEVEL: str = "INFO"
     LOG_DIR: str = ".logs"
+    SKIP_INIT: bool = False
 
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
