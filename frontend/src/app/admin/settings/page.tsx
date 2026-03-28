@@ -1,15 +1,19 @@
 'use client';
 
-import { Pagination } from '@/components/ui/Pagination';
 import { SettingsHeader } from './components/SettingsHeader';
 import { SettingsTabs } from './components/SettingsTabs';
 import { ErrorBanner } from './components/ErrorBanner';
-import { SettingsToolbar } from './components/SettingsToolbar';
-import { SettingsTable } from './components/SettingsTable';
-import { LookupExplorer } from './components/LookupExplorer';
 import { EditSettingModal } from './components/EditSettingModal';
 import { RestoreSettingModal } from './components/RestoreSettingModal';
 import { useAdminSettingsManagement } from './lib/useAdminSettingsManagement';
+
+// New Section Components
+import { GeneralSettings } from './components/GeneralSettings';
+import { BrandingSettings } from './components/BrandingSettings';
+import { OperationsSettings } from './components/OperationsSettings';
+import { HealthSettings } from './components/HealthSettings';
+import { SecuritySettings } from './components/SecuritySettings';
+import { DictionarySettings } from './components/DictionarySettings';
 
 export default function SettingsPage() {
   const {
@@ -23,9 +27,6 @@ export default function SettingsPage() {
     editingKey,
     isRestoreModalOpen,
     categories,
-    tables,
-    selectedTable,
-    columns,
     formData,
     setFormData,
     restoreData,
@@ -43,50 +44,50 @@ export default function SettingsPage() {
     handleSave,
     handleDelete,
     handleRestore,
-    fetchColumns,
     openRestoreModal,
     closeRestoreModal,
     openEditModalForNew,
   } = useAdminSettingsManagement();
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
-      <SettingsHeader onOpenRestore={openRestoreModal} onOpenNew={openEditModalForNew} />
+    <div className="w-full max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
+      <SettingsHeader 
+        onOpenRestore={openRestoreModal} 
+        onOpenNew={openEditModalForNew} 
+      />
 
       <SettingsTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
       {error && <ErrorBanner error={error} />}
 
-      {activeTab !== 'lookup' ? (
-        <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-sm">
-          <SettingsToolbar
+      <div className="min-h-[600px]">
+        {activeTab === 'general' && <GeneralSettings />}
+
+        {activeTab === 'system' && <BrandingSettings />}
+        
+        {activeTab === 'operations' && <OperationsSettings />}
+        
+        {activeTab === 'health' && <HealthSettings />}
+        
+        {activeTab === 'security' && <SecuritySettings />}
+        
+        {activeTab === 'dictionary' && (
+          <DictionarySettings 
+            settings={settings}
+            loading={loading}
+            meta={meta}
+            categories={categories}
             search={search}
             onSearchChange={setSearch}
             categoryFilter={categoryFilter}
             onCategoryFilterChange={setCategoryFilter}
-            meta={meta}
-          />
-
-          <SettingsTable
-            settings={settings}
-            loading={loading}
+            onPageChange={setPage}
+            onPerPageChange={setPerPage}
             onEdit={openEditModal}
             onDelete={handleDelete}
           />
-
-          {meta && <Pagination meta={meta} onPageChange={setPage} onPerPageChange={setPerPage} />}
-        </div>
-      ) : (
-        <LookupExplorer
-          loading={loading}
-          categories={categories}
-          onCategoryClick={setCategoryFilter}
-          tables={tables}
-          selectedTable={selectedTable}
-          onSelectTable={fetchColumns}
-          columns={columns}
-        />
-      )}
+        )}
+      </div>
 
       {isModalOpen && (
         <EditSettingModal

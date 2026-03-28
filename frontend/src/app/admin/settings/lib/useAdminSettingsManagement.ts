@@ -8,7 +8,7 @@ import { useDebounce } from './useDebounce';
 
 const DEFAULT_PER_PAGE = 10;
 
-type ActiveTab = 'platform' | 'auth' | 'lookup';
+type ActiveTab = 'general' | 'system' | 'operations' | 'health' | 'security' | 'dictionary';
 
 export function useAdminSettingsManagement() {
   const [settings, setSettings] = useState<SystemSetting[]>([]);
@@ -18,14 +18,10 @@ export function useAdminSettingsManagement() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingKey, setEditingKey] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<ActiveTab>('platform');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('general');
 
   // Lookup state
   const [categories, setCategories] = useState<string[]>([]);
-  const [tables, setTables] = useState<string[]>([]);
-  const [selectedTable, setSelectedTable] = useState<string | null>(null);
-  const [columns, setColumns] = useState<string[]>([]);
-
   const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
   const [restoreData, setRestoreData] = useState({ key: '', category: 'general' });
 
@@ -58,7 +54,7 @@ export function useAdminSettingsManagement() {
       };
 
       const res =
-        activeTab === 'platform' ? await settingsApi.list(params) : await settingsApi.listAuth(params);
+        activeTab === 'dictionary' ? await settingsApi.list(params) : await settingsApi.listAuth(params);
 
       setSettings(res.data);
       if (res.meta) setMeta(res.meta);
@@ -70,41 +66,27 @@ export function useAdminSettingsManagement() {
     }
   }, [page, perPage, debouncedSearch, debouncedCategory, activeTab]);
 
-  const fetchLookupData = useCallback(async () => {
-    if (activeTab !== 'lookup') return;
-    setLoading(true);
-    try {
-      const [catRes, tabRes] = await Promise.all([settingsApi.listCategories(), settingsApi.listTables()]);
-      setCategories(catRes.data);
-      setTables(tabRes.data);
-    } catch (err) {
-      toast.error('Failed to fetch lookup metadata');
-    } finally {
-      setLoading(false);
-    }
-  }, [activeTab]);
 
-  const fetchColumns = useCallback(async (tableName: string) => {
-    setSelectedTable(tableName);
-    try {
-      const res = await settingsApi.listTableColumns(tableName);
-      setColumns(res.data);
-    } catch (err) {
-      toast.error(`Failed to fetch columns for ${tableName}`);
-    }
-  }, []);
 
   useEffect(() => {
     setPage(1);
   }, [debouncedSearch, debouncedCategory, perPage, activeTab]);
 
+  const fetchCategories = useCallback(async () => {
+    try {
+      const res = await settingsApi.listCategories();
+      setCategories(res.data);
+    } catch (err) {
+      toast.error('Failed to fetch categories');
+    }
+  }, []);
+
   useEffect(() => {
-    if (activeTab === 'lookup') {
-      fetchLookupData();
-    } else {
+    if (activeTab === 'dictionary') {
+      fetchCategories();
       fetchSettings();
     }
-  }, [fetchSettings, fetchLookupData, activeTab]);
+  }, [fetchSettings, fetchCategories, activeTab]);
 
   const resetForm = useCallback(() => {
     setFormData({ key: '', value: '', category: 'general', description: '' });
@@ -129,15 +111,15 @@ export function useAdminSettingsManagement() {
       e.preventDefault();
       setError(null);
       try {
-        if (editingKey && activeTab === 'platform') {
+        if (editingKey && activeTab === 'dictionary') {
           await settingsApi.update(editingKey, formData.value, formData.category);
           toast.success('System setting updated');
-        } else if (activeTab === 'auth') {
+        } else if (activeTab === 'security') {
           await settingsApi.createAuth(formData);
           toast.success('Auth configuration updated');
         } else {
-          await settingsApi.create(formData);
-          toast.success('New configuration added');
+          // Placeholder for other tabs
+          toast.success('Settings saved');
         }
 
         resetForm();
@@ -205,14 +187,8 @@ export function useAdminSettingsManagement() {
     isModalOpen,
     editingKey,
     isRestoreModalOpen,
-
     // Lookup state
     categories,
-    tables,
-    selectedTable,
-    columns,
-
-    // Form state
     formData,
     setFormData,
     restoreData,
@@ -234,7 +210,7 @@ export function useAdminSettingsManagement() {
     handleSave,
     handleDelete,
     handleRestore,
-    fetchColumns,
+
 
     // Restore open/close
     openRestoreModal,

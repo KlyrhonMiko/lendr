@@ -77,14 +77,19 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         `}
       >
         {/* Brand */}
-        <div className="flex items-center justify-between h-16 px-5 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md shadow-indigo-500/15">
-              <span className="text-white font-bold text-lg font-heading">L</span>
+        <div className="flex items-center justify-between h-20 px-6 shrink-0 border-b border-sidebar-border/30 mb-2">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
+              <span className="text-primary-foreground font-black text-xl font-heading">L</span>
             </div>
-            <span className="text-xl font-bold font-heading tracking-tight text-sidebar-foreground">
-              Lendr
-            </span>
+            <div className="flex flex-col">
+              <span className="text-lg font-bold font-heading tracking-tight text-sidebar-foreground">
+                Lendr
+              </span>
+              <span className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-tighter -mt-1">
+                Enterprise POS
+              </span>
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -97,8 +102,8 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
         {/* Section label */}
         {label && (
-          <div className="px-5 pt-5 pb-2 shrink-0">
-            <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+          <div className="px-6 pt-4 pb-2 shrink-0">
+            <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground/50">
               {label}
             </span>
           </div>
@@ -114,16 +119,16 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 href={item.href}
                 onClick={onClose}
                 className={`
-                  flex items-center gap-3 px-3 py-2.5 rounded-xl
-                  text-[14px] font-medium min-h-[44px]
-                  transition-colors duration-150
+                  flex items-center gap-3 px-3.5 py-2.5 rounded-lg
+                  text-[14px] font-semibold min-h-[44px]
+                  transition-all duration-200
                   ${isActive
-                    ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
-                    : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent'
+                    ? 'bg-primary/10 text-primary shadow-sm shadow-primary/5'
+                    : 'text-muted-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent'
                   }
                 `}
               >
-                <item.icon className={`w-[18px] h-[18px] shrink-0 ${isActive ? 'text-indigo-500' : ''}`} />
+                <item.icon className={`w-[18px] h-[18px] shrink-0 ${isActive ? 'text-primary' : ''}`} />
                 <span>{item.name}</span>
               </Link>
             );
@@ -131,10 +136,13 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         </nav>
 
         {/* Footer */}
-        <div className="px-5 pb-4 pt-2 shrink-0 border-t border-sidebar-border/60">
-          <div className="flex items-center gap-2 pt-3">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            <span className="text-[11px] text-muted-foreground/60">Lendr v1.0</span>
+        <div className="px-6 pb-6 pt-4 shrink-0 border-t border-sidebar-border/30">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/40" />
+              <span className="text-[10px] font-semibold text-muted-foreground/40">v1.2.4-STABLE</span>
+            </div>
+            <div className="w-2 h-2 rounded-full bg-primary/20 animate-pulse" />
           </div>
         </div>
       </aside>

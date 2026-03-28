@@ -2,6 +2,7 @@
 
 import { Search } from 'lucide-react';
 import type { PaginationMeta } from '@/lib/api';
+import { Select } from '@/components/ui/select';
 
 export function SettingsToolbar({
   search,
@@ -9,13 +10,20 @@ export function SettingsToolbar({
   categoryFilter,
   onCategoryFilterChange,
   meta,
+  categories,
 }: {
   search: string;
   onSearchChange: (v: string) => void;
   categoryFilter: string;
   onCategoryFilterChange: (v: string) => void;
   meta: PaginationMeta | null;
+  categories: string[];
 }) {
+  const categoryOptions = [
+    { label: 'All Categories', value: '' },
+    ...categories.map(c => ({ label: c, value: c }))
+  ];
+
   return (
     <div className="p-4 border-b border-border bg-background/50 flex items-center gap-3 flex-wrap">
       <div className="relative w-80">
@@ -29,13 +37,13 @@ export function SettingsToolbar({
         />
       </div>
 
-      <input
-        type="text"
-        placeholder="Filter by category..."
-        value={categoryFilter}
-        onChange={(e) => onCategoryFilterChange(e.target.value)}
-        className="h-10 px-4 rounded-xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all text-sm font-medium w-48"
-      />
+      <div className="w-56">
+        <Select 
+          value={categoryFilter}
+          onChange={(e) => onCategoryFilterChange(e.target.value)}
+          options={categoryOptions}
+        />
+      </div>
 
       {meta && (
         <span className="ml-auto text-sm text-muted-foreground font-medium">

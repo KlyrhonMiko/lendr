@@ -20,7 +20,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
     );
 
   return (
-    <header className="sticky top-0 z-30 w-full h-16 bg-background/80 backdrop-blur-xl border-b border-border flex items-center justify-between px-4 lg:px-6 shrink-0">
+    <header className="sticky top-0 z-30 w-full h-16 bg-background/60 backdrop-blur-md border-b border-border flex items-center justify-between px-6 shrink-0">
       {/* Left: hamburger + breadcrumbs */}
       <div className="flex items-center gap-2 min-w-0">
         <button
@@ -31,17 +31,17 @@ export function Header({ onMenuToggle }: HeaderProps) {
           <Menu className="w-5 h-5" />
         </button>
 
-        <nav className="hidden sm:flex items-center gap-1 text-sm min-w-0">
+        <nav className="hidden sm:flex items-center gap-1 text-xs font-semibold min-w-0">
           {breadcrumbs.map((crumb, i) => (
             <span key={i} className="flex items-center gap-1 min-w-0">
               {i > 0 && (
-                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
+                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30 shrink-0" />
               )}
               <span
-                className={`truncate ${
+                className={`truncate tracking-wide ${
                   i === breadcrumbs.length - 1
-                    ? 'font-medium text-foreground'
-                    : 'text-muted-foreground'
+                    ? 'text-primary px-2 py-0.5 bg-primary/10 rounded-md shadow-sm'
+                    : 'text-muted-foreground/60 hover:text-foreground transition-colors'
                 }`}
               >
                 {crumb}
@@ -54,10 +54,10 @@ export function Header({ onMenuToggle }: HeaderProps) {
       {/* Right: user info + sign out */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         <div className="hidden md:flex flex-col text-right">
-          <span className="text-sm font-medium text-foreground leading-tight">
+          <span className="text-xs font-bold text-foreground leading-tight tracking-tight">
             {user ? `${user.first_name} ${user.last_name}` : 'Loading...'}
           </span>
-          <span className="text-[11px] text-muted-foreground capitalize leading-tight mt-0.5">
+          <span className="text-[10px] font-bold text-primary/70 uppercase tracking-widest leading-tight mt-0.5">
             {user?.role.replace('_', ' ') || 'User'}
           </span>
         </div>
@@ -66,11 +66,11 @@ export function Header({ onMenuToggle }: HeaderProps) {
 
         <button
           onClick={() => void logout()}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-colors"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-muted-foreground/60 hover:text-destructive hover:bg-destructive/5 border border-transparent hover:border-destructive/10 transition-all active:scale-95"
           title="Sign out"
         >
           <LogOut className="w-4 h-4" />
-          <span className="hidden sm:inline text-xs font-medium">Sign out</span>
+          <span className="hidden sm:inline text-[11px] font-bold uppercase tracking-wider">Logout</span>
         </button>
       </div>
     </header>
