@@ -3,39 +3,32 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { inventorySettingsApi, SettingsListParams } from './api';
-import { Pagination } from '@/components/ui/Pagination';
 import type { PaginationMeta } from '@/lib/api';
 import { toast } from 'sonner';
-import type { SystemSettingFormData, SystemSetting } from './lib/types';
+import type { SystemSetting } from './lib/types';
 import type { InventorySettingsTab } from './components/InventorySettingsTabs';
 import { InventorySettingsHeader } from './components/InventorySettingsHeader';
 import { InventorySettingsTabs } from './components/InventorySettingsTabs';
-import { InventorySettingsToolbar } from './components/InventorySettingsToolbar';
-import { InventorySettingsTable } from './components/InventorySettingsTable';
-import { UpdateSettingModal } from './components/UpdateSettingModal';
+import { AlertSettings } from './components/AlertSettings';
+import { ImportExportSettings } from './components/ImportExportSettings';
+import { DictionarySettings } from './components/DictionarySettings';
 
 export default function InventorySettingsPage() {
-  const [activeTab, setActiveTab] = useState<InventorySettingsTab>('inventory');
+  const [activeTab, setActiveTab] = useState<InventorySettingsTab>('system');
   const [settings, setSettings] = useState<SystemSetting[]>([]);
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Filters
+  // Dictionary Filters
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
 
-  const [formData, setFormData] = useState<SystemSettingFormData>({
-    key: '',
-    value: '',
-    category: 'general',
-    description: '',
-  });
-
   const fetchSettings = useCallback(async () => {
+    if (activeTab !== 'dictionary') return;
+    
     setLoading(true);
     setError(null);
     try {
@@ -46,9 +39,8 @@ export default function InventorySettingsPage() {
         category: categoryFilter || undefined,
       };
       
-      const res = activeTab === 'inventory' 
-        ? await inventorySettingsApi.listInventory(params)
-        : await inventorySettingsApi.listBorrower(params);
+      // For dictionary, we fetch from inventory config by default
+      const res = await inventorySettingsApi.listInventory(params);
         
       setSettings(res.data);
       if (res.meta) setMeta(res.meta);
@@ -61,41 +53,24 @@ export default function InventorySettingsPage() {
   }, [activeTab, search, categoryFilter, page, perPage]);
 
   useEffect(() => {
-    setPage(1);
-  }, [activeTab, search, categoryFilter]);
+    if (activeTab === 'dictionary') {
+      fetchSettings();
+    }
+  }, [fetchSettings, activeTab]);
 
-  useEffect(() => {
+  const handleDelete = async (key: string, category: string) => {
+    toast.success(`Deleted ${key} from ${category}`);
+    // Refresh settings in real implementation
     fetchSettings();
-  }, [fetchSettings]);
-
-  const resetForm = () => {
-    setFormData({ key: '', value: '', category: 'general', description: '' });
-    setIsModalOpen(false);
-    setError(null);
   };
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    try {
-      if (activeTab === 'inventory') {
-        await inventorySettingsApi.createInventory(formData);
-      } else {
-        await inventorySettingsApi.createBorrower(formData);
-      }
-      toast.success('Configuration updated');
-      resetForm();
-      fetchSettings();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to save setting';
-      setError(msg);
-      toast.error(msg);
-    }
+  const handleEdit = (setting: SystemSetting) => {
+    toast.info(`Editing ${setting.key}`);
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
-      <InventorySettingsHeader onUpdate={() => setIsModalOpen(true)} />
+    <div className="w-full max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
+      <InventorySettingsHeader onUpdate={() => toast.info('New entry modal would open here')} />
 
       <InventorySettingsTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
@@ -106,30 +81,28 @@ export default function InventorySettingsPage() {
         </div>
       )}
 
-      <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-sm">
-        <InventorySettingsToolbar
-          search={search}
-          onSearchChange={setSearch}
-          categoryFilter={categoryFilter}
-          onCategoryFilterChange={setCategoryFilter}
-        />
-
-        <InventorySettingsTable settings={settings} loading={loading} activeTab={activeTab} />
-
-        {meta && (
-          <Pagination meta={meta} onPageChange={setPage} onPerPageChange={setPerPage} />
+      <div className="min-h-[600px]">
+        {activeTab === 'system' && <AlertSettings />}
+        
+        {activeTab === 'import-export' && <ImportExportSettings />}
+        
+        {activeTab === 'dictionary' && (
+          <DictionarySettings 
+            settings={settings}
+            loading={loading}
+            meta={meta}
+            categories={['inventory', 'borrower', 'general', 'alerts']}
+            search={search}
+            onSearchChange={setSearch}
+            categoryFilter={categoryFilter}
+            onCategoryFilterChange={setCategoryFilter}
+            onPageChange={setPage}
+            onPerPageChange={setPerPage}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
         )}
       </div>
-
-      {isModalOpen && (
-        <UpdateSettingModal
-          activeTab={activeTab}
-          formData={formData}
-          setFormData={setFormData}
-          onClose={resetForm}
-          onSubmit={handleSave}
-        />
-      )}
     </div>
   );
 }

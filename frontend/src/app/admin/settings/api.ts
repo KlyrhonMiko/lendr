@@ -5,6 +5,7 @@ export interface SystemSetting {
   value: string;
   category: string;
   description: string | null;
+  last_modified?: string;
 }
 
 export interface SystemSettingCreate {

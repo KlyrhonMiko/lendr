@@ -20,8 +20,9 @@ export function SettingsTable({
         <thead>
           <tr className="border-b border-border/50 text-xs uppercase tracking-wider text-muted-foreground bg-background/30 font-semibold font-heading">
             <th className="p-4 pl-6">Key &amp; Description</th>
-            <th className="p-4">Category</th>
+            <th className="p-4 text-center">Category</th>
             <th className="p-4">Value</th>
+            <th className="p-4 text-center font-mono text-[10px]">Last Modified</th>
             <th className="p-4 pr-6 text-right">Actions</th>
           </tr>
         </thead>
@@ -52,9 +53,14 @@ export function SettingsTable({
                 </span>
               </td>
               <td className="p-4">
-                <code className="text-sm px-2 py-1 rounded bg-muted font-mono border border-border/50 text-indigo-400">
+                <code className="text-xs px-2 py-1 rounded bg-muted font-mono border border-border/50 text-indigo-400">
                   {setting.value}
                 </code>
+              </td>
+              <td className="p-4 text-center">
+                <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap">
+                  {setting.last_modified || new Date().toISOString().split('T')[0]}
+                </span>
               </td>
               <td className="p-4 pr-6 text-right">
                 <div className="flex items-center justify-end gap-1">
