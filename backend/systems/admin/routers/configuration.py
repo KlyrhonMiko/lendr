@@ -29,13 +29,14 @@ async def list_settings(
     per_page: int = Query(default=20, ge=1, le=500),
     key: str | None = None,
     category: str | None = None,
+    system: str | None = None,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_permission("admin:config:manage")),
 ):
     skip = (page - 1) * per_page
     settings, total = config_service.get_all(
-        session, skip=skip, limit=per_page, key=key, category=category
+        session, skip=skip, limit=per_page, key=key, category=category, system=system
     )
 
     return create_success_response(
@@ -59,6 +60,22 @@ async def list_categories(
     categories = config_service.get_categories(session)
 
     return create_success_response(data=categories, request=request)
+
+
+@router.get(
+    "/systems",
+    response_model=GenericResponse[list[str]],
+    responses={401: {"model": GenericResponse}},
+)
+async def list_systems(
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("admin:config:manage")),
+):
+    systems = config_service.get_systems(session)
+
+    return create_success_response(data=systems, request=request)
 
 
 @router.get(

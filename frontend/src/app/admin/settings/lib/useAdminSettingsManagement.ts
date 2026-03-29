@@ -18,22 +18,25 @@ export function useAdminSettingsManagement() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingKey, setEditingKey] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<ActiveTab>('general');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('health');
 
   // Lookup state
   const [categories, setCategories] = useState<string[]>([]);
+  const [systems, setSystems] = useState<string[]>([]);
   const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
   const [restoreData, setRestoreData] = useState({ key: '', category: 'general' });
 
   // Filters
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [systemFilter, setSystemFilter] = useState('');
 
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(DEFAULT_PER_PAGE);
 
   const debouncedSearch = useDebounce(search, 400);
   const debouncedCategory = useDebounce(categoryFilter, 400);
+  const debouncedSystem = useDebounce(systemFilter, 400);
 
   const [formData, setFormData] = useState<SystemSettingCreate & { description: string }>({
     key: '',
@@ -51,6 +54,7 @@ export function useAdminSettingsManagement() {
         per_page: perPage,
         search: debouncedSearch || undefined,
         category: debouncedCategory || undefined,
+        system: debouncedSystem || undefined,
       };
 
       const res =
@@ -64,29 +68,31 @@ export function useAdminSettingsManagement() {
     } finally {
       setLoading(false);
     }
-  }, [page, perPage, debouncedSearch, debouncedCategory, activeTab]);
-
-
+  }, [page, perPage, debouncedSearch, debouncedCategory, debouncedSystem, activeTab]);
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, debouncedCategory, perPage, activeTab]);
+  }, [debouncedSearch, debouncedCategory, debouncedSystem, perPage, activeTab]);
 
-  const fetchCategories = useCallback(async () => {
+  const fetchLookups = useCallback(async () => {
     try {
-      const res = await settingsApi.listCategories();
-      setCategories(res.data);
+      const [catRes, sysRes] = await Promise.all([
+        settingsApi.listCategories(),
+        settingsApi.listSystems(),
+      ]);
+      setCategories(catRes.data);
+      setSystems(sysRes.data);
     } catch (err) {
-      toast.error('Failed to fetch categories');
+      toast.error('Failed to fetch filter options');
     }
   }, []);
 
   useEffect(() => {
     if (activeTab === 'dictionary') {
-      fetchCategories();
+      fetchLookups();
       fetchSettings();
     }
-  }, [fetchSettings, fetchCategories, activeTab]);
+  }, [fetchSettings, fetchLookups, activeTab]);
 
   const resetForm = useCallback(() => {
     setFormData({ key: '', value: '', category: 'general', description: '' });
@@ -189,6 +195,7 @@ export function useAdminSettingsManagement() {
     isRestoreModalOpen,
     // Lookup state
     categories,
+    systems,
     formData,
     setFormData,
     restoreData,
@@ -199,6 +206,8 @@ export function useAdminSettingsManagement() {
     setSearch,
     categoryFilter,
     setCategoryFilter,
+    systemFilter,
+    setSystemFilter,
     page,
     setPage,
     perPage,
@@ -220,4 +229,3 @@ export function useAdminSettingsManagement() {
     openEditModalForNew,
   };
 }
-

@@ -8,6 +8,7 @@ from core.config import settings
 from core.database import get_session
 from systems.admin.models.user import User
 from systems.admin.services.user_service import UserService
+from systems.admin.services.audit_service import audit_service
 from systems.auth.services.rbac_service import rbac_service
 
 reusable_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
@@ -56,9 +57,21 @@ def get_current_user(session: Session = Depends(get_session), token: str = Depen
 def require_system_access(system: str):
     def _checker(session: Session = Depends(get_session), current_user: User = Depends(get_current_user),) -> None:
         if not rbac_service.has_system_access(session, current_user, system):
+            detail = f"Role '{current_user.role}' cannot access {system} system"
+            
+            # Log security violation for cross-system attempts (especially admin)
+            audit_service.log_action(
+                db=session,
+                entity_type="security",
+                entity_id=system,
+                action="unauthorized_access",
+                reason_code="403-FORBIDDEN",
+                actor_id=current_user.id
+            )
+            
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Role '{current_user.role}' cannot access {system} system",
+                detail=detail,
             )
 
     return _checker

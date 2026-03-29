@@ -35,6 +35,12 @@ class User(BaseModel, table=True):
     employee_id: str | None = Field(default=None, index=True, max_length=50)
     shift_type: str = Field(default="day", max_length=20)
 
+    @property
+    def full_name(self) -> str:
+        if self.middle_name:
+            return f"{self.first_name} {self.middle_name} {self.last_name}"
+        return f"{self.first_name} {self.last_name}"
+
     __table_args__ = (
         Index(
             "ix_user_username_active",

@@ -10,7 +10,7 @@ from core.database import engine
 from core.config import settings
 from core.initialization_service import InitializationService
 from core.schemas import create_error_response
-from utils.logging import setup_logging, get_logger
+from utils.logging import setup_logging, get_logger, setup_health_logging, log_operation
 
 # Routers
 from systems.admin.routers.backup import router as backup
@@ -19,6 +19,7 @@ from systems.admin.routers.users import router as users
 from systems.admin.routers.roles import router as roles_config
 from systems.admin.routers.audit_log import router as admin_audit_log
 from systems.admin.routers.dashboard import router as admin_dashboard
+from systems.admin.routers.health import router as health
 
 from systems.auth.dependencies import require_system_access
 from systems.auth.routers.auth import router as auth
@@ -35,7 +36,9 @@ from systems.inventory.routers.data import router as data
 
 # Initialize System-wide Logging
 setup_logging(log_level=settings.LOG_LEVEL, log_dir=settings.LOG_DIR)
+setup_health_logging()
 logger = get_logger("app")
+health_logger = get_logger("health")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -44,8 +47,11 @@ async def lifespan(app: FastAPI):
         with Session(engine) as session:
             init_service = InitializationService()
             init_service.run(session)
+        log_operation("INIT-DONE", "System Initialization COMPLETED")
+        log_operation("DB-CONNECT", "PostgreSQL connectivity established")
     else:
         logger.warning("System Initialization SKIPPED (SKIP_INIT=True)")
+        log_operation("INIT-SKIP", "System Initialization SKIPPED", level="WARNING")
     yield
 
 
@@ -106,6 +112,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
+    log_operation("500-INTERNAL", f"Crash in {request.url.path}: {str(exc)}", level="ERROR")
     return JSONResponse(
         status_code=500,
         content=create_error_response(
@@ -126,6 +133,7 @@ app.include_router(config, prefix="/api/admin/config", tags=["Admin - Configurat
 app.include_router(roles_config, prefix="/api/admin/roles", tags=["Admin - Roles"], dependencies=admin_access)
 app.include_router(admin_audit_log, prefix="/api/admin/audit-log", tags=["Admin - Audit Logs"], dependencies=admin_access)
 app.include_router(admin_dashboard, prefix="/api/admin/dashboard", tags=["Admin - Dashboard"], dependencies=admin_access)
+app.include_router(health, prefix="/api/admin/health", tags=["Admin - System Health"], dependencies=admin_access)
 app.include_router(auth, prefix="/api/auth", tags=["Auth"])
 app.include_router(auth_config, prefix="/api/auth/config", tags=["Auth - Configuration"], dependencies=admin_access)
 

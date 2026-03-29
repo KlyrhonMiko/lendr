@@ -1,4 +1,5 @@
 import { auth } from './auth';
+import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -31,11 +32,49 @@ interface LoginCredentials {
   password: string;
 }
 
+/** 
+ * Unique browser/hardware fingerprint.
+ * This is async to allow FingerprintJS to calculate hardware hashes.
+ */
+let fpPromise: Promise<string> | null = null;
+
+async function getDeviceId(): Promise<string> {
+  if (typeof window === 'undefined') return 'server';
+  
+  // Use cached fingerprint if available in localStorage for sync-like speed
+  const cachedId = localStorage.getItem('lendr_fp_id');
+  if (cachedId) return cachedId;
+
+  if (!fpPromise) {
+    fpPromise = (async () => {
+      try {
+        const fp = await FingerprintJS.load();
+        const result = await fp.get();
+        const visitorId = `FP-${result.visitorId}`;
+        localStorage.setItem('lendr_fp_id', visitorId);
+        return visitorId;
+      } catch (error) {
+        console.error('Fingerprint failed, falling back to UUID', error);
+        // Robust fallback to UUID if fingerprinting is blocked
+        let fallbackId = localStorage.getItem('lendr_device_id');
+        if (!fallbackId) {
+          fallbackId = `DEV-${crypto.randomUUID()}`;
+          localStorage.setItem('lendr_device_id', fallbackId);
+        }
+        return fallbackId;
+      }
+    })();
+  }
+
+  return fpPromise;
+}
+
 async function request<T>(
   url: string,
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> {
   const token = auth.getToken();
+  const deviceId = await getDeviceId();
 
   const headers = new Headers(options.headers);
   if (!(options.body instanceof FormData)) {
@@ -44,6 +83,8 @@ async function request<T>(
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
   }
+  
+  headers.set('X-Device-ID', deviceId);
 
   const response = await fetch(`${API_BASE_URL}/api${url}`, {
     ...options,
@@ -64,15 +105,22 @@ async function request<T>(
 }
 
 export const api = {
+  getDeviceId, // Expose for UI comparison
+
   login: async (formData: LoginCredentials) => {
     // Backend login expects multipart/form-data for OAuth2PasswordRequestForm
     const body = new FormData();
     body.append('username', formData.username);
     body.append('password', formData.password);
 
+    const deviceId = await getDeviceId();
+
     const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: 'POST',
       body,
+      headers: {
+        'X-Device-ID': deviceId,
+      },
     });
 
     if (!response.ok) {
@@ -88,9 +136,14 @@ export const api = {
     body.append('username', formData.username);
     body.append('password', formData.password);
 
+    const deviceId = await getDeviceId();
+
     const response = await fetch(`${API_BASE_URL}/api/auth/borrower/login`, {
       method: 'POST',
       body,
+      headers: {
+        'X-Device-ID': deviceId,
+      },
     });
 
     if (!response.ok) {

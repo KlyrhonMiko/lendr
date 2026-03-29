@@ -27,6 +27,7 @@ export default function SettingsPage() {
     editingKey,
     isRestoreModalOpen,
     categories,
+    systems,
     formData,
     setFormData,
     restoreData,
@@ -35,6 +36,8 @@ export default function SettingsPage() {
     setSearch,
     categoryFilter,
     setCategoryFilter,
+    systemFilter,
+    setSystemFilter,
     page,
     setPage,
     perPage,
@@ -51,10 +54,7 @@ export default function SettingsPage() {
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
-      <SettingsHeader 
-        onOpenRestore={openRestoreModal} 
-        onOpenNew={openEditModalForNew} 
-      />
+      <SettingsHeader />
 
       <SettingsTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
@@ -77,14 +77,19 @@ export default function SettingsPage() {
             loading={loading}
             meta={meta}
             categories={categories}
+            systems={systems}
             search={search}
             onSearchChange={setSearch}
             categoryFilter={categoryFilter}
             onCategoryFilterChange={setCategoryFilter}
+            systemFilter={systemFilter}
+            onSystemFilterChange={setSystemFilter}
             onPageChange={setPage}
             onPerPageChange={setPerPage}
             onEdit={openEditModal}
             onDelete={handleDelete}
+            onOpenRestore={openRestoreModal}
+            onOpenNew={openEditModalForNew}
           />
         )}
       </div>

@@ -393,6 +393,7 @@ class ConfigBaseService(Generic[ConfigModelType]):
         limit: int = 100,
         key: str | None = None,
         category: str | None = None,
+        system: str | None = None,
     ) -> tuple[list[ConfigModelType], int]:
 
         statement = select(self.model).where(self.model.is_deleted.is_(False))
@@ -400,6 +401,8 @@ class ConfigBaseService(Generic[ConfigModelType]):
             statement = statement.where(self.model.key.ilike(f"%{key}%"))
         if category:
             statement = statement.where(self.model.category == category)
+        if system:
+            statement = statement.where(self.model.system == system)
         total_statement = select(func.count()).select_from(statement.subquery())
 
         total = session.exec(total_statement).one()
@@ -411,6 +414,15 @@ class ConfigBaseService(Generic[ConfigModelType]):
     def get_categories(self, session: Session) -> list[str]:
         statement = (
             select(self.model.category)
+            .where(self.model.is_deleted.is_(False))
+            .distinct()
+        )
+
+        return sorted(list(session.exec(statement).all()))
+
+    def get_systems(self, session: Session) -> list[str]:
+        statement = (
+            select(self.model.system)
             .where(self.model.is_deleted.is_(False))
             .distinct()
         )

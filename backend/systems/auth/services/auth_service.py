@@ -7,6 +7,9 @@ from systems.admin.models.user import User
 from systems.admin.services.user_service import UserService
 from utils.id_generator import get_next_sequence
 from utils.security import verify_password
+from systems.auth.models.user_session import UserSession
+from systems.auth.models.borrower_session import BorrowerSession
+from utils.time_utils import get_now_manila
 
 
 class AuthService:
@@ -36,15 +39,14 @@ class AuthService:
         user_id: str,
         expires_delta: timedelta,
         user_uuid: UUID | None = None,
-    ) -> "BorrowerSession":
-        from systems.auth.models.borrower_session import BorrowerSession
-        from utils.time_utils import get_now_manila
-
+        device_id: str | None = None,
+    ) -> BorrowerSession:
         expires_at = get_now_manila() + expires_delta
         db_session = BorrowerSession(
             session_id=get_next_sequence(session, BorrowerSession, "session_id", "BSE"),
             borrower_uuid=user_uuid,
             expires_at=expires_at,
+            device_id=device_id,
         )
         session.add(db_session)
         session.commit()
@@ -53,9 +55,6 @@ class AuthService:
         return db_session
 
     def is_borrower_session_valid(self, session: Session, session_id: str) -> bool:
-        from systems.auth.models.borrower_session import BorrowerSession
-        from utils.time_utils import get_now_manila
-
         statement = select(BorrowerSession).where(
             BorrowerSession.session_id == session_id,
             BorrowerSession.is_revoked == False,
@@ -66,7 +65,6 @@ class AuthService:
         return db_session is not None
 
     def revoke_borrower_session(self, session: Session, session_id: str):
-        from systems.auth.models.borrower_session import BorrowerSession
         statement = select(BorrowerSession).where(BorrowerSession.session_id == session_id)
         db_session = session.exec(statement).first()
 
@@ -76,9 +74,6 @@ class AuthService:
             session.commit()
 
     def extend_borrower_session(self, session: Session, session_id: str, expires_delta: timedelta):
-        from systems.auth.models.borrower_session import BorrowerSession
-        from utils.time_utils import get_now_manila
-        
         statement = select(BorrowerSession).where(BorrowerSession.session_id == session_id)
         db_session = session.exec(statement).first()
         if db_session:
@@ -91,15 +86,14 @@ class AuthService:
         session: Session,
         user_uuid: UUID,
         expires_delta: timedelta,
-    ) -> "UserSession":
-        from systems.auth.models.user_session import UserSession
-        from utils.time_utils import get_now_manila
-
+        device_id: str | None = None,
+    ) -> UserSession:
         expires_at = get_now_manila() + expires_delta
         db_session = UserSession(
             session_id=get_next_sequence(session, UserSession, "session_id", "USE"),
             user_uuid=user_uuid,
             expires_at=expires_at,
+            device_id=device_id,
         )
         session.add(db_session)
         session.commit()
@@ -108,9 +102,6 @@ class AuthService:
         return db_session
 
     def is_user_session_valid(self, session: Session, session_id: str) -> bool:
-        from systems.auth.models.user_session import UserSession
-        from utils.time_utils import get_now_manila
-
         statement = select(UserSession).where(
             UserSession.session_id == session_id,
             UserSession.is_revoked == False,
@@ -121,7 +112,6 @@ class AuthService:
         return db_session is not None
 
     def revoke_user_session(self, session: Session, session_id: str):
-        from systems.auth.models.user_session import UserSession
         statement = select(UserSession).where(UserSession.session_id == session_id)
         db_session = session.exec(statement).first()
         if db_session:
@@ -130,9 +120,6 @@ class AuthService:
             session.commit()
 
     def extend_user_session(self, session: Session, session_id: str, expires_delta: timedelta):
-        from systems.auth.models.user_session import UserSession
-        from utils.time_utils import get_now_manila
-        
         statement = select(UserSession).where(UserSession.session_id == session_id)
         db_session = session.exec(statement).first()
         if db_session:
