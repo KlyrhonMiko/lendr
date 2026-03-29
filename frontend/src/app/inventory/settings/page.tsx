@@ -70,7 +70,7 @@ export default function InventorySettingsPage() {
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
-      <InventorySettingsHeader onUpdate={() => toast.info('New entry modal would open here')} />
+      <InventorySettingsHeader />
 
       <InventorySettingsTabs activeTab={activeTab} onTabChange={setActiveTab} />
 

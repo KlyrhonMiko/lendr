@@ -628,7 +628,7 @@ def seed_inventory_weight_configurations(headers: dict[str, str]) -> None:
         ("borrowed", "20", "Weight for borrowed unit status"),
     ]
     for key, value, desc in unit_status_weights:
-        create_setting(headers, system="inventory", key=key, value=value, category="inventory_units_status", description=desc, endpoint="/api/inventory/config/inventory")
+        create_setting(headers, system="inventory", key=key, value=value, category="inventory_units_status_weights", description=desc, endpoint="/api/inventory/config/inventory")
 
     # inventory_units_condition_weights
     print(f"\n  {CYAN}Category: inventory_units_condition_weights{RESET}")
@@ -640,7 +640,7 @@ def seed_inventory_weight_configurations(headers: dict[str, str]) -> None:
         ("excellent", "20", "Weight for excellent unit condition"),
     ]
     for key, value, desc in unit_condition_weights:
-        create_setting(headers, system="inventory", key=key, value=value, category="inventory_units_condition", description=desc, endpoint="/api/inventory/config/inventory")
+        create_setting(headers, system="inventory", key=key, value=value, category="inventory_units_condition_weights", description=desc, endpoint="/api/inventory/config/inventory")
 
     # inventory_batches_status_weights
     print(f"\n  {CYAN}Category: inventory_batches_status_weights{RESET}")
@@ -652,7 +652,7 @@ def seed_inventory_weight_configurations(headers: dict[str, str]) -> None:
         ("healthy", "20", "Weight for healthy batch status"),
     ]
     for key, value, desc in batch_status_weights:
-        create_setting(headers, system="inventory", key=key, value=value, category="inventory_batches_status", description=desc, endpoint="/api/inventory/config/inventory")
+        create_setting(headers, system="inventory", key=key, value=value, category="inventory_batches_status_weights", description=desc, endpoint="/api/inventory/config/inventory")
 
     # inventory_batches_condition_weights
     print(f"\n  {CYAN}Category: inventory_batches_condition_weights{RESET}")
@@ -664,7 +664,7 @@ def seed_inventory_weight_configurations(headers: dict[str, str]) -> None:
         ("excellent", "20", "Weight for excellent batch condition"),
     ]
     for key, value, desc in batch_condition_weights:
-        create_setting(headers, system="inventory", key=key, value=value, category="inventory_batches_condition", description=desc, endpoint="/api/inventory/config/inventory")
+        create_setting(headers, system="inventory", key=key, value=value, category="inventory_batches_condition_weights", description=desc, endpoint="/api/inventory/config/inventory")
 
 
 def seed_borrow_request_configurations(headers: dict[str, str]) -> None:
@@ -987,6 +987,30 @@ def seed_audit_configurations(headers: dict[str, str]) -> None:
         create_setting(headers, system="inventory", key=key, value=value, category="audit_logs_action", description=desc, endpoint="/api/inventory/config/inventory")
 
 
+def seed_inventory_alert_settings(headers: dict[str, str]) -> None:
+    """Seed inventory threshold and alert policy configurations."""
+    section("INVENTORY ALERT SETTINGS")
+    
+    # inventory_threshold_alerts
+    print(f"\n  {CYAN}Category: inventory_threshold_alerts{RESET}")
+    alerts = [
+        ("low_stock_threshold", "20", "Alert when stock falls below this % of total quantity"),
+        ("overstock_threshold", "150", "Alert when stock exceeds this % of total quantity"),
+        ("expiry_threshold", "15", "Alert when remaining shelf life is below this %"),
+        ("borrow_request_alert_duration", "60", "Duration for pending borrow request alerts"),
+        ("borrow_request_alert_unit", "minutes", "Time unit for borrow request alerts"),
+        ("notification_channels", '["in-app", "email", "sms"]', "Active channels for system notifications"),
+        {"key": "alert_recipient_roles", "value": '["inventory_manager", "admin"]', "description": "Roles notified of inventory alerts"},
+        {"key": "specific_recipients", "value": "[]", "description": "Specific individuals notified of inventory alerts"}
+    ]
+    for item in alerts:
+        if isinstance(item, dict):
+            create_setting(headers, system="inventory", key=item["key"], value=item["value"], category="inventory_threshold_alerts", description=item["description"], endpoint="/api/inventory/config/inventory")
+        else:
+            key, value, desc = item
+            create_setting(headers, system="inventory", key=key, value=value, category="inventory_threshold_alerts", description=desc, endpoint="/api/inventory/config/inventory")
+
+
 def print_summary() -> int:
     """Print execution summary."""
     total = pass_count + fail_count
@@ -1027,6 +1051,7 @@ def main() -> int:
         seed_borrow_participant_configurations(admin_headers)
         seed_rbac_role_permissions(admin_headers)
         seed_user_configurations(admin_headers)
+        seed_inventory_alert_settings(admin_headers)
         seed_backup_configurations(admin_headers)
         seed_audit_configurations(admin_headers)
         

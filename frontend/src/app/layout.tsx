@@ -3,6 +3,7 @@ import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 
 import { AuthProvider } from "@/contexts/AuthContext";
+import QueryProvider from "@/providers/QueryProvider";
 import { Toaster } from "sonner";
 
 const inter = Inter({
@@ -31,8 +32,10 @@ export default function RootLayout({
         className={`${inter.variable} ${jakarta.variable} antialiased selection:bg-indigo-500/30 font-sans`}
       >
         <AuthProvider>
-          {children}
-          <Toaster richColors position="top-right" />
+          <QueryProvider>
+            {children}
+            <Toaster richColors position="top-right" />
+          </QueryProvider>
         </AuthProvider>
       </body>
     </html>

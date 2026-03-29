@@ -58,6 +58,16 @@ SYSTEM_CONFIGS = [
     # Inventory Movement Reason Codes
     {"system": "inventory", "key": "manual_adjustment", "value": "Manual Adjustment", "category": "inventory_movements_reason_code", "description": "Manual stock adjustment"},
     {"system": "inventory", "key": "count_correction", "value": "Count Correction", "category": "inventory_movements_reason_code", "description": "Stock count correction"},
+
+    # Inventory Threshold & Alert Settings
+    {"system": "inventory", "key": "low_stock_threshold", "value": "20", "category": "inventory_threshold_alerts", "description": "Alert when stock falls below this % of total quantity"},
+    {"system": "inventory", "key": "overstock_threshold", "value": "150", "category": "inventory_threshold_alerts", "description": "Alert when stock exceeds this % of total quantity"},
+    {"system": "inventory", "key": "expiry_threshold", "value": "15", "category": "inventory_threshold_alerts", "description": "Alert when remaining shelf life is below this %"},
+    {"system": "inventory", "key": "borrow_request_alert_duration", "value": "60", "category": "inventory_threshold_alerts", "description": "Duration for pending borrow request alerts"},
+    {"system": "inventory", "key": "borrow_request_alert_unit", "value": "minutes", "category": "inventory_threshold_alerts", "description": "Time unit for borrow request alerts"},
+    {"system": "inventory", "key": "notification_channels", "value": '["in-app", "email", "sms"]', "category": "inventory_threshold_alerts", "description": "Active channels for system notifications"},
+    {"system": "inventory", "key": "alert_recipient_roles", "value": '["inventory_manager", "admin"]', "category": "inventory_threshold_alerts", "description": "Roles notified of inventory alerts"},
+    {"system": "inventory", "key": "specific_recipients", "value": "[]", "category": "inventory_threshold_alerts", "description": "Specific individuals notified of inventory alerts"},
     {"system": "inventory", "key": "damage_writeoff", "value": "Damage / Write-off", "category": "inventory_movements_reason_code", "description": "Damaged stock write-off"},
     {"system": "inventory", "key": "loss_writeoff", "value": "Loss / Write-off", "category": "inventory_movements_reason_code", "description": "Lost stock write-off"},
     {"system": "inventory", "key": "procurement_correction", "value": "Procurement Correction", "category": "inventory_movements_reason_code", "description": "Procurement correction"},
@@ -65,11 +75,11 @@ SYSTEM_CONFIGS = [
     {"system": "inventory", "key": "reversal_error", "value": "Reversal Error", "category": "inventory_movements_reason_code", "description": "Reversal due to incorrect ledger entry"},
 
     # Inventory Batch Status
-    {"system": "inventory", "key": "healthy", "value": "11", "category": "inventory_batches_status", "description": "Stock level is healthy"},
-    {"system": "inventory", "key": "low_stock", "value": "10", "category": "inventory_batches_status", "description": "Stock level is low (threshold)"},
-    {"system": "inventory", "key": "out_of_stock", "value": "0", "category": "inventory_batches_status", "description": "Stock is depleted"},
-    {"system": "inventory", "key": "near_expiry", "value": "7", "category": "inventory_batches_status", "description": "Batch is near expiration (days)"},
-    {"system": "inventory", "key": "expired", "value": "0", "category": "inventory_batches_status", "description": "Batch has expired"},
+    {"system": "inventory", "key": "healthy", "value": "Healthy", "category": "inventory_batches_status", "description": "Stock level is healthy"},
+    {"system": "inventory", "key": "low_stock", "value": "Low Stock", "category": "inventory_batches_status", "description": "Stock level is low (threshold)"},
+    {"system": "inventory", "key": "out_of_stock", "value": "Out of Stock", "category": "inventory_batches_status", "description": "Stock is depleted"},
+    {"system": "inventory", "key": "near_expiry", "value": "Near Expiry", "category": "inventory_batches_status", "description": "Batch is near expiration (days)"},
+    {"system": "inventory", "key": "expired", "value": "Expired", "category": "inventory_batches_status", "description": "Batch has expired"},
 
     # Inventory Batch Condition
     {"system": "inventory", "key": "excellent", "value": "Excellent", "category": "inventory_batches_condition", "description": "Batch is in excellent condition"},
