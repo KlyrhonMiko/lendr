@@ -1,26 +1,140 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Toggle } from '@/components/ui/toggle';
 import { Input, Textarea } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
-import { Image as ImageIcon, Globe, Tablet, BellRing, Save } from 'lucide-react';
+import { Image as ImageIcon, Globe, Tablet, BellRing, Save, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { api } from '@/lib/api';
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
+interface BrandingSettings {
+  visual_identity: {
+    brand_name: string;
+    system_theme: string;
+    logo_url: string | null;
+    favicon_url: string | null;
+  };
+  banner: {
+    is_enabled: boolean;
+    message: string | null;
+    banner_type: string;
+    expiry_date: string | null;
+    expiry_time: string | null;
+  };
+}
 
 export function BrandingSettings() {
   const [loading, setLoading] = useState(false);
-  
-  const handleSave = () => {
-    setLoading(true);
-    setTimeout(() => {
+  const [fetching, setFetching] = useState(true);
+  const [settings, setSettings] = useState<BrandingSettings>({
+    visual_identity: {
+      brand_name: 'Lendr',
+      system_theme: 'system',
+      logo_url: null,
+      favicon_url: null,
+    },
+    banner: {
+      is_enabled: false,
+      message: '',
+      banner_type: 'info',
+      expiry_date: '',
+      expiry_time: '',
+    },
+  });
+
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const faviconInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await api.get<BrandingSettings>('/admin/settings/branding');
+        if (response.status === 'success') {
+          setSettings(response.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch branding settings:', error);
+        toast.error('Failed to load branding configurations');
+      } finally {
+        setFetching(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const handleUpload = async (file: File, type: 'logo' | 'favicon') => {
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error('File size exceeds 5MB limit');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      setLoading(true);
+      const response = await api.post<{ url: string }>('/admin/settings/branding/upload', formData);
+      if (response.status === 'success') {
+        setSettings(prev => ({
+          ...prev,
+          visual_identity: {
+            ...prev.visual_identity,
+            [type === 'logo' ? 'logo_url' : 'favicon_url']: response.data.url
+          }
+        }));
+        toast.success(`${type === 'logo' ? 'Logo' : 'Favicon'} uploaded successfully`);
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Upload failed');
+    } finally {
       setLoading(false);
-      toast.success('Branding settings updated successfully');
-    }, 1000);
+    }
   };
+
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      const response = await api.put<BrandingSettings>('/admin/settings/branding', settings);
+      if (response.status === 'success') {
+        toast.success('Branding settings updated successfully');
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to save settings');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (fetching) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground italic">Fetching branding profile...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <input 
+        type="file" 
+        className="hidden" 
+        ref={logoInputRef} 
+        accept="image/*" 
+        onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0], 'logo')}
+      />
+      <input 
+        type="file" 
+        className="hidden" 
+        ref={faviconInputRef} 
+        accept="image/*" 
+        onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0], 'favicon')}
+      />
+
       {/* Platform Branding */}
       <Card>
         <CardHeader className="flex flex-row items-center gap-4">
@@ -34,11 +148,23 @@ export function BrandingSettings() {
         </CardHeader>
         <CardContent className="grid gap-8 md:grid-cols-2">
           <div className="space-y-6">
-            <Input label="Organization Name" placeholder="e.g. Lendr Corp" defaultValue="Lendr" />
+            <Input 
+              label="Organization Name" 
+              placeholder="e.g. Lendr Corp" 
+              value={settings.visual_identity.brand_name ?? ''}
+              onChange={(e) => setSettings({
+                ...settings,
+                visual_identity: { ...settings.visual_identity, brand_name: e.target.value }
+              })}
+            />
             
             <Select 
               label="System Theme" 
-              defaultValue="system"
+              value={settings.visual_identity.system_theme ?? 'system'}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSettings({
+                ...settings,
+                visual_identity: { ...settings.visual_identity, system_theme: e.target.value }
+              })}
               options={[
                 { label: 'Light', value: 'light' },
                 { label: 'Dark', value: 'dark' },
@@ -50,23 +176,49 @@ export function BrandingSettings() {
           <div className="space-y-6">
             <div className="space-y-2">
               <label className="text-sm font-semibold text-foreground px-1">Organization Logo</label>
-              <div className="border-2 border-dashed border-border rounded-xl p-8 flex flex-col items-center justify-center gap-3 bg-secondary/20 hover:bg-secondary/40 transition-colors cursor-pointer group">
-                <div className="w-10 h-10 rounded-full bg-background flex items-center justify-center text-muted-foreground group-hover:scale-110 transition-transform shadow-sm">
-                  <ImageIcon className="w-5 h-5" />
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-medium">Click to upload or drag and drop</p>
-                  <p className="text-xs text-muted-foreground mt-1">PNG, JPG, SVG (Recommended: 200x50px)</p>
-                </div>
+              <div 
+                onClick={() => logoInputRef.current?.click()}
+                className="relative overflow-hidden border-2 border-dashed border-border rounded-xl p-8 flex flex-col items-center justify-center gap-3 bg-secondary/20 hover:bg-secondary/40 transition-colors cursor-pointer group h-[140px]"
+              >
+                {settings.visual_identity.logo_url ? (
+                  <img 
+                    src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${settings.visual_identity.logo_url}`} 
+                    alt="Logo Preview" 
+                    className="max-h-full max-w-full object-contain pointer-events-none"
+                  />
+                ) : (
+                  <>
+                    <div className="w-10 h-10 rounded-full bg-background flex items-center justify-center text-muted-foreground group-hover:scale-110 transition-transform shadow-sm">
+                      <ImageIcon className="w-5 h-5" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-medium">Click to upload or drag and drop</p>
+                      <p className="text-xs text-muted-foreground mt-1">PNG, JPG, WEBP, SVG (Recommended: 200x50px)</p>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-foreground px-1">Favicon</label>
-                <div className="border-2 border-dashed border-border rounded-xl p-4 flex flex-col items-center justify-center gap-2 bg-muted/10 hover:bg-muted/20 transition-colors cursor-pointer">
-                  <Tablet className="w-5 h-5 text-muted-foreground" />
-                  <p className="text-[10px] text-center text-muted-foreground">32x32 PNG</p>
+                <div 
+                  onClick={() => faviconInputRef.current?.click()}
+                  className="relative overflow-hidden border-2 border-dashed border-border rounded-xl p-4 flex flex-col items-center justify-center gap-2 bg-muted/10 hover:bg-muted/20 transition-colors cursor-pointer h-[70px]"
+                >
+                  {settings.visual_identity.favicon_url ? (
+                    <img 
+                      src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${settings.visual_identity.favicon_url}`} 
+                      alt="Favicon Preview" 
+                      className="w-8 h-8 object-contain pointer-events-none"
+                    />
+                  ) : (
+                    <>
+                      <Tablet className="w-5 h-5 text-muted-foreground" />
+                      <p className="text-[10px] text-center text-muted-foreground">32x32 PNG</p>
+                    </>
+                  )}
                 </div>
               </div>
               <div className="flex items-end pb-1">
@@ -87,15 +239,34 @@ export function BrandingSettings() {
             <CardTitle>System-wide Announcement Banner</CardTitle>
             <CardDescription>Display a global notification banner to all active users.</CardDescription>
           </div>
-          <Toggle label="Enable Banner" defaultChecked={false} />
+          <Toggle 
+            label="Enable Banner" 
+            checked={!!settings.banner.is_enabled}
+            onChange={(e) => setSettings({
+              ...settings,
+              banner: { ...settings.banner, is_enabled: e.target.checked }
+            })}
+          />
         </CardHeader>
         <CardContent className="space-y-6">
-          <Textarea label="Banner Message" placeholder="Enter the announcement text here..." />
+          <Textarea 
+            label="Banner Message" 
+            placeholder="Enter the announcement text here..." 
+            value={settings.banner.message ?? ''}
+            onChange={(e) => setSettings({
+              ...settings,
+              banner: { ...settings.banner, message: e.target.value }
+            })}
+          />
           
           <div className="grid gap-6 md:grid-cols-3">
             <Select 
               label="Banner Type" 
-              defaultValue="info"
+              value={settings.banner.banner_type ?? 'info'}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSettings({
+                ...settings,
+                banner: { ...settings.banner, banner_type: e.target.value }
+              })}
               options={[
                 { label: 'Informational', value: 'info' },
                 { label: 'Warning', value: 'warning' },
@@ -103,8 +274,24 @@ export function BrandingSettings() {
               ]} 
             />
             
-            <Input label="Expiry Date" type="date" />
-            <Input label="Expiry Time" type="time" />
+            <Input 
+              label="Expiry Date" 
+              type="date" 
+              value={settings.banner.expiry_date ?? ''}
+              onChange={(e) => setSettings({
+                ...settings,
+                banner: { ...settings.banner, expiry_date: e.target.value }
+              })}
+            />
+            <Input 
+              label="Expiry Time" 
+              type="time" 
+              value={settings.banner.expiry_time ?? ''}
+              onChange={(e) => setSettings({
+                ...settings,
+                banner: { ...settings.banner, expiry_time: e.target.value }
+              })}
+            />
           </div>
         </CardContent>
         <CardFooter className="flex justify-end">
@@ -113,8 +300,17 @@ export function BrandingSettings() {
             disabled={loading}
             className="flex items-center gap-2 px-6 py-2.5 bg-primary hover:bg-primary/95 disabled:opacity-50 text-primary-foreground rounded-lg text-sm font-bold shadow-sm transition-all active:scale-[0.98]"
           >
-            <Save className="w-4 h-4" />
-            {loading ? 'Saving...' : 'Save Branding Configuration'}
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                Save Branding Configuration
+              </>
+            )}
           </button>
         </CardFooter>
       </Card>

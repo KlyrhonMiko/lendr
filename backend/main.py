@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 import time
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,6 +17,7 @@ from utils.logging import setup_logging, get_logger, setup_health_logging, log_o
 from systems.admin.routers.backup import router as backup
 from systems.admin.routers.configuration import router as config
 from systems.admin.routers.general_settings import router as general_settings
+from systems.admin.routers.branding_settings import router as branding_settings
 from systems.admin.routers.users import router as users
 from systems.admin.routers.roles import router as roles_config
 from systems.admin.routers.audit_log import router as admin_audit_log
@@ -71,6 +73,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Lendr Unified API", lifespan=lifespan)
+
+# Mount Static Assets
+app.mount("/api/assets", StaticFiles(directory="assets"), name="assets")
 
 app.add_middleware(
     CORSMiddleware,
@@ -146,6 +151,7 @@ app.include_router(backup, prefix="/api/admin/backups", tags=["Admin - Backups"]
 app.include_router(users, prefix="/api/admin/users", tags=["Admin - Users"], dependencies=admin_access)
 app.include_router(config, prefix="/api/admin/config", tags=["Admin - Configuration"], dependencies=admin_access)
 app.include_router(general_settings, prefix="/api/admin/settings/general", tags=["Admin - General Settings"], dependencies=admin_access)
+app.include_router(branding_settings, prefix="/api/admin/settings/branding", tags=["Admin - Branding Settings"], dependencies=admin_access)
 app.include_router(roles_config, prefix="/api/admin/roles", tags=["Admin - Roles"], dependencies=admin_access)
 app.include_router(admin_audit_log, prefix="/api/admin/audit-log", tags=["Admin - Audit Logs"], dependencies=admin_access)
 app.include_router(admin_dashboard, prefix="/api/admin/dashboard", tags=["Admin - Dashboard"], dependencies=admin_access)
