@@ -151,6 +151,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         self, 
         session: Session, 
         schema: InventoryItemCreate,
+        prefix: str | None = "ITEM",
         actor_id: UUID | None = None,
     ) -> InventoryItem:
         self.validate_uniqueness(
@@ -164,7 +165,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         return super().create(
             session, 
             schema, 
-            prefix="ITEM",
+            prefix=prefix,
             actor_id=actor_id,
         )
 

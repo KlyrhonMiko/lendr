@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -20,27 +20,78 @@ import {
   FileSpreadsheet,
   FilePieChart,
   Mail,
+  ShieldCheck,
+  Barcode,
+  Layers,
+  AlertCircle,
+  Sparkles,
   Table as TableIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { api } from '@/lib/api';
+import { useImportHistory, useImportInventory, useExportData, useDownloadTemplate } from '../lib/useImportExport';
+import { useInventoryItems } from '@/app/inventory/items/lib/useItemQueries';
+import { User as SystemUser } from '@/app/admin/users/api';
+import { format } from 'date-fns';
 
 export function ImportExportSettings() {
-  const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const perPage = 5;
   const [duplicateMode, setDuplicateMode] = useState('skip');
+  const [isIntegrityModalOpen, setIsIntegrityModalOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleImport = () => {
-    toast.info('Selecting file for import...');
+  // Hooks
+  const { data: historyResponse, isLoading: historyLoading } = useImportHistory(page, perPage);
+  const mutation = useImportInventory();
+  const { exportData } = useExportData();
+  const { downloadTemplate } = useDownloadTemplate();
+  const { data: itemsResponse } = useInventoryItems({ per_page: 500 });
+  const items = itemsResponse?.data || [];
+
+  const [users, setUsers] = useState<SystemUser[]>([]);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const res = await api.get<SystemUser[]>('/inventory/data/borrowers');
+        setUsers(res.data);
+      } catch (err) {
+        console.error('Failed to fetch borrowers for export filter:', err);
+      }
+    };
+    fetchUsers();
+  }, []);
+
+  // Audit Log Export State
+  const [auditParams, setAuditParams] = useState({
+    from_date: '',
+    to_date: '',
+    format: 'csv'
+  });
+
+  // Ledger Export State
+  const [borrowParams, setBorrowParams] = useState({
+    status: 'all',
+    format: 'xlsx',
+    borrower_id: ''
+  });
+
+  const [movementParams, setMovementParams] = useState({
+    movement_type: 'all',
+    item_id: '',
+    format: 'xlsx'
+  });
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      mutation.mutate({ file, mode: duplicateMode });
+    }
   };
 
-  const handleExport = (type: string) => {
-    toast.success(`Exporting ${type}...`);
-  };
-
-  const importHistory = [
-    { date: '2024-03-24 10:30', name: 'inventory_initial.csv', by: 'Admin', total: 150, success: 148, failed: 2, status: 'Completed' },
-    { date: '2024-03-22 14:15', name: 'new_equipment_batch.csv', by: 'Inv Manager', total: 45, success: 45, failed: 0, status: 'Completed' },
-    { date: '2024-03-20 09:00', name: 'equipment_update.csv', by: 'Admin', total: 200, success: 190, failed: 10, status: 'Error' },
-  ];
+  const importHistory = historyResponse?.data || [];
+  const meta = historyResponse?.meta;
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
@@ -58,19 +109,29 @@ export function ImportExportSettings() {
             </div>
           </CardHeader>
           <CardContent className="flex-1 space-y-6">
-            <div className="border-2 border-dashed border-border rounded-2xl p-8 flex flex-col items-center justify-center gap-4 bg-muted/10 hover:bg-muted/20 transition-all cursor-pointer group">
+            <div 
+              onClick={() => fileInputRef.current?.click()}
+              className={`border-2 border-dashed border-border rounded-2xl p-8 flex flex-col items-center justify-center gap-4 bg-muted/10 hover:bg-muted/20 transition-all cursor-pointer group ${mutation.isPending ? 'opacity-50 pointer-events-none' : ''}`}
+            >
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept=".csv"
+                onChange={handleFileSelect}
+              />
               <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center text-muted-foreground group-hover:scale-110 transition-transform">
-                <FileSpreadsheet className="w-8 h-8" />
+                {mutation.isPending ? <RefreshCcw className="w-8 h-8 animate-spin" /> : <FileSpreadsheet className="w-8 h-8" />}
               </div>
               <div className="text-center">
-                <p className="text-sm font-semibold">Click to upload or drag and drop</p>
+                <p className="text-sm font-semibold">{mutation.isPending ? 'Importing...' : 'Click to upload or drag and drop'}</p>
                 <p className="text-xs text-muted-foreground mt-1">Accepted format: CSV only (max 10MB)</p>
               </div>
               <button 
-                onClick={handleImport}
                 className="px-4 py-2 bg-indigo-500 text-white rounded-lg text-xs font-bold hover:bg-indigo-600 transition-colors"
+                disabled={mutation.isPending}
               >
-                Select File
+                {mutation.isPending ? 'Processing...' : 'Select File'}
               </button>
             </div>
 
@@ -84,15 +145,18 @@ export function ImportExportSettings() {
                   <p className="text-xs text-muted-foreground">Standardized template for bulk imports.</p>
                 </div>
               </div>
-              <button className="px-3 py-1.5 bg-indigo-500 text-white rounded-lg text-xs font-bold hover:bg-indigo-600">
+              <button 
+                onClick={downloadTemplate}
+                className="px-3 py-1.5 bg-indigo-500 text-white rounded-lg text-xs font-bold hover:bg-indigo-600"
+              >
                 Download
               </button>
             </div>
 
             <div className="grid gap-4">
               <label className="text-sm font-semibold px-1">Duplicate Handling</label>
-              <div className="grid grid-cols-3 gap-2">
-                {['Skip', 'Overwrite', 'Merge'].map((mode) => (
+              <div className="grid grid-cols-2 gap-2">
+                {['Skip', 'Overwrite'].map((mode) => (
                   <button
                     key={mode}
                     onClick={() => setDuplicateMode(mode.toLowerCase())}
@@ -109,8 +173,11 @@ export function ImportExportSettings() {
             </div>
           </CardContent>
           <CardFooter className="p-6 border-t border-border/50">
-             <button className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-muted text-muted-foreground rounded-xl text-sm font-bold opacity-50 cursor-not-allowed">
-               Review Import Mapping <ArrowRight className="w-4 h-4" />
+             <button 
+               onClick={() => setIsIntegrityModalOpen(true)}
+               className="w-full h-12 flex items-center justify-center gap-2 bg-muted hover:bg-muted/80 text-muted-foreground rounded-xl text-sm font-bold transition-all border border-border/50 hover:border-indigo-500/30 group"
+             >
+               View Import Rules & Validation <FileText className="w-4 h-4 group-hover:text-indigo-500 transition-colors" />
              </button>
           </CardFooter>
         </Card>
@@ -137,14 +204,25 @@ export function ImportExportSettings() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/50">
-                  {importHistory.map((item, i) => (
-                    <tr key={i} className="hover:bg-muted/30 transition-colors">
-                      <td className="p-4 pl-6 text-muted-foreground font-mono">{item.date}</td>
-                      <td className="p-4 font-semibold">{item.name}</td>
+                  {historyLoading ? (
+                    <tr>
+                      <td colSpan={4} className="p-12 text-center text-muted-foreground">
+                        <RefreshCcw className="w-6 h-6 animate-spin mx-auto mb-2" />
+                        Loading history...
+                      </td>
+                    </tr>
+                  ) : importHistory.map((item, i) => (
+                    <tr key={item.id} className="hover:bg-muted/30 transition-colors">
+                      <td className="p-4 pl-6 text-muted-foreground font-mono">
+                         {item.created_at}
+                      </td>
+                      <td className="p-4 font-semibold">{item.filename}</td>
                       <td className="p-4 text-center">
                         <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold border ${
                           item.status === 'Completed' 
                             ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' 
+                            : item.status === 'Partial Success'
+                            ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
                             : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
                         }`}>
                           {item.status === 'Completed' ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
@@ -152,18 +230,50 @@ export function ImportExportSettings() {
                         </span>
                       </td>
                       <td className="p-4 pr-6 text-right">
-                         {item.failed > 0 && (
-                           <button className="text-xs text-rose-500 hover:underline">Error Report</button>
+                         {item.error_count > 0 && (
+                           <button 
+                             onClick={() => {
+                               console.log(item.error_log);
+                               toast.info('Check console for error details (Error Report UI coming soon)');
+                             }}
+                             className="text-xs text-rose-500 hover:underline"
+                           >
+                             Error Report
+                           </button>
                          )}
                       </td>
                     </tr>
                   ))}
+                  {!historyLoading && importHistory.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="p-12 text-center text-muted-foreground italic">
+                        No import history found.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
           </CardContent>
-          <CardFooter className="p-6 border-t border-border/50">
-             <button className="text-xs text-indigo-500 font-bold hover:underline mx-auto">View Full History</button>
+          <CardFooter className="p-6 border-t border-border/50 flex items-center justify-between">
+             <div className="flex items-center gap-2">
+                <button 
+                  disabled={page <= 1}
+                  onClick={() => setPage(page - 1)}
+                  className="p-2 rounded-lg hover:bg-muted disabled:opacity-30"
+                >
+                  <ArrowRight className="w-4 h-4 rotate-180" />
+                </button>
+                <span className="text-xs font-bold">Page {page}</span>
+                <button 
+                  disabled={!meta || page * perPage >= meta.total}
+                  onClick={() => setPage(page + 1)}
+                  className="p-2 rounded-lg hover:bg-muted disabled:opacity-30"
+                >
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+             </div>
+             <button className="text-xs text-indigo-500 font-bold hover:underline">View Full History</button>
           </CardFooter>
         </Card>
       </div>
@@ -186,22 +296,37 @@ export function ImportExportSettings() {
                <FilePieChart className="w-4 h-4" />
                Audit Logs
              </div>
-             <div className="grid gap-4">
-               <div className="grid grid-cols-2 gap-4">
-                 <Input label="From Date" type="date" />
-                 <Input label="To Date" type="date" />
-               </div>
-               <Select 
-                 label="Format"
-                 options={[
-                   { label: 'CSV (Comma Separated Values)', value: 'csv' },
-                   { label: 'XLSX (Excel Spreadsheet)', value: 'xlsx' },
-                 ]}
-               />
-               <button className="w-full h-11 bg-indigo-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2">
-                 <Download className="w-4 h-4" /> Export Audit Logs
-               </button>
-             </div>
+              <div className="grid gap-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <Input 
+                    label="From Date" 
+                    type="date" 
+                    value={auditParams.from_date}
+                    onChange={(e) => setAuditParams({...auditParams, from_date: e.target.value})}
+                  />
+                  <Input 
+                    label="To Date" 
+                    type="date" 
+                    value={auditParams.to_date}
+                    onChange={(e) => setAuditParams({...auditParams, to_date: e.target.value})}
+                  />
+                </div>
+                <Select 
+                  label="Format"
+                  value={auditParams.format}
+                  onChange={(e) => setAuditParams({...auditParams, format: (e.target as HTMLSelectElement).value})}
+                  options={[
+                    { label: 'CSV (Comma Separated Values)', value: 'csv' },
+                    { label: 'XLSX (Excel Spreadsheet)', value: 'xlsx' },
+                  ]}
+                />
+                <button 
+                  onClick={() => exportData('audit', auditParams)}
+                  className="w-full h-11 bg-indigo-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2"
+                >
+                  <Download className="w-4 h-4" /> Export Audit Logs
+                </button>
+              </div>
            </div>
 
            {/* Ledger Data */}
@@ -211,43 +336,96 @@ export function ImportExportSettings() {
                Ledger Data
              </div>
              <div className="grid gap-6">
-               <div className="space-y-4 p-4 rounded-2xl border border-border bg-muted/5">
-                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1">Borrow Request History</p>
-                 <div className="grid grid-cols-2 gap-4">
-                   <Select label="Status Filter" options={[
-                      { label: 'All Statuses', value: 'all' },
-                      { label: 'Pending', value: 'pending' },
-                      { label: 'Approved', value: 'approved' },
-                      { label: 'Returned', value: 'returned' },
-                    ]} />
-                   <Select label="Format" options={[
-                      { label: 'Excel (XLSX)', value: 'xlsx' },
-                      { label: 'CSV', value: 'csv' },
-                      { label: 'PDF Report', value: 'pdf' },
-                    ]} />
-                 </div>
-                 <button className="w-full h-10 bg-muted hover:bg-muted font-bold text-xs rounded-lg transition-colors border border-border">
-                   Export History
-                 </button>
-               </div>
+                <div className="space-y-4 p-4 rounded-2xl border border-border bg-muted/5">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1">Borrow Request History</p>
+                  <div className="space-y-4">
+                    <Select 
+                       label="Specific Borrower (Optional)" 
+                       value={borrowParams.borrower_id}
+                       onChange={(e) => setBorrowParams({...borrowParams, borrower_id: (e.target as HTMLSelectElement).value})}
+                       options={[
+                          { label: 'All Borrowers', value: '' },
+                          ...users.map(u => ({ 
+                            label: `${u.first_name} ${u.last_name} (${u.user_id})`, 
+                            value: u.user_id 
+                          }))
+                        ]} 
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <Select 
+                         label="Status Filter" 
+                         value={borrowParams.status}
+                         onChange={(e) => setBorrowParams({...borrowParams, status: (e.target as HTMLSelectElement).value})}
+                         options={[
+                            { label: 'All Statuses', value: 'all' },
+                            { label: 'Pending', value: 'pending' },
+                            { label: 'Approved', value: 'approved' },
+                            { label: 'Returned', value: 'returned' },
+                          ]} 
+                      />
+                      <Select 
+                         label="Format" 
+                         value={borrowParams.format}
+                         onChange={(e) => setBorrowParams({...borrowParams, format: (e.target as HTMLSelectElement).value})}
+                         options={[
+                            { label: 'Excel (XLSX)', value: 'xlsx' },
+                            { label: 'CSV', value: 'csv' },
+                          ]} 
+                      />
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => exportData('requests', borrowParams)}
+                    className="w-full h-10 bg-muted hover:bg-muted font-bold text-xs rounded-lg transition-colors border border-border"
+                  >
+                    Export History
+                  </button>
+                </div>
 
-               <div className="space-y-4 p-4 rounded-2xl border border-border bg-muted/5">
-                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1">Equipment Movements</p>
-                 <div className="grid grid-cols-2 gap-4">
-                   <Select label="Movement Type" options={[
-                      { label: 'All Movements', value: 'all' },
-                      { label: 'In Only', value: 'in' },
-                      { label: 'Out Only', value: 'out' },
-                    ]} />
-                   <Select label="Format" options={[
-                      { label: 'Excel (XLSX)', value: 'xlsx' },
-                      { label: 'CSV', value: 'csv' },
-                    ]} />
-                 </div>
-                 <button className="w-full h-10 bg-muted hover:bg-muted font-bold text-xs rounded-lg transition-colors border border-border">
-                   Export Movements
-                 </button>
-               </div>
+                <div className="space-y-4 p-4 rounded-2xl border border-border bg-muted/5">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1">Equipment Movements</p>
+                  <div className="space-y-4">
+                    <Select 
+                       label="Specific Item (Optional)" 
+                       value={movementParams.item_id}
+                       onChange={(e) => setMovementParams({...movementParams, item_id: (e.target as HTMLSelectElement).value})}
+                       options={[
+                          { label: 'All Items', value: '' },
+                          ...items.map(item => ({ 
+                            label: `${item.name} (${item.item_id})`, 
+                            value: item.item_id 
+                          }))
+                        ]} 
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <Select 
+                         label="Movement Type" 
+                         value={movementParams.movement_type}
+                         onChange={(e) => setMovementParams({...movementParams, movement_type: (e.target as HTMLSelectElement).value})}
+                         options={[
+                            { label: 'All Movements', value: 'all' },
+                            { label: 'In Only', value: 'in' },
+                            { label: 'Out Only', value: 'out' },
+                          ]} 
+                      />
+                      <Select 
+                         label="Format" 
+                         value={movementParams.format}
+                         onChange={(e) => setMovementParams({...movementParams, format: (e.target as HTMLSelectElement).value})}
+                         options={[
+                            { label: 'Excel (XLSX)', value: 'xlsx' },
+                            { label: 'CSV', value: 'csv' },
+                          ]} 
+                      />
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => exportData('movements', movementParams)}
+                    className="w-full h-10 bg-muted hover:bg-muted font-bold text-xs rounded-lg transition-colors border border-border"
+                  >
+                    Export Movements
+                  </button>
+                </div>
              </div>
            </div>
         </CardContent>
@@ -269,8 +447,15 @@ export function ImportExportSettings() {
             Create Schedule +
           </button>
         </CardHeader>
-        <CardContent>
-          <div className="grid gap-6 md:grid-cols-3">
+        <CardContent className="relative">
+          {/* Overlay for Coming Soon */}
+          <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-b-3xl">
+             <div className="px-6 py-3 bg-indigo-500 text-white rounded-2xl font-bold shadow-2xl flex items-center gap-2 animate-pulse">
+                <Clock className="w-5 h-5" /> Feature Coming Soon
+             </div>
+          </div>
+          
+          <div className="grid gap-6 md:grid-cols-3 opacity-40 grayscale">
             <div className="space-y-4 p-6 rounded-3xl bg-muted/30 border border-border border-dashed flex flex-col items-center justify-center text-center">
               <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center text-muted-foreground mb-2">
                 <Mail className="w-6 h-6" />
@@ -310,6 +495,197 @@ export function ImportExportSettings() {
         </CardContent>
       </Card>
 
+      {/* Data Integrity Modal */}
+      {isIntegrityModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-4xl bg-card border border-border rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-border flex items-center justify-between bg-muted/5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
+                  <ShieldCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold">Import Rules & Data Integrity</h3>
+                  <p className="text-xs text-muted-foreground">Detailed guide on how to structure your CSV for successful bulk ingestion.</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsIntegrityModalOpen(false)}
+                className="p-2 rounded-lg hover:bg-muted transition-colors"
+                title="Close Guide"
+              >
+                <XCircle className="w-5 h-5 text-muted-foreground" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6 space-y-8 scrollbar-thin scrollbar-thumb-border">
+              {/* High-Level Overview Cards */}
+              <div className="grid gap-6 md:grid-cols-2">
+                {/* Trackable Items Logic Card */}
+                <div className="relative group p-6 rounded-3xl bg-blue-500/5 border border-blue-500/10 flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-500">
+                      <Barcode className="w-6 h-6" />
+                    </div>
+                    <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-blue-500/10 text-blue-500 border border-blue-500/20 uppercase tracking-widest">Trackable (Equipment)</span>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold mb-2">Trackable Item Strategy</h4>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Used for unique assets like Laptops, Drones, or Tools. Each row is treated as a <span className="text-blue-500 font-bold">unique physical unit</span>.
+                    </p>
+                  </div>
+                  <ul className="text-xs space-y-2 mt-2">
+                    <li className="flex items-start gap-2">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-blue-500 mt-0.5" />
+                      <div><span className="font-bold text-foreground">serial_number:</span> Mandatory and must be unique.</div>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-blue-500 mt-0.5" />
+                      <div><span className="font-bold text-foreground">quantity:</span> Ignored (defaults to 1 unit per serial).</div>
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Untrackable/Consumable Logic Card */}
+                <div className="relative group p-6 rounded-3xl bg-amber-500/5 border border-amber-500/10 flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-500">
+                      <Layers className="w-6 h-6" />
+                    </div>
+                    <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-widest">Untrackable (Consumables)</span>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold mb-2">Bulk Consumable Strategy</h4>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Used for items tracked in <span className="text-amber-500 font-bold">batches</span> such as Masks, Batteries, or Perishables.
+                    </p>
+                  </div>
+                  <ul className="text-xs space-y-2 mt-2">
+                    <li className="flex items-start gap-2">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-500 mt-0.5" />
+                      <div><span className="font-bold text-foreground">quantity:</span> Mandatory (must be greater than 0).</div>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-500 mt-0.5" />
+                      <div><span className="font-bold text-foreground">expiration_date:</span> Mandatory for consumables (YYYY-MM-DD).</div>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Advanced Field Reference */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-bold px-1 flex items-center gap-2">
+                   <TableIcon className="w-4 h-4 text-indigo-500" />
+                   Validation Matrix
+                </h4>
+                <div className="rounded-2xl border border-border overflow-hidden bg-muted/5">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted/50 border-b border-border text-muted-foreground">
+                      <tr>
+                        <th className="p-3 pl-6 text-left font-bold w-1/4">Field (Header)</th>
+                        <th className="p-3 text-left font-bold w-1/2">Behavior & Logic</th>
+                        <th className="p-3 pr-6 text-left font-bold w-1/4">Constraints</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/50">
+                      <tr>
+                        <td className="p-3 pl-6 font-mono font-bold text-indigo-500">category</td>
+                        <td className="p-3 text-muted-foreground leading-relaxed text-[11px]">High-level organizational grouping for different departments or functional areas.</td>
+                        <td className="p-3 pr-6 italic font-semibold text-indigo-500/80">it_communications, medical_clinical, safety_security...</td>
+                      </tr>
+                      <tr>
+                        <td className="p-3 pl-6 font-mono font-bold text-indigo-500">item_type</td>
+                        <td className="p-3 text-muted-foreground leading-relaxed text-[11px]">Sub-category for grouping similar equipment or supplies under a classification.</td>
+                        <td className="p-3 pr-6 italic font-semibold text-indigo-500/80">electronics, tools, pharmaceuticals...</td>
+                      </tr>
+                      <tr>
+                        <td className="p-3 pl-6 font-mono font-bold text-indigo-500">classification</td>
+                        <td className="p-3 text-muted-foreground leading-relaxed">System-wide categorization. Controls whether tracking rules are enforced.</td>
+                        <td className="p-3 pr-6 italic font-semibold">equipment, consumable</td>
+                      </tr>
+                      <tr>
+                        <td className="p-3 pl-6 font-mono font-bold text-indigo-500">is_trackable</td>
+                        <td className="p-3 text-muted-foreground leading-relaxed">True = Asset tracking (Requires Serial). False = Batch tracking.</td>
+                        <td className="p-3 pr-6 italic font-semibold text-rose-500">true, false</td>
+                      </tr>
+                      <tr>
+                        <td className="p-3 pl-6 font-mono font-bold text-indigo-500">condition</td>
+                        <td className="p-3 text-muted-foreground leading-relaxed">The physical state of the item at the time of import.</td>
+                        <td className="p-3 pr-6 italic">good, fair, poor</td>
+                      </tr>
+                      <tr>
+                        <td className="p-3 pl-6 font-mono font-bold text-indigo-500">serial_number</td>
+                        <td className="p-3 text-muted-foreground leading-relaxed font-semibold">Only required if is_trackable is "true".</td>
+                        <td className="p-3 pr-6 italic text-blue-500">Unique Identifier</td>
+                      </tr>
+                      <tr>
+                        <td className="p-3 pl-6 font-mono font-bold text-indigo-500">expiration_date</td>
+                        <td className="p-3 text-muted-foreground leading-relaxed font-semibold">Required for any consumable item.</td>
+                        <td className="p-3 pr-6 italic text-amber-500 uppercase">YYYY-MM-DD</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Dual Sample Rows */}
+              <div className="grid gap-6 md:grid-cols-2">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                    <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Equipment Sample</h4>
+                  </div>
+                  <div className="bg-muted/30 p-4 rounded-2xl border border-border font-mono text-[9px] overflow-x-auto whitespace-nowrap leading-relaxed opacity-80 hover:opacity-100 transition-opacity">
+                    <div className="text-muted-foreground"># Trackable Asset Row</div>
+                    name,category,classification,item_type,is_trackable,serial_number
+                    <br />
+                    "Dell Monitor","it_communications","equipment","electronics","true","SN-102938"
+                    <br />
+                    "Fire Extinguisher","safety_security","equipment","tools","true","FE-998877"
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                    <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Consumable Sample</h4>
+                  </div>
+                  <div className="bg-muted/30 p-4 rounded-2xl border border-border font-mono text-[9px] overflow-x-auto whitespace-nowrap leading-relaxed opacity-80 hover:opacity-100 transition-opacity">
+                    <div className="text-muted-foreground"># Non-Trackable Batch Row</div>
+                    name,category,classification,item_type,is_trackable,quantity,expiration_date
+                    <br />
+                    "Surgical Gloves","medical_clinical","consumable","disposables","false","500","2026-12-01"
+                  </div>
+                </div>
+              </div>
+
+              {/* Pro Tip Box */}
+              <div className="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 shrink-0">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-indigo-500 mb-1 tracking-tight">System Refinement: Logic Heuristics</h4>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Our import engine includes "Rescue Mapping". If you accidentally put "Equipment" in the <span className="font-mono">item_type</span> column instead of <span className="font-mono">classification</span>, the system will attempt to intelligently re-map it for you!
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-6 border-t border-border bg-muted/5 flex items-center justify-between">
+              <p className="text-[10px] text-muted-foreground italic">Need help? Reference the official documentation for full API specs.</p>
+              <button 
+                onClick={() => setIsIntegrityModalOpen(false)}
+                className="px-8 py-2.5 bg-indigo-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/20 hover:scale-105 active:scale-95 transition-all"
+              >
+                Close & Return
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

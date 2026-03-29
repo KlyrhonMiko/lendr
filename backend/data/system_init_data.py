@@ -9,6 +9,8 @@ SYSTEM_CONFIGS = [
     {"system": "inventory", "key": "disposables", "value": "Disposables", "category": "inventory_item_type", "description": "Disposable items for single use"},
     {"system": "inventory", "key": "chemicals", "value": "Chemicals", "category": "inventory_item_type", "description": "Chemical products and solutions"},
     {"system": "inventory", "key": "pharmaceuticals", "value": "Pharmaceuticals", "category": "inventory_item_type", "description": "Pharmaceutical products and medications"},
+    {"system": "inventory", "key": "consumable", "value": "Consumable", "category": "inventory_item_type", "description": "Consumable items that are used up"},
+    {"system": "inventory", "key": "equipment", "value": "Equipment", "category": "inventory_item_type", "description": "Durable equipment items"},
 
     # Inventory Condition
     {"system": "inventory", "key": "good", "value": "Good", "category": "inventory_condition", "description": "Item is in good working condition"},

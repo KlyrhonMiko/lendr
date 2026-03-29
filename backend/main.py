@@ -31,6 +31,7 @@ from systems.inventory.routers.audit_log import router as audit_log
 from systems.inventory.routers.borrower import router as borrower
 from systems.inventory.routers.configuration import router as inv_config
 from systems.inventory.routers.settings import router as inv_settings
+from systems.inventory.routers.data import router as data
 
 # Initialize System-wide Logging
 setup_logging(log_level=settings.LOG_LEVEL, log_dir=settings.LOG_DIR)
@@ -177,6 +178,12 @@ app.include_router(
     inv_settings,
     prefix="/api/inventory/settings",
     tags=["Inventory - Global Settings"],
+    dependencies=inventory_access,
+)
+app.include_router(
+    data,
+    prefix="/api/inventory/data",
+    tags=["Inventory - Data Management"],
     dependencies=inventory_access,
 )
 

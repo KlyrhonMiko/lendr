@@ -14,6 +14,7 @@ from .borrow_participant import BorrowParticipant
 from .borrow_request_unit import BorrowRequestUnit
 from .borrow_request_batch import BorrowRequestBatch
 from .settings import InventoryConfig, BorrowerConfig 
+from .import_history import ImportHistory
 
 __all__ = [
     "InventoryItem",
@@ -31,4 +32,5 @@ __all__ = [
     "AuditLog",
     "InventoryConfig",
     "BorrowerConfig",
+    "ImportHistory",
 ]

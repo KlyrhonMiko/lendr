@@ -276,7 +276,7 @@ class ConfigBaseService(Generic[ConfigModelType]):
         category: str | None = None,
     ) -> ConfigModelType | None:
         statement = select(self.model).where(
-            self.model.key == key,
+            (func.lower(self.model.key) == key.lower()) | (func.lower(self.model.value) == key.lower()),
             self.model.is_deleted.is_(False),
         )
 
@@ -295,7 +295,7 @@ class ConfigBaseService(Generic[ConfigModelType]):
 
     def exists(self, session: Session, key: str, category: str) -> bool:
         statement = select(self.model).where(
-            self.model.key == key,
+            (func.lower(self.model.key) == key.lower()) | (func.lower(self.model.value) == key.lower()),
             self.model.category == category,
             self.model.is_deleted.is_(False),
         )

@@ -38,7 +38,9 @@ async function request<T>(
   const token = auth.getToken();
 
   const headers = new Headers(options.headers);
-  headers.set('Content-Type', 'application/json');
+  if (!(options.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json');
+  }
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
   }
@@ -122,7 +124,7 @@ export const api = {
   post: <T>(url: string, data?: unknown) => {
     const options: RequestInit = { method: 'POST' };
     if (data !== undefined) {
-      options.body = JSON.stringify(data);
+      options.body = data instanceof FormData ? data : JSON.stringify(data);
     }
     return request<T>(url, options);
   },

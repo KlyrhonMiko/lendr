@@ -5,6 +5,7 @@ from uuid import uuid4
 from sqlmodel import Session, select
 from systems.admin.models.user import User
 from systems.admin.models.settings import AdminConfig
+from systems.inventory.models.settings import InventoryConfig
 from utils.security import get_password_hash
 from data.system_init_data import SYSTEM_CONFIGS, RBAC_ROLES
 from utils.logging import get_logger
@@ -46,15 +47,18 @@ class InitializationService:
         """Idempotently seed general system configurations."""
         count = 0
         for config_data in SYSTEM_CONFIGS:
+            system = config_data.get("system", "admin")
+            model = InventoryConfig if system == "inventory" else AdminConfig
+            
             existing = session.exec(
-                select(AdminConfig).where(
-                    AdminConfig.key == config_data["key"],
-                    AdminConfig.category == config_data["category"]
+                select(model).where(
+                    model.key == config_data["key"],
+                    model.category == config_data["category"]
                 )
             ).first()
-
+    
             if not existing:
-                config = AdminConfig(**config_data)
+                config = model(**config_data)
                 session.add(config)
                 count += 1
         
