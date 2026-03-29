@@ -15,6 +15,7 @@ from utils.logging import setup_logging, get_logger, setup_health_logging, log_o
 # Routers
 from systems.admin.routers.backup import router as backup
 from systems.admin.routers.configuration import router as config
+from systems.admin.routers.general_settings import router as general_settings
 from systems.admin.routers.users import router as users
 from systems.admin.routers.roles import router as roles_config
 from systems.admin.routers.audit_log import router as admin_audit_log
@@ -47,8 +48,22 @@ async def lifespan(app: FastAPI):
         with Session(engine) as session:
             init_service = InitializationService()
             init_service.run(session)
+            
+            # Initialize System Localization
+            from systems.admin.services.configuration_service import ConfigurationService
+            from utils.time_utils import update_system_timezone, update_system_format
+            
+            config_service = ConfigurationService()
+            tz = config_service.get_value(session, "timezone", "Asia/Manila", category="general_settings")
+            df = config_service.get_value(session, "date_format", "MM/DD/YYYY", category="general_settings")
+            tf = config_service.get_value(session, "time_format", "12h", category="general_settings")
+            
+            update_system_timezone(tz)
+            update_system_format(df, tf)
+            
         log_operation("INIT-DONE", "System Initialization COMPLETED")
         log_operation("DB-CONNECT", "PostgreSQL connectivity established")
+        log_operation("LOCALE-INIT", f"System Timezone set to {tz}, Format: {df} {tf}")
     else:
         logger.warning("System Initialization SKIPPED (SKIP_INIT=True)")
         log_operation("INIT-SKIP", "System Initialization SKIPPED", level="WARNING")
@@ -130,6 +145,7 @@ admin_access = [
 app.include_router(backup, prefix="/api/admin/backups", tags=["Admin - Backups"], dependencies=admin_access)
 app.include_router(users, prefix="/api/admin/users", tags=["Admin - Users"], dependencies=admin_access)
 app.include_router(config, prefix="/api/admin/config", tags=["Admin - Configuration"], dependencies=admin_access)
+app.include_router(general_settings, prefix="/api/admin/settings/general", tags=["Admin - General Settings"], dependencies=admin_access)
 app.include_router(roles_config, prefix="/api/admin/roles", tags=["Admin - Roles"], dependencies=admin_access)
 app.include_router(admin_audit_log, prefix="/api/admin/audit-log", tags=["Admin - Audit Logs"], dependencies=admin_access)
 app.include_router(admin_dashboard, prefix="/api/admin/dashboard", tags=["Admin - Dashboard"], dependencies=admin_access)

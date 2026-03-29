@@ -1,6 +1,7 @@
 from datetime import datetime
 from uuid import UUID
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_serializer
+from utils.time_utils import format_datetime
 
 class SystemStatusRead(BaseModel):
     # Overall Status Cards
@@ -40,11 +41,19 @@ class ActiveSessionRead(BaseModel):
     expires_at: datetime
     device_id: str | None = None
 
+    @field_serializer("issued_at", "expires_at")
+    def serialize_dates(self, dt: datetime) -> str:
+        return format_datetime(dt)
+
 class LogEntryRead(BaseModel):
-    timestamp: str
+    timestamp: datetime
     code: str = Field(..., description="Error code e.g., '500-INTERNAL'")
     message: str = Field(..., description="Description of the event")
     level: str = Field(..., description="Original log level")
     severity: str = Field(..., description="UI-friendly severity: 'Critical', 'Warning', 'Info'")
+
+    @field_serializer("timestamp")
+    def serialize_timestamp(self, dt: datetime) -> str:
+        return format_datetime(dt)
 
     model_config = ConfigDict(from_attributes=True)

@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 import time
 import psutil
 import re
@@ -119,9 +120,9 @@ class SystemHealthService:
         statement = (
             select(UserSession, User)
             .join(User, UserSession.user_uuid == User.id, isouter=True)
-            .where(UserSession.is_revoked == False)
+            .where(not UserSession.is_revoked)
             .where(UserSession.expires_at > now)
-            .where(UserSession.is_deleted == False)
+            .where(not UserSession.is_deleted)
             .offset(skip).limit(limit)
         )
         
@@ -185,9 +186,18 @@ class SystemHealthService:
                         severity = "Critical"
                     elif lvl_upper == "WARNING":
                         severity = "Warning"
+
+                    # Parse the timestamp string into a datetime object
+                    # Logs are written in Manila time (system local)
+                    from utils.time_utils import DEFAULT_TZ
+                    try:
+                        dt_timestamp = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S").replace(tzinfo=DEFAULT_TZ)
+                    except ValueError:
+                        # Fallback if format differs
+                        dt_timestamp = get_now_manila()
                     
                     logs.append(LogEntryRead(
-                        timestamp=timestamp,
+                        timestamp=dt_timestamp,
                         code=code or f"{lvl_upper}-EVENT",
                         message=message,
                         level=level,

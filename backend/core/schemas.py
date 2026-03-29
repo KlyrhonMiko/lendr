@@ -3,7 +3,7 @@ from uuid import UUID
 from typing import Any, Generic, Optional, TypeVar
 
 from fastapi import Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 
 from utils.time_utils import format_datetime, get_now_manila
 
@@ -107,6 +107,10 @@ class ConfigRead(BaseModel):
     description: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+
+    @field_serializer("created_at", "updated_at")
+    def serialize_dates(self, dt: datetime) -> str:
+        return format_datetime(dt)
 
     class Config:
         from_attributes = True

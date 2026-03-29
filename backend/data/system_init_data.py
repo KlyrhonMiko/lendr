@@ -207,6 +207,12 @@ SYSTEM_CONFIGS = [
     {"system": "inventory", "key": "assign", "value": "Assign", "category": "audit_logs_action", "description": "Units assigned"},
     {"system": "inventory", "key": "adjust_stock", "value": "Adjust Stock", "category": "audit_logs_action", "description": "Stock adjustment"},
     {"system": "inventory", "key": "transition", "value": "Transition", "category": "audit_logs_action", "description": "Status transition"},
+
+    # General Settings
+    {"system": "admin", "key": "timezone", "value": "Asia/Manila", "category": "general_settings", "description": "System-wide timezone"},
+    {"system": "admin", "key": "date_format", "value": "MM/DD/YYYY", "category": "general_settings", "description": "System-wide date format"},
+    {"system": "admin", "key": "time_format", "value": "12h", "category": "general_settings", "description": "System-wide time format"},
+    {"system": "admin", "key": "language", "value": "en", "category": "general_settings", "description": "System-wide language"},
 ]
 
 RBAC_ROLES = [

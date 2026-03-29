@@ -1011,6 +1011,28 @@ def seed_inventory_alert_settings(headers: dict[str, str]) -> None:
             create_setting(headers, system="inventory", key=key, value=value, category="inventory_threshold_alerts", description=desc, endpoint="/api/inventory/config/inventory")
 
 
+def seed_general_settings(headers: dict[str, str]) -> None:
+    """Seed general system settings (Localization and Feature Flags) via API."""
+    section("GENERAL SETTINGS CONFIGURATIONS")
+    
+    settings = [
+        ("timezone", "Asia/Manila", "System default timezone"),
+        ("date_format", "MM/DD/YYYY", "System-wide date display format"),
+        ("time_format", "12h", "System-wide time display format"),
+        ("language", "en", "System default language"),
+    ]
+    
+    for key, value, desc in settings:
+        create_setting(
+            headers,
+            system="admin",
+            key=key,
+            value=value,
+            category="general_settings",
+            description=desc,
+        )
+
+
 def print_summary() -> int:
     """Print execution summary."""
     total = pass_count + fail_count
@@ -1054,6 +1076,7 @@ def main() -> int:
         seed_inventory_alert_settings(admin_headers)
         seed_backup_configurations(admin_headers)
         seed_audit_configurations(admin_headers)
+        seed_general_settings(admin_headers)
         
         # Step 4: Print summary and return exit code
         return print_summary()
