@@ -12,13 +12,10 @@ import { InventorySettingsTabs } from './components/InventorySettingsTabs';
 import { AlertSettings } from './components/AlertSettings';
 import { ImportExportSettings } from './components/ImportExportSettings';
 import { DictionarySettings } from './components/DictionarySettings';
+import { useInventorySettings, useSettingMutations } from './lib/useSettingsQueries';
 
 export default function InventorySettingsPage() {
   const [activeTab, setActiveTab] = useState<InventorySettingsTab>('system');
-  const [settings, setSettings] = useState<SystemSetting[]>([]);
-  const [meta, setMeta] = useState<PaginationMeta | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Dictionary Filters
   const [search, setSearch] = useState('');
@@ -26,42 +23,26 @@ export default function InventorySettingsPage() {
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
 
-  const fetchSettings = useCallback(async () => {
-    if (activeTab !== 'dictionary') return;
-    
-    setLoading(true);
-    setError(null);
-    try {
-      const params: SettingsListParams = {
-        page,
-        per_page: perPage,
-        key: search || undefined,
-        category: categoryFilter || undefined,
-      };
-      
-      // For dictionary, we fetch from inventory config by default
-      const res = await inventorySettingsApi.listInventory(params);
-        
-      setSettings(res.data);
-      if (res.meta) setMeta(res.meta);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to fetch settings';
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  }, [activeTab, search, categoryFilter, page, perPage]);
+  const { data: settingsResponse, isLoading: loading, error: queryError } = useInventorySettings({
+    page,
+    per_page: perPage,
+    key: search || undefined,
+    category: categoryFilter || undefined,
+  }, activeTab);
 
-  useEffect(() => {
-    if (activeTab === 'dictionary') {
-      fetchSettings();
-    }
-  }, [fetchSettings, activeTab]);
+  const { deleteSetting, createSetting } = useSettingMutations();
+
+  const settings = settingsResponse?.data || [];
+  const meta = settingsResponse?.meta || null;
+  const error = queryError ? (queryError as Error).message : null;
 
   const handleDelete = async (key: string, category: string) => {
-    toast.success(`Deleted ${key} from ${category}`);
-    // Refresh settings in real implementation
-    fetchSettings();
+    try {
+      await deleteSetting.mutateAsync({ category, key });
+      toast.success(`Deleted ${key} from ${category}`);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete setting');
+    }
   };
 
   const handleEdit = (setting: SystemSetting) => {
@@ -91,7 +72,7 @@ export default function InventorySettingsPage() {
             settings={settings}
             loading={loading}
             meta={meta}
-            categories={['inventory', 'borrower', 'general', 'alerts']}
+            categories={['inventory_category', 'inventory_condition', 'inventory_item_type', 'inventory_classification', 'inventory_movements_reason_code']}
             search={search}
             onSearchChange={setSearch}
             categoryFilter={categoryFilter}
@@ -100,6 +81,14 @@ export default function InventorySettingsPage() {
             onPerPageChange={setPerPage}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            onAdd={async (data) => {
+               try {
+                 await createSetting.mutateAsync(data);
+                 toast.success('Added new dictionary entry');
+               } catch (err: any) {
+                 toast.error(err.message || 'Failed to add entry');
+               }
+            }}
           />
         )}
       </div>

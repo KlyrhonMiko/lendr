@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { AlertCircle } from 'lucide-react';
-import { borrowApi, BorrowListParams, BorrowRequestEvent, BorrowRequest } from './api';
+import { borrowApi, BorrowRequestEvent, BorrowRequest } from './api';
+import { useBorrowRequests, useBorrowMutations } from './lib/useRequestQueries';
 import { Pagination } from '@/components/ui/Pagination';
 import { UnitSelectionModal } from './UnitSelectionModal';
 import { ReturnModal } from './ReturnModal';
@@ -18,10 +19,6 @@ import { ConfirmBorrowActionModal } from './components/ConfirmBorrowActionModal'
 import { ReleaseReceiptModal } from './components/ReleaseReceiptModal';
 
 export default function BorrowsPage() {
-  const [records, setRecords] = useState<BorrowRecord[]>([]);
-  const [meta, setMeta] = useState<PaginationMeta | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const [requestEvents, setRequestEvents] = useState<Record<string, BorrowRequestEvent[]>>({});
   const [loadingEvents, setLoadingEvents] = useState<Record<string, boolean>>({});
@@ -44,26 +41,18 @@ export default function BorrowsPage() {
 
   const debouncedSearch = useDebounce(searchInput, 400);
 
-  const fetchRecords = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params: BorrowListParams = {
-        page,
-        per_page: perPage,
-        status: statusFilter !== 'ALL' ? statusFilter : undefined,
-        search: debouncedSearch || undefined,
-      };
-      const res = await borrowApi.list(params);
-      setRecords(res.data);
-      if (res.meta) setMeta(res.meta);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to fetch data';
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, perPage, statusFilter, debouncedSearch]);
+  const { data: requestsResponse, isLoading: requestsLoading, error: requestsError } = useBorrowRequests({
+    page,
+    per_page: perPage,
+    status: statusFilter !== 'ALL' ? statusFilter : undefined,
+    search: debouncedSearch || undefined,
+  });
+
+  const records = (requestsResponse?.data as unknown as BorrowRecord[]) || [];
+  const meta = requestsResponse?.meta || null;
+  const error = requestsError ? (requestsError as Error).message : null;
+
+  const { executeAction, invalidateList } = useBorrowMutations();
 
   const fetchRequestEvents = useCallback(async (requestId: string, force = false) => {
     if (!force && requestEvents[requestId]) return;
@@ -116,25 +105,13 @@ export default function BorrowsPage() {
     setPage(1);
   }, [statusFilter, debouncedSearch, perPage]);
 
-  useEffect(() => {
-    fetchRecords();
-  }, [fetchRecords]);
-
-  const actionHandlers = {
-    approve: borrowApi.approve,
-    reject: borrowApi.reject,
-    release: borrowApi.release,
-    return: borrowApi.return,
-    reopen: borrowApi.reopen,
-
-    close: borrowApi.close,
-  } as const;
+  // Remove manual initial fetchRecords hook
 
   const handleAction = async (action: BorrowAction, requestId: string, notes?: string) => {
     try {
-      await actionHandlers[action](requestId, { notes });
+      await executeAction.mutateAsync({ action, id: requestId, payload: { notes } });
       toast.success(`Request ${action.replaceAll('_', ' ')}d successfully`);
-      fetchRecords();
+      
       if (expandedIds.has(requestId)) {
         void fetchRequestEvents(requestId, true);
       }
@@ -146,7 +123,6 @@ export default function BorrowsPage() {
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : `Failed to ${action} request`;
-      setError(msg);
       toast.error(msg);
     }
   };
@@ -185,7 +161,7 @@ export default function BorrowsPage() {
 
         <RequestsTable
           records={records}
-          loading={loading}
+          loading={requestsLoading}
           expandedIds={expandedIds}
           onToggleRow={toggleRow}
           requestEvents={requestEvents}
@@ -222,7 +198,7 @@ export default function BorrowsPage() {
           onSuccess={() => {
             const requestId = assigningRequest.request_id;
             setAssigningRequest(null);
-            fetchRecords();
+            invalidateList();
             fetchAssignments(requestId);
             void fetchRequestEvents(requestId, true);
           }}
@@ -236,7 +212,7 @@ export default function BorrowsPage() {
           onSuccess={() => {
             const requestId = returningRequest.request_id;
             setReturningRequest(null);
-            fetchRecords();
+            invalidateList();
             if (expandedIds.has(requestId)) {
               void fetchRequestEvents(requestId, true);
             }

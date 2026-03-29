@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { ledgerApi, MovementLedgerParams, Anomaly, LedgerMovement } from './api';
-import { inventorySettingsApi } from '../settings/api';
+import { useLedgerMovements, useLedgerAnomalies, useReasonCodes, useLedgerMutations } from './lib/useLedgerQueries';
 import { Pagination } from '@/components/ui/Pagination';
 import type { PaginationMeta } from '@/lib/api';
 import { toast } from 'sonner';
@@ -13,15 +13,10 @@ import { MovementLedgerTable } from './components/MovementLedgerTable';
 import { ReversalMovementModal } from './components/ReversalMovementModal';
 
 export default function MovementLedgerPage() {
-  const [movements, setMovements] = useState<LedgerMovement[]>([]);
-  const [anomalies, setAnomalies] = useState<Anomaly[]>([]);
   const [activeTab, setActiveTab] = useState<MovementLedgerTab>('ledger');
   const [expandedAnomalyId, setExpandedAnomalyId] = useState<string | null>(null);
 
   const toggleAnomalyExpand = (id: string) => setExpandedAnomalyId(expandedAnomalyId === id ? null : id);
-
-  const [meta, setMeta] = useState<PaginationMeta | null>(null);
-  const [loading, setLoading] = useState(true);
 
   // Filters
   const [page, setPage] = useState(1);
@@ -34,56 +29,23 @@ export default function MovementLedgerPage() {
   const [selectedMovement, setSelectedMovement] = useState<LedgerMovement | null>(null);
   const [reversalReason, setReversalReason] = useState('');
   const [reversalReasonCode, setReversalReasonCode] = useState('CORRECTION');
-  const [reasonCodes, setReasonCodes] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const fetchLedger = useCallback(async () => {
-    setLoading(true);
-    try {
-      if (activeTab === 'ledger') {
-        const params: MovementLedgerParams = {
-          page,
-          per_page: perPage,
-          movement_type: movementType || undefined,
-          inventory_id: itemId || undefined,
-        };
-        const res = await ledgerApi.list(params);
-        setMovements(res.data);
-        if (res.meta) setMeta(res.meta);
-      } else {
-        const res = await ledgerApi.getAnomalies();
-        setAnomalies(res.data);
-        setMeta(null);
-      }
-    } catch (err: any) {
-      toast.error('Failed to fetch ledger data');
-    } finally {
-      setLoading(false);
-    }
-  }, [activeTab, page, perPage, movementType, itemId]);
+  const { data: movementsResponse, isLoading: movementsLoading } = useLedgerMovements(
+    { page, per_page: perPage, movement_type: movementType || undefined, inventory_id: itemId || undefined },
+    activeTab === 'ledger'
+  );
 
-  const fetchReasonCodes = useCallback(async () => {
-    try {
-      const res = await inventorySettingsApi.listInventory({
-        category: 'inventory_movements_reason_code',
-      });
-      if (res.data.length > 0) {
-        setReasonCodes(res.data.map((s: any) => s.key));
-      } else {
-        setReasonCodes(['CORRECTION', 'ERROR', 'DUPLICATE_ENTRY', 'DAMAGED_ON_ARRIVAL']);
-      }
-    } catch (err) {
-      setReasonCodes(['CORRECTION', 'ERROR', 'DUPLICATE_ENTRY', 'DAMAGED_ON_ARRIVAL']);
-    }
-  }, []);
+  const { data: anomaliesResponse, isLoading: anomaliesLoading } = useLedgerAnomalies(activeTab === 'anomalies');
+  
+  const { data: reasonCodesResponse } = useReasonCodes();
+  const { reverseMovement } = useLedgerMutations();
 
-  useEffect(() => {
-    fetchLedger();
-  }, [fetchLedger]);
-
-  useEffect(() => {
-    fetchReasonCodes();
-  }, [fetchReasonCodes]);
+  const movements = movementsResponse?.data || [];
+  const meta = movementsResponse?.meta || null;
+  const anomalies = anomaliesResponse?.data || [];
+  const reasonCodes = reasonCodesResponse || ['CORRECTION', 'ERROR', 'DUPLICATE_ENTRY', 'DAMAGED_ON_ARRIVAL'];
+  const loading = activeTab === 'ledger' ? movementsLoading : anomaliesLoading;
 
   const openReversalModal = (movement: LedgerMovement) => {
     setSelectedMovement(movement);
@@ -98,10 +60,9 @@ export default function MovementLedgerPage() {
     
     setIsSubmitting(true);
     try {
-      await ledgerApi.reverse(selectedMovement.movement_id, reversalReason, reversalReasonCode);
+      await reverseMovement.mutateAsync({ id: selectedMovement.movement_id, reason: reversalReason, reasonCode: reversalReasonCode });
       toast.success('Movement reversal record created successfully');
       setIsReversalModalOpen(false);
-      fetchLedger();
     } catch (err: any) {
       toast.error(err.message || 'Failed to reverse movement');
     } finally {

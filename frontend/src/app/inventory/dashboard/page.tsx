@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect } from 'react';
 import { toast } from 'sonner';
-import { dashboardApi } from './dashboard-api';
+import { useDashboardData } from './lib/useDashboardQueries';
 import type {
   DashboardStats,
   RecentTransaction,
@@ -22,76 +22,55 @@ import { InventoryBreakdownPanel } from './components/InventoryBreakdownPanel';
 import { InventoryHealthPanel, BorrowingTrendsPanel } from './components/ActivityCharts';
 
 export default function InventoryDashboard() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [recent, setRecent] = useState<RecentTransaction[]>([]);
-  const [lowStock, setLowStock] = useState<LowStockItem[]>([]);
-  const [pendingCounts, setPendingCounts] = useState<PendingCounts>({});
-  const [breakdown, setBreakdown] = useState<CategoryBreakdown[]>([]);
-  const [health, setHealth] = useState<InventoryHealth | null>(null);
-  const [trends, setTrends] = useState<BorrowingTrend[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetchDashboardData = useCallback(async () => {
-    try {
-      const [statsRes, recentRes, lowStockRes, pendingRes, breakdownRes, healthRes, trendsRes] =
-        await Promise.all([
-          dashboardApi.getStats(),
-          dashboardApi.getRecent(),
-          dashboardApi.getLowStock(),
-          dashboardApi.getPendingCounts(),
-          dashboardApi.getInventoryBreakdown(),
-          dashboardApi.getHealth(),
-          dashboardApi.getTrends(),
-        ]);
-      setStats(statsRes.data);
-      setRecent(recentRes.data);
-      setLowStock(lowStockRes.data);
-      setPendingCounts(pendingRes.data);
-      setBreakdown(breakdownRes.data);
-      setHealth(healthRes.data);
-      setTrends(trendsRes.data);
-    } catch {
-      toast.error('Failed to load dashboard data');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const {
+    stats,
+    recent,
+    lowStock,
+    pendingCounts,
+    breakdown,
+    health,
+    trends,
+    isLoading,
+    isError,
+  } = useDashboardData();
 
   useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
+    if (isError) {
+      toast.error('Failed to load dashboard data');
+    }
+  }, [isError]);
 
   return (
     <div className="w-full max-w-6xl mx-auto space-y-4 animate-in fade-in duration-500">
       <DashboardHeader />
 
-      <InventoryStatsGrid stats={stats} loading={loading} />
+      <InventoryStatsGrid stats={stats} loading={isLoading} />
       
       <div className="grid lg:grid-cols-5 gap-4">
         <div className="lg:col-span-3">
-          <BorrowingTrendsPanel trends={trends} loading={loading} />
+          <BorrowingTrendsPanel trends={trends} loading={isLoading} />
         </div>
         <div className="lg:col-span-2">
-          <InventoryHealthPanel health={health} loading={loading} />
+          <InventoryHealthPanel health={health} loading={isLoading} />
         </div>
       </div>
 
       <div className="grid lg:grid-cols-5 gap-4">
         <div className="lg:col-span-3 min-h-0">
-          <RecentTransactionsPanel recent={recent} loading={loading} />
+          <RecentTransactionsPanel recent={recent} loading={isLoading} />
         </div>
         <div className="lg:col-span-2 flex flex-col gap-4 min-h-0">
-          <RequestsPipelinePanel counts={pendingCounts} loading={loading} />
+          <RequestsPipelinePanel counts={pendingCounts} loading={isLoading} />
           <QuickActionsPanel />
         </div>
       </div>
 
       <div className="grid lg:grid-cols-5 gap-4 items-start">
         <div className="lg:col-span-3">
-          <LowStockPanel items={lowStock} loading={loading} />
+          <LowStockPanel items={lowStock} loading={isLoading} />
         </div>
         <div className="lg:col-span-2">
-          <InventoryBreakdownPanel breakdown={breakdown} loading={loading} />
+          <InventoryBreakdownPanel breakdown={breakdown} loading={isLoading} />
         </div>
       </div>
     </div>

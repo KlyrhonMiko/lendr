@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { inventoryApi, InventoryBatch, ConfigRead, StockAdjustmentPayload } from './api';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { useInventoryBatches } from './lib/useItemQueries';
 import { X, Plus, Edit2, Loader2, AlertCircle, Layers, History, TrendingUp, TrendingDown } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -11,9 +13,7 @@ interface BatchManagementProps {
 }
 
 export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
-  const [batches, setBatches] = useState<InventoryBatch[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   
   const [isAdding, setIsAdding] = useState(false);
   const [editingBatch, setEditingBatch] = useState<InventoryBatch | null>(null);
@@ -32,38 +32,29 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
     note: '',
   });
 
-  const [movementTypes, setMovementTypes] = useState<ConfigRead[]>([]);
-  const [reasonCodes, setReasonCodes] = useState<ConfigRead[]>([]);
+  const { data: batchesResponse, isLoading: batchesLoading, error: batchesError } = useInventoryBatches(itemId, {});
+  const batches = batchesResponse?.data || [];
+  const error = batchesError ? (batchesError as Error).message : null;
 
-  const fetchBatches = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await inventoryApi.listBatches(itemId);
-      setBatches(res.data);
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch batches');
-    } finally {
-      setLoading(false);
-    }
-  }, [itemId]);
-
-  const fetchConfigs = useCallback(async () => {
-    try {
+  const { data: configs } = useQuery({
+    queryKey: ['inventory', 'configs', 'movements'],
+    queryFn: async () => {
       const [moveRes, reasonRes] = await Promise.all([
         inventoryApi.getConfigs('inventory_movements_movement_type'),
         inventoryApi.getConfigs('inventory_movements_reason_code'),
       ]);
-      setMovementTypes(moveRes.data);
-      setReasonCodes(reasonRes.data);
-    } catch (err) {
-      console.error('Failed to fetch movement configs', err);
-    }
-  }, []);
+      return { movementTypes: moveRes.data, reasonCodes: reasonRes.data };
+    },
+    staleTime: Infinity,
+  });
 
-  useEffect(() => {
-    fetchBatches();
-    fetchConfigs();
-  }, [fetchBatches, fetchConfigs]);
+  const movementTypes = configs?.movementTypes || [];
+  const reasonCodes = configs?.reasonCodes || [];
+
+  const invalidateBatches = () => {
+    queryClient.invalidateQueries({ queryKey: ['inventory', 'items', itemId, 'batches'] });
+    queryClient.invalidateQueries({ queryKey: ['inventory', 'items'] }); // Main list
+  };
 
   const resetForms = useCallback(() => {
     setIsAdding(false);
@@ -95,7 +86,7 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
         toast.success('New batch created');
       }
       resetForms();
-      fetchBatches();
+      invalidateBatches();
     } catch (err: any) {
       toast.error(err.message || 'Action failed');
     }
@@ -115,7 +106,7 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
       });
       toast.success('Stock adjusted successfully');
       resetForms();
-      fetchBatches();
+      invalidateBatches();
     } catch (err: any) {
       toast.error(err.message || 'Adjustment failed');
     }
@@ -287,7 +278,7 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
-                {loading ? (
+                {batchesLoading ? (
                   <tr><td colSpan={5} className="p-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-indigo-500" /></td></tr>
                 ) : batches.length === 0 ? (
                   <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">No batches created for this item.</td></tr>

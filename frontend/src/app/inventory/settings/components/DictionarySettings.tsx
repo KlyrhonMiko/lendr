@@ -21,7 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { toast } from 'sonner';
-import type { SystemSetting } from '../lib/types';
+import type { SystemSetting, SystemSettingCreate } from '../lib/types';
 import type { PaginationMeta } from '@/lib/api';
 import { Pagination } from '@/components/ui/Pagination';
 
@@ -38,6 +38,7 @@ interface DictionarySettingsProps {
   onPerPageChange: (perPage: number) => void;
   onEdit: (setting: SystemSetting) => void;
   onDelete: (key: string, category: string) => void;
+  onAdd: (data: SystemSettingCreate) => Promise<void>;
 }
 
 export function DictionarySettings({
@@ -52,11 +53,21 @@ export function DictionarySettings({
   onPageChange,
   onPerPageChange,
   onEdit,
-  onDelete
+  onDelete,
+  onAdd
 }: DictionarySettingsProps) {
   const [editingRow, setEditingRow] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<SystemSetting>>({});
   const [isAdding, setIsAdding] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // New Entry State
+  const [newEntry, setNewEntry] = useState<SystemSettingCreate>({
+    category: categories[0] || 'inventory_category',
+    key: '',
+    value: '',
+    description: ''
+  });
 
   const handleStartEdit = (setting: SystemSetting) => {
     setEditingRow(`${setting.category}-${setting.key}`);
@@ -69,7 +80,12 @@ export function DictionarySettings({
   };
 
   const handleSaveEdit = () => {
-    toast.success('Entry updated successfully');
+    onAdd({
+        category: editData.category!,
+        key: editData.key!,
+        value: editData.value!,
+        description: editData.description || undefined
+    });
     setEditingRow(null);
   };
 
@@ -132,9 +148,30 @@ export function DictionarySettings({
               </button>
            </CardHeader>
            <CardContent className="grid gap-6 md:grid-cols-3">
-              <Select label="Category" options={categories.map(c => ({ label: c, value: c }))} />
-              <Input label="Key" placeholder="e.g. MIN_STOCK_WARN" />
-              <Input label="Value" placeholder="e.g. 10" />
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-muted-foreground ml-1">Category</label>
+                <Select 
+                  defaultValue={newEntry.category} 
+                  onChange={(e) => setNewEntry({...newEntry, category: (e.target as HTMLSelectElement).value})}
+                  options={categories.map(c => ({ label: c, value: c }))} 
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-muted-foreground ml-1">Key Name</label>
+                <Input 
+                  placeholder="e.g. MIN_STOCK_WARN" 
+                  value={newEntry.key}
+                  onChange={(e) => setNewEntry({...newEntry, key: e.target.value})}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-muted-foreground ml-1">Value</label>
+                <Input 
+                  placeholder="e.g. 10" 
+                  value={newEntry.value}
+                  onChange={(e) => setNewEntry({...newEntry, value: e.target.value})}
+                />
+              </div>
            </CardContent>
            <div className="px-6 py-4 border-t border-indigo-500/10 flex justify-end gap-3">
               <button 
@@ -143,8 +180,25 @@ export function DictionarySettings({
               >
                 Cancel
               </button>
-              <button className="px-6 py-2 bg-indigo-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/20">
-                Save Entry
+              <button 
+                onClick={async () => {
+                    if (!newEntry.key || !newEntry.value) {
+                        toast.error('Key and Value are required');
+                        return;
+                    }
+                    setIsSubmitting(true);
+                    try {
+                        await onAdd(newEntry);
+                        setIsAdding(false);
+                        setNewEntry({ ...newEntry, key: '', value: '' });
+                    } finally {
+                        setIsSubmitting(false);
+                    }
+                }}
+                disabled={isSubmitting}
+                className="px-6 py-2 bg-indigo-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/20 disabled:opacity-50"
+              >
+                {isSubmitting ? 'Saving...' : 'Save Entry'}
               </button>
            </div>
          </Card>

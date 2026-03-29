@@ -18,4 +18,10 @@ export const inventorySettingsApi = {
 
   createBorrower: (data: SystemSettingCreate) => 
     api.post<SystemSetting>('/inventory/config/borrower', data),
+
+  deleteInventory: (category: string, key: string) =>
+    api.delete<SystemSetting>(`/inventory/config/inventory/${category}/${key}`),
+
+  deleteBorrower: (category: string, key: string) =>
+    api.delete<SystemSetting>(`/inventory/config/borrower/${category}/${key}`),
 };
