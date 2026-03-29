@@ -804,7 +804,7 @@ def seed_user_configurations(headers: dict[str, str]) -> None:
         ("employee", "EMPL", "General staff with read access to inventory catalog and requested-items submission rights."),
     ]
     for key, value, desc in roles:
-        create_setting(headers, system="auth", key=key, value=value, category="users_role", description=desc, endpoint="/api/auth/config")
+        create_setting(headers, system="admin", key=key, value=value, category="users_role", description=desc, endpoint="/api/auth/config")
 
     # users_shift_type
     print(f"\n  {CYAN}Category: users_shift_type{RESET}")
@@ -815,7 +815,7 @@ def seed_user_configurations(headers: dict[str, str]) -> None:
         ("evening", "Evening", "Evening shift (typically 2pm-10pm)"),
     ]
     for key, value, desc in shifts:
-        create_setting(headers, system="auth", key=key, value=value, category="users_shift_type", description=desc, endpoint="/api/auth/config")
+        create_setting(headers, system="admin", key=key, value=value, category="users_shift_type", description=desc, endpoint="/api/auth/config")
 
 
 def seed_rbac_role_permissions(headers: dict[str, str]) -> None:

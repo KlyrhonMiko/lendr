@@ -149,18 +149,18 @@ SYSTEM_CONFIGS = [
     {"system": "borrower", "key": "recipient", "value": "Recipient", "category": "borrow_participants_role_in_request", "description": "Recipient of borrowed items"},
 
     # User Management
-    {"system": "auth", "key": "admin", "value": "ADMIN", "category": "users_role", "description": "Complete authority over user management, system configuration, and data overrides."},
-    {"system": "auth", "key": "inventory_manager", "value": "IVTM", "category": "users_role", "description": "Owns inventory lifecycle, borrowing workflow approvals, stock controls, and inventory configuration management."},
-    {"system": "auth", "key": "dispatch", "value": "DSPT", "category": "users_role", "description": "Operates release and return flow, validates units, and performs operational hand-offs."},
-    {"system": "auth", "key": "borrower", "value": "BRWR", "category": "users_role", "description": "Uses the borrower portal to submit borrowing requests and track assigned inventory usage."},
-    {"system": "auth", "key": "finance_manager", "value": "FINM", "category": "users_role", "description": "Monitors inventory performance, dashboard KPIs, and financial-impact configuration with read-heavy access."},
-    {"system": "auth", "key": "accountant", "value": "ACCT", "category": "users_role", "description": "Reconciles inventory movements, reviews anomalies, and performs audit-ledger verification."},
-    {"system": "auth", "key": "employee", "value": "EMPL", "category": "users_role", "description": "General staff with read access to inventory catalog and requested-items submission rights."},
+    {"system": "admin", "key": "admin", "value": "ADMIN", "category": "users_role", "description": "Complete authority over user management, system configuration, and data overrides."},
+    {"system": "admin", "key": "inventory_manager", "value": "IVTM", "category": "users_role", "description": "Owns inventory lifecycle, borrowing workflow approvals, stock controls, and inventory configuration management."},
+    {"system": "admin", "key": "dispatch", "value": "DSPT", "category": "users_role", "description": "Operates release and return flow, validates units, and performs operational hand-offs."},
+    {"system": "admin", "key": "borrower", "value": "BRWR", "category": "users_role", "description": "Uses the borrower portal to submit borrowing requests and track assigned inventory usage."},
+    {"system": "admin", "key": "finance_manager", "value": "FINM", "category": "users_role", "description": "Monitors inventory performance, dashboard KPIs, and financial-impact configuration with read-heavy access."},
+    {"system": "admin", "key": "accountant", "value": "ACCT", "category": "users_role", "description": "Reconciles inventory movements, reviews anomalies, and performs audit-ledger verification."},
+    {"system": "admin", "key": "employee", "value": "EMPL", "category": "users_role", "description": "General staff with read access to inventory catalog and requested-items submission rights."},
 
-    {"system": "auth", "key": "day", "value": "Day", "category": "users_shift_type", "description": "Day shift (typically 8am-5pm)"},
-    {"system": "auth", "key": "night", "value": "Night", "category": "users_shift_type", "description": "Night shift (typically 5pm-2am)"},
-    {"system": "auth", "key": "morning", "value": "Morning", "category": "users_shift_type", "description": "Morning shift (typically 6am-2pm)"},
-    {"system": "auth", "key": "evening", "value": "Evening", "category": "users_shift_type", "description": "Evening shift (typically 2pm-10pm)"},
+    {"system": "admin", "key": "day", "value": "Day", "category": "users_shift_type", "description": "Day shift (typically 8am-5pm)"},
+    {"system": "admin", "key": "night", "value": "Night", "category": "users_shift_type", "description": "Night shift (typically 5pm-2am)"},
+    {"system": "admin", "key": "morning", "value": "Morning", "category": "users_shift_type", "description": "Morning shift (typically 6am-2pm)"},
+    {"system": "admin", "key": "evening", "value": "Evening", "category": "users_shift_type", "description": "Evening shift (typically 2pm-10pm)"},
 
     # Backup & Audit Taxonomies
     {"system": "admin", "key": "local", "value": "local", "category": "backup_runs_destination", "description": "Local filesystem destination"},
