@@ -16,6 +16,7 @@ class BaseModel(SQLModel):
     deleted_at: datetime | None = Field(default=None, nullable=True)
 
 class ConfigurationBase(BaseModel):
+    system: str = Field(index=True, max_length=50)
     key: str = Field(index=True, max_length=100)
     value: str = Field(sa_type=Text)
     category: str = Field(default="general", max_length=50)

@@ -1,3 +1,5 @@
+from datetime import datetime
+from uuid import UUID
 from typing import Any, Generic, Optional, TypeVar
 
 from fastapi import Request
@@ -85,6 +87,7 @@ class ConfigBase(BaseModel):
 
 
 class ConfigCreate(ConfigBase):
+    system: str = Field(..., max_length=50)
     key: str = Field(..., max_length=100)
     category: str = Field(default="general", max_length=50)
     description: Optional[str] = None
@@ -95,10 +98,15 @@ class ConfigUpdate(ConfigBase):
 
 
 
-class ConfigRead(ConfigBase):
+class ConfigRead(BaseModel):
+    id: UUID
+    system: str
     key: str
     category: str
+    value: str
     description: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True
