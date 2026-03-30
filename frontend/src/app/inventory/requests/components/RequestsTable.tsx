@@ -12,6 +12,7 @@ import {
   XCircle,
   Archive,
 } from 'lucide-react';
+import { parseSystemDate } from '@/lib/utils';
 import type { BorrowRecord, BorrowAction, StatusTab } from '../lib/types';
 import type { BorrowRequestEvent } from '../api';
 
@@ -67,7 +68,7 @@ function ActionButton({
 
 function formatDate(dateStr: string) {
   try {
-    const d = new Date(dateStr);
+    const d = parseSystemDate(dateStr);
     if (isNaN(d.getTime())) return dateStr;
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',
@@ -84,7 +85,7 @@ function formatDate(dateStr: string) {
 
 function formatEventDate(dateStr: string) {
   try {
-    const d = new Date(dateStr);
+    const d = parseSystemDate(dateStr);
     if (isNaN(d.getTime())) return dateStr;
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',

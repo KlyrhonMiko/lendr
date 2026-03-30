@@ -16,6 +16,15 @@ class ImportService:
     def __init__(self):
         self.inventory_service = InventoryService()
 
+    def _parse_bool(self, value: any) -> bool:
+        """Robustly parse boolean from CSV strings."""
+        if value is None:
+            return False
+        if isinstance(value, bool):
+            return value
+        s = str(value).lower().strip()
+        return s in ("true", "1", "yes", "y", "t", "on")
+
     def get_history(self, session: Session, skip: int = 0, limit: int = 100) -> tuple[list[ImportHistory], int]:
         """Get paginated import history."""
         statement = select(ImportHistory).order_by(ImportHistory.created_at.desc())
@@ -38,7 +47,16 @@ class ImportService:
     ) -> ImportHistory:
         content = await file.read()
         decoded = content.decode("utf-8")
-        reader = csv.DictReader(io.StringIO(decoded))
+        # Pre-process the string IO to strip spaces from headers
+        input_stream = io.StringIO(decoded)
+        first_line = input_stream.readline()
+        if first_line:
+            headers = [h.strip() for h in next(csv.reader(io.StringIO(first_line)))]
+            input_stream = io.StringIO(decoded) # Reset
+            reader = csv.DictReader(input_stream, fieldnames=headers)
+            next(reader) # Skip header row
+        else:
+            reader = csv.DictReader(input_stream)
         
         # 0. Initial record of the import (Committed immediately)
         history = ImportHistory(
@@ -55,26 +73,30 @@ class ImportService:
         session.refresh(history)
 
         errors = []
+        rows_count = 0
+        success_count = 0
+        error_count = 0
         
         # 1. Start Transactional Wrapper
-        # We temporarily replace session.commit with session.flush so sub-services 
-        # (like BaseService) don't finalize transactions prematurely.
         original_commit = session.commit
         session.commit = session.flush # Atomic mapping: commit -> flush
 
         try:
             for i, row in enumerate(reader, 1):
-                history.total_rows += 1
+                rows_count += 1
                 try:
+                    # 0. Strip all whitespace from values
+                    row = {k: (v.strip() if isinstance(v, str) else v) for k, v in row.items()}
+                    
                     # 0. Smart Rescue/Mapping (in case user swapped columns)
                     self._rescue_mapping(session, row)
 
                     # 1. Validation & Parsing
-                    name = (row.get("name") or "").strip()
-                    item_type = (row.get("item_type") or "").strip()
-                    classification = (row.get("classification") or "").strip()
-                    is_trackable_str = (row.get("is_trackable") or "false").lower().strip()
-                    is_trackable = is_trackable_str == "true"
+                    name = row.get("name") or ""
+                    item_type = row.get("item_type") or ""
+                    classification = row.get("classification") or ""
+                    
+                    is_trackable = self._parse_bool(row.get("is_trackable", "false"))
                     
                     if not name or not item_type or not classification:
                         raise ValueError(f"Missing mandatory item fields: name='{name}', item_type='{item_type}', or classification='{classification}'")
@@ -88,33 +110,43 @@ class ImportService:
                     else:
                         self._handle_batch_import(session, item, row, actor_id)
 
-                    history.success_count += 1
+                    success_count += 1
                 except Exception as e:
-                    history.error_count += 1
+                    error_count += 1
                     errors.append({"row": i, "error": str(e), "data": row})
 
             # Restore original commit method
             session.commit = original_commit
 
             # 2. Final Atomic Decision
-            if history.error_count > 0:
+            if error_count > 0:
                 # If even one row failed, roll back ALL inventory changes
                 session.rollback()
                 history.status = "failed"
+                # Preserve the counts/logs even after rollback
+                history.total_rows = rows_count
                 history.success_count = 0 # Mark everything as failed in summary
+                history.error_count = error_count
+                history.error_log = errors
             else:
                 # 100% Success - finalize the transaction
-                session.commit()
+                history.total_rows = rows_count
+                history.success_count = success_count
+                history.error_count = 0
                 history.status = "completed"
+                history.error_log = []
+                session.commit()
 
         except Exception as e:
             # Catastrophic failure (e.g. DB connection lost)
             session.commit = original_commit
             session.rollback()
             history.status = "failed"
+            history.total_rows = rows_count
+            history.error_count = error_count + 1
             errors.append({"row": "system", "error": f"Internal Error: {str(e)}"})
+            history.error_log = errors
             
-        history.error_log = errors
         session.add(history)
         session.commit()
         session.refresh(history)
@@ -153,7 +185,7 @@ class ImportService:
                 category=canonical_category,
                 item_type=canonical_item_type,
                 classification=canonical_classification,
-                is_trackable=(row.get("is_trackable") or "false").lower().strip() == "true",
+                is_trackable=self._parse_bool(row.get("is_trackable", "false")),
                 description=(row.get("description") or "").strip() or None,
                 condition=(row.get("condition") or "good").strip().lower()
             )
@@ -162,7 +194,7 @@ class ImportService:
             # Update item metadata if overwrite mode is on
             item.category = (row.get("category") or item.category)
             item.description = (row.get("description") or item.description)
-            item.condition = (row.get("condition") or "good").lower().strip()
+            item.condition = str(row.get("condition") or "good").lower().strip()
             session.add(item)
             # (Note: item_type and is_trackable are usually immutable for items with stock, 
             # so we avoid changing them during simple import for safety)
@@ -209,7 +241,7 @@ class ImportService:
 
     def _handle_batch_import(self, session: Session, item: InventoryItem, row: dict, actor_id: Optional[UUID]):
         qty_str = row.get("quantity")
-        expiry_str = row.get("expiration_date", "").strip()
+        expiry_str = str(row.get("expiration_date") or "").strip()
         
         if not qty_str:
             raise ValueError("quantity is required for non-trackable items")

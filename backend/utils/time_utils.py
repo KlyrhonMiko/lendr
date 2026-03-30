@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 # Default: Manila is GMT+8
 DEFAULT_TZ = ZoneInfo("Asia/Manila")
+MANILA_TZ = DEFAULT_TZ # Alias for existing system services
 
 # Shared state for the application (Display only)
 CURRENT_DISPLAY_TZ = DEFAULT_TZ

@@ -1488,6 +1488,59 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         session.add(unit)
         if item:
             self._sync_item_quantities(session, item.item_id)
+            
+            # Record movement if status changed
+            if after_state["status"] != before_state["status"]:
+                old_is_avail = before_state["status"] == "available"
+                new_is_avail = after_state["status"] == "available"
+                
+                # Determine qty change for the ledger (which tracks availability)
+                ledger_qty_change = 0
+                if old_is_avail and not new_is_avail:
+                    ledger_qty_change = -1
+                elif not old_is_avail and new_is_avail:
+                    ledger_qty_change = 1
+                
+                # Internal mapping of status to movement type
+                # Note: These must match seed_configuration.py
+                movement_type_map = {
+                    "maintenance": "maintenance",
+                    "retired": "retirement",
+                    "consumed": "consumption",
+                    "expired": "expiration",
+                    "discarded": "discarded",
+                    "borrowed": "borrow_release",
+                }
+                
+                if after_state["status"] == "available":
+                    if before_state["status"] == "borrowed":
+                        m_type = "borrow_return"
+                    elif before_state["status"] == "maintenance":
+                        m_type = "maintenance_return"
+                    else:
+                        m_type = "manual_adjustment"
+                else:
+                    m_type = movement_type_map.get(after_state["status"], "manual_adjustment")
+                
+                # Ensure the movement type is registered in config
+                self._require_config_key(
+                    session,
+                    key=m_type,
+                    table_name="inventory_movements",
+                    field_name="movement_type",
+                    field_label="inventory movement type",
+                )
+                
+                movement = InventoryMovement(
+                    movement_id=get_next_sequence(session, InventoryMovement, "movement_id", "MOV"),
+                    inventory_uuid=item.id,
+                    qty_change=ledger_qty_change,
+                    movement_type=m_type,
+                    note=f"Status changed from {before_state['status']} to {after_state['status']} for unit: {unit.unit_id}",
+                    actor_id=actor_id,
+                )
+                session.add(movement)
+
         return unit
 
     def retire_unit(
@@ -1548,12 +1601,16 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             self._sync_item_quantities(session, item.item_id)
             
             # Record retirement movement in the ledger
+            # Only record -1 if it was previously available
+            # If it was already non-available (e.g. maintenance), qty_change is 0
+            ledger_qty_change = -1 if before_state["status"] == "available" else 0
+
             movement = InventoryMovement(
                 movement_id=get_next_sequence(session, InventoryMovement, "movement_id", "MOV"),
                 inventory_uuid=item.id,
-                qty_change=-1,
+                qty_change=ledger_qty_change,
                 movement_type="retirement",
-                note=f"Unit retired: {unit.unit_id}",
+                note=f"Unit retired: {unit.unit_id} (Previous status: {before_state['status']})",
                 actor_id=actor_id,
             )
             session.add(movement)

@@ -430,6 +430,15 @@ def seed_inventory_configurations(headers: dict[str, str]) -> None:
     create_setting(
         headers,
         system="inventory",
+        key="excellent",
+        value="Excellent",
+        category="inventory_condition",
+        description="Item is in excellent working condition",
+        endpoint="/api/inventory/config/inventory",
+    )
+    create_setting(
+        headers,
+        system="inventory",
         key="good",
         value="Good",
         category="inventory_condition",
@@ -549,7 +558,14 @@ def seed_inventory_movement_configurations(headers: dict[str, str]) -> None:
         ("borrow_return", "Borrow Return", "Unit returned from borrowing"),
         ("procurement", "Procurement", "New unit procured"),
         ("reversal", "Reversal", "Reversal of previous movement"),
+        ("maintenance", "Maintenance", "Unit is under maintenance"),
+        ("maintenance_return", "Maintenance Return", "Unit returned from maintenance"),
+        ("retirement", "Retirement", "Unit has been retired from service"),
+        ("consumption", "Consumption", "Unit has been consumed"),
+        ("expiration", "Expiration", "Unit has expired"),
+        ("discarded", "Discarded", "Unit has been discarded"),
     ]
+
     for key, value, desc in movements:
         create_setting(
             headers,

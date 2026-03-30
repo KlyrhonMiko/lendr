@@ -39,6 +39,8 @@ export function ImportExportSettings() {
   const perPage = 5;
   const [duplicateMode, setDuplicateMode] = useState('skip');
   const [isIntegrityModalOpen, setIsIntegrityModalOpen] = useState(false);
+  const [selectedHistory, setSelectedHistory] = useState<any | null>(null);
+  const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Hooks
@@ -69,6 +71,11 @@ export function ImportExportSettings() {
     to_date: '',
     format: 'csv'
   });
+  
+  // Catalog Export State
+  const [catalogParams, setCatalogParams] = useState({
+    format: 'xlsx'
+  });
 
   // Ledger Export State
   const [borrowParams, setBorrowParams] = useState({
@@ -87,6 +94,8 @@ export function ImportExportSettings() {
     const file = e.target.files?.[0];
     if (file) {
       mutation.mutate({ file, mode: duplicateMode });
+      // Reset input value to allow selecting the same file again
+      e.target.value = '';
     }
   };
 
@@ -218,27 +227,27 @@ export function ImportExportSettings() {
                       </td>
                       <td className="p-4 font-semibold">{item.filename}</td>
                       <td className="p-4 text-center">
-                        <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold border ${
-                          item.status === 'Completed' 
-                            ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' 
-                            : item.status === 'Partial Success'
-                            ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
-                            : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
+                        <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold border capitalize ${
+                          item.status === 'completed' 
+                            ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' 
+                            : item.status === 'failed'
+                            ? 'bg-rose-500/10 text-rose-600 border-rose-500/20'
+                            : 'bg-amber-500/10 text-amber-600 border-amber-500/20'
                         }`}>
-                          {item.status === 'Completed' ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                          {item.status}
+                          {item.status === 'completed' ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                          {item.status.replace('_', ' ')}
                         </span>
                       </td>
                       <td className="p-4 pr-6 text-right">
-                         {item.error_count > 0 && (
+                         {(item.status === 'failed' || item.status === 'partial_success' || item.error_count > 0) && (
                            <button 
                              onClick={() => {
-                               console.log(item.error_log);
-                               toast.info('Check console for error details (Error Report UI coming soon)');
+                               setSelectedHistory(item);
+                               setIsErrorModalOpen(true);
                              }}
-                             className="text-xs text-rose-500 hover:underline"
+                             className="text-xs text-rose-500 hover:underline font-bold"
                            >
-                             Error Report
+                             View Errors
                            </button>
                          )}
                       </td>
@@ -290,12 +299,40 @@ export function ImportExportSettings() {
           </div>
         </CardHeader>
         <CardContent className="grid gap-10 md:grid-cols-2">
-           {/* Audit Logs */}
-           <div className="space-y-6">
-             <div className="flex items-center gap-2 text-sm font-semibold text-emerald-500 px-1">
-               <FilePieChart className="w-4 h-4" />
-               Audit Logs
-             </div>
+            {/* Inventory Catalog */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 text-sm font-semibold text-blue-500 px-1">
+                <Barcode className="w-4 h-4" />
+                Inventory Catalog (Full State)
+              </div>
+               <div className="grid gap-4">
+                 <p className="text-xs text-muted-foreground leading-relaxed px-1">
+                   Export all catalog items, individual tracked units (with serials), and consumable batches in a single report.
+                 </p>
+                 <Select 
+                   label="Format"
+                   value={catalogParams.format}
+                   onChange={(e) => setCatalogParams({...catalogParams, format: (e.target as HTMLSelectElement).value})}
+                   options={[
+                     { label: 'Excel (XLSX)', value: 'xlsx' },
+                     { label: 'CSV (Comma Separated)', value: 'csv' },
+                   ]}
+                 />
+                 <button 
+                   onClick={() => exportData('catalog', catalogParams)}
+                   className="w-full h-11 bg-blue-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2"
+                 >
+                   <Download className="w-4 h-4" /> Export Complete State
+                 </button>
+               </div>
+            </div>
+
+            {/* Audit Logs */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 text-sm font-semibold text-emerald-500 px-1">
+                <FilePieChart className="w-4 h-4" />
+                Audit Logs
+              </div>
               <div className="grid gap-4">
                 <div className="grid grid-cols-2 gap-4">
                   <Input 
@@ -681,6 +718,91 @@ export function ImportExportSettings() {
                 className="px-8 py-2.5 bg-indigo-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/20 hover:scale-105 active:scale-95 transition-all"
               >
                 Close & Return
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Error Report Modal */}
+      {isErrorModalOpen && selectedHistory && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-4xl bg-card border border-border rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-border flex items-center justify-between bg-rose-500/5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-500">
+                  <AlertCircle className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-rose-600">Import Error Report</h3>
+                  <p className="text-xs text-muted-foreground">Detailed logs for <span className="font-bold text-foreground">{selectedHistory.filename}</span></p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsErrorModalOpen(false)}
+                className="p-2 rounded-lg hover:bg-muted transition-colors"
+              >
+                <XCircle className="w-5 h-5 text-muted-foreground" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-0 scrollbar-thin scrollbar-thumb-border">
+              <div className="p-6 bg-rose-500/5 border-b border-rose-500/10 mb-2">
+                <div className="grid grid-cols-3 gap-4 text-center">
+                   <div className="p-3 rounded-2xl bg-background border border-border">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Total Rows</p>
+                      <p className="text-xl font-bold">{selectedHistory.total_rows}</p>
+                   </div>
+                   <div className="p-3 rounded-2xl bg-background border border-emerald-500/20">
+                      <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Success</p>
+                      <p className="text-xl font-bold text-emerald-600">{selectedHistory.success_count}</p>
+                   </div>
+                   <div className="p-3 rounded-2xl bg-background border border-rose-500/20">
+                      <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest">Failed</p>
+                      <p className="text-xl font-bold text-rose-600">{selectedHistory.error_count}</p>
+                   </div>
+                </div>
+              </div>
+
+              <table className="w-full text-left border-collapse">
+                <thead className="sticky top-0 bg-card border-b border-border z-10">
+                  <tr className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                    <th className="p-4 pl-6 w-20">Row</th>
+                    <th className="p-4 w-1/3">Error Message</th>
+                    <th className="p-4 pr-6">Offending Data</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/50">
+                  {Array.isArray(selectedHistory.error_log) && selectedHistory.error_log.map((err: any, idx: number) => (
+                    <tr key={idx} className="hover:bg-muted/30 transition-colors align-top">
+                      <td className="p-4 pl-6 font-mono font-bold text-rose-500">{err.row}</td>
+                      <td className="p-4 text-sm font-medium text-foreground leading-relaxed">
+                        {err.error}
+                      </td>
+                      <td className="p-4 pr-6">
+                         <div className="p-3 rounded-xl bg-muted/30 font-mono text-[10px] text-muted-foreground break-all max-h-32 overflow-y-auto">
+                            {err.data ? JSON.stringify(err.data, null, 2) : 'N/A'}
+                         </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {(!selectedHistory.error_log || selectedHistory.error_log.length === 0) && (
+                    <tr>
+                      <td colSpan={3} className="p-20 text-center text-muted-foreground italic">
+                         No detailed error logs found for this import.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            
+            <div className="p-6 border-t border-border bg-muted/5 flex items-center justify-between">
+              <p className="text-[10px] text-muted-foreground italic">All changes from this import were rolled back to maintain data integrity.</p>
+              <button 
+                onClick={() => setIsErrorModalOpen(false)}
+                className="px-8 py-2.5 bg-rose-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-rose-500/20 hover:scale-105 active:scale-95 transition-all"
+              >
+                Close Report
               </button>
             </div>
           </div>

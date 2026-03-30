@@ -6,6 +6,7 @@ import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { useInventoryBatches } from './lib/useItemQueries';
 import { X, Plus, Edit2, Loader2, AlertCircle, Layers, History, TrendingUp, TrendingDown } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn, parseSystemDate } from '@/lib/utils';
 
 interface BatchManagementProps {
   itemId: string;
@@ -120,8 +121,17 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
   const openEdit = (batch: InventoryBatch) => {
     resetForms();
     setEditingBatch(batch);
+
+    let dateVal = '';
+    if (batch.expiration_date) {
+      const d = parseSystemDate(batch.expiration_date);
+      if (!isNaN(d.getTime())) {
+        dateVal = d.toISOString().split('T')[0];
+      }
+    }
+
     setFormData({
-      expiration_date: batch.expiration_date ? batch.expiration_date.split('T')[0] : '',
+      expiration_date: dateVal,
       description: batch.description || '',
     });
     setIsAdding(true);
@@ -298,7 +308,7 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
                       <span className="text-muted-foreground"> / {batch.total_qty}</span>
                     </td>
                     <td className="p-3 text-sm text-muted-foreground">
-                      {batch.expiration_date ? new Date(batch.expiration_date).toLocaleDateString() : 'No expiry'}
+                      {batch.expiration_date ? parseSystemDate(batch.expiration_date).toLocaleDateString() : 'No expiry'}
                     </td>
                     <td className="p-3">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${

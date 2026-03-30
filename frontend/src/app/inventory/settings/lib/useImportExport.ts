@@ -65,6 +65,7 @@ export function useExportData() {
       });
       
       const endpointMap: Record<string, string> = {
+        'catalog': '/inventory/data/export/catalog',
         'audit': '/inventory/data/export/audit-logs',
         'requests': '/inventory/data/export/ledger/requests',
         'movements': '/inventory/data/export/ledger/movements'

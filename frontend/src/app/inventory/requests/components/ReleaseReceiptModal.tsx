@@ -13,11 +13,12 @@ import {
   FileText,
 } from 'lucide-react';
 import { borrowApi, type ReleaseReceipt } from '../api';
+import { parseSystemDate } from '@/lib/utils';
 
 function fmtDate(dateStr?: string) {
   if (!dateStr) return '';
   try {
-    const d = new Date(dateStr);
+    const d = parseSystemDate(dateStr);
     if (isNaN(d.getTime())) return dateStr;
     return new Intl.DateTimeFormat('en-US', {
       month: 'short', day: 'numeric', year: 'numeric',
@@ -29,7 +30,7 @@ function fmtDate(dateStr?: string) {
 function fmtShort(dateStr?: string) {
   if (!dateStr) return '';
   try {
-    const d = new Date(dateStr);
+    const d = parseSystemDate(dateStr);
     if (isNaN(d.getTime())) return dateStr;
     return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(d);
   } catch { return dateStr; }

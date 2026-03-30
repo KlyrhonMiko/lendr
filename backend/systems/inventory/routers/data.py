@@ -105,6 +105,14 @@ async def export_movements(
 ):
     return export_service.export_movements(session, format, movement_type, item_id)
 
+@router.get("/export/catalog")
+async def export_catalog(
+    format: str = Query(..., pattern="^(csv|xlsx)$"),
+    session: Session = Depends(get_session),
+    _: None = Depends(require_permission("inventory:config:manage")),
+):
+    return export_service.export_inventory(session, format)
+
 @router.get("/import/template")
 async def get_import_template():
     import csv

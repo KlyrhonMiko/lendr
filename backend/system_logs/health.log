@@ -459,3 +459,93 @@ WHERE audit_logs.id = %(id_1)s::UUID AND audit_logs.is_deleted IS false]
 2026-03-30 12:18:18 [INFO] [SCHEDULER-SYNC] Operations maintenance scheduled daily at 03:00.
 2026-03-30 12:45:39 [INFO] [SCHEDULER-SYNC] Backup scheduled: daily at 18:00. Next run: 2026-03-30 18:00:00+08:00
 2026-03-30 12:45:39 [INFO] [SCHEDULER-SYNC] Operations maintenance scheduled daily at 03:00.
+2026-03-30 13:20:09 [INFO] [SCHEDULER-START] Background scheduler started
+2026-03-30 13:20:09 [INFO] [SCHEDULER-SYNC] Backup scheduled: daily at 18:00. Next run: 2026-03-30 18:00:00+08:00
+2026-03-30 13:20:09 [INFO] [SCHEDULER-SYNC] Operations maintenance scheduled daily at 03:00.
+2026-03-30 13:20:09 [INFO] [INIT-DONE] System Initialization COMPLETED
+2026-03-30 13:20:09 [INFO] [DB-CONNECT] PostgreSQL connectivity established
+2026-03-30 13:20:09 [INFO] [LOCALE-INIT] System Timezone set to Europe/Berlin, Format: YYYY-MM-DD 12h
+2026-03-30 13:21:19 [INFO] [SCHEDULER-START] Background scheduler started
+2026-03-30 13:21:19 [INFO] [SCHEDULER-SYNC] Backup scheduled: daily at 18:00. Next run: 2026-03-30 18:00:00+08:00
+2026-03-30 13:21:19 [INFO] [SCHEDULER-SYNC] Operations maintenance scheduled daily at 03:00.
+2026-03-30 13:21:19 [INFO] [INIT-DONE] System Initialization COMPLETED
+2026-03-30 13:21:19 [INFO] [DB-CONNECT] PostgreSQL connectivity established
+2026-03-30 13:21:19 [INFO] [LOCALE-INIT] System Timezone set to Europe/Berlin, Format: YYYY-MM-DD 12h
+2026-03-30 13:30:37 [INFO] [SCHEDULER-START] Background scheduler started
+2026-03-30 13:30:37 [INFO] [SCHEDULER-SYNC] Backup scheduled: daily at 18:00. Next run: 2026-03-30 18:00:00+08:00
+2026-03-30 13:30:37 [INFO] [SCHEDULER-SYNC] Operations maintenance scheduled daily at 03:00.
+2026-03-30 13:30:37 [INFO] [INIT-DONE] System Initialization COMPLETED
+2026-03-30 13:30:37 [INFO] [DB-CONNECT] PostgreSQL connectivity established
+2026-03-30 13:30:37 [INFO] [LOCALE-INIT] System Timezone set to Europe/Berlin, Format: YYYY-MM-DD 12h
+2026-03-30 13:38:50 [INFO] [SCHEDULER-START] Background scheduler started
+2026-03-30 13:38:50 [INFO] [SCHEDULER-SYNC] Backup scheduled: daily at 18:00. Next run: 2026-03-30 18:00:00+08:00
+2026-03-30 13:38:50 [INFO] [SCHEDULER-SYNC] Operations maintenance scheduled daily at 03:00.
+2026-03-30 13:38:50 [INFO] [INIT-DONE] System Initialization COMPLETED
+2026-03-30 13:38:50 [INFO] [DB-CONNECT] PostgreSQL connectivity established
+2026-03-30 13:38:50 [INFO] [LOCALE-INIT] System Timezone set to Europe/Berlin, Format: YYYY-MM-DD 12h
+2026-03-30 13:38:58 [INFO] [SCHEDULER-START] Background scheduler started
+2026-03-30 13:38:58 [INFO] [SCHEDULER-SYNC] Backup scheduled: daily at 18:00. Next run: 2026-03-30 18:00:00+08:00
+2026-03-30 13:38:58 [INFO] [SCHEDULER-SYNC] Operations maintenance scheduled daily at 03:00.
+2026-03-30 13:38:58 [INFO] [INIT-DONE] System Initialization COMPLETED
+2026-03-30 13:38:58 [INFO] [DB-CONNECT] PostgreSQL connectivity established
+2026-03-30 13:38:58 [INFO] [LOCALE-INIT] System Timezone set to Europe/Berlin, Format: YYYY-MM-DD 12h
+2026-03-30 13:39:39 [INFO] [SCHEDULER-START] Background scheduler started
+2026-03-30 13:39:39 [INFO] [SCHEDULER-SYNC] Backup scheduled: daily at 18:00. Next run: 2026-03-30 18:00:00+08:00
+2026-03-30 13:39:39 [INFO] [SCHEDULER-SYNC] Operations maintenance scheduled daily at 03:00.
+2026-03-30 13:39:39 [INFO] [INIT-DONE] System Initialization COMPLETED
+2026-03-30 13:39:39 [INFO] [DB-CONNECT] PostgreSQL connectivity established
+2026-03-30 13:39:39 [INFO] [LOCALE-INIT] System Timezone set to Europe/Berlin, Format: YYYY-MM-DD 12h
+2026-03-30 13:46:32 [INFO] [SCHEDULER-START] Background scheduler started
+2026-03-30 13:46:32 [INFO] [SCHEDULER-SYNC] Backup scheduled: daily at 18:00. Next run: 2026-03-30 18:00:00+08:00
+2026-03-30 13:46:32 [INFO] [SCHEDULER-SYNC] Operations maintenance scheduled daily at 03:00.
+2026-03-30 13:46:32 [INFO] [INIT-DONE] System Initialization COMPLETED
+2026-03-30 13:46:32 [INFO] [DB-CONNECT] PostgreSQL connectivity established
+2026-03-30 13:46:32 [INFO] [LOCALE-INIT] System Timezone set to Europe/Berlin, Format: YYYY-MM-DD 12h
+2026-03-30 13:48:23 [INFO] [SCHEDULER-START] Background scheduler started
+2026-03-30 13:48:23 [INFO] [SCHEDULER-SYNC] Backup scheduled: daily at 18:00. Next run: 2026-03-30 18:00:00+08:00
+2026-03-30 13:48:23 [INFO] [SCHEDULER-SYNC] Operations maintenance scheduled daily at 03:00.
+2026-03-30 13:48:23 [INFO] [INIT-DONE] System Initialization COMPLETED
+2026-03-30 13:48:23 [INFO] [DB-CONNECT] PostgreSQL connectivity established
+2026-03-30 13:48:23 [INFO] [LOCALE-INIT] System Timezone set to Europe/Berlin, Format: YYYY-MM-DD 12h
+2026-03-30 14:13:31 [INFO] [SCHEDULER-START] Background scheduler started
+2026-03-30 14:13:31 [INFO] [SCHEDULER-SYNC] Backup scheduled: daily at 18:00. Next run: 2026-03-30 18:00:00+08:00
+2026-03-30 14:13:31 [INFO] [SCHEDULER-SYNC] Operations maintenance scheduled daily at 03:00.
+2026-03-30 14:13:31 [INFO] [INIT-DONE] System Initialization COMPLETED
+2026-03-30 14:13:31 [INFO] [DB-CONNECT] PostgreSQL connectivity established
+2026-03-30 14:13:31 [INFO] [LOCALE-INIT] System Timezone set to Europe/Berlin, Format: YYYY-MM-DD 12h
+2026-03-30 14:22:40 [INFO] [SCHEDULER-START] Background scheduler started
+2026-03-30 14:22:40 [INFO] [SCHEDULER-SYNC] Backup scheduled: daily at 18:00. Next run: 2026-03-30 18:00:00+08:00
+2026-03-30 14:22:40 [INFO] [SCHEDULER-SYNC] Operations maintenance scheduled daily at 03:00.
+2026-03-30 14:22:40 [INFO] [INIT-DONE] System Initialization COMPLETED
+2026-03-30 14:22:40 [INFO] [DB-CONNECT] PostgreSQL connectivity established
+2026-03-30 14:22:40 [INFO] [LOCALE-INIT] System Timezone set to Europe/Berlin, Format: YYYY-MM-DD 12h
+2026-03-30 14:22:47 [INFO] [SCHEDULER-START] Background scheduler started
+2026-03-30 14:22:47 [INFO] [SCHEDULER-SYNC] Backup scheduled: daily at 18:00. Next run: 2026-03-30 18:00:00+08:00
+2026-03-30 14:22:47 [INFO] [SCHEDULER-SYNC] Operations maintenance scheduled daily at 03:00.
+2026-03-30 14:22:47 [INFO] [INIT-DONE] System Initialization COMPLETED
+2026-03-30 14:22:47 [INFO] [DB-CONNECT] PostgreSQL connectivity established
+2026-03-30 14:22:47 [INFO] [LOCALE-INIT] System Timezone set to Europe/Berlin, Format: YYYY-MM-DD 12h
+2026-03-30 14:29:33 [INFO] [SCHEDULER-START] Background scheduler started
+2026-03-30 14:29:33 [INFO] [SCHEDULER-SYNC] Backup scheduled: daily at 18:00. Next run: 2026-03-30 18:00:00+08:00
+2026-03-30 14:29:33 [INFO] [SCHEDULER-SYNC] Operations maintenance scheduled daily at 03:00.
+2026-03-30 14:29:33 [INFO] [INIT-DONE] System Initialization COMPLETED
+2026-03-30 14:29:33 [INFO] [DB-CONNECT] PostgreSQL connectivity established
+2026-03-30 14:29:33 [INFO] [LOCALE-INIT] System Timezone set to Europe/Berlin, Format: YYYY-MM-DD 12h
+2026-03-30 14:33:23 [INFO] [SCHEDULER-START] Background scheduler started
+2026-03-30 14:33:23 [INFO] [SCHEDULER-SYNC] Backup scheduled: daily at 18:00. Next run: 2026-03-30 18:00:00+08:00
+2026-03-30 14:33:23 [INFO] [SCHEDULER-SYNC] Operations maintenance scheduled daily at 03:00.
+2026-03-30 14:33:23 [INFO] [INIT-DONE] System Initialization COMPLETED
+2026-03-30 14:33:23 [INFO] [DB-CONNECT] PostgreSQL connectivity established
+2026-03-30 14:33:23 [INFO] [LOCALE-INIT] System Timezone set to Europe/Berlin, Format: YYYY-MM-DD 12h
+2026-03-30 14:43:45 [INFO] [SCHEDULER-START] Background scheduler started
+2026-03-30 14:43:45 [INFO] [SCHEDULER-SYNC] Backup scheduled: daily at 18:00. Next run: 2026-03-30 18:00:00+08:00
+2026-03-30 14:43:45 [INFO] [SCHEDULER-SYNC] Operations maintenance scheduled daily at 03:00.
+2026-03-30 14:43:45 [INFO] [INIT-DONE] System Initialization COMPLETED
+2026-03-30 14:43:45 [INFO] [DB-CONNECT] PostgreSQL connectivity established
+2026-03-30 14:43:45 [INFO] [LOCALE-INIT] System Timezone set to Europe/Berlin, Format: YYYY-MM-DD 12h
+2026-03-30 14:58:26 [INFO] [SCHEDULER-START] Background scheduler started
+2026-03-30 14:58:26 [INFO] [SCHEDULER-SYNC] Backup scheduled: daily at 18:00. Next run: 2026-03-30 18:00:00+08:00
+2026-03-30 14:58:26 [INFO] [SCHEDULER-SYNC] Operations maintenance scheduled daily at 03:00.
+2026-03-30 14:58:26 [INFO] [INIT-DONE] System Initialization COMPLETED
+2026-03-30 14:58:26 [INFO] [DB-CONNECT] PostgreSQL connectivity established
+2026-03-30 14:58:26 [INFO] [LOCALE-INIT] System Timezone set to Europe/Berlin, Format: YYYY-MM-DD 12h

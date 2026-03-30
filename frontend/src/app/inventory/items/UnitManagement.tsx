@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
+import { cn, parseSystemDate } from '@/lib/utils';
 
 interface UnitManagementProps {
   itemId: string;
@@ -209,9 +209,18 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
 
   const startEdit = (unit: any) => {
     setEditingUnitId(unit.unit_id);
+    
+    let dateVal = '';
+    if (unit.expiration_date) {
+      const d = parseSystemDate(unit.expiration_date);
+      if (!isNaN(d.getTime())) {
+        dateVal = d.toISOString().split('T')[0];
+      }
+    }
+
     setFormData({
       serial_number: unit.serial_number || '',
-      expiration_date: unit.expiration_date ? unit.expiration_date.split('T')[0] : '',
+      expiration_date: dateVal,
       condition: unit.condition || 'good',
       description: unit.description || '',
       status: unit.status || 'available',

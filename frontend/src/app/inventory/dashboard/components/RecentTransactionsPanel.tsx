@@ -1,6 +1,7 @@
 import type { RecentTransaction } from '../lib/types';
 import Link from 'next/link';
 import { ArrowRight, Clock, Inbox, AlertCircle } from 'lucide-react';
+import { parseSystemDate } from '@/lib/utils';
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   pending: { label: 'Pending', className: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400' },
@@ -23,23 +24,8 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function parseBackendDate(dateStr: string): Date {
-  // Backend format: "MM/DD/YYYY - hh:MM:SS AM/PM"
-  const match = dateStr.match(
-    /^(\d{2})\/(\d{2})\/(\d{4})\s*-\s*(\d{2}):(\d{2}):(\d{2})\s*(AM|PM)$/i
-  );
-  if (match) {
-    const [, mo, dd, yyyy, hh, mm, ss, ampm] = match;
-    let hour = parseInt(hh, 10);
-    if (ampm.toUpperCase() === 'PM' && hour !== 12) hour += 12;
-    if (ampm.toUpperCase() === 'AM' && hour === 12) hour = 0;
-    return new Date(+yyyy, +mo - 1, +dd, hour, +mm, +ss);
-  }
-  return new Date(dateStr);
-}
-
 function formatRelativeDate(dateStr: string): string {
-  const date = parseBackendDate(dateStr);
+  const date = parseSystemDate(dateStr);
   if (isNaN(date.getTime())) return dateStr;
 
   const now = new Date();
