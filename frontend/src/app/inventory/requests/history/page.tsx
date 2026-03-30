@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { History, Search, Loader2, AlertCircle, FileText, User, Calendar, Tag, Info, Filter } from 'lucide-react';
-import { borrowApi, BorrowRequestEventGlobal } from '../api';
+import { History, Search, Loader2, AlertCircle, User, Calendar, Tag, Info } from 'lucide-react';
+import { BorrowRequestEventGlobal } from '../api';
+import { useGlobalBorrowEvents } from '../lib/useRequestQueries';
 import { Pagination } from '@/components/ui/Pagination';
-import type { PaginationMeta } from '@/lib/api';
 import Link from 'next/link';
 
 function useDebounce<T>(value: T, delay: number): T {
@@ -17,10 +17,6 @@ function useDebounce<T>(value: T, delay: number): T {
 }
 
 export default function RequestHistoryPage() {
-  const [events, setEvents] = useState<BorrowRequestEventGlobal[]>([]);
-  const [meta, setMeta] = useState<PaginationMeta | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
   const [eventTypeFilter, setEventTypeFilter] = useState('');
@@ -32,36 +28,24 @@ export default function RequestHistoryPage() {
   const debouncedRequestId = useDebounce(requestIdFilter, 400);
   const debouncedActorName = useDebounce(actorNameFilter, 400);
 
-  const fetchEvents = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await borrowApi.getAllEvents({
-        page,
-        per_page: perPage,
-        event_type: eventTypeFilter || undefined,
-        request_id: debouncedRequestId || undefined,
-        actor_name: debouncedActorName || undefined,
-        date_from: dateFrom || undefined,
-        date_to: dateTo || undefined,
-      });
-      setEvents(res.data as BorrowRequestEventGlobal[]);
-      if (res.meta) setMeta(res.meta);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch request events');
-    } finally {
-      setLoading(false);
-    }
-  }, [page, perPage, eventTypeFilter, debouncedRequestId, debouncedActorName, dateFrom, dateTo]);
+  const { data: eventsResponse, isLoading: loading, error: queryError, refetch } = useGlobalBorrowEvents({
+    page,
+    per_page: perPage,
+    event_type: eventTypeFilter || undefined,
+    request_id: debouncedRequestId || undefined,
+    actor_name: debouncedActorName || undefined,
+    date_from: dateFrom || undefined,
+    date_to: dateTo || undefined,
+  });
+
+  const events = (eventsResponse?.data as BorrowRequestEventGlobal[]) || [];
+  const meta = eventsResponse?.meta || null;
+  const error = queryError ? (queryError as Error).message : null;
 
   // Reset to page 1 on filter change
   useEffect(() => {
     setPage(1);
   }, [eventTypeFilter, debouncedRequestId, debouncedActorName, dateFrom, dateTo, perPage]);
-
-  useEffect(() => {
-    fetchEvents();
-  }, [fetchEvents]);
 
   const getEventBadgeClass = (type: string) => {
     switch (type.toLowerCase()) {
@@ -201,7 +185,7 @@ export default function RequestHistoryPage() {
                   <td colSpan={5} className="p-12 text-center text-rose-500">
                     <AlertCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
                     <p className="font-bold">{error}</p>
-                    <button onClick={() => fetchEvents()} className="mt-4 px-6 py-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs font-bold hover:bg-rose-500/20 transition-all">
+                    <button onClick={() => refetch()} className="mt-4 px-6 py-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs font-bold hover:bg-rose-500/20 transition-all">
                       Try Again
                     </button>
                   </td>

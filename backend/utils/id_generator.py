@@ -16,21 +16,23 @@ def get_next_sequence(session: Session, model: Type[ModelType], field_name: str,
     statement = (
         select(getattr(model, field_name))
         .where(getattr(model, field_name).like(f"{prefix}-%"))
-        .order_by(getattr(model, field_name).desc())
-        .limit(1)
     )
     
-    last_id = session.exec(statement).first()
+    all_ids = session.exec(statement).all()
     
-    if not last_id:
+    if not all_ids:
         return f"{prefix}-000001"
     
-    try:
-        # Extract the numeric part after the hyphen
-        current_seq = int(last_id.split("-")[-1])
-        next_seq = current_seq + 1
-    except (ValueError, IndexError):
-        # Fallback if the format is somehow messed up
-        next_seq = 1
-        
-    return f"{prefix}-{next_seq:06d}"
+    max_seq = 0
+    for record_id in all_ids:
+        try:
+            # Extract the numeric part after the LAST hyphen
+            parts = record_id.split("-")
+            if len(parts) >= 2:
+                seq_str = parts[-1]
+                if seq_str.isdigit():
+                    max_seq = max(max_seq, int(seq_str))
+        except (ValueError, IndexError):
+            continue
+            
+    return f"{prefix}-{max_seq + 1:06d}"

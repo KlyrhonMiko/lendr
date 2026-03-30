@@ -21,7 +21,7 @@ class BaseService(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         self.lookup_field = lookup_field
 
     def get(
-        self, session: Session, lookup_val: Any, include_deleted: bool = False
+        self, session: Session, lookup_val: Any, include_deleted: bool = False, include_archived: bool = True
     ) -> ModelType | None:
 
         statement = select(self.model).where(
@@ -29,25 +29,39 @@ class BaseService(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         )
         if not include_deleted:
             statement = statement.where(self.model.is_deleted.is_(False))
+        if not include_archived:
+            statement = statement.where(self.model.is_archived.is_(False))
 
         return session.exec(statement).first()
 
     def get_all(
-        self, session: Session, skip: int = 0, limit: int = 100
+        self, 
+        session: Session, 
+        skip: int = 0, 
+        limit: int = 100, 
+        include_archived: bool = False,
+        is_archived: Optional[bool] = None
     ) -> tuple[list[ModelType], int]:
-        """Get all non-deleted records with pagination and total count."""
+        """Get all non-deleted records with pagination and flexible archival filtering."""
 
-        items_statement = (
-            select(self.model)
-            .where(self.model.is_deleted.is_(False))
-            .offset(skip)
-            .limit(limit)
-        )
-        total_statement = select(func.count(self.model.id)).where(
-            self.model.is_deleted.is_(False)
-        )
+        # Build base query for items
+        items_statement = select(self.model).where(self.model.is_deleted.is_(False))
+        
+        # Build base query for total count
+        total_statement = select(func.count(self.model.id)).where(self.model.is_deleted.is_(False))
 
-        items = session.exec(items_statement).all()
+        # Apply archival filtering
+        if is_archived is not None:
+            # Explicitly filter for archived (True) or active (False)
+            items_statement = items_statement.where(self.model.is_archived == is_archived)
+            total_statement = total_statement.where(self.model.is_archived == is_archived)
+        elif not include_archived:
+            # Default behavior (if not specified): hide archived items
+            items_statement = items_statement.where(self.model.is_archived.is_(False))
+            total_statement = total_statement.where(self.model.is_archived.is_(False))
+
+        # Execute queries
+        items = session.exec(items_statement.offset(skip).limit(limit)).all()
         total_count = session.exec(total_statement).one()
 
         return items, total_count
@@ -198,6 +212,82 @@ class BaseService(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
         return db_obj
 
+    def archive(
+        self, 
+        session: Session, 
+        db_obj: ModelType,
+        actor_id: Optional[UUID] = None,
+    ) -> ModelType:
+        before = db_obj.model_dump(mode="json")
+        db_obj.is_archived = True
+        db_obj.archived_at = get_now_manila()
+        session.add(db_obj)
+
+        # Log archival
+        self._log_audit(
+            session=session,
+            action="archived",
+            entity_id=getattr(db_obj, self.lookup_field),
+            before=before,
+            after=db_obj.model_dump(mode="json"),
+            actor_id=actor_id,
+        )
+
+        session.commit()
+        session.refresh(db_obj)
+
+        return db_obj
+
+    def restore_archive(
+        self, 
+        session: Session, 
+        db_obj: ModelType,
+        actor_id: Optional[UUID] = None,
+    ) -> ModelType:
+        before = db_obj.model_dump(mode="json")
+        db_obj.is_archived = False
+        db_obj.archived_at = None
+        session.add(db_obj)
+
+        # Log restoration
+        self._log_audit(
+            session=session,
+            action="unarchived",
+            entity_id=getattr(db_obj, self.lookup_field),
+            before=before,
+            after=db_obj.model_dump(mode="json"),
+            actor_id=actor_id,
+        )
+
+        session.commit()
+        session.refresh(db_obj)
+
+        return db_obj
+
+    def hard_delete(
+        self, 
+        session: Session, 
+        db_obj: ModelType,
+        actor_id: Optional[UUID] = None,
+    ) -> None:
+        """Permanently remove a record from the database."""
+        before = db_obj.model_dump(mode="json")
+        entity_id = getattr(db_obj, self.lookup_field)
+        
+        session.delete(db_obj)
+
+        # Log the permanent purge
+        self._log_audit(
+            session=session,
+            action="purged",
+            entity_id=entity_id,
+            before=before,
+            after=None,
+            actor_id=actor_id,
+        )
+
+        session.commit()
+
     def validate_uniqueness(
         self,
         session: Session,
@@ -276,7 +366,7 @@ class ConfigBaseService(Generic[ConfigModelType]):
         category: str | None = None,
     ) -> ConfigModelType | None:
         statement = select(self.model).where(
-            self.model.key == key,
+            (func.lower(self.model.key) == key.lower()) | (func.lower(self.model.value) == key.lower()),
             self.model.is_deleted.is_(False),
         )
 
@@ -295,7 +385,7 @@ class ConfigBaseService(Generic[ConfigModelType]):
 
     def exists(self, session: Session, key: str, category: str) -> bool:
         statement = select(self.model).where(
-            self.model.key == key,
+            (func.lower(self.model.key) == key.lower()) | (func.lower(self.model.value) == key.lower()),
             self.model.category == category,
             self.model.is_deleted.is_(False),
         )
@@ -393,6 +483,7 @@ class ConfigBaseService(Generic[ConfigModelType]):
         limit: int = 100,
         key: str | None = None,
         category: str | None = None,
+        system: str | None = None,
     ) -> tuple[list[ConfigModelType], int]:
 
         statement = select(self.model).where(self.model.is_deleted.is_(False))
@@ -400,6 +491,8 @@ class ConfigBaseService(Generic[ConfigModelType]):
             statement = statement.where(self.model.key.ilike(f"%{key}%"))
         if category:
             statement = statement.where(self.model.category == category)
+        if system:
+            statement = statement.where(self.model.system == system)
         total_statement = select(func.count()).select_from(statement.subquery())
 
         total = session.exec(total_statement).one()
@@ -411,6 +504,15 @@ class ConfigBaseService(Generic[ConfigModelType]):
     def get_categories(self, session: Session) -> list[str]:
         statement = (
             select(self.model.category)
+            .where(self.model.is_deleted.is_(False))
+            .distinct()
+        )
+
+        return sorted(list(session.exec(statement).all()))
+
+    def get_systems(self, session: Session) -> list[str]:
+        statement = (
+            select(self.model.system)
             .where(self.model.is_deleted.is_(False))
             .distinct()
         )

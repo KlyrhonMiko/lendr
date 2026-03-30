@@ -186,18 +186,20 @@ export function InventoryItemFormModal({
             />
           </div>
 
-          <label className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border/50 cursor-pointer hover:bg-muted/60 transition-colors">
-            <input
-              type="checkbox"
-              checked={formData.is_trackable}
-              onChange={(e) => setFormData({ ...formData, is_trackable: e.target.checked })}
-              className="h-4.5 w-4.5 rounded border-border accent-indigo-500"
-            />
-            <div>
-              <p className="text-sm font-medium text-foreground">Track individual units</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Enable serial number or per-unit tracking</p>
-            </div>
-          </label>
+          {!editingItem && (
+            <label className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border/50 cursor-pointer hover:bg-muted/60 transition-colors">
+              <input
+                type="checkbox"
+                checked={formData.is_trackable}
+                onChange={(e) => setFormData({ ...formData, is_trackable: e.target.checked })}
+                className="h-4.5 w-4.5 rounded border-border accent-indigo-500"
+              />
+              <div>
+                <p className="text-sm font-medium text-foreground">Track individual units</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Enable serial number or per-unit tracking</p>
+              </div>
+            </label>
+          )}
 
           <div className="flex gap-3 pt-2">
             <button

@@ -76,6 +76,51 @@ def setup_logging(log_level: str = "INFO", log_dir: str = ".logs"):
 
     return logger
 
+def setup_health_logging(log_file: str = "system_logs/health.log"):
+    """
+    Initialize a separate logger for System Health / Operational metrics.
+    This file is intended for long-term health monitoring and user-facing dashboards.
+    """
+    # Ensure health log directory exists
+    log_file_path = Path(log_file)
+    log_file_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Health Logger
+    health_logger = logging.getLogger("health")
+    health_logger.setLevel(logging.INFO)
+    health_logger.propagate = False # Prevent health logs from cluttering the main backend.log if they share the root logger
+    
+    # Avoid duplicate handlers if already setup
+    if health_logger.handlers:
+        return health_logger
+        
+    # File Handler (Simple rotating for health)
+    handler = TimedRotatingFileHandler(
+        log_file, when="midnight", interval=1, backupCount=90, encoding="utf-8"
+    )
+    # Match the format expected by HealthService re.compile(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \[(\w+)\] (.+)$")
+    formatter = logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
+    handler.setFormatter(formatter)
+    health_logger.addHandler(handler)
+    
+    return health_logger
+
+def log_operation(code: str, message: str, level: str = "INFO"):
+    """
+    Log an operational event specifically formatted for the System Health dashboard.
+    Format: [CODE] Description
+    """
+    health_logger = logging.getLogger("health")
+    # If health logging isn't setup yet, it will just use defaults (usually stdout)
+    # This ensures calls to log_operation record structured data.
+    formatted_msg = f"[{code}] {message}"
+    
+    level_num = getattr(logging, level.upper(), logging.INFO)
+    health_logger.log(level_num, formatted_msg)
+
 # Convenience function to get loggers for specific modules
 def get_logger(name: str):
     return logging.getLogger(name)

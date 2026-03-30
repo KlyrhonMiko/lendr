@@ -14,6 +14,8 @@ class BorrowerSession(BaseModel, table=True):
 
     borrower_uuid: UUID | None = Field(default=None, foreign_key="users.id", index=True)
     
+    device_id: str | None = Field(default=None, max_length=100)
+    
     issued_at: datetime = Field(default_factory=get_now_manila)
     expires_at: datetime
     is_revoked: bool = Field(default=False)

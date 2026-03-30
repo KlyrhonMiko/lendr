@@ -1,9 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { PaginationMeta } from '@/lib/api';
-import { inventoryAuditApi } from '../api';
-import type { AuditLog, AuditLogParams } from '../lib/types';
+import type { AuditLogParams } from '../api';
+import { useAuditLogs } from './useAuditLogQueries';
 
 const DEFAULT_PER_PAGE = 10;
 
@@ -18,10 +17,6 @@ function timeframeToDateFrom(timeframe: string): string | undefined {
 }
 
 export function useInventoryAuditLogsManagement() {
-  const [logs, setLogs] = useState<AuditLog[]>([]);
-  const [meta, setMeta] = useState<PaginationMeta | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(DEFAULT_PER_PAGE);
@@ -36,31 +31,17 @@ export function useInventoryAuditLogsManagement() {
     setExpandedAuditId((prev) => (prev === id ? null : id));
   }, []);
 
-  const fetchLogs = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params: AuditLogParams = {
-        page,
-        per_page: perPage,
-        actor_id: search || undefined,
-        entity_type: entityFilter || undefined,
-        date_from,
-      };
+  const { data: logsResponse, isLoading: loading, error: queryError } = useAuditLogs({
+    page,
+    per_page: perPage,
+    actor_id: search || undefined,
+    entity_type: entityFilter || undefined,
+    date_from,
+  });
 
-      const res = await inventoryAuditApi.list(params);
-      setLogs(res.data);
-      if (res.meta) setMeta(res.meta);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch audit logs');
-    } finally {
-      setLoading(false);
-    }
-  }, [page, perPage, search, entityFilter, date_from]);
-
-  useEffect(() => {
-    fetchLogs();
-  }, [fetchLogs]);
+  const logs = logsResponse?.data || [];
+  const meta = logsResponse?.meta || null;
+  const error = queryError ? (queryError as Error).message : null;
 
   return {
     logs,

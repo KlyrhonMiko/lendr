@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Loader2, CheckCircle2, AlertCircle, Info, Layers, Sparkles } from 'lucide-react';
+import { parseSystemDate } from '@/lib/utils';
 import { borrowApi, BorrowRequest } from './api';
 import { inventoryApi } from '../items/api';
 import { toast } from 'sonner';
@@ -396,9 +397,9 @@ export function UnitSelectionModal({ request, onClose, onSuccess }: UnitSelectio
                               <span className="text-sm font-bold font-mono">{batch.batch_id}</span>
                               {batch.expiration_date && (
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${
-                                  new Date(batch.expiration_date) < new Date() ? 'bg-rose-500 text-rose-50' : 'bg-amber-500/10 text-amber-500'
+                                  parseSystemDate(batch.expiration_date) < new Date() ? 'bg-rose-500 text-rose-50' : 'bg-amber-500/10 text-amber-500'
                                 }`}>
-                                  Exp: {new Date(batch.expiration_date).toLocaleDateString()}
+                                  Exp: {parseSystemDate(batch.expiration_date).toLocaleDateString()}
                                 </span>
                               )}
                             </div>

@@ -11,6 +11,7 @@ from core.config import settings
 from systems.admin.models.backup import BackupRun, BackupArtifact
 from systems.admin.services.configuration_service import ConfigurationService
 from utils.time_utils import get_now_manila
+from utils.logging import log_operation
 
 
 class BackupService:
@@ -73,6 +74,9 @@ class BackupService:
             session.add(backup_run)
             session.commit()
             session.refresh(backup_run)
+            
+            log_operation("BACKUP-SUCCESS", f"Database backup {backup_run.id} completed successfully")
+            
             return backup_run
             
         except Exception as e:
@@ -86,8 +90,12 @@ class BackupService:
             backup_run.completed_at = get_now_manila()
             session.add(backup_run)
             session.commit()
+            
+            error_msg = f"Backup {backup_run.backup_id} failed: {str(e)}"
+            log_operation("BACKUP-FAIL", error_msg, level="ERROR")
+            
             # We raise the exception so the API returns a proper 500 error instead of "Success"
-            raise RuntimeError(f"Backup {backup_run.backup_id} failed: {str(e)}") from e
+            raise RuntimeError(error_msg) from e
 
     def _run_local_backup(self, session: Session, backup_run: BackupRun):
         timestamp = get_now_manila().strftime("%Y%m%d_%H%M%S")

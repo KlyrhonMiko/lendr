@@ -12,6 +12,7 @@ from core.schemas import (
 )
 from systems.admin.models.user import User
 from systems.admin.services.configuration_service import ConfigurationService
+from systems.admin.services.scheduler_service import scheduler_service
 from systems.auth.dependencies import get_current_user, require_permission
 
 router = APIRouter()
@@ -29,13 +30,14 @@ async def list_settings(
     per_page: int = Query(default=20, ge=1, le=500),
     key: str | None = None,
     category: str | None = None,
+    system: str | None = None,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_permission("admin:config:manage")),
 ):
     skip = (page - 1) * per_page
     settings, total = config_service.get_all(
-        session, skip=skip, limit=per_page, key=key, category=category
+        session, skip=skip, limit=per_page, key=key, category=category, system=system
     )
 
     return create_success_response(
@@ -59,6 +61,22 @@ async def list_categories(
     categories = config_service.get_categories(session)
 
     return create_success_response(data=categories, request=request)
+
+
+@router.get(
+    "/systems",
+    response_model=GenericResponse[list[str]],
+    responses={401: {"model": GenericResponse}},
+)
+async def list_systems(
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("admin:config:manage")),
+):
+    systems = config_service.get_systems(session)
+
+    return create_success_response(data=systems, request=request)
 
 
 @router.get(
@@ -131,6 +149,9 @@ async def create_setting(
         actor_id=current_user.id,
     )
 
+    if setting_data.category == "operations_settings":
+        scheduler_service.sync_schedule()
+
     return create_success_response(
         message=f"Setting '{setting_data.key}' created successfully",
         data=config_service.get_by_key(
@@ -182,6 +203,9 @@ async def update_setting(
         description=setting_data.description,
         actor_id=current_user.id,
     )
+
+    if category == "operations_settings":
+        scheduler_service.sync_schedule()
 
     return create_success_response(
         message=f"Setting '{key}' updated successfully",
@@ -242,6 +266,9 @@ async def restore_setting(
         )
 
     config_service.restore(session, setting, actor_id=current_user.id)
+
+    if category == "operations_settings":
+        scheduler_service.sync_schedule()
 
     return create_success_response(
         message=f"Setting '{key}' restored successfully",

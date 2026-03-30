@@ -113,3 +113,9 @@ dmypy.json
 
 # Profiling
 *.prof
+
+# Claude/agent files (local agent state, memories)
+.agents/
+.claude/
+memories/
+CLAUDE.md

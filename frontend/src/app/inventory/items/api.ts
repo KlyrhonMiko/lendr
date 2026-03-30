@@ -1,6 +1,7 @@
 import { api, buildQueryString } from '@/lib/api';
 
 export interface InventoryItem {
+  id: string;
   item_id: string;
   name: string;
   category: string;

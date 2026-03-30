@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 import time
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,17 +11,23 @@ from core.database import engine
 from core.config import settings
 from core.initialization_service import InitializationService
 from core.schemas import create_error_response
-from utils.logging import setup_logging, get_logger
+from utils.logging import setup_logging, get_logger, setup_health_logging, log_operation
 
 # Routers
 from systems.admin.routers.backup import router as backup
 from systems.admin.routers.configuration import router as config
+from systems.admin.routers.general_settings import router as general_settings
+from systems.admin.routers.branding_settings import router as branding_settings
 from systems.admin.routers.users import router as users
 from systems.admin.routers.roles import router as roles_config
 from systems.admin.routers.audit_log import router as admin_audit_log
 from systems.admin.routers.dashboard import router as admin_dashboard
+from systems.admin.routers.health import router as health
+from systems.admin.routers.operations_settings import router as operations_settings
+from systems.admin.routers.archives import router as archives
 
 from systems.auth.dependencies import require_system_access
+from core.middleware import MaintenanceMiddleware
 from systems.auth.routers.auth import router as auth
 from systems.auth.routers.configuration import router as auth_config
 from systems.inventory.routers.borrowing import router as borrowing
@@ -30,10 +37,14 @@ from systems.inventory.routers.dashboard import router as dashboard
 from systems.inventory.routers.audit_log import router as audit_log
 from systems.inventory.routers.borrower import router as borrower
 from systems.inventory.routers.configuration import router as inv_config
+from systems.inventory.routers.settings import router as inv_settings
+from systems.inventory.routers.data import router as data
 
 # Initialize System-wide Logging
 setup_logging(log_level=settings.LOG_LEVEL, log_dir=settings.LOG_DIR)
+setup_health_logging()
 logger = get_logger("app")
+health_logger = get_logger("health")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -42,21 +53,40 @@ async def lifespan(app: FastAPI):
         with Session(engine) as session:
             init_service = InitializationService()
             init_service.run(session)
+            
+            # Initialize System Localization
+            from systems.admin.services.configuration_service import ConfigurationService
+            from utils.time_utils import update_system_timezone, update_system_format
+            
+            config_service = ConfigurationService()
+            tz = config_service.get_value(session, "timezone", "Asia/Manila", category="general_settings")
+            df = config_service.get_value(session, "date_format", "MM/DD/YYYY", category="general_settings")
+            tf = config_service.get_value(session, "time_format", "12h", category="general_settings")
+            
+            update_system_timezone(tz)
+            update_system_format(df, tf)
+            
+            # Start Background Scheduler
+            from systems.admin.services.scheduler_service import scheduler_service
+            scheduler_service.start()
+            
+        log_operation("INIT-DONE", "System Initialization COMPLETED")
+        log_operation("DB-CONNECT", "PostgreSQL connectivity established")
+        log_operation("LOCALE-INIT", f"System Timezone set to {tz}, Format: {df} {tf}")
     else:
         logger.warning("System Initialization SKIPPED (SKIP_INIT=True)")
+        log_operation("INIT-SKIP", "System Initialization SKIPPED", level="WARNING")
     yield
 
 
 app = FastAPI(title="Lendr Unified API", lifespan=lifespan)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Mount Static Assets
+app.mount("/api/assets", StaticFiles(directory="assets"), name="assets")
 
+# --- Middleware Stack (Last added is Outermost) ---
+
+# 3. Custom Logging Middleware (Innermost of the three)
 @app.middleware("http")
 async def logging_middleware(request: Request, call_next):
     """Global middleware to log every request and its outcome."""
@@ -79,6 +109,19 @@ async def logging_middleware(request: Request, call_next):
             exc_info=True
         )
         raise e
+
+# 2. Maintenance Mode Middleware
+app.add_middleware(MaintenanceMiddleware)
+
+# 1. CORSMiddleware (Outermost)
+# We add this last so it wraps all other middlewares, including Maintenance
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Global Exception Handlers
 @app.exception_handler(HTTPException)
@@ -104,6 +147,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
+    log_operation("500-INTERNAL", f"Crash in {request.url.path}: {str(exc)}", level="ERROR")
     return JSONResponse(
         status_code=500,
         content=create_error_response(
@@ -121,9 +165,14 @@ admin_access = [
 app.include_router(backup, prefix="/api/admin/backups", tags=["Admin - Backups"], dependencies=admin_access)
 app.include_router(users, prefix="/api/admin/users", tags=["Admin - Users"], dependencies=admin_access)
 app.include_router(config, prefix="/api/admin/config", tags=["Admin - Configuration"], dependencies=admin_access)
+app.include_router(general_settings, prefix="/api/admin/settings/general", tags=["Admin - General Settings"], dependencies=admin_access)
+app.include_router(branding_settings, prefix="/api/admin/settings/branding", tags=["Admin - Branding Settings"], dependencies=admin_access)
+app.include_router(operations_settings, prefix="/api/admin/settings/operations", tags=["Admin - Operations Settings"], dependencies=admin_access)
+app.include_router(archives, prefix="/api/admin/settings/operations/archives", tags=["Admin - Operations Settings"], dependencies=admin_access)
 app.include_router(roles_config, prefix="/api/admin/roles", tags=["Admin - Roles"], dependencies=admin_access)
 app.include_router(admin_audit_log, prefix="/api/admin/audit-log", tags=["Admin - Audit Logs"], dependencies=admin_access)
 app.include_router(admin_dashboard, prefix="/api/admin/dashboard", tags=["Admin - Dashboard"], dependencies=admin_access)
+app.include_router(health, prefix="/api/admin/health", tags=["Admin - System Health"], dependencies=admin_access)
 app.include_router(auth, prefix="/api/auth", tags=["Auth"])
 app.include_router(auth_config, prefix="/api/auth/config", tags=["Auth - Configuration"], dependencies=admin_access)
 
@@ -170,6 +219,18 @@ app.include_router(
     inv_config,
     prefix="/api/inventory/config",
     tags=["Inventory - Configuration"],
+    dependencies=inventory_access,
+)
+app.include_router(
+    inv_settings,
+    prefix="/api/inventory/settings",
+    tags=["Inventory - Global Settings"],
+    dependencies=inventory_access,
+)
+app.include_router(
+    data,
+    prefix="/api/inventory/data",
+    tags=["Inventory - Data Management"],
     dependencies=inventory_access,
 )
 

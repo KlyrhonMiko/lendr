@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { inventoryApi, ConfigRead } from './api';
+import { useQueryClient } from '@tanstack/react-query';
+import { useInventoryUnits } from './lib/useItemQueries';
 import {
   X,
   Plus,
@@ -17,7 +19,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
+import { cn, parseSystemDate } from '@/lib/utils';
 
 interface UnitManagementProps {
   itemId: string;
@@ -134,11 +136,11 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
-  const [units, setUnits] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [isBatch, setIsBatch] = useState(false);
   const [editingUnitId, setEditingUnitId] = useState<string | null>(null);
+
+  const queryClient = useQueryClient();
 
   const [statusConfigs, setStatusConfigs] = useState<ConfigRead[]>([]);
   const [conditionConfigs, setConditionConfigs] = useState<ConfigRead[]>([]);
@@ -146,6 +148,14 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
   const [searchSerial, setSearchSerial] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterCondition, setFilterCondition] = useState('');
+
+  const { data: unitsResponse, isLoading: unitsLoading } = useInventoryUnits(itemId, {
+    serial_number: searchSerial || undefined,
+    status: filterStatus || undefined,
+    condition: filterCondition || undefined,
+  });
+
+  const units = unitsResponse?.data || [];
 
   const [formData, setFormData] = useState({
     serial_number: '',
@@ -170,26 +180,14 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
     }
   }, []);
 
-  const fetchUnits = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await inventoryApi.listUnits(itemId, {
-        serial_number: searchSerial || undefined,
-        status: filterStatus || undefined,
-        condition: filterCondition || undefined,
-      });
-      setUnits(res.data);
-    } catch {
-      toast.error('Failed to load units');
-    } finally {
-      setLoading(false);
-    }
-  }, [itemId, searchSerial, filterStatus, filterCondition]);
-
   useEffect(() => {
     fetchConfigs();
-    fetchUnits();
-  }, [fetchConfigs, fetchUnits]);
+  }, [fetchConfigs]);
+
+  const invalidateQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['inventory', 'items', itemId, 'units'] });
+    queryClient.invalidateQueries({ queryKey: ['inventory', 'items'] }); // Main list
+  };
 
   const resetForm = () => {
     setFormData({
@@ -211,9 +209,18 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
 
   const startEdit = (unit: any) => {
     setEditingUnitId(unit.unit_id);
+    
+    let dateVal = '';
+    if (unit.expiration_date) {
+      const d = parseSystemDate(unit.expiration_date);
+      if (!isNaN(d.getTime())) {
+        dateVal = d.toISOString().split('T')[0];
+      }
+    }
+
     setFormData({
       serial_number: unit.serial_number || '',
-      expiration_date: unit.expiration_date ? unit.expiration_date.split('T')[0] : '',
+      expiration_date: dateVal,
       condition: unit.condition || 'good',
       description: unit.description || '',
       status: unit.status || 'available',
@@ -257,7 +264,7 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
         toast.success('Unit created');
       }
       closeForm();
-      fetchUnits();
+      invalidateQueries();
     } catch (err: any) {
       toast.error(err.message || 'Failed to save unit');
     }
@@ -268,7 +275,7 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
     try {
       await inventoryApi.retireUnit(itemId, unitId);
       toast.success('Unit retired');
-      fetchUnits();
+      invalidateQueries();
     } catch (err: any) {
       toast.error(err.message || 'Failed to retire unit');
     }
@@ -310,17 +317,16 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
         <div className="px-5 py-3 border-b border-border/50 shrink-0">
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="w-4 h-4 text-muted-foreground" />
+              </div>
               <input
                 type="text"
                 placeholder="Search by serial number..."
                 value={searchSerial}
                 onChange={(e) => setSearchSerial(e.target.value)}
-                className="w-full h-9 pl-8.5 pr-3 rounded-xl bg-muted/50 border border-border text-sm focus:bg-background focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 transition-all"
+                className="w-full h-9 pl-9 pr-3 rounded-xl bg-muted/50 border border-border text-sm focus:bg-background focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 transition-all"
               />
-              {loading && (
-                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground animate-spin" />
-              )}
             </div>
             <FilterSelect
               value={filterStatus}
@@ -483,10 +489,13 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
         )}
 
         {/* Unit List */}
-        <div className="flex-1 overflow-y-auto px-5 pt-3 pb-5 min-h-0">
-          {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
+        <div className="flex-1 overflow-y-auto min-h-0 bg-muted/10 relative p-5">
+          {unitsLoading ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-10">
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+                <p className="text-sm font-medium text-muted-foreground">Loading units...</p>
+              </div>
             </div>
           ) : units.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">

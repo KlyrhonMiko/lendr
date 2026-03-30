@@ -24,9 +24,11 @@ auth_service = AuthService()
 
 @router.post("/login", response_model=Token)
 async def login_for_access_token(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     session: Session = Depends(get_session),
 ):
+    device_id = request.headers.get("X-Device-ID")
     user = auth_service.authenticate_user(session, form_data.username, form_data.password)
     if not user:
         raise HTTPException(
@@ -55,7 +57,8 @@ async def login_for_access_token(
         db_session = auth_service.create_user_session(
                 session=session,
                 user_uuid=user.id,
-                expires_delta=access_token_expires
+                expires_delta=access_token_expires,
+                device_id=device_id
             )
 
     access_token = auth_service.create_access_token(
@@ -76,9 +79,11 @@ async def login_for_access_token(
 
 @router.post("/borrower/login", response_model=Token)
 async def borrower_login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     session: Session = Depends(get_session),
 ):
+    device_id = request.headers.get("X-Device-ID")
     user = auth_service.authenticate_user(session, form_data.username, form_data.password)
     if not user:
         raise HTTPException(
@@ -94,12 +99,14 @@ async def borrower_login(
             user_id=user.user_id,
             expires_delta=access_token_expires,
             user_uuid=user.id,
+            device_id=device_id,
         )
     else:
         db_session = auth_service.create_user_session(
                 session=session,
                 user_uuid=user.id,
-                expires_delta=access_token_expires
+                expires_delta=access_token_expires,
+                device_id=device_id,
             )
 
     access_token = auth_service.create_access_token(

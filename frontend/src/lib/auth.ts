@@ -1,3 +1,5 @@
+import { http, getDeviceId } from '@/lib/http';
+
 export interface User {
   user_id: string;
   username: string;
@@ -125,11 +127,8 @@ export const auth = {
 
       if (token) {
         try {
-          await fetch(`${API_BASE_URL}/api/auth/logout`, {
+          await http.request('/auth/logout', {
             method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`
-            },
             keepalive: true,
           });
         } catch {
@@ -153,24 +152,11 @@ export const auth = {
     if (!token) return null;
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/auth/me`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          auth.logout();
-        }
-        return null;
-      }
-
-      const result = await response.json();
+      const result = await http.request<User>('/auth/me', { method: 'GET' });
       return result.data;
     } catch (error) {
-      console.error('Failed to fetch user:', error);
-      return null;
+      // Re-throw MaintenanceError so it's caught by the Context/Wrapper
+      throw error;
     }
   },
 

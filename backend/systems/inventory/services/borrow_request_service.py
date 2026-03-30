@@ -1,5 +1,6 @@
 from datetime import datetime
 from sqlmodel import Session, select, func, and_
+from typing import Optional
 from uuid import UUID
 
 from core.base_service import BaseService
@@ -259,6 +260,8 @@ class BorrowService(
         date_from: datetime | None = None,
         date_to: datetime | None = None,
         returned_on_time: bool | None = None,
+        include_archived: bool = False,
+        is_archived: Optional[bool] = None,
     ) -> tuple[list[BorrowRequest], int]:
         """Get all borrow requests with optional filters and pagination."""
         needs_user_join = search is not None
@@ -271,6 +274,12 @@ class BorrowService(
             )
         else:
             statement = select(BorrowRequest).where(BorrowRequest.is_deleted.is_(False))
+
+        # Apply archival filtering
+        if is_archived is not None:
+            statement = statement.where(BorrowRequest.is_archived == is_archived)
+        elif not include_archived:
+            statement = statement.where(BorrowRequest.is_archived.is_(False))
 
         if status is not None:
             statement = statement.where(BorrowRequest.status == status)
@@ -744,16 +753,15 @@ class BorrowService(
                 f"Expected {borrow_item.qty_requested} units for item {item.item_id}, got {len(normalized_unit_ids)}"
             )
 
-        # Check if units are already assigned for THIS item
+        # Clear existing assignments for THIS item to support reassignment
         existing_assignments = [
             a
             for a in self._get_borrow_assignments(session, db_request)
             if a.inventory_unit and a.inventory_unit.inventory_uuid == item_uuid
         ]
-        if existing_assignments:
-            raise ValueError(
-                f"Units are already assigned for item {item.item_id} in this request"
-            )
+        is_reassign = len(existing_assignments) > 0
+        for a in existing_assignments:
+            session.delete(a)
 
         borrower = self._get_user_by_uuid(session, db_request.borrower_uuid)
         now = get_now_manila()
@@ -769,6 +777,8 @@ class BorrowService(
                     f"Unit {unit_id} does not belong to item {item.item_id}"
                 )
             if unit.status != "available":
+                # Special check: If we're reassigning, we should ensure the newly selected units are available.
+                # However, what if we're reselecting the SAME units? (unlikely but possible in some UIs)
                 raise ValueError(f"Unit {unit_id} is not available for assignment")
 
             assignment = BorrowRequestUnit(
@@ -792,7 +802,7 @@ class BorrowService(
             borrow_uuid=db_request.id,
             event_type="units_assigned",
             actor_id=actor_id,
-            note=note,
+            note=f"{'Re-assigned' if is_reassign else 'Assigned'} units for item {item.item_id}. {note or ''}",
         )
         session.add(event)
 
@@ -1603,3 +1613,5 @@ class BorrowService(
         session.commit()
         session.refresh(db_request)
         return db_request
+
+borrow_request_service = BorrowService()

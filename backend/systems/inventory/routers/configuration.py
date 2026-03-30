@@ -75,6 +75,28 @@ async def create_inventory_setting(
     return create_success_response(data=setting, request=request)
 
 
+@router.delete(
+    "/inventory/{category}/{key}",
+    response_model=GenericResponse[ConfigRead],
+)
+async def delete_inventory_setting(
+    category: str,
+    key: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("inventory:config:manage")),
+):
+    setting = inventory_service.get_by_key(session, key, category=category)
+    if not setting:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="Setting not found")
+
+    inventory_service.delete(session, setting, actor_id=current_user.id)
+    return create_success_response(data=setting, request=request)
+
+
 # --- Borrower Config ---
 
 
@@ -127,4 +149,26 @@ async def create_borrower_setting(
         session, setting_data.key, category=setting_data.category
     )
 
+    return create_success_response(data=setting, request=request)
+
+
+@router.delete(
+    "/borrower/{category}/{key}",
+    response_model=GenericResponse[ConfigRead],
+)
+async def delete_borrower_setting(
+    category: str,
+    key: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("inventory:config:manage")),
+):
+    setting = borrower_service.get_by_key(session, key, category=category)
+    if not setting:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="Setting not found")
+
+    borrower_service.delete(session, setting, actor_id=current_user.id)
     return create_success_response(data=setting, request=request)

@@ -4,17 +4,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type { PaginationMeta } from '@/lib/api';
 import type { AuthConfig, User, UserListParams } from '../api';
-import { userApi } from '../api';
 import type { UserConfirmAction } from './types';
+import { useAdminUsers, useAdminUserConfigs, useAdminUserMutations } from './useUserQueries';
 
 const DEFAULT_PER_PAGE = 10;
 
 export function useUsersManagement() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [meta, setMeta] = useState<PaginationMeta | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   // Filter states
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
@@ -23,59 +18,38 @@ export function useUsersManagement() {
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(DEFAULT_PER_PAGE);
 
-  // Config states
-  const [roles, setRoles] = useState<AuthConfig[]>([]);
-  const [shifts, setShifts] = useState<AuthConfig[]>([]);
+  // Params
+  const params: UserListParams = {
+    page,
+    per_page: perPage,
+    search: search || undefined,
+    role: roleFilter || undefined,
+    shift_type: shiftFilter || undefined,
+    is_active: statusFilter === 'all' ? undefined : statusFilter === 'active',
+  };
+
+  // Queries
+  const { data: usersRes, isLoading: loading, error: userError } = useAdminUsers(params);
+  const { data: rolesRes } = useAdminUserConfigs('users_role');
+  const { data: shiftsRes } = useAdminUserConfigs('users_shift_type');
+
+  // Mutations
+  const { deleteUser, restoreUser } = useAdminUserMutations();
+
+  const users = usersRes?.data || [];
+  const meta = usersRes?.meta || null;
+  const error = userError?.message || null;
+  const roles = rolesRes?.data || [];
+  const shifts = shiftsRes?.data || [];
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | undefined>(undefined);
   const [isConfirmingAction, setIsConfirmingAction] = useState<UserConfirmAction | null>(null);
 
-  const fetchUsers = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params: UserListParams = {
-        page,
-        per_page: perPage,
-        search: search || undefined,
-        role: roleFilter || undefined,
-        shift_type: shiftFilter || undefined,
-        is_active: statusFilter === 'all' ? undefined : statusFilter === 'active',
-      };
-
-      const res = await userApi.list(params);
-      setUsers(res.data);
-      if (res.meta) setMeta(res.meta);
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch users');
-    } finally {
-      setLoading(false);
-    }
-  }, [page, perPage, search, roleFilter, shiftFilter, statusFilter]);
-
-  const fetchConfigs = useCallback(async () => {
-    try {
-      const [rolesRes, shiftsRes] = await Promise.all([
-        userApi.getConfigs('users_role'),
-        userApi.getConfigs('users_shift_type'),
-      ]);
-      setRoles(rolesRes.data);
-      setShifts(shiftsRes.data);
-    } catch (err) {
-      // Configs are used for friendly labels; failure shouldn't hard-break the page.
-      console.error('Failed to fetch configs:', err);
-    }
-  }, []);
-
   useEffect(() => {
-    fetchConfigs();
-  }, [fetchConfigs]);
-
-  useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
+    setPage(1);
+  }, [search, roleFilter, shiftFilter, statusFilter, perPage]);
 
   const handleEdit = (user: User) => {
     setSelectedUser(user);
@@ -93,21 +67,10 @@ export function useUsersManagement() {
     if (!isConfirmingAction) return;
     const { type, user } = isConfirmingAction;
 
-    try {
-      if (type === 'delete') {
-        await userApi.delete(user.user_id);
-        toast.success(`User ${user.username} deactivated`);
-      } else {
-        await userApi.restore(user.user_id);
-        toast.success(`User ${user.username} restored`);
-      }
-
-      fetchUsers();
-    } catch (err: any) {
-      toast.error(err.message || `Failed to ${type} user`);
-    } finally {
-      setIsConfirmingAction(null);
-    }
+    const action = type === 'delete' ? deleteUser : restoreUser;
+    action.mutate(user.user_id, {
+      onSettled: () => setIsConfirmingAction(null),
+    });
   };
 
   return {
@@ -142,8 +105,7 @@ export function useUsersManagement() {
     handleEdit,
     handleAdd,
     handleConfirmAction,
-    // Refetch
-    fetchUsers,
+    // Refetch (proxy to trigger refresh if needed)
+    fetchUsers: () => {}, 
   };
 }
-

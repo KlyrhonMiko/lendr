@@ -142,10 +142,15 @@ class BorrowRequestRead(BaseModel):
     assigned_units: list[BorrowRequestUnitRead] = []
     assigned_batches: list[BorrowRequestBatchRead] = []
     returned_on_time: Optional[bool] = None
+    
+    id: Optional[str] = None # UUID from BaseModel
+    is_archived: bool = False
+    archived_at: Optional[datetime] = None
+    retention_tags: Optional[list[str]] = None
 
-    @field_serializer("request_date", "return_at", "closed_at")
+    @field_serializer("request_date", "return_at", "closed_at", "archived_at")
     def serialize_dates(self, dt: datetime | None) -> str | None:
-        return format_datetime(dt)
+        return format_datetime(dt) if dt else None
 
 
 class BorrowRequestApprove(BaseModel):

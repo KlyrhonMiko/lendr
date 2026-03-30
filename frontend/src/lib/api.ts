@@ -1,21 +1,11 @@
-import { auth } from './auth';
+'use client';
+
+import { http, MaintenanceError, getDeviceId, ApiResponse, PaginationMeta } from './http';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-export interface PaginationMeta {
-  total: number;
-  limit: number;
-  offset: number;
-  page?: number;
-  per_page?: number;
-}
-
-export interface ApiResponse<T> {
-  status: 'success' | 'error';
-  data: T;
-  message?: string;
-  meta?: PaginationMeta;
-}
+export { MaintenanceError };
+export type { ApiResponse, PaginationMeta };
 
 /** Build a URL query string from a plain object, omitting null/undefined/empty values. */
 export function buildQueryString(params: Record<string, unknown>): string {
@@ -31,46 +21,22 @@ interface LoginCredentials {
   password: string;
 }
 
-async function request<T>(
-  url: string,
-  options: RequestInit = {}
-): Promise<ApiResponse<T>> {
-  const token = auth.getToken();
-
-  const headers = new Headers(options.headers);
-  headers.set('Content-Type', 'application/json');
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`);
-  }
-
-  const response = await fetch(`${API_BASE_URL}/api${url}`, {
-    ...options,
-    headers,
-  });
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      if (typeof window !== 'undefined') {
-        auth.logout();
-      }
-    }
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || errorData.detail || 'An error occurred during the request');
-  }
-
-  return response.json();
-}
-
 export const api = {
+  getDeviceId,
+
   login: async (formData: LoginCredentials) => {
-    // Backend login expects multipart/form-data for OAuth2PasswordRequestForm
     const body = new FormData();
     body.append('username', formData.username);
     body.append('password', formData.password);
 
+    const deviceId = await getDeviceId();
+
     const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: 'POST',
       body,
+      headers: {
+        'X-Device-ID': deviceId,
+      },
     });
 
     if (!response.ok) {
@@ -86,9 +52,14 @@ export const api = {
     body.append('username', formData.username);
     body.append('password', formData.password);
 
+    const deviceId = await getDeviceId();
+
     const response = await fetch(`${API_BASE_URL}/api/auth/borrower/login`, {
       method: 'POST',
       body,
+      headers: {
+        'X-Device-ID': deviceId,
+      },
     });
 
     if (!response.ok) {
@@ -117,21 +88,27 @@ export const api = {
     return response.json();
   },
 
-  get: <T>(url: string) => request<T>(url, { method: 'GET' }),
+  get: <T>(url: string) => http.request<T>(url, { method: 'GET' }),
 
   post: <T>(url: string, data?: unknown) => {
     const options: RequestInit = { method: 'POST' };
     if (data !== undefined) {
-      options.body = JSON.stringify(data);
+      options.body = data instanceof FormData ? data : JSON.stringify(data);
     }
-    return request<T>(url, options);
+    return http.request<T>(url, options);
   },
 
   patch: <T>(url: string, data: unknown) =>
-    request<T>(url, {
+    http.request<T>(url, {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
 
-  delete: <T>(url: string) => request<T>(url, { method: 'DELETE' }),
+  put: <T>(url: string, data: unknown) =>
+    http.request<T>(url, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  delete: <T>(url: string) => http.request<T>(url, { method: 'DELETE' }),
 };

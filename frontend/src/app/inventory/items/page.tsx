@@ -1,15 +1,15 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { AlertCircle } from 'lucide-react';
-import { inventoryApi, InventoryItem, InventoryListParams, ConfigRead } from './api';
+import { InventoryItem } from './api';
 import { UnitManagement } from './UnitManagement';
 import { BatchManagement } from './BatchManagement';
 import { ItemHistory } from './ItemHistory';
 import { Pagination } from '@/components/ui/Pagination';
-import type { PaginationMeta } from '@/lib/api';
 import { toast } from 'sonner';
 import { useDebounce } from './lib/useDebounce';
+import { useInventoryItems, useInventoryConfigs, useInventoryItemMutations } from './lib/useItemQueries';
 import type { InventoryItemFormData } from './lib/inventoryItemForm';
 import { InventoryItemsHeader } from './components/InventoryItemsHeader';
 import { InventoryItemsToolbar } from './components/InventoryItemsToolbar';
@@ -19,12 +19,6 @@ import { InventoryItemFormModal } from './components/InventoryItemFormModal';
 const DEFAULT_PER_PAGE = 10;
 
 export default function InventoryPage() {
-  // List state
-  const [items, setItems] = useState<InventoryItem[]>([]);
-  const [meta, setMeta] = useState<PaginationMeta | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   // Filter state
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -49,73 +43,39 @@ export default function InventoryPage() {
     condition: '',
     description: '',
   });
-  const [classifications, setClassifications] = useState<ConfigRead[]>([]);
-  const [itemTypes, setItemTypes] = useState<ConfigRead[]>([]);
-  const [conditions, setConditions] = useState<ConfigRead[]>([]);
-  const [categories, setCategories] = useState<ConfigRead[]>([]);
 
   const [unitManagementItemId, setUnitManagementItemId] = useState<string | null>(null);
   const [batchManagementItemId, setBatchManagementItemId] = useState<string | null>(null);
   const [itemHistoryItemId, setItemHistoryItemId] = useState<string | null>(null);
 
-  const fetchItems = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params: InventoryListParams = {
-        page,
-        per_page: perPage,
-        search: debouncedSearch || undefined,
-        category: debouncedCategory || undefined,
-        classification: classificationFilter || undefined,
-        item_type: itemTypeFilter || undefined,
-        condition: conditionFilter || undefined,
-      };
-      const res = await inventoryApi.list(params);
-      setItems(res.data);
-      if (res.meta) setMeta(res.meta);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to fetch inventory';
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, perPage, debouncedSearch, debouncedCategory, itemTypeFilter, conditionFilter]);
+  // Queries
+  const { data: configsData } = useInventoryConfigs();
+  const { classifications = [], itemTypes = [], conditions = [], categories = [] } = configsData || {};
+
+  const { data: itemsResponse, isLoading: itemsLoading, error: itemsError } = useInventoryItems({
+    page,
+    per_page: perPage,
+    search: debouncedSearch || undefined,
+    category: debouncedCategory || undefined,
+    classification: classificationFilter || undefined,
+    item_type: itemTypeFilter || undefined,
+    condition: conditionFilter || undefined,
+  });
+
+  const { createItem, updateItem, deleteItem } = useInventoryItemMutations();
+
+  const items = itemsResponse?.data || [];
+  const meta = itemsResponse?.meta || null;
 
   // Reset page to 1 whenever any filter changes (but not when page itself changes)
   useEffect(() => {
     setPage(1);
   }, [debouncedSearch, debouncedCategory, classificationFilter, itemTypeFilter, conditionFilter, perPage]);
 
-  useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
-
-  useEffect(() => {
-    const fetchConfigs = async () => {
-      try {
-        const [classRes, typeRes, condRes, catRes] = await Promise.all([
-          inventoryApi.getConfigs('inventory_classification'),
-          inventoryApi.getConfigs('inventory_item_type'),
-          inventoryApi.getConfigs('inventory_condition'),
-          inventoryApi.getConfigs('inventory_category'),
-        ]);
-        setClassifications(classRes.data);
-        setItemTypes(typeRes.data);
-        setConditions(condRes.data);
-        setCategories(catRes.data);
-      } catch (err) {
-        console.error('Failed to fetch configurations', err);
-      }
-    };
-    fetchConfigs();
-  }, []);
-
   const resetForm = () => {
     setFormData({ name: '', category: '', classification: '', item_type: '', is_trackable: false, condition: '', description: '' });
     setEditingItem(null);
     setIsModalOpen(false);
-    setError(null);
   };
 
   const openEditModal = (item: InventoryItem) => {
@@ -134,21 +94,23 @@ export default function InventoryPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
     try {
       if (editingItem) {
-        await inventoryApi.update(editingItem.item_id, {
-          name: formData.name,
-          category: formData.category,
-          classification: formData.classification || undefined,
-          item_type: formData.item_type,
-          is_trackable: formData.is_trackable,
-          condition: formData.condition,
-          description: formData.description || undefined,
+        await updateItem.mutateAsync({
+          id: editingItem.item_id,
+          data: {
+            name: formData.name,
+            category: formData.category,
+            classification: formData.classification || undefined,
+            item_type: formData.item_type,
+            is_trackable: formData.is_trackable,
+            condition: formData.condition,
+            description: formData.description || undefined,
+          }
         });
         toast.success('Equipment updated successfully');
       } else {
-        await inventoryApi.create({
+        await createItem.mutateAsync({
           name: formData.name,
           category: formData.category,
           classification: formData.classification || undefined,
@@ -160,10 +122,8 @@ export default function InventoryPage() {
         toast.success('New equipment added to catalog');
       }
       resetForm();
-      fetchItems();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to save equipment';
-      setError(msg);
       toast.error(msg);
     }
   };
@@ -171,12 +131,10 @@ export default function InventoryPage() {
   const handleDelete = async (itemId: string) => {
     if (!confirm('Are you sure you want to delete this equipment?')) return;
     try {
-      await inventoryApi.delete(itemId);
+      await deleteItem.mutateAsync(itemId);
       toast.success('Item removed from inventory');
-      fetchItems();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to delete';
-      setError(msg);
       toast.error(msg);
     }
   };
@@ -185,10 +143,10 @@ export default function InventoryPage() {
     <div className="w-full max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500">
       <InventoryItemsHeader onAdd={() => setIsModalOpen(true)} />
 
-      {error && (
+      {itemsError && (
         <div className="bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 px-4 py-3 rounded-xl text-sm flex items-center gap-3 animate-in slide-in-from-top-2">
           <AlertCircle className="w-4 h-4 shrink-0" />
-          <p>{error}</p>
+          <p>{itemsError.message}</p>
         </div>
       )}
 
@@ -218,7 +176,7 @@ export default function InventoryPage() {
 
         <InventoryItemsTable
           items={items}
-          loading={loading}
+          loading={itemsLoading}
           onOpenHistory={(itemId) => setItemHistoryItemId(itemId)}
           onOpenUnitManagement={(itemId) => setUnitManagementItemId(itemId)}
           onOpenBatchManagement={(itemId) => setBatchManagementItemId(itemId)}

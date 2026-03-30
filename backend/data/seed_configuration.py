@@ -352,6 +352,7 @@ def bootstrap_admin() -> dict[str, str]:
 
 def create_setting(
     headers: dict[str, str],
+    system: str,
     key: str,
     value: str,
     category: str,
@@ -360,9 +361,10 @@ def create_setting(
     label: str | None = None,
 ) -> bool:
     """Create a configuration setting via REST API."""
-    label = label or f"POST {endpoint} (key={key}, category={category})"
+    label = label or f"POST {endpoint} (system={system}, key={key}, category={category})"
     
     payload = {
+        "system": system,
         "key": key,
         "value": value,
         "category": category,
@@ -415,6 +417,7 @@ def seed_inventory_configurations(headers: dict[str, str]) -> None:
     for key, value, desc in item_types:
         create_setting(
             headers,
+            system="inventory",
             key=key,
             value=value,
             category="inventory_item_type",
@@ -426,6 +429,16 @@ def seed_inventory_configurations(headers: dict[str, str]) -> None:
     print(f"\n  {CYAN}Category: inventory_condition{RESET}")
     create_setting(
         headers,
+        system="inventory",
+        key="excellent",
+        value="Excellent",
+        category="inventory_condition",
+        description="Item is in excellent working condition",
+        endpoint="/api/inventory/config/inventory",
+    )
+    create_setting(
+        headers,
+        system="inventory",
         key="good",
         value="Good",
         category="inventory_condition",
@@ -434,6 +447,7 @@ def seed_inventory_configurations(headers: dict[str, str]) -> None:
     )
     create_setting(
         headers,
+        system="inventory",
         key="fair",
         value="Fair",
         category="inventory_condition",
@@ -442,6 +456,7 @@ def seed_inventory_configurations(headers: dict[str, str]) -> None:
     )
     create_setting(
         headers,
+        system="inventory",
         key="poor",
         value="Poor",
         category="inventory_condition",
@@ -450,10 +465,11 @@ def seed_inventory_configurations(headers: dict[str, str]) -> None:
     )
     create_setting(
         headers,
+        system="inventory",
         key="damaged",
         value="Damaged",
         category="inventory_condition",
-        description="Item is damaged and not usable",
+        description="Item is non-functional and requires repair",
         endpoint="/api/inventory/config/inventory",
     )
     
@@ -467,6 +483,7 @@ def seed_inventory_configurations(headers: dict[str, str]) -> None:
     for key, value, desc in classifications:
         create_setting(
             headers,
+            system="inventory",
             key=key,
             value=value,
             category="inventory_classification",
@@ -490,6 +507,7 @@ def seed_inventory_configurations(headers: dict[str, str]) -> None:
     for key, value, desc in categories:
         create_setting(
             headers,
+            system="inventory",
             key=key,
             value=value,
             category="inventory_category",
@@ -514,7 +532,7 @@ def seed_inventory_unit_configurations(headers: dict[str, str]) -> None:
         ("discarded", "Discarded", "Unit has been discarded"),
     ]
     for key, value, desc in statuses:
-        create_setting(headers, key=key, value=value, category="inventory_units_status", description=desc, endpoint="/api/inventory/config/inventory")
+        create_setting(headers, system="inventory", key=key, value=value, category="inventory_units_status", description=desc, endpoint="/api/inventory/config/inventory")
     
     # inventory_units_condition
     print(f"\n  {CYAN}Category: inventory_units_condition{RESET}")
@@ -526,7 +544,7 @@ def seed_inventory_unit_configurations(headers: dict[str, str]) -> None:
         ("unusable", "Unusable", "Unit is unusable"),
     ]
     for key, value, desc in conditions:
-        create_setting(headers, key=key, value=value, category="inventory_units_condition", description=desc, endpoint="/api/inventory/config/inventory")
+        create_setting(headers, system="inventory", key=key, value=value, category="inventory_units_condition", description=desc, endpoint="/api/inventory/config/inventory")
 
 
 def seed_inventory_movement_configurations(headers: dict[str, str]) -> None:
@@ -540,10 +558,18 @@ def seed_inventory_movement_configurations(headers: dict[str, str]) -> None:
         ("borrow_return", "Borrow Return", "Unit returned from borrowing"),
         ("procurement", "Procurement", "New unit procured"),
         ("reversal", "Reversal", "Reversal of previous movement"),
+        ("maintenance", "Maintenance", "Unit is under maintenance"),
+        ("maintenance_return", "Maintenance Return", "Unit returned from maintenance"),
+        ("retirement", "Retirement", "Unit has been retired from service"),
+        ("consumption", "Consumption", "Unit has been consumed"),
+        ("expiration", "Expiration", "Unit has expired"),
+        ("discarded", "Discarded", "Unit has been discarded"),
     ]
+
     for key, value, desc in movements:
         create_setting(
             headers,
+            system="inventory",
             key=key,
             value=value,
             category="inventory_movements_movement_type",
@@ -564,6 +590,7 @@ def seed_inventory_movement_configurations(headers: dict[str, str]) -> None:
     for key, value, desc in movement_reasons:
         create_setting(
             headers,
+            system="inventory",
             key=key,
             value=value,
             category="inventory_movements_reason_code",
@@ -586,7 +613,7 @@ def seed_inventory_batch_configurations(headers: dict[str, str]) -> None:
         ("expired", "0", "Batch has expired"),
     ]
     for key, value, desc in statuses:
-        create_setting(headers, key=key, value=value, category="inventory_batches_status", description=desc, endpoint="/api/inventory/config/inventory")
+        create_setting(headers, system="inventory", key=key, value=value, category="inventory_batches_status", description=desc, endpoint="/api/inventory/config/inventory")
     
     # inventory_batches_condition
     print(f"\n  {CYAN}Category: inventory_batches_condition{RESET}")
@@ -598,7 +625,7 @@ def seed_inventory_batch_configurations(headers: dict[str, str]) -> None:
         ("unusable", "Unusable", "Batch is unusable"),
     ]
     for key, value, desc in conditions:
-        create_setting(headers, key=key, value=value, category="inventory_batches_condition", description=desc, endpoint="/api/inventory/config/inventory")
+        create_setting(headers, system="inventory", key=key, value=value, category="inventory_batches_condition", description=desc, endpoint="/api/inventory/config/inventory")
 
 
 def seed_inventory_weight_configurations(headers: dict[str, str]) -> None:
@@ -617,7 +644,7 @@ def seed_inventory_weight_configurations(headers: dict[str, str]) -> None:
         ("borrowed", "20", "Weight for borrowed unit status"),
     ]
     for key, value, desc in unit_status_weights:
-        create_setting(headers, key=key, value=value, category="inventory_units_status_weights", description=desc, endpoint="/api/inventory/config/inventory")
+        create_setting(headers, system="inventory", key=key, value=value, category="inventory_units_status_weights", description=desc, endpoint="/api/inventory/config/inventory")
 
     # inventory_units_condition_weights
     print(f"\n  {CYAN}Category: inventory_units_condition_weights{RESET}")
@@ -629,7 +656,7 @@ def seed_inventory_weight_configurations(headers: dict[str, str]) -> None:
         ("excellent", "20", "Weight for excellent unit condition"),
     ]
     for key, value, desc in unit_condition_weights:
-        create_setting(headers, key=key, value=value, category="inventory_units_condition_weights", description=desc, endpoint="/api/inventory/config/inventory")
+        create_setting(headers, system="inventory", key=key, value=value, category="inventory_units_condition_weights", description=desc, endpoint="/api/inventory/config/inventory")
 
     # inventory_batches_status_weights
     print(f"\n  {CYAN}Category: inventory_batches_status_weights{RESET}")
@@ -641,7 +668,7 @@ def seed_inventory_weight_configurations(headers: dict[str, str]) -> None:
         ("healthy", "20", "Weight for healthy batch status"),
     ]
     for key, value, desc in batch_status_weights:
-        create_setting(headers, key=key, value=value, category="inventory_batches_status_weights", description=desc, endpoint="/api/inventory/config/inventory")
+        create_setting(headers, system="inventory", key=key, value=value, category="inventory_batches_status_weights", description=desc, endpoint="/api/inventory/config/inventory")
 
     # inventory_batches_condition_weights
     print(f"\n  {CYAN}Category: inventory_batches_condition_weights{RESET}")
@@ -653,7 +680,7 @@ def seed_inventory_weight_configurations(headers: dict[str, str]) -> None:
         ("excellent", "20", "Weight for excellent batch condition"),
     ]
     for key, value, desc in batch_condition_weights:
-        create_setting(headers, key=key, value=value, category="inventory_batches_condition_weights", description=desc, endpoint="/api/inventory/config/inventory")
+        create_setting(headers, system="inventory", key=key, value=value, category="inventory_batches_condition_weights", description=desc, endpoint="/api/inventory/config/inventory")
 
 
 def seed_borrow_request_configurations(headers: dict[str, str]) -> None:
@@ -673,7 +700,7 @@ def seed_borrow_request_configurations(headers: dict[str, str]) -> None:
         ("warehouse_rejected", "8", "Request rejected by warehouse (terminal)"),
     ]
     for key, value, desc in statuses:
-        create_setting(headers, key=key, value=value, category="borrow_requests_status", description=desc, endpoint="/api/inventory/config/borrower")
+        create_setting(headers, system="borrower", key=key, value=value, category="borrow_requests_status", description=desc, endpoint="/api/inventory/config/borrower")
     
     # borrow_requests_approval_channel
     print(f"\n  {CYAN}Category: borrow_requests_approval_channel{RESET}")
@@ -688,6 +715,7 @@ def seed_borrow_request_configurations(headers: dict[str, str]) -> None:
     for key, value, desc in channels:
         create_setting(
             headers,
+            system="borrower",
             key=key,
             value=value,
             category="borrow_requests_approval_channel",
@@ -704,6 +732,7 @@ def seed_borrow_request_configurations(headers: dict[str, str]) -> None:
     for key, value, desc in request_channels:
         create_setting(
             headers,
+            system="borrower",
             key=key,
             value=value,
             category="borrow_requests_request_channel",
@@ -729,6 +758,7 @@ def seed_borrow_request_configurations(headers: dict[str, str]) -> None:
     for key, value, desc in events:
         create_setting(
             headers,
+            system="borrower",
             key=key,
             value=value,
             category="borrow_request_events_event_type",
@@ -749,7 +779,7 @@ def seed_requested_item_configurations(headers: dict[str, str]) -> None:
         ("fulfilled", "Fulfilled", "Item has been fulfilled (terminal)"),
     ]
     for key, value, desc in statuses:
-        create_setting(headers, key=key, value=value, category="requested_items_status", description=desc, endpoint="/api/inventory/config/borrower")
+        create_setting(headers, system="borrower", key=key, value=value, category="requested_items_status", description=desc, endpoint="/api/inventory/config/borrower")
 
 
 def seed_borrow_participant_configurations(headers: dict[str, str]) -> None:
@@ -765,6 +795,7 @@ def seed_borrow_participant_configurations(headers: dict[str, str]) -> None:
     for key, value, desc in roles:
         create_setting(
             headers,
+            system="borrower",
             key=key,
             value=value,
             category="borrow_participants_role_in_request",
@@ -789,7 +820,7 @@ def seed_user_configurations(headers: dict[str, str]) -> None:
         ("employee", "EMPL", "General staff with read access to inventory catalog and requested-items submission rights."),
     ]
     for key, value, desc in roles:
-        create_setting(headers, key=key, value=value, category="users_role", description=desc, endpoint="/api/auth/config")
+        create_setting(headers, system="admin", key=key, value=value, category="users_role", description=desc, endpoint="/api/auth/config")
 
     # users_shift_type
     print(f"\n  {CYAN}Category: users_shift_type{RESET}")
@@ -800,7 +831,7 @@ def seed_user_configurations(headers: dict[str, str]) -> None:
         ("evening", "Evening", "Evening shift (typically 2pm-10pm)"),
     ]
     for key, value, desc in shifts:
-        create_setting(headers, key=key, value=value, category="users_shift_type", description=desc, endpoint="/api/auth/config")
+        create_setting(headers, system="admin", key=key, value=value, category="users_shift_type", description=desc, endpoint="/api/auth/config")
 
 
 def seed_rbac_role_permissions(headers: dict[str, str]) -> None:
@@ -911,7 +942,7 @@ def seed_backup_configurations(headers: dict[str, str]) -> None:
         ("both", "both", "Both local and S3 destinations"),
     ]
     for key, value, desc in destinations:
-        create_setting(headers, key=key, value=value, category="backup_runs_destination", description=desc)
+        create_setting(headers, system="admin", key=key, value=value, category="backup_runs_destination", description=desc)
     
     # backup_runs_status
     print(f"\n  {CYAN}Category: backup_runs_status{RESET}")
@@ -922,7 +953,7 @@ def seed_backup_configurations(headers: dict[str, str]) -> None:
         ("failed", "Failed", "Backup run failed"),
     ]
     for key, value, desc in statuses:
-        create_setting(headers, key=key, value=value, category="backup_runs_status", description=desc)
+        create_setting(headers, system="admin", key=key, value=value, category="backup_runs_status", description=desc)
     
     # backup_artifacts_target_type
     print(f"\n  {CYAN}Category: backup_artifacts_target_type{RESET}")
@@ -931,7 +962,7 @@ def seed_backup_configurations(headers: dict[str, str]) -> None:
         ("s3", "S3", "Amazon S3 bucket backup"),
     ]
     for key, value, desc in targets:
-        create_setting(headers, key=key, value=value, category="backup_artifacts_target_type", description=desc)
+        create_setting(headers, system="admin", key=key, value=value, category="backup_artifacts_target_type", description=desc)
 
 
 def seed_audit_configurations(headers: dict[str, str]) -> None:
@@ -948,9 +979,10 @@ def seed_audit_configurations(headers: dict[str, str]) -> None:
         ("requested_item", "Requested Item", "Requested item entity"),
         ("user", "User", "User entity"),
         ("system_setting", "System Setting", "System configuration entity"),
+        ("audit_log", "Audit Log", "System audit log entity"),
     ]
     for key, value, desc in entities:
-        create_setting(headers, key=key, value=value, category="audit_logs_entity_type", description=desc, endpoint="/api/inventory/config/inventory")
+        create_setting(headers, system="admin", key=key, value=value, category="audit_logs_entity_type", description=desc)
     
     # audit_logs_action
     print(f"\n  {CYAN}Category: audit_logs_action{RESET}")
@@ -967,9 +999,87 @@ def seed_audit_configurations(headers: dict[str, str]) -> None:
         ("assign", "Assign", "Units assigned"),
         ("adjust_stock", "Adjust Stock", "Stock adjustment"),
         ("transition", "Transition", "Status transition"),
+        ("archived", "Archived", "Entity moved to archive"),
+        ("unarchived", "Unarchived", "Entity restored from archive"),
+        ("purged", "Purged", "Entity permanently deleted"),
+        ("restored", "Restored", "Entity restored from soft-delete"),
+        ("deleted", "Deleted", "Entity soft-deleted"),
     ]
     for key, value, desc in actions:
-        create_setting(headers, key=key, value=value, category="audit_logs_action", description=desc, endpoint="/api/inventory/config/inventory")
+        create_setting(headers, system="admin", key=key, value=value, category="audit_logs_action", description=desc)
+
+
+def seed_inventory_alert_settings(headers: dict[str, str]) -> None:
+    """Seed inventory threshold and alert policy configurations."""
+    section("INVENTORY ALERT SETTINGS")
+    
+    # inventory_threshold_alerts
+    print(f"\n  {CYAN}Category: inventory_threshold_alerts{RESET}")
+    alerts = [
+        ("low_stock_threshold", "20", "Alert when stock falls below this % of total quantity"),
+        ("overstock_threshold", "150", "Alert when stock exceeds this % of total quantity"),
+        ("expiry_threshold", "15", "Alert when remaining shelf life is below this %"),
+        ("borrow_request_alert_duration", "60", "Duration for pending borrow request alerts"),
+        ("borrow_request_alert_unit", "minutes", "Time unit for borrow request alerts"),
+        ("notification_channels", '["in-app", "email", "sms"]', "Active channels for system notifications"),
+        {"key": "alert_recipient_roles", "value": '["inventory_manager", "admin"]', "description": "Roles notified of inventory alerts"},
+        {"key": "specific_recipients", "value": "[]", "description": "Specific individuals notified of inventory alerts"}
+    ]
+    for item in alerts:
+        if isinstance(item, dict):
+            create_setting(headers, system="inventory", key=item["key"], value=item["value"], category="inventory_threshold_alerts", description=item["description"], endpoint="/api/inventory/config/inventory")
+        else:
+            key, value, desc = item
+            create_setting(headers, system="inventory", key=key, value=value, category="inventory_threshold_alerts", description=desc, endpoint="/api/inventory/config/inventory")
+
+
+def seed_general_settings(headers: dict[str, str]) -> None:
+    """Seed general system settings (Localization and Feature Flags) via API."""
+    section("GENERAL SETTINGS CONFIGURATIONS")
+    
+    settings = [
+        ("timezone", "Asia/Manila", "System default timezone"),
+        ("date_format", "MM/DD/YYYY", "System-wide date display format"),
+        ("time_format", "12h", "System-wide time display format"),
+        ("language", "en", "System default language"),
+    ]
+    
+    for key, value, desc in settings:
+        create_setting(
+            headers,
+            system="admin",
+            key=key,
+            value=value,
+            category="general_settings",
+            description=desc,
+        )
+
+
+def seed_operations_configurations(headers: dict[str, str]) -> None:
+    """Seed operations and data retention configurations."""
+    section("OPERATIONS & DATA RETENTION CONFIGURATIONS")
+
+    print(f"\n  {CYAN}Category: operations_settings{RESET}")
+    ops_settings = [
+        ("archive_audit_value", "90", "Archive audit logs older than (value)"),
+        ("archive_audit_unit", "d", "Archive audit logs older than (unit: d/m/y)"),
+        ("archive_borrow_value", "1", "Archive borrow records older than (value)"),
+        ("archive_borrow_unit", "y", "Archive borrow records older than (unit: d/m/y)"),
+        ("retention_auto_delete", "true", "Enable automatic permanent deletion of expired archives"),
+        ("retention_value", "7", "Auto-delete archives older than (value)"),
+        ("retention_unit", "y", "Auto-delete archives older than (unit: d/m/y)"),
+        ("retention_exclusion", "[]", "JSON list of tags/keywords that exclude a record from auto-deletion"),
+        ("maintenance_schedule_time", "03:00", "Daily trigger time for system maintenance (archiving/purging)"),
+    ]
+    for key, value, desc in ops_settings:
+        create_setting(
+            headers,
+            system="admin",
+            key=key,
+            value=value,
+            category="operations_settings",
+            description=desc,
+        )
 
 
 def print_summary() -> int:
@@ -1012,8 +1122,11 @@ def main() -> int:
         seed_borrow_participant_configurations(admin_headers)
         seed_rbac_role_permissions(admin_headers)
         seed_user_configurations(admin_headers)
+        seed_inventory_alert_settings(admin_headers)
         seed_backup_configurations(admin_headers)
         seed_audit_configurations(admin_headers)
+        seed_general_settings(admin_headers)
+        seed_operations_configurations(admin_headers)
         
         # Step 4: Print summary and return exit code
         return print_summary()

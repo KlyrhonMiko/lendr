@@ -13,7 +13,7 @@ from utils.time_utils import format_datetime
 
 class AuditService(BaseService[AuditLog, Any, Any]):
     def __init__(self):
-        super().__init__(AuditLog)
+        super().__init__(AuditLog, lookup_field="audit_id")
 
     @staticmethod
     def _uuid_key_to_human_key(key: str) -> str:
@@ -195,6 +195,8 @@ class AuditService(BaseService[AuditLog, Any, Any]):
         actor_user_id: Optional[str] = None,
         date_from: Optional[datetime] = None,
         date_to: Optional[datetime] = None,
+        include_archived: bool = False,
+        is_archived: Optional[bool] = None,
         skip: int = 0,
         limit: int = 50
     ) -> tuple[list[dict[str, Any]], int]:
@@ -230,6 +232,11 @@ class AuditService(BaseService[AuditLog, Any, Any]):
             statement = statement.where(AuditLog.created_at >= date_from)
         if date_to:
             statement = statement.where(AuditLog.created_at <= date_to)
+
+        if is_archived is not None:
+            statement = statement.where(AuditLog.is_archived == is_archived)
+        elif not include_archived:
+            statement = statement.where(AuditLog.is_archived.is_(False))
             
         total_count = session.exec(select(func.count()).select_from(statement.subquery())).one()
         results = session.exec(statement.offset(skip).limit(limit)).all()
@@ -238,6 +245,7 @@ class AuditService(BaseService[AuditLog, Any, Any]):
         sanitized_logs = []
         for log, user_id, employee_id in results:
             sanitized_logs.append({
+                "id": str(log.id),
                 "audit_id": log.audit_id,
                 "entity_type": log.entity_type,
                 "entity_id": log.entity_id,
@@ -248,6 +256,9 @@ class AuditService(BaseService[AuditLog, Any, Any]):
                 "user_id": user_id,
                 "employee_id": employee_id,
                 "created_at": log.created_at,
+                "is_archived": log.is_archived,
+                "archived_at": log.archived_at,
+                "retention_tags": log.retention_tags,
             })
 
         return sanitized_logs, total_count

@@ -1,4 +1,4 @@
-from sqlalchemy import Text
+from sqlalchemy import Text, JSON
 from datetime import datetime
 from uuid import UUID, uuid4
 
@@ -14,8 +14,12 @@ class BaseModel(SQLModel):
     updated_at: datetime = Field(default_factory=get_now_manila, nullable=False)
     is_deleted: bool = Field(default=False, nullable=False)
     deleted_at: datetime | None = Field(default=None, nullable=True)
+    is_archived: bool = Field(default=False, nullable=False, index=True)
+    archived_at: datetime | None = Field(default=None, nullable=True)
+    retention_tags: list[str] | None = Field(default=None, sa_type=JSON)
 
 class ConfigurationBase(BaseModel):
+    system: str = Field(index=True, max_length=50)
     key: str = Field(index=True, max_length=100)
     value: str = Field(sa_type=Text)
     category: str = Field(default="general", max_length=50)

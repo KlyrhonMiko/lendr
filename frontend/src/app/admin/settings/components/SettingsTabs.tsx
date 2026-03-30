@@ -6,10 +6,10 @@ type ActiveTab = 'general' | 'system' | 'operations' | 'health' | 'security' | '
 
 export function SettingsTabs({ activeTab, onTabChange }: { activeTab: ActiveTab; onTabChange: (t: ActiveTab) => void }) {
   const tabs = [
+    { id: 'health', label: 'System Health', icon: Activity },
     { id: 'general', label: 'General Settings', icon: Globe },
     { id: 'system', label: 'Platform Branding', icon: Monitor },
     { id: 'operations', label: 'System Operations', icon: Settings },
-    { id: 'health', label: 'System Health', icon: Activity },
     { id: 'security', label: 'Security & Access', icon: Shield },
     { id: 'dictionary', label: 'Data Dictionary', icon: BookOpen },
   ] as const;
