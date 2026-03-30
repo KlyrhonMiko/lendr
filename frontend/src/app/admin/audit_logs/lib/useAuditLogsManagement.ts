@@ -2,9 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { PaginationMeta } from '@/lib/api';
-import { adminAuditApi } from '../api';
-import type { AuditLog } from '../api';
-import type { AuditLogParams } from '../api';
+import type { AuditLog, AuditLogParams } from '../api';
+import { useAdminAuditLogs } from './useAuditLogQueries';
 
 const DEFAULT_PER_PAGE = 10;
 
@@ -19,11 +18,6 @@ function timeframeToDateFrom(timeframe: string): string | undefined {
 }
 
 export function useAuditLogsManagement() {
-  const [logs, setLogs] = useState<AuditLog[]>([]);
-  const [meta, setMeta] = useState<PaginationMeta | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(DEFAULT_PER_PAGE);
   const [search, setSearch] = useState('');
@@ -33,35 +27,29 @@ export function useAuditLogsManagement() {
 
   const date_from = useMemo(() => timeframeToDateFrom(timeframe), [timeframe]);
 
+  // Params
+  const params: AuditLogParams = {
+    page,
+    per_page: perPage,
+    actor_id: search || undefined,
+    entity_type: entityFilter || undefined,
+    date_from,
+  };
+
+  // Queries
+  const { data: logsRes, isLoading: loading, error: auditError } = useAdminAuditLogs(params);
+
+  const logs = logsRes?.data || [];
+  const meta = logsRes?.meta || null;
+  const error = auditError?.message || null;
+
   const toggleExpand = useCallback((id: string) => {
     setExpandedAuditId((prev) => (prev === id ? null : id));
   }, []);
 
-  const fetchLogs = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params: AuditLogParams = {
-        page,
-        per_page: perPage,
-        actor_id: search || undefined,
-        entity_type: entityFilter || undefined,
-        date_from,
-      };
-
-      const res = await adminAuditApi.list(params);
-      setLogs(res.data);
-      if (res.meta) setMeta(res.meta);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch audit logs');
-    } finally {
-      setLoading(false);
-    }
-  }, [page, perPage, search, entityFilter, date_from]);
-
   useEffect(() => {
-    fetchLogs();
-  }, [fetchLogs]);
+    setPage(1);
+  }, [search, entityFilter, timeframe, perPage]);
 
   return {
     // data

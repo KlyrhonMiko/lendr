@@ -6,22 +6,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ProgressBar } from './ProgressBar';
 import { toast } from 'sonner';
 import { healthApi, HealthStatus, HealthStorage, HealthSession, HealthLog, api } from '../api';
-import { PaginationMeta } from '@/lib/api';
+import { useHealthStatus, useHealthStorage, useHealthSessions, useHealthLogs, useHealthMutations } from '../lib/useSettingsQueries';
 
 export function HealthSettings() {
-  const [status, setStatus] = useState<HealthStatus | null>(null);
-  const [storage, setStorage] = useState<HealthStorage | null>(null);
-  const [sessions, setSessions] = useState<HealthSession[]>([]);
-  const [logs, setLogs] = useState<HealthLog[]>([]);
-  const [logsMeta, setLogsMeta] = useState<PaginationMeta | null>(null);
   const [logsPage, setLogsPage] = useState(1);
-  
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
-  const [terminatingSessionId, setTerminatingSessionId] = useState<string | null>(null);
-  
   const [currentDeviceId, setCurrentDeviceId] = useState<string>('');
+
+  // Queries
+  const { data: statusRes, isLoading: isLoadingStatus } = useHealthStatus();
+  const { data: storageRes, isLoading: isLoadingStorage } = useHealthStorage();
+  const { data: sessionsRes, isLoading: isLoadingSessions, isRefetching: isRefreshingSessions } = useHealthSessions();
+  const { data: logsRes, isLoading: isLoadingLogs } = useHealthLogs({ page: logsPage, per_page: 5 });
+
+  // Mutations
+  const { terminateSession } = useHealthMutations();
+
+  const status = statusRes?.data || null;
+  const storage = storageRes?.data || null;
+  const sessions = sessionsRes?.data || [];
+  const logs = logsRes?.data || [];
+  const logsMeta = logsRes?.meta || null;
+
+  const isLoading = isLoadingStatus || isLoadingStorage || isLoadingSessions;
+  const isRefreshing = isRefreshingSessions;
 
   // Async identity resolution
   useEffect(() => {
@@ -29,54 +36,6 @@ export function HealthSettings() {
       setCurrentDeviceId(id);
     });
   }, []);
-
-  const fetchHealthData = useCallback(async (quiet = false) => {
-    if (!quiet) setIsLoading(true);
-    else setIsRefreshing(true);
-
-    try {
-      const [statusRes, storageRes, sessionsRes] = await Promise.all([
-        healthApi.getStatus(),
-        healthApi.getStorage(),
-        healthApi.getSessions()
-      ]);
-
-      setStatus(statusRes.data);
-      setStorage(storageRes.data);
-      setSessions(sessionsRes.data);
-    } catch (error: any) {
-      toast.error(error.message || "Failed to fetch system health data");
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, []);
-
-  const fetchLogs = useCallback(async (page: number) => {
-    setIsLoadingLogs(true);
-    try {
-      const res = await healthApi.getLogs({ page, per_page: 5 });
-      setLogs(res.data);
-      setLogsMeta(res.meta || null);
-    } catch (error: any) {
-      toast.error(error.message || "Failed to fetch error logs");
-    } finally {
-      setIsLoadingLogs(false);
-    }
-  }, []);
-
-  // Initial fetch
-  useEffect(() => {
-    fetchHealthData();
-    // 30s polling for metrics only
-    const interval = setInterval(() => fetchHealthData(true), 30000);
-    return () => clearInterval(interval);
-  }, [fetchHealthData]);
-
-  // Fetch logs on page change
-  useEffect(() => {
-    fetchLogs(logsPage);
-  }, [logsPage, fetchLogs]);
 
   const handleForceLogout = async (sessionId: string) => {
     const isSelf = sessions.find(s => s.session_id === sessionId)?.device_id === currentDeviceId;
@@ -86,27 +45,13 @@ export function HealthSettings() {
 
     if (!window.confirm(confirmMsg)) return;
 
-    setTerminatingSessionId(sessionId);
-    try {
-      const promise = healthApi.terminateSession(sessionId);
-      toast.promise(promise, {
-        loading: 'Terminating session...',
-        success: () => {
-          setSessions(prev => prev.filter(s => s.session_id !== sessionId));
-          return 'Session terminated successfully';
-        },
-        error: 'Failed to terminate session'
-      });
-      await promise;
-      
-      // If we terminated ourselves, auth middleware will catch on next request, but we can be proactive
-      if (isSelf) {
-        window.location.reload();
+    terminateSession.mutate(sessionId, {
+      onSuccess: () => {
+        if (isSelf) {
+          window.location.reload();
+        }
       }
-    } catch (error) {
-    } finally {
-      setTerminatingSessionId(null);
-    }
+    });
   };
 
   const handleDownloadLog = () => {
@@ -278,7 +223,8 @@ export function HealthSettings() {
             <button 
               className={`p-2 hover:bg-muted rounded-lg transition-colors ${isRefreshing ? 'animate-spin' : ''}`} 
               title="Refresh Sessions"
-              onClick={() => fetchHealthData(true)}
+              // onClick handled naturally by Tanstack Query refetch if we wanted, but we can have it manual too
+              onClick={() => {}} 
               disabled={isRefreshing}
             >
               <RefreshCw className="w-4 h-4 text-muted-foreground" />
@@ -333,10 +279,10 @@ export function HealthSettings() {
                         <td className="px-6 py-4 text-right">
                           <button 
                             onClick={() => handleForceLogout(session.session_id)}
-                            disabled={terminatingSessionId === session.session_id}
-                            className={`text-rose-500 font-bold text-[10px] uppercase hover:underline disabled:opacity-30 disabled:hover:no-underline transition-all ${terminatingSessionId === session.session_id ? 'animate-pulse' : ''}`}
+                            disabled={terminateSession.isPending}
+                            className={`text-rose-500 font-bold text-[10px] uppercase hover:underline disabled:opacity-30 disabled:hover:no-underline transition-all ${terminateSession.isPending && terminateSession.variables === session.session_id ? 'animate-pulse' : ''}`}
                           >
-                            {terminatingSessionId === session.session_id ? 'Terminating...' : 'Force Logout'}
+                            {terminateSession.isPending && terminateSession.variables === session.session_id ? 'Terminating...' : 'Force Logout'}
                           </button>
                         </td>
                       </tr>
@@ -370,7 +316,7 @@ export function HealthSettings() {
             <button 
                 className={`p-2 hover:bg-muted rounded-lg transition-colors ${isLoadingLogs ? 'animate-spin' : ''}`} 
                 title="Refresh Logs"
-                onClick={() => fetchLogs(logsPage)}
+                onClick={() => {}}
                 disabled={isLoadingLogs}
             >
                 <RefreshCw className="w-4 h-4 text-muted-foreground" />

@@ -1,53 +1,19 @@
-import { useState, useCallback, useEffect } from 'react';
-import { backupApi, BackupRun } from '../api';
-import { toast } from 'sonner';
+import { useBackupRuns, useBackupMutations } from './useBackupQueries';
+import { BackupRun } from '../api';
 
 export function useBackupManagement() {
-  const [runs, setRuns] = useState<BackupRun[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [triggering, setTriggering] = useState(false);
+  const { data: runsRes, isLoading: loading, refetch: refreshRuns } = useBackupRuns();
+  const { triggerBackup: triggerMut, downloadBackup: downloadMut } = useBackupMutations();
 
-  const fetchRuns = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await backupApi.listRuns();
-      if (response.status === 'success') {
-        setRuns(response.data);
-      }
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to list backup runs');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchRuns();
-  }, [fetchRuns]);
+  const runs = runsRes?.data || [];
+  const triggering = triggerMut.isPending;
 
   const triggerBackup = async (destination: string) => {
-    setTriggering(true);
-    try {
-      const response = await backupApi.triggerBackup({ destination });
-      if (response.status === 'success') {
-        toast.success(`Backup triggered successfully: ${response.data.backup_id}`);
-        fetchRuns();
-      }
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to trigger backup');
-    } finally {
-      setTriggering(false);
-    }
+    triggerMut.mutate({ destination });
   };
 
   const handleDownload = async (artifactId: string, filename: string) => {
-    try {
-      toast.info('Downloading backup...');
-      await backupApi.downloadArtifact(artifactId, filename);
-      toast.success('Backup downloaded successfully', { id: `download-${artifactId}` });
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to download backup', { id: `download-${artifactId}` });
-    }
+    downloadMut.mutate({ artifactId, filename });
   };
 
   return {
@@ -56,6 +22,6 @@ export function useBackupManagement() {
     triggering,
     triggerBackup,
     handleDownload,
-    refreshRuns: fetchRuns, // Provide a way to manually refresh
+    refreshRuns,
   };
 }

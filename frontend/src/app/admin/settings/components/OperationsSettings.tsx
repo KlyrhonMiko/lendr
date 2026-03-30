@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { ArchivesModal } from './ArchivesModal';
 import { archivesApi } from '../api';
+import { useOperationsSettings, useBackupRuns, useOperationsMutations, useBackupMutations } from '../lib/useSettingsQueries';
 
 interface OperationsSettingsData {
   maintenance: {
@@ -49,44 +50,34 @@ interface BackupRun {
 }
 
 export function OperationsSettings() {
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [data, setData] = useState<OperationsSettingsData | null>(null);
-  const [backups, setBackups] = useState<BackupRun[]>([]);
   const [newExclusion, setNewExclusion] = useState('');
   const [showArchives, setShowArchives] = useState(false);
+  const [localData, setLocalData] = useState<OperationsSettingsData | null>(null);
+
+  // Queries
+  const { data: operationsRes, isLoading: isLoadingOperations } = useOperationsSettings();
+  const { data: backupRunsRes, isLoading: isLoadingBackups } = useBackupRuns();
+
+  // Mutations
+  const { updateOperations } = useOperationsMutations();
+  const { triggerBackup, deleteBackup } = useBackupMutations();
+
+  const data = localData || operationsRes?.data || null;
+  const backups = backupRunsRes?.data || [];
+  const loading = isLoadingOperations || isLoadingBackups;
+  const saving = updateOperations.isPending;
 
   useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const [settingsRes, backupsRes] = await Promise.all([
-        api.get<OperationsSettingsData>('/admin/settings/operations'),
-        api.get<BackupRun[]>('/admin/backups/runs')
-      ]);
-      setData(settingsRes.data);
-      setBackups(backupsRes.data);
-    } catch (error) {
-      toast.error('Failed to load operations settings');
-    } finally {
-      setLoading(false);
+    if (operationsRes?.data && !localData) {
+      setLocalData(operationsRes.data);
     }
-  };
+  }, [operationsRes, localData]);
 
   const handleSave = async () => {
     if (!data) return;
-    setSaving(true);
-    try {
-      await api.put('/admin/settings/operations', data);
-      toast.success('System operations updated successfully');
-    } catch (error) {
-      toast.error('Failed to update operations settings');
-    } finally {
-      setSaving(false);
-    }
+    updateOperations.mutate(data, {
+      onSuccess: () => setLocalData(null)
+    });
   };
 
   const formatSize = (bytes: number) => {
@@ -120,7 +111,7 @@ export function OperationsSettings() {
           <Toggle 
             label={data.maintenance.enabled ? "Active" : "Inactive"} 
             checked={data.maintenance.enabled} 
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setData((prev: OperationsSettingsData | null) => prev ? {
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
               ...prev, 
               maintenance: { ...prev.maintenance, enabled: e.target.checked }
             } : null)} 
@@ -131,7 +122,7 @@ export function OperationsSettings() {
             <label className="text-sm font-semibold text-foreground px-1">Custom Maintenance Message</label>
             <Textarea 
               value={data.maintenance.message} 
-              onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setData((prev: OperationsSettingsData | null) => prev ? {
+              onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
                 ...prev,
                 maintenance: { ...prev.maintenance, message: e.target.value }
               } : null)}
@@ -157,7 +148,7 @@ export function OperationsSettings() {
           <Select 
             label="Frequency" 
             value={data.backup_schedule.frequency}
-            onChange={(e: ChangeEvent<HTMLSelectElement>) => setData((prev: OperationsSettingsData | null) => prev ? {
+            onChange={(e: ChangeEvent<HTMLSelectElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
               ...prev,
               backup_schedule: { ...prev.backup_schedule, frequency: e.target.value }
             } : null)}
@@ -171,7 +162,7 @@ export function OperationsSettings() {
             label="Backup Time" 
             type="time" 
             value={data.backup_schedule.time}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setData((prev: OperationsSettingsData | null) => prev ? {
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
               ...prev,
               backup_schedule: { ...prev.backup_schedule, time: e.target.value }
             } : null)}
@@ -179,7 +170,7 @@ export function OperationsSettings() {
           <Select 
             label="Storage Location" 
             value={data.backup_schedule.storage_location}
-            onChange={(e: ChangeEvent<HTMLSelectElement>) => setData((prev: OperationsSettingsData | null) => prev ? {
+            onChange={(e: ChangeEvent<HTMLSelectElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
               ...prev,
               backup_schedule: { ...prev.backup_schedule, storage_location: e.target.value }
             } : null)}
@@ -232,7 +223,12 @@ export function OperationsSettings() {
                         <button className="p-2 hover:bg-indigo-500/10 hover:text-indigo-500 rounded-lg transition-colors" title="Download">
                           <FileText className="w-4 h-4" />
                         </button>
-                        <button className="p-2 hover:bg-rose-500/10 hover:text-rose-500 rounded-lg transition-colors" title="Delete">
+                        <button 
+                          onClick={() => deleteBackup.mutate(backup.backup_id)}
+                          className="p-2 hover:bg-rose-500/10 hover:text-rose-500 rounded-lg transition-colors" 
+                          title="Delete"
+                          disabled={deleteBackup.isPending}
+                        >
                           <Trash2 className="w-4 h-4" />
                         </button>
                      </td>
@@ -263,7 +259,7 @@ export function OperationsSettings() {
                   type="number" 
                   className="flex-1" 
                   value={data.archive_policy.audit_logs_value}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => setData((prev: OperationsSettingsData | null) => prev ? {
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
                     ...prev,
                     archive_policy: { ...prev.archive_policy, audit_logs_value: parseInt(e.target.value) || 0 }
                   } : null)}
@@ -271,7 +267,7 @@ export function OperationsSettings() {
                 <Select 
                   options={[{label: 'Days', value:'d'}, {label: 'Months', value:'m'}]} 
                   value={data.archive_policy.audit_logs_unit}
-                  onChange={(e: ChangeEvent<HTMLSelectElement>) => setData((prev: OperationsSettingsData | null) => prev ? {
+                  onChange={(e: ChangeEvent<HTMLSelectElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
                     ...prev,
                     archive_policy: { ...prev.archive_policy, audit_logs_unit: e.target.value }
                   } : null)}
@@ -284,7 +280,7 @@ export function OperationsSettings() {
                   type="number" 
                   className="flex-1" 
                   value={data.archive_policy.borrow_records_value}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => setData((prev: OperationsSettingsData | null) => prev ? {
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
                     ...prev,
                     archive_policy: { ...prev.archive_policy, borrow_records_value: parseInt(e.target.value) || 0 }
                   } : null)}
@@ -292,7 +288,7 @@ export function OperationsSettings() {
                 <Select 
                   options={[{label: 'Days', value:'d'}, {label: 'Months', value:'m'}, {label: 'Years', value:'y'}]} 
                   value={data.archive_policy.borrow_records_unit}
-                  onChange={(e: ChangeEvent<HTMLSelectElement>) => setData((prev: OperationsSettingsData | null) => prev ? {
+                  onChange={(e: ChangeEvent<HTMLSelectElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
                     ...prev,
                     archive_policy: { ...prev.archive_policy, borrow_records_unit: e.target.value }
                   } : null)}
@@ -320,7 +316,7 @@ export function OperationsSettings() {
             </div>
             <Toggle 
               checked={data.retention_policy.auto_delete} 
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setData((prev: OperationsSettingsData | null) => prev ? {
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
                 ...prev,
                 retention_policy: { ...prev.retention_policy, auto_delete: e.target.checked }
               } : null)}
@@ -333,7 +329,7 @@ export function OperationsSettings() {
                   type="number" 
                   className="flex-1" 
                   value={data.retention_policy.delete_older_than_value}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => setData((prev: OperationsSettingsData | null) => prev ? {
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
                     ...prev,
                     retention_policy: { ...prev.retention_policy, delete_older_than_value: parseInt(e.target.value) || 0 }
                   } : null)}
@@ -341,7 +337,7 @@ export function OperationsSettings() {
                 <Select 
                   options={[{label: 'Years', value:'y'}, {label: 'Months', value:'m'}]} 
                   value={data.retention_policy.delete_older_than_unit}
-                  onChange={(e: ChangeEvent<HTMLSelectElement>) => setData((prev: OperationsSettingsData | null) => prev ? {
+                  onChange={(e: ChangeEvent<HTMLSelectElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
                     ...prev,
                     retention_policy: { ...prev.retention_policy, delete_older_than_unit: e.target.value }
                   } : null)}
@@ -353,7 +349,7 @@ export function OperationsSettings() {
                   label="Daily Maintenance Window" 
                   type="time" 
                   value={data.retention_policy.maintenance_time}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => setData((prev: OperationsSettingsData | null) => prev ? {
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
                     ...prev,
                     retention_policy: { ...prev.retention_policy, maintenance_time: e.target.value }
                   } : null)}
@@ -365,13 +361,13 @@ export function OperationsSettings() {
              <div className="space-y-2">
                <label className="text-sm font-semibold text-foreground px-1">Exclusion List (Mark as Never Purge)</label>
                <div className="flex flex-wrap gap-2">
-                 {data.retention_policy.exclusion_list.map((tag, idx) => (
+                 {data.retention_policy.exclusion_list.map((tag: string, idx: number) => (
                    <span key={tag} className="px-3 py-1 bg-muted rounded-lg text-xs font-medium border border-border flex items-center gap-1.5">
                      {tag}
                      <Trash2 
                        className="w-3 h-3 text-muted-foreground hover:text-rose-500 cursor-pointer transition-colors" 
                        onClick={() => {
-                         setData((prev: OperationsSettingsData | null) => {
+                         setLocalData((prev: OperationsSettingsData | null) => {
                            if (!prev) return null;
                            const newList = [...prev.retention_policy.exclusion_list];
                            newList.splice(idx, 1);
@@ -394,7 +390,7 @@ export function OperationsSettings() {
                     <button 
                       onClick={() => {
                         if (newExclusion.trim()) {
-                          setData((prev: OperationsSettingsData | null) => prev ? {
+                          setLocalData((prev: OperationsSettingsData | null) => prev ? {
                             ...prev,
                             retention_policy: { 
                               ...prev.retention_policy, 

@@ -7,6 +7,7 @@ import { Globe, Mail, Save, Send, AlertCircle, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+import { useGeneralSettings, useGeneralMutations } from '../lib/useSettingsQueries';
 
 interface LocalizationSettings {
   timezone: string;
@@ -20,55 +21,37 @@ interface GeneralSettingsPayload {
 }
 
 export function GeneralSettings() {
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [settings, setSettings] = useState<GeneralSettingsPayload | null>(null);
+  const [localSettings, setLocalSettings] = useState<GeneralSettingsPayload | null>(null);
+
+  // Queries
+  const { data: settingsRes, isLoading } = useGeneralSettings();
+
+  // Mutations
+  const { updateGeneral } = useGeneralMutations();
+
+  const settings = localSettings || settingsRes?.data || null;
+  const saving = updateGeneral.isPending;
 
   useEffect(() => {
-    fetchSettings();
-  }, []);
-
-  const fetchSettings = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get<GeneralSettingsPayload>('/admin/settings/general');
-      setSettings(response.data);
-    } catch (error) {
-      toast.error('Failed to load general settings');
-      console.error(error);
-    } finally {
-      setLoading(false);
+    if (settingsRes?.data && !localSettings) {
+      setLocalSettings(settingsRes.data);
     }
-  };
+  }, [settingsRes, localSettings]);
 
   const handleSave = async () => {
     if (!settings) return;
-    
-    setSaving(true);
-    try {
-      // Small delay for UI feedback
-      await new Promise(resolve => setTimeout(resolve, 500));
-      await api.put('/admin/settings/general', settings);
-      toast.success('General settings updated successfully');
-      // Re-fetch to ensure UI is in sync with server state
-      await fetchSettings();
-    } catch (error) {
-      toast.error('Failed to update settings');
-      console.error(error);
-    } finally {
-      setSaving(false);
-    }
+    updateGeneral.mutate(settings);
   };
 
   const updateLocalization = (key: keyof LocalizationSettings, value: string) => {
     if (!settings) return;
-    setSettings({
+    setLocalSettings({
       ...settings,
       localization: { ...settings.localization, [key]: value }
     });
   };
 
-  if (loading) {
+  if (isLoading && !settings) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />

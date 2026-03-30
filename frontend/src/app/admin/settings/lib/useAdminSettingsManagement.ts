@@ -6,37 +6,64 @@ import type { PaginationMeta } from '@/lib/api';
 import { settingsApi, type SettingsListParams, type SystemSetting, type SystemSettingCreate } from '../api';
 import { useDebounce } from './useDebounce';
 
+import { useAdminSettings, useAdminSettingLookups, useAdminSettingMutations, useAuthConfigurations } from './useSettingsQueries';
+
 const DEFAULT_PER_PAGE = 10;
 
 type ActiveTab = 'general' | 'system' | 'operations' | 'health' | 'security' | 'dictionary';
 
 export function useAdminSettingsManagement() {
-  const [settings, setSettings] = useState<SystemSetting[]>([]);
-  const [meta, setMeta] = useState<PaginationMeta | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingKey, setEditingKey] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('health');
-
-  // Lookup state
-  const [categories, setCategories] = useState<string[]>([]);
-  const [systems, setSystems] = useState<string[]>([]);
-  const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
-  const [restoreData, setRestoreData] = useState({ key: '', category: 'general' });
 
   // Filters
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [systemFilter, setSystemFilter] = useState('');
-
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(DEFAULT_PER_PAGE);
 
   const debouncedSearch = useDebounce(search, 400);
   const debouncedCategory = useDebounce(categoryFilter, 400);
   const debouncedSystem = useDebounce(systemFilter, 400);
+
+  const params: SettingsListParams = {
+    page,
+    per_page: perPage,
+    search: debouncedSearch || undefined,
+    category: debouncedCategory || undefined,
+    system: debouncedSystem || undefined,
+  };
+
+  // Queries
+  const { 
+    data: dictionaryRes, 
+    isLoading: dictionaryLoading, 
+    error: dictionaryError 
+  } = useAdminSettings(params);
+
+  const {
+    data: authRes,
+    isLoading: authLoading,
+    error: authError
+  } = useAuthConfigurations(params);
+
+  const { data: lookupData } = useAdminSettingLookups();
+
+  // Mutations
+  const { updateSetting, createAuthSetting, deleteSetting, restoreSetting } = useAdminSettingMutations();
+
+  const settings = activeTab === 'dictionary' ? dictionaryRes?.data || [] : authRes?.data || [];
+  const meta = activeTab === 'dictionary' ? dictionaryRes?.meta || null : authRes?.meta || null;
+  const loading = activeTab === 'dictionary' ? dictionaryLoading : authLoading;
+  const error = (activeTab === 'dictionary' ? dictionaryError : authError)?.message || null;
+
+  const categories = lookupData?.categories || [];
+  const systems = lookupData?.systems || [];
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
+  const [restoreData, setRestoreData] = useState({ key: '', category: 'general' });
 
   const [formData, setFormData] = useState<SystemSettingCreate & { description: string }>({
     key: '',
@@ -45,60 +72,10 @@ export function useAdminSettingsManagement() {
     description: '',
   });
 
-  const fetchSettings = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params: SettingsListParams = {
-        page,
-        per_page: perPage,
-        search: debouncedSearch || undefined,
-        category: debouncedCategory || undefined,
-        system: debouncedSystem || undefined,
-      };
-
-      const res =
-        activeTab === 'dictionary' ? await settingsApi.list(params) : await settingsApi.listAuth(params);
-
-      setSettings(res.data);
-      if (res.meta) setMeta(res.meta);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to fetch settings';
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, perPage, debouncedSearch, debouncedCategory, debouncedSystem, activeTab]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch, debouncedCategory, debouncedSystem, perPage, activeTab]);
-
-  const fetchLookups = useCallback(async () => {
-    try {
-      const [catRes, sysRes] = await Promise.all([
-        settingsApi.listCategories(),
-        settingsApi.listSystems(),
-      ]);
-      setCategories(catRes.data);
-      setSystems(sysRes.data);
-    } catch (err) {
-      toast.error('Failed to fetch filter options');
-    }
-  }, []);
-
-  useEffect(() => {
-    if (activeTab === 'dictionary') {
-      fetchLookups();
-      fetchSettings();
-    }
-  }, [fetchSettings, fetchLookups, activeTab]);
-
   const resetForm = useCallback(() => {
     setFormData({ key: '', value: '', category: 'general', description: '' });
     setEditingKey(null);
     setIsModalOpen(false);
-    setError(null);
   }, []);
 
   const openEditModal = useCallback((setting: SystemSetting) => {
@@ -115,58 +92,41 @@ export function useAdminSettingsManagement() {
   const handleSave = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      setError(null);
       try {
         if (editingKey && activeTab === 'dictionary') {
-          await settingsApi.update(editingKey, formData.value, formData.category);
-          toast.success('System setting updated');
+          await updateSetting.mutateAsync({ key: editingKey, value: formData.value, category: formData.category });
         } else if (activeTab === 'security') {
-          await settingsApi.createAuth(formData);
-          toast.success('Auth configuration updated');
+          await createAuthSetting.mutateAsync(formData);
         } else {
-          // Placeholder for other tabs
           toast.success('Settings saved');
         }
-
         resetForm();
-        fetchSettings();
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Failed to save setting';
-        setError(msg);
-        toast.error(msg);
+        // Error toast handled in mutation
       }
     },
-    [activeTab, editingKey, fetchSettings, formData, resetForm]
+    [activeTab, editingKey, formData, resetForm, updateSetting, createAuthSetting]
   );
 
   const handleDelete = useCallback(
     async (key: string, category: string) => {
       if (!confirm(`Are you sure you want to delete "${key}" from "${category}"?`)) return;
-      try {
-        await settingsApi.delete(key, category);
-        toast.success('Setting deleted');
-        fetchSettings();
-      } catch (err: any) {
-        toast.error(err.message || 'Failed to delete setting');
-      }
+      deleteSetting.mutate({ key, category });
     },
-    [fetchSettings]
+    [deleteSetting]
   );
 
   const handleRestore = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      try {
-        await settingsApi.restore(restoreData.key, restoreData.category);
-        toast.success('Setting restored successfully');
-        setIsRestoreModalOpen(false);
-        setRestoreData({ key: '', category: 'general' });
-        fetchSettings();
-      } catch (err: any) {
-        toast.error(err.message || 'Failed to restore setting');
-      }
+      restoreSetting.mutate({ key: restoreData.key, category: restoreData.category }, {
+        onSuccess: () => {
+          setIsRestoreModalOpen(false);
+          setRestoreData({ key: '', category: 'general' });
+        }
+      });
     },
-    [fetchSettings, restoreData.category, restoreData.key]
+    [restoreData.category, restoreData.key, restoreSetting]
   );
 
   const openRestoreModal = useCallback(() => setIsRestoreModalOpen(true), []);

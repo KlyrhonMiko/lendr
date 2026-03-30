@@ -1,14 +1,12 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { toast } from 'sonner';
-import { adminDashboardApi } from './dashboard-api';
 import type {
   AdminStats,
   ActivityPoint,
   UserInsights,
   SystemRegistry,
 } from './lib/types';
+import { useAdminDashboardData } from './lib/useDashboardQueries';
 
 import { DashboardHeader } from './components/DashboardHeader';
 import { AdminStatsGrid } from './components/AdminStatsGrid';
@@ -17,34 +15,13 @@ import { UserDistributionPanel } from './components/UserDistributionPanel';
 import { SystemRegistryPanel } from './components/SystemRegistryPanel';
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState<AdminStats | null>(null);
-  const [activity, setActivity] = useState<ActivityPoint[]>([]);
-  const [userInsights, setUserInsights] = useState<UserInsights | null>(null);
-  const [registry, setRegistry] = useState<SystemRegistry[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Queries
+  const { data, isLoading: loading } = useAdminDashboardData();
 
-  const fetchDashboardData = useCallback(async () => {
-    try {
-      const [statsRes, activityRes, usersRes, registryRes] = await Promise.all([
-        adminDashboardApi.getStats(),
-        adminDashboardApi.getActivity(),
-        adminDashboardApi.getUsers(),
-        adminDashboardApi.getRegistry(),
-      ]);
-      setStats(statsRes.data);
-      setActivity(activityRes.data);
-      setUserInsights(usersRes.data);
-      setRegistry(registryRes.data);
-    } catch {
-      toast.error('Failed to load admin dashboard data');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
+  const stats = data?.stats || null;
+  const activity = data?.activity || [];
+  const userInsights = data?.userInsights || null;
+  const registry = data?.registry || [];
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500">

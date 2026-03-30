@@ -8,6 +8,7 @@ import { Select } from '@/components/ui/select';
 import { Image as ImageIcon, Globe, Tablet, BellRing, Save, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+import { useBrandingSettings, useBrandingMutations } from '../lib/useSettingsQueries';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -28,43 +29,29 @@ interface BrandingSettings {
 }
 
 export function BrandingSettings() {
-  const [loading, setLoading] = useState(false);
-  const [fetching, setFetching] = useState(true);
-  const [settings, setSettings] = useState<BrandingSettings>({
-    visual_identity: {
-      brand_name: 'Lendr',
-      system_theme: 'system',
-      logo_url: null,
-      favicon_url: null,
-    },
-    banner: {
-      is_enabled: false,
-      message: '',
-      banner_type: 'info',
-      expiry_date: '',
-      expiry_time: '',
-    },
-  });
+  const [localSettings, setLocalSettings] = useState<BrandingSettings | null>(null);
 
   const logoInputRef = useRef<HTMLInputElement>(null);
   const faviconInputRef = useRef<HTMLInputElement>(null);
 
+  // Queries
+  const { data: brandingRes, isLoading: fetching } = useBrandingSettings();
+
+  // Mutations
+  const { updateBranding, uploadBrandingFile } = useBrandingMutations();
+
+  const settings = localSettings || brandingRes?.data || {
+    visual_identity: { brand_name: 'Lendr', system_theme: 'system', logo_url: null, favicon_url: null },
+    banner: { is_enabled: false, message: '', banner_type: 'info', expiry_date: '', expiry_time: '' },
+  };
+
+  const loading = updateBranding.isPending || uploadBrandingFile.isPending;
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await api.get<BrandingSettings>('/admin/settings/branding');
-        if (response.status === 'success') {
-          setSettings(response.data);
-        }
-      } catch (error) {
-        console.error('Failed to fetch branding settings:', error);
-        toast.error('Failed to load branding configurations');
-      } finally {
-        setFetching(false);
-      }
-    };
-    fetchData();
-  }, []);
+    if (brandingRes?.data && !localSettings) {
+      setLocalSettings(brandingRes.data);
+    }
+  }, [brandingRes, localSettings]);
 
   const handleUpload = async (file: File, type: 'logo' | 'favicon') => {
     if (file.size > MAX_FILE_SIZE) {
@@ -75,38 +62,24 @@ export function BrandingSettings() {
     const formData = new FormData();
     formData.append('file', file);
 
-    try {
-      setLoading(true);
-      const response = await api.post<{ url: string }>('/admin/settings/branding/upload', formData);
-      if (response.status === 'success') {
-        setSettings(prev => ({
+    uploadBrandingFile.mutate(formData, {
+      onSuccess: (response) => {
+        setLocalSettings(prev => prev ? {
           ...prev,
           visual_identity: {
             ...prev.visual_identity,
             [type === 'logo' ? 'logo_url' : 'favicon_url']: response.data.url
           }
-        }));
+        } : null);
         toast.success(`${type === 'logo' ? 'Logo' : 'Favicon'} uploaded successfully`);
       }
-    } catch (error: any) {
-      toast.error(error.message || 'Upload failed');
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   const handleSave = async () => {
-    setLoading(true);
-    try {
-      const response = await api.put<BrandingSettings>('/admin/settings/branding', settings);
-      if (response.status === 'success') {
-        toast.success('Branding settings updated successfully');
-      }
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to save settings');
-    } finally {
-      setLoading(false);
-    }
+    updateBranding.mutate(settings, {
+      onSuccess: () => setLocalSettings(null)
+    });
   };
 
   if (fetching) {
@@ -152,7 +125,7 @@ export function BrandingSettings() {
               label="Organization Name" 
               placeholder="e.g. Lendr Corp" 
               value={settings.visual_identity.brand_name ?? ''}
-              onChange={(e) => setSettings({
+              onChange={(e) => setLocalSettings({
                 ...settings,
                 visual_identity: { ...settings.visual_identity, brand_name: e.target.value }
               })}
@@ -161,7 +134,7 @@ export function BrandingSettings() {
             <Select 
               label="System Theme" 
               value={settings.visual_identity.system_theme ?? 'system'}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSettings({
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setLocalSettings({
                 ...settings,
                 visual_identity: { ...settings.visual_identity, system_theme: e.target.value }
               })}
@@ -242,7 +215,7 @@ export function BrandingSettings() {
           <Toggle 
             label="Enable Banner" 
             checked={!!settings.banner.is_enabled}
-            onChange={(e) => setSettings({
+            onChange={(e) => setLocalSettings({
               ...settings,
               banner: { ...settings.banner, is_enabled: e.target.checked }
             })}
@@ -253,7 +226,7 @@ export function BrandingSettings() {
             label="Banner Message" 
             placeholder="Enter the announcement text here..." 
             value={settings.banner.message ?? ''}
-            onChange={(e) => setSettings({
+            onChange={(e) => setLocalSettings({
               ...settings,
               banner: { ...settings.banner, message: e.target.value }
             })}
@@ -263,7 +236,7 @@ export function BrandingSettings() {
             <Select 
               label="Banner Type" 
               value={settings.banner.banner_type ?? 'info'}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSettings({
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setLocalSettings({
                 ...settings,
                 banner: { ...settings.banner, banner_type: e.target.value }
               })}
@@ -278,7 +251,7 @@ export function BrandingSettings() {
               label="Expiry Date" 
               type="date" 
               value={settings.banner.expiry_date ?? ''}
-              onChange={(e) => setSettings({
+              onChange={(e) => setLocalSettings({
                 ...settings,
                 banner: { ...settings.banner, expiry_date: e.target.value }
               })}
@@ -287,7 +260,7 @@ export function BrandingSettings() {
               label="Expiry Time" 
               type="time" 
               value={settings.banner.expiry_time ?? ''}
-              onChange={(e) => setSettings({
+              onChange={(e) => setLocalSettings({
                 ...settings,
                 banner: { ...settings.banner, expiry_time: e.target.value }
               })}
