@@ -982,7 +982,7 @@ def seed_audit_configurations(headers: dict[str, str]) -> None:
         ("audit_log", "Audit Log", "System audit log entity"),
     ]
     for key, value, desc in entities:
-        create_setting(headers, system="inventory", key=key, value=value, category="audit_logs_entity_type", description=desc, endpoint="/api/inventory/config/inventory")
+        create_setting(headers, system="admin", key=key, value=value, category="audit_logs_entity_type", description=desc)
     
     # audit_logs_action
     print(f"\n  {CYAN}Category: audit_logs_action{RESET}")
@@ -1006,7 +1006,7 @@ def seed_audit_configurations(headers: dict[str, str]) -> None:
         ("deleted", "Deleted", "Entity soft-deleted"),
     ]
     for key, value, desc in actions:
-        create_setting(headers, system="inventory", key=key, value=value, category="audit_logs_action", description=desc, endpoint="/api/inventory/config/inventory")
+        create_setting(headers, system="admin", key=key, value=value, category="audit_logs_action", description=desc)
 
 
 def seed_inventory_alert_settings(headers: dict[str, str]) -> None:
@@ -1069,6 +1069,7 @@ def seed_operations_configurations(headers: dict[str, str]) -> None:
         ("retention_value", "7", "Auto-delete archives older than (value)"),
         ("retention_unit", "y", "Auto-delete archives older than (unit: d/m/y)"),
         ("retention_exclusion", "[]", "JSON list of tags/keywords that exclude a record from auto-deletion"),
+        ("maintenance_schedule_time", "03:00", "Daily trigger time for system maintenance (archiving/purging)"),
     ]
     for key, value, desc in ops_settings:
         create_setting(

@@ -40,7 +40,7 @@ export default function BorrowPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const invRes = await inventoryApi.list();
+      const invRes = await inventoryApi.list({ per_page: 500 });
       setItems(invRes.data);
     } catch {
       toast.error('Failed to load inventory data');

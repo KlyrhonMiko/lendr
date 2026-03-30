@@ -1,11 +1,13 @@
 import json
 from datetime import datetime, timezone
 from uuid import uuid4
+from typing import Type
 
 from sqlmodel import Session, select
 from systems.admin.models.user import User
 from systems.admin.models.settings import AdminConfig
-from systems.inventory.models.settings import InventoryConfig
+from systems.auth.models.settings import AuthConfig
+from systems.inventory.models.settings import InventoryConfig, BorrowerConfig
 from utils.security import get_password_hash
 from data.system_init_data import SYSTEM_CONFIGS, RBAC_ROLES
 from utils.logging import get_logger
@@ -13,7 +15,23 @@ from utils.migrations import run_migrations
 
 logger = get_logger("core.init")
 
+AUTH_CONFIG_CATEGORIES = {"users_role", "users_shift_type"}
+ConfigModel = Type[AdminConfig] | Type[InventoryConfig] | Type[BorrowerConfig] | Type[AuthConfig]
+
 class InitializationService:
+    def _resolve_config_model(self, config_data: dict) -> tuple[ConfigModel, str]:
+        category = config_data.get("category", "")
+        system = config_data.get("system", "admin")
+
+        # Mirror API endpoints used in seed_configuration.py routing.
+        if category in AUTH_CONFIG_CATEGORIES:
+            return AuthConfig, "admin"
+        if system == "borrower":
+            return BorrowerConfig, "borrower"
+        if system == "inventory":
+            return InventoryConfig, "inventory"
+        return AdminConfig, "admin"
+
     def ensure_admin_user(self, session: Session):
         """Pre-create admin123 user directly in database if it doesn't exist."""
         existing = session.exec(
@@ -43,12 +61,64 @@ class InitializationService:
         else:
             logger.debug("Administrator account already exists.")
 
+    def rebalance_misplaced_configurations(self, session: Session):
+        """Move wrongly stored rows out of admin_configurations into their proper tables."""
+        moved = 0
+        removed = 0
+
+        misplaced_rows = session.exec(
+            select(AdminConfig).where(
+                (AdminConfig.system == "borrower")
+                | (AdminConfig.category.in_(list(AUTH_CONFIG_CATEGORIES)))
+            )
+        ).all()
+
+        for row in misplaced_rows:
+            if row.category in AUTH_CONFIG_CATEGORIES:
+                target_model: ConfigModel = AuthConfig
+                target_system = "admin"
+            elif row.system == "borrower":
+                target_model = BorrowerConfig
+                target_system = "borrower"
+            else:
+                continue
+
+            existing = session.exec(
+                select(target_model).where(
+                    target_model.key == row.key,
+                    target_model.category == row.category,
+                )
+            ).first()
+
+            if not existing:
+                session.add(
+                    target_model(
+                        system=target_system,
+                        key=row.key,
+                        value=row.value,
+                        category=row.category,
+                        description=row.description,
+                    )
+                )
+                moved += 1
+
+            session.delete(row)
+            removed += 1
+
+        if moved or removed:
+            logger.info(
+                "Rebalanced misplaced configs: moved=%s removed_from_admin=%s",
+                moved,
+                removed,
+            )
+        else:
+            logger.debug("No misplaced admin configurations found.")
+
     def seed_configurations(self, session: Session):
         """Idempotently seed general system configurations."""
         count = 0
         for config_data in SYSTEM_CONFIGS:
-            system = config_data.get("system", "admin")
-            model = InventoryConfig if system == "inventory" else AdminConfig
+            model, normalized_system = self._resolve_config_model(config_data)
             
             existing = session.exec(
                 select(model).where(
@@ -58,7 +128,13 @@ class InitializationService:
             ).first()
     
             if not existing:
-                config = model(**config_data)
+                config = model(
+                    system=normalized_system,
+                    key=config_data["key"],
+                    value=config_data["value"],
+                    category=config_data["category"],
+                    description=config_data.get("description"),
+                )
                 session.add(config)
                 count += 1
         
@@ -108,6 +184,7 @@ class InitializationService:
         # 2. Seed Data
         logger.info("Starting System Initialization Registry check...")
         self.ensure_admin_user(session)
+        self.rebalance_misplaced_configurations(session)
         self.seed_configurations(session)
         self.seed_rbac_roles(session)
         session.commit()
