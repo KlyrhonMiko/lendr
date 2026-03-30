@@ -19,10 +19,14 @@ class AuditLogRead(BaseModel):
     user_id: Optional[str] = None
     employee_id: Optional[str] = None
     created_at: datetime
+    
+    is_archived: bool = False
+    archived_at: Optional[datetime] = None
+    retention_tags: Optional[list[str]] = None
 
-    @field_serializer("created_at")
-    def serialize_created_at(self, dt: datetime) -> str:
-        return format_datetime(dt)
+    @field_serializer("created_at", "archived_at")
+    def serialize_dates(self, dt: datetime | None) -> str | None:
+        return format_datetime(dt) if dt else None
 
     class Config:
         from_attributes = True

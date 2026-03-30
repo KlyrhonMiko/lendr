@@ -194,6 +194,7 @@ SYSTEM_CONFIGS = [
     {"system": "inventory", "key": "requested_item", "value": "Requested Item", "category": "audit_logs_entity_type", "description": "Requested item entity"},
     {"system": "inventory", "key": "user", "value": "User", "category": "audit_logs_entity_type", "description": "User entity"},
     {"system": "inventory", "key": "system_setting", "value": "System Setting", "category": "audit_logs_entity_type", "description": "System configuration entity"},
+    {"system": "admin", "key": "audit_log", "value": "Audit Log", "category": "audit_logs_entity_type", "description": "System audit log entity"},
 
     {"system": "inventory", "key": "create", "value": "Create", "category": "audit_logs_action", "description": "Entity created"},
     {"system": "inventory", "key": "update", "value": "Update", "category": "audit_logs_action", "description": "Entity updated"},
@@ -207,12 +208,28 @@ SYSTEM_CONFIGS = [
     {"system": "inventory", "key": "assign", "value": "Assign", "category": "audit_logs_action", "description": "Units assigned"},
     {"system": "inventory", "key": "adjust_stock", "value": "Adjust Stock", "category": "audit_logs_action", "description": "Stock adjustment"},
     {"system": "inventory", "key": "transition", "value": "Transition", "category": "audit_logs_action", "description": "Status transition"},
+    {"system": "admin", "key": "archived", "value": "Archived", "category": "audit_logs_action", "description": "Entity moved to archive"},
+    {"system": "admin", "key": "unarchived", "value": "Unarchived", "category": "audit_logs_action", "description": "Entity restored from archive"},
+    {"system": "admin", "key": "purged", "value": "Purged", "category": "audit_logs_action", "description": "Entity permanently deleted"},
+    {"system": "admin", "key": "restored", "value": "Restored", "category": "audit_logs_action", "description": "Entity restored from soft-delete"},
+    {"system": "admin", "key": "deleted", "value": "Deleted", "category": "audit_logs_action", "description": "Entity soft-deleted"},
 
     # General Settings
     {"system": "admin", "key": "timezone", "value": "Asia/Manila", "category": "general_settings", "description": "System-wide timezone"},
     {"system": "admin", "key": "date_format", "value": "MM/DD/YYYY", "category": "general_settings", "description": "System-wide date format"},
     {"system": "admin", "key": "time_format", "value": "12h", "category": "general_settings", "description": "System-wide time format"},
     {"system": "admin", "key": "language", "value": "en", "category": "general_settings", "description": "System-wide language"},
+
+    # Operations & Data Retention
+    {"system": "admin", "key": "archive_audit_value", "value": "90", "category": "operations_settings", "description": "Archive audit logs older than (value)"},
+    {"system": "admin", "key": "archive_audit_unit", "value": "d", "category": "operations_settings", "description": "Archive audit logs older than (unit: d/m/y)"},
+    {"system": "admin", "key": "archive_borrow_value", "value": "1", "category": "operations_settings", "description": "Archive borrow records older than (value)"},
+    {"system": "admin", "key": "archive_borrow_unit", "value": "y", "category": "operations_settings", "description": "Archive borrow records older than (unit: d/m/y)"},
+    {"system": "admin", "key": "retention_auto_delete", "value": "true", "category": "operations_settings", "description": "Enable automatic permanent deletion of expired archives"},
+    {"system": "admin", "key": "retention_value", "value": "7", "category": "operations_settings", "description": "Auto-delete archives older than (value)"},
+    {"system": "admin", "key": "retention_unit", "value": "y", "category": "operations_settings", "description": "Auto-delete archives older than (unit: d/m/y)"},
+    {"system": "admin", "key": "retention_exclusion", "value": "[\"permanent_record\"]", "category": "operations_settings", "description": "JSON list of tags/keywords that exclude a record from auto-deletion"},
+    {"system": "admin", "key": "maintenance_schedule_time", "value": "03:00", "category": "operations_settings", "description": "Daily trigger time for system maintenance (archiving/purging)"},
 ]
 
 RBAC_ROLES = [

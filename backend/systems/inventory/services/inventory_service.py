@@ -118,12 +118,20 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         is_trackable: Optional[bool] = None,
         condition: Optional[str] = None,
         include_deleted: bool = False,
+        include_archived: bool = False,
+        is_archived: Optional[bool] = None,
     ) -> tuple[list[InventoryItem], int]:
         """Get inventory items with optional search and filters."""
         statement = select(InventoryItem)
 
         if not include_deleted:
             statement = statement.where(InventoryItem.is_deleted.is_(False))
+            
+        # Apply archival filtering
+        if is_archived is not None:
+            statement = statement.where(InventoryItem.is_archived == is_archived)
+        elif not include_archived:
+            statement = statement.where(InventoryItem.is_archived.is_(False))
 
         if search:
             statement = statement.where(InventoryItem.name.ilike(f"%{search}%"))

@@ -1,5 +1,6 @@
 from datetime import datetime
 from sqlmodel import Session, select, func, and_
+from typing import Optional
 from uuid import UUID
 
 from core.base_service import BaseService
@@ -259,6 +260,8 @@ class BorrowService(
         date_from: datetime | None = None,
         date_to: datetime | None = None,
         returned_on_time: bool | None = None,
+        include_archived: bool = False,
+        is_archived: Optional[bool] = None,
     ) -> tuple[list[BorrowRequest], int]:
         """Get all borrow requests with optional filters and pagination."""
         needs_user_join = search is not None
@@ -271,6 +274,12 @@ class BorrowService(
             )
         else:
             statement = select(BorrowRequest).where(BorrowRequest.is_deleted.is_(False))
+
+        # Apply archival filtering
+        if is_archived is not None:
+            statement = statement.where(BorrowRequest.is_archived == is_archived)
+        elif not include_archived:
+            statement = statement.where(BorrowRequest.is_archived.is_(False))
 
         if status is not None:
             statement = statement.where(BorrowRequest.status == status)
@@ -1603,3 +1612,5 @@ class BorrowService(
         session.commit()
         session.refresh(db_request)
         return db_request
+
+borrow_request_service = BorrowService()

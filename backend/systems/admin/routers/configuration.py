@@ -12,6 +12,7 @@ from core.schemas import (
 )
 from systems.admin.models.user import User
 from systems.admin.services.configuration_service import ConfigurationService
+from systems.admin.services.scheduler_service import scheduler_service
 from systems.auth.dependencies import get_current_user, require_permission
 
 router = APIRouter()
@@ -148,6 +149,9 @@ async def create_setting(
         actor_id=current_user.id,
     )
 
+    if setting_data.category == "operations_settings":
+        scheduler_service.sync_schedule()
+
     return create_success_response(
         message=f"Setting '{setting_data.key}' created successfully",
         data=config_service.get_by_key(
@@ -199,6 +203,9 @@ async def update_setting(
         description=setting_data.description,
         actor_id=current_user.id,
     )
+
+    if category == "operations_settings":
+        scheduler_service.sync_schedule()
 
     return create_success_response(
         message=f"Setting '{key}' updated successfully",
@@ -259,6 +266,9 @@ async def restore_setting(
         )
 
     config_service.restore(session, setting, actor_id=current_user.id)
+
+    if category == "operations_settings":
+        scheduler_service.sync_schedule()
 
     return create_success_response(
         message=f"Setting '{key}' restored successfully",

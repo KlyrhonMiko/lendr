@@ -963,6 +963,7 @@ def seed_audit_configurations(headers: dict[str, str]) -> None:
         ("requested_item", "Requested Item", "Requested item entity"),
         ("user", "User", "User entity"),
         ("system_setting", "System Setting", "System configuration entity"),
+        ("audit_log", "Audit Log", "System audit log entity"),
     ]
     for key, value, desc in entities:
         create_setting(headers, system="inventory", key=key, value=value, category="audit_logs_entity_type", description=desc, endpoint="/api/inventory/config/inventory")
@@ -982,6 +983,11 @@ def seed_audit_configurations(headers: dict[str, str]) -> None:
         ("assign", "Assign", "Units assigned"),
         ("adjust_stock", "Adjust Stock", "Stock adjustment"),
         ("transition", "Transition", "Status transition"),
+        ("archived", "Archived", "Entity moved to archive"),
+        ("unarchived", "Unarchived", "Entity restored from archive"),
+        ("purged", "Purged", "Entity permanently deleted"),
+        ("restored", "Restored", "Entity restored from soft-delete"),
+        ("deleted", "Deleted", "Entity soft-deleted"),
     ]
     for key, value, desc in actions:
         create_setting(headers, system="inventory", key=key, value=value, category="audit_logs_action", description=desc, endpoint="/api/inventory/config/inventory")
@@ -1033,6 +1039,32 @@ def seed_general_settings(headers: dict[str, str]) -> None:
         )
 
 
+def seed_operations_configurations(headers: dict[str, str]) -> None:
+    """Seed operations and data retention configurations."""
+    section("OPERATIONS & DATA RETENTION CONFIGURATIONS")
+
+    print(f"\n  {CYAN}Category: operations_settings{RESET}")
+    ops_settings = [
+        ("archive_audit_value", "90", "Archive audit logs older than (value)"),
+        ("archive_audit_unit", "d", "Archive audit logs older than (unit: d/m/y)"),
+        ("archive_borrow_value", "1", "Archive borrow records older than (value)"),
+        ("archive_borrow_unit", "y", "Archive borrow records older than (unit: d/m/y)"),
+        ("retention_auto_delete", "true", "Enable automatic permanent deletion of expired archives"),
+        ("retention_value", "7", "Auto-delete archives older than (value)"),
+        ("retention_unit", "y", "Auto-delete archives older than (unit: d/m/y)"),
+        ("retention_exclusion", "[]", "JSON list of tags/keywords that exclude a record from auto-deletion"),
+    ]
+    for key, value, desc in ops_settings:
+        create_setting(
+            headers,
+            system="admin",
+            key=key,
+            value=value,
+            category="operations_settings",
+            description=desc,
+        )
+
+
 def print_summary() -> int:
     """Print execution summary."""
     total = pass_count + fail_count
@@ -1077,6 +1109,7 @@ def main() -> int:
         seed_backup_configurations(admin_headers)
         seed_audit_configurations(admin_headers)
         seed_general_settings(admin_headers)
+        seed_operations_configurations(admin_headers)
         
         # Step 4: Print summary and return exit code
         return print_summary()

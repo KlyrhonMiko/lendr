@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth, User } from '@/lib/auth';
+import { MaintenanceError } from '@/lib/api';
 
 interface AuthContextType {
   user: User | null;
@@ -23,9 +24,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const userData = await auth.getUser();
-    setUser(userData);
-    setLoading(false);
+    try {
+      const userData = await auth.getUser();
+      setUser(userData);
+    } catch (error) {
+      if (error instanceof MaintenanceError) {
+        setUser(null);
+      } else {
+        console.error('Failed to refresh user:', error);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -45,10 +55,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         auth.setupTokenTimer(token);
       }
       
-      const userData = await auth.getUser();
-      if (mounted) {
-        setUser(userData);
-        setLoading(false);
+      try {
+        const userData = await auth.getUser();
+        if (mounted) {
+          setUser(userData);
+          setLoading(false);
+        }
+      } catch (error) {
+        if (mounted) {
+          setUser(null);
+          setLoading(false);
+          if (!(error instanceof MaintenanceError)) {
+            console.error('Initial user fetch failed:', error);
+          }
+        }
       }
     };
 

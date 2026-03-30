@@ -24,9 +24,17 @@ class RequestedItemService(BaseService[RequestedItem, RequestedItemCreate, Reque
         search: Optional[str] = None,
         status: Optional[str] = None,
         requested_by: Optional[str] = None,
+        include_archived: bool = False,
+        is_archived: Optional[bool] = None,
     ) -> tuple[list[RequestedItem], int]:
         """Get requested items with optional search and filter params."""
         statement = select(RequestedItem).where(RequestedItem.is_deleted.is_(False))
+        
+        # Apply archival filtering
+        if is_archived is not None:
+            statement = statement.where(RequestedItem.is_archived == is_archived)
+        elif not include_archived:
+            statement = statement.where(RequestedItem.is_archived.is_(False))
 
         if search:
             statement = statement.where(RequestedItem.item_name.ilike(f"%{search}%"))

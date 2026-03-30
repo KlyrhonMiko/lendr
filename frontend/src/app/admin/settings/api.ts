@@ -113,3 +113,43 @@ export const healthApi = {
   getLogs: (params: { page?: number; per_page?: number } = {}) => 
     api.get<HealthLog[]>(`/admin/health/logs${buildQueryString(params as Record<string, unknown>)}`),
 };
+// --- Archives API ---
+import type { BorrowRequest } from '../../inventory/requests/api';
+
+export interface ArchivedAuditLog {
+  id: string;
+  audit_id: string;
+  entity_type: string;
+  entity_id: string;
+  action: string;
+  reason_code: string | null;
+  before_json: any;
+  after_json: any;
+  user_id: string | null;
+  employee_id: string | null;
+  created_at: string;
+  is_archived: boolean;
+  archived_at: string;
+  retention_tags: string[] | null;
+}
+
+export interface ArchivedBorrowRequest extends BorrowRequest {
+  id: string;
+  is_archived: boolean;
+  archived_at: string;
+  retention_tags: string[] | null;
+}
+
+export const archivesApi = {
+  getAuditLogs: (params: { page?: number; per_page?: number } = {}) =>
+    api.get<ArchivedAuditLog[]>(`/admin/settings/operations/archives/audit-logs${buildQueryString(params as Record<string, unknown>)}`),
+  
+  getBorrowRequests: (params: { page?: number; per_page?: number } = {}) =>
+    api.get<ArchivedBorrowRequest[]>(`/admin/settings/operations/archives/borrow-requests${buildQueryString(params as Record<string, unknown>)}`),
+  
+  restore: (entityType: 'audit-log' | 'borrow-request', id: string) =>
+    api.post(`/admin/settings/operations/archives/${entityType}/${id}/restore`),
+  
+  updateTags: (entityType: 'audit-log' | 'borrow-request', id: string, tags: string[]) =>
+    api.patch(`/admin/settings/operations/archives/${entityType}/${id}/tags`, { tags }),
+};

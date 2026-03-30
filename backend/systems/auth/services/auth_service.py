@@ -57,7 +57,7 @@ class AuthService:
     def is_borrower_session_valid(self, session: Session, session_id: str) -> bool:
         statement = select(BorrowerSession).where(
             BorrowerSession.session_id == session_id,
-            BorrowerSession.is_revoked == False,
+            BorrowerSession.is_revoked.is_(False),
             BorrowerSession.expires_at > get_now_manila()
         )
         db_session = session.exec(statement).first()
@@ -104,7 +104,7 @@ class AuthService:
     def is_user_session_valid(self, session: Session, session_id: str) -> bool:
         statement = select(UserSession).where(
             UserSession.session_id == session_id,
-            UserSession.is_revoked == False,
+            UserSession.is_revoked.is_(False),
             UserSession.expires_at > get_now_manila()
         )
         db_session = session.exec(statement).first()
@@ -126,5 +126,37 @@ class AuthService:
             db_session.expires_at = get_now_manila() + expires_delta
             session.add(db_session)
             session.commit()
+
+    def revoke_all_other_sessions(self, session: Session, exclude_session_id: str | None = None):
+        """Revoke all active user and borrower sessions, except for the specified exclude_session_id."""
+        now = get_now_manila()
+        
+        # Revoke User Sessions
+        stmt_user = select(UserSession).where(
+            UserSession.is_revoked.is_(False),
+            UserSession.expires_at > now
+        )
+        if exclude_session_id:
+            stmt_user = stmt_user.where(UserSession.session_id != exclude_session_id)
+            
+        user_sessions = session.exec(stmt_user).all()
+        for us in user_sessions:
+            us.is_revoked = True
+            session.add(us)
+            
+        # Revoke Borrower Sessions
+        stmt_borrower = select(BorrowerSession).where(
+            BorrowerSession.is_revoked.is_(False),
+            BorrowerSession.expires_at > now
+        )
+        if exclude_session_id:
+            stmt_borrower = stmt_borrower.where(BorrowerSession.session_id != exclude_session_id)
+            
+        borrower_sessions = session.exec(stmt_borrower).all()
+        for bs in borrower_sessions:
+            bs.is_revoked = True
+            session.add(bs)
+            
+        session.commit()
 
 auth_service = AuthService()

@@ -23,8 +23,11 @@ from systems.admin.routers.roles import router as roles_config
 from systems.admin.routers.audit_log import router as admin_audit_log
 from systems.admin.routers.dashboard import router as admin_dashboard
 from systems.admin.routers.health import router as health
+from systems.admin.routers.operations_settings import router as operations_settings
+from systems.admin.routers.archives import router as archives
 
 from systems.auth.dependencies import require_system_access
+from core.middleware import MaintenanceMiddleware
 from systems.auth.routers.auth import router as auth
 from systems.auth.routers.configuration import router as auth_config
 from systems.inventory.routers.borrowing import router as borrowing
@@ -63,6 +66,10 @@ async def lifespan(app: FastAPI):
             update_system_timezone(tz)
             update_system_format(df, tf)
             
+            # Start Background Scheduler
+            from systems.admin.services.scheduler_service import scheduler_service
+            scheduler_service.start()
+            
         log_operation("INIT-DONE", "System Initialization COMPLETED")
         log_operation("DB-CONNECT", "PostgreSQL connectivity established")
         log_operation("LOCALE-INIT", f"System Timezone set to {tz}, Format: {df} {tf}")
@@ -77,14 +84,9 @@ app = FastAPI(title="Lendr Unified API", lifespan=lifespan)
 # Mount Static Assets
 app.mount("/api/assets", StaticFiles(directory="assets"), name="assets")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# --- Middleware Stack (Last added is Outermost) ---
 
+# 3. Custom Logging Middleware (Innermost of the three)
 @app.middleware("http")
 async def logging_middleware(request: Request, call_next):
     """Global middleware to log every request and its outcome."""
@@ -107,6 +109,19 @@ async def logging_middleware(request: Request, call_next):
             exc_info=True
         )
         raise e
+
+# 2. Maintenance Mode Middleware
+app.add_middleware(MaintenanceMiddleware)
+
+# 1. CORSMiddleware (Outermost)
+# We add this last so it wraps all other middlewares, including Maintenance
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Global Exception Handlers
 @app.exception_handler(HTTPException)
@@ -152,6 +167,8 @@ app.include_router(users, prefix="/api/admin/users", tags=["Admin - Users"], dep
 app.include_router(config, prefix="/api/admin/config", tags=["Admin - Configuration"], dependencies=admin_access)
 app.include_router(general_settings, prefix="/api/admin/settings/general", tags=["Admin - General Settings"], dependencies=admin_access)
 app.include_router(branding_settings, prefix="/api/admin/settings/branding", tags=["Admin - Branding Settings"], dependencies=admin_access)
+app.include_router(operations_settings, prefix="/api/admin/settings/operations", tags=["Admin - Operations Settings"], dependencies=admin_access)
+app.include_router(archives, prefix="/api/admin/settings/operations/archives", tags=["Admin - Operations Settings"], dependencies=admin_access)
 app.include_router(roles_config, prefix="/api/admin/roles", tags=["Admin - Roles"], dependencies=admin_access)
 app.include_router(admin_audit_log, prefix="/api/admin/audit-log", tags=["Admin - Audit Logs"], dependencies=admin_access)
 app.include_router(admin_dashboard, prefix="/api/admin/dashboard", tags=["Admin - Dashboard"], dependencies=admin_access)

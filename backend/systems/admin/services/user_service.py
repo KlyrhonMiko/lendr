@@ -21,9 +21,17 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
         role: Optional[str] = None,
         is_active: Optional[bool] = None,
         shift_type: Optional[str] = None,
+        include_archived: bool = False,
+        is_archived: Optional[bool] = None,
     ) -> tuple[list[User], int]:
         """Get users with optional search and filter params."""
         statement = select(User)
+        
+        # Apply archival filtering
+        if is_archived is not None:
+            statement = statement.where(User.is_archived == is_archived)
+        elif not include_archived:
+            statement = statement.where(User.is_archived.is_(False))
 
         # Default: only show active users
         if is_active is None:

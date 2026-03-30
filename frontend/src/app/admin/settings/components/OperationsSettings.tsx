@@ -1,31 +1,109 @@
 'use client';
 
-import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { useState, useEffect, ChangeEvent } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Toggle } from '@/components/ui/toggle';
 import { Input, Textarea } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
-import { Wrench, Database, Archive, Trash2, Calendar, Clock, RefreshCw, FileText, Save } from 'lucide-react';
+import { Wrench, Database, Archive, Trash2, Clock, RefreshCw, FileText, Save, Plus } from 'lucide-react';
 import { toast } from 'sonner';
+import { api } from '@/lib/api';
+import { ArchivesModal } from './ArchivesModal';
+import { archivesApi } from '../api';
+
+interface OperationsSettingsData {
+  maintenance: {
+    enabled: boolean;
+    message: string;
+  };
+  backup_schedule: {
+    frequency: string;
+    time: string;
+    storage_location: string;
+  };
+  archive_policy: {
+    audit_logs_value: number;
+    audit_logs_unit: string;
+    borrow_records_value: number;
+    borrow_records_unit: string;
+  };
+  retention_policy: {
+    auto_delete: boolean;
+    delete_older_than_value: number;
+    delete_older_than_unit: string;
+    exclusion_list: string[];
+    maintenance_time: string;
+  };
+}
+
+interface BackupRun {
+  backup_id: string;
+  started_at: string;
+  completed_at: string | null;
+  status: string;
+  destination: string;
+  artifacts: Array<{
+    artifact_id: string;
+    size_bytes: number;
+  }>;
+}
 
 export function OperationsSettings() {
-  const [loading, setLoading] = useState(false);
-  const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [data, setData] = useState<OperationsSettingsData | null>(null);
+  const [backups, setBackups] = useState<BackupRun[]>([]);
+  const [newExclusion, setNewExclusion] = useState('');
+  const [showArchives, setShowArchives] = useState(false);
 
-  const handleSave = () => {
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const [settingsRes, backupsRes] = await Promise.all([
+        api.get<OperationsSettingsData>('/admin/settings/operations'),
+        api.get<BackupRun[]>('/admin/backups/runs')
+      ]);
+      setData(settingsRes.data);
+      setBackups(backupsRes.data);
+    } catch (error) {
+      toast.error('Failed to load operations settings');
+    } finally {
       setLoading(false);
-      toast.success('System operations updated');
-    }, 1000);
+    }
   };
 
-  const backups = [
-    { id: 1, date: '2026-03-28', time: '02:00 AM', size: '154 MB', trigger: 'Scheduled', status: 'Success' },
-    { id: 2, date: '2026-03-27', time: '02:00 AM', size: '152 MB', trigger: 'Scheduled', status: 'Success' },
-    { id: 3, date: '2026-03-26', time: '11:45 PM', size: '151 MB', trigger: 'Manual', status: 'Success' },
-    { id: 4, date: '2026-03-26', time: '02:00 AM', size: '148 MB', trigger: 'Scheduled', status: 'Failed' },
-  ];
+  const handleSave = async () => {
+    if (!data) return;
+    setSaving(true);
+    try {
+      await api.put('/admin/settings/operations', data);
+      toast.success('System operations updated successfully');
+    } catch (error) {
+      toast.error('Failed to update operations settings');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const formatSize = (bytes: number) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  if (loading || !data) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <RefreshCw className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -40,18 +118,27 @@ export function OperationsSettings() {
             <CardDescription>Block user access to the platform for scheduled repairs or updates.</CardDescription>
           </div>
           <Toggle 
-            label={maintenanceMode ? "Active" : "Inactive"} 
-            checked={maintenanceMode} 
-            onChange={(e) => setMaintenanceMode(e.target.checked)} 
+            label={data.maintenance.enabled ? "Active" : "Inactive"} 
+            checked={data.maintenance.enabled} 
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setData((prev: OperationsSettingsData | null) => prev ? {
+              ...prev, 
+              maintenance: { ...prev.maintenance, enabled: e.target.checked }
+            } : null)} 
           />
         </CardHeader>
-        <CardContent className={maintenanceMode ? "space-y-6 opacity-100 transition-opacity" : "space-y-6 opacity-50 grayscale pointer-events-none transition-opacity"}>
-          <Textarea label="Custom Maintenance Message" defaultValue="The system is currently undergoing scheduled maintenance. Please check back later." />
-          
-          <div className="grid gap-6 md:grid-cols-2">
-            <Input label="Start Date/Time" type="datetime-local" />
-            <Input label="End Date/Time" type="datetime-local" />
+        <CardContent className={data.maintenance.enabled ? "space-y-6 opacity-100 transition-opacity" : "space-y-6 opacity-50 grayscale pointer-events-none transition-opacity"}>
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-foreground px-1">Custom Maintenance Message</label>
+            <Textarea 
+              value={data.maintenance.message} 
+              onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setData((prev: OperationsSettingsData | null) => prev ? {
+                ...prev,
+                maintenance: { ...prev.maintenance, message: e.target.value }
+              } : null)}
+            />
           </div>
+          
+          {/* Time scheduling removed per user request for simplicity */}
         </CardContent>
       </Card>
 
@@ -69,21 +156,39 @@ export function OperationsSettings() {
         <CardContent className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           <Select 
             label="Frequency" 
-            defaultValue="daily"
+            value={data.backup_schedule.frequency}
+            onChange={(e: ChangeEvent<HTMLSelectElement>) => setData((prev: OperationsSettingsData | null) => prev ? {
+              ...prev,
+              backup_schedule: { ...prev.backup_schedule, frequency: e.target.value }
+            } : null)}
             options={[
               { label: 'Daily', value: 'daily' },
               { label: 'Weekly', value: 'weekly' },
               { label: 'Monthly', value: 'monthly' }
             ]} 
           />
-          <Input label="Backup Time" type="time" defaultValue="02:00" />
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-foreground px-1">Storage Location</label>
-            <div className="h-12 flex items-center px-4 bg-muted/20 border border-border rounded-xl text-sm font-medium text-muted-foreground">
-              <RefreshCw className="w-4 h-4 mr-2 animate-spin-slow" />
-              Primary: AWS S3 (Cloud)
-            </div>
-          </div>
+          <Input 
+            label="Backup Time" 
+            type="time" 
+            value={data.backup_schedule.time}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setData((prev: OperationsSettingsData | null) => prev ? {
+              ...prev,
+              backup_schedule: { ...prev.backup_schedule, time: e.target.value }
+            } : null)}
+          />
+          <Select 
+            label="Storage Location" 
+            value={data.backup_schedule.storage_location}
+            onChange={(e: ChangeEvent<HTMLSelectElement>) => setData((prev: OperationsSettingsData | null) => prev ? {
+              ...prev,
+              backup_schedule: { ...prev.backup_schedule, storage_location: e.target.value }
+            } : null)}
+            options={[
+              { label: 'Local Server', value: 'local' },
+              { label: 'Amazon S3 (Cloud)', value: 's3' },
+              { label: 'Local + S3 (Mirror)', value: 'both' }
+            ]} 
+          />
         </CardContent>
       </Card>
 
@@ -102,30 +207,30 @@ export function OperationsSettings() {
                  <tr>
                     <th className="px-6 py-4">Date & Time</th>
                     <th className="px-6 py-4">Size</th>
-                    <th className="px-6 py-4">Triggered By</th>
+                    <th className="px-6 py-4">Target</th>
                     <th className="px-6 py-4">Status</th>
                     <th className="px-6 py-4 text-right">Actions</th>
                  </tr>
                </thead>
                <tbody className="divide-y divide-border/50">
-                 {backups.map((backup) => (
-                   <tr key={backup.id} className="hover:bg-muted/10 transition-colors">
-                     <td className="px-6 py-4 font-medium">{backup.date} {backup.time}</td>
-                     <td className="px-6 py-4">{backup.size}</td>
+                 {backups.length === 0 ? (
+                   <tr>
+                     <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground italic">No backup history available</td>
+                   </tr>
+                 ) : backups.map((backup) => (
+                   <tr key={backup.backup_id} className="hover:bg-muted/10 transition-colors">
+                     <td className="px-6 py-4 font-medium">{backup.started_at}</td>
+                     <td className="px-6 py-4">{formatSize(backup.artifacts[0]?.size_bytes || 0)}</td>
+                     <td className="px-6 py-4 capitalize">{backup.destination}</td>
                      <td className="px-6 py-4">
-                        <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${backup.trigger === 'Scheduled' ? 'bg-indigo-500/10 text-indigo-500' : 'bg-amber-500/10 text-amber-500'}`}>
-                          {backup.trigger}
-                        </span>
-                     </td>
-                     <td className="px-6 py-4">
-                        <span className={`flex items-center gap-1.5 ${backup.status === 'Success' ? 'text-emerald-500' : 'text-rose-500'}`}>
-                          <div className={`w-1.5 h-1.5 rounded-full ${backup.status === 'Success' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                        <span className={`flex items-center gap-1.5 ${backup.status === 'completed' ? 'text-emerald-500' : backup.status === 'running' ? 'text-blue-500' : 'text-rose-500'}`}>
+                          <div className={`w-1.5 h-1.5 rounded-full ${backup.status === 'completed' ? 'bg-emerald-500' : backup.status === 'running' ? 'bg-blue-500' : 'bg-rose-500'}`} />
                           {backup.status}
                         </span>
                      </td>
                      <td className="px-6 py-4 text-right space-x-2">
-                        <button className="p-2 hover:bg-emerald-500/10 hover:text-emerald-500 rounded-lg transition-colors" title="Restore">
-                          <RefreshCw className="w-4 h-4" />
+                        <button className="p-2 hover:bg-indigo-500/10 hover:text-indigo-500 rounded-lg transition-colors" title="Download">
+                          <FileText className="w-4 h-4" />
                         </button>
                         <button className="p-2 hover:bg-rose-500/10 hover:text-rose-500 rounded-lg transition-colors" title="Delete">
                           <Trash2 className="w-4 h-4" />
@@ -153,14 +258,51 @@ export function OperationsSettings() {
           </CardHeader>
           <CardContent className="space-y-6">
              <div className="flex items-end gap-3">
-                <Input label="Archive audit logs older than:" type="number" defaultValue="90" className="flex-1" />
-                <Select options={[{label: 'Days', value:'d'}, {label: 'Months', value:'m'}]} defaultValue="d" className="w-[110px]" />
+                <Input 
+                  label="Archive audit logs older than:" 
+                  type="number" 
+                  className="flex-1" 
+                  value={data.archive_policy.audit_logs_value}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setData((prev: OperationsSettingsData | null) => prev ? {
+                    ...prev,
+                    archive_policy: { ...prev.archive_policy, audit_logs_value: parseInt(e.target.value) || 0 }
+                  } : null)}
+                />
+                <Select 
+                  options={[{label: 'Days', value:'d'}, {label: 'Months', value:'m'}]} 
+                  value={data.archive_policy.audit_logs_unit}
+                  onChange={(e: ChangeEvent<HTMLSelectElement>) => setData((prev: OperationsSettingsData | null) => prev ? {
+                    ...prev,
+                    archive_policy: { ...prev.archive_policy, audit_logs_unit: e.target.value }
+                  } : null)}
+                  className="w-[110px]" 
+                />
              </div>
              <div className="flex items-end gap-3">
-                <Input label="Archive borrow records older than:" type="number" defaultValue="1" className="flex-1" />
-                <Select options={[{label: 'Days', value:'d'}, {label: 'Months', value:'m'}, {label: 'Years', value:'y'}]} defaultValue="y" className="w-[110px]" />
+                <Input 
+                  label="Archive borrow records older than:" 
+                  type="number" 
+                  className="flex-1" 
+                  value={data.archive_policy.borrow_records_value}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setData((prev: OperationsSettingsData | null) => prev ? {
+                    ...prev,
+                    archive_policy: { ...prev.archive_policy, borrow_records_value: parseInt(e.target.value) || 0 }
+                  } : null)}
+                />
+                <Select 
+                  options={[{label: 'Days', value:'d'}, {label: 'Months', value:'m'}, {label: 'Years', value:'y'}]} 
+                  value={data.archive_policy.borrow_records_unit}
+                  onChange={(e: ChangeEvent<HTMLSelectElement>) => setData((prev: OperationsSettingsData | null) => prev ? {
+                    ...prev,
+                    archive_policy: { ...prev.archive_policy, borrow_records_unit: e.target.value }
+                  } : null)}
+                  className="w-[110px]" 
+                />
              </div>
-             <button className="w-full py-2.5 bg-secondary text-secondary-foreground rounded-xl text-sm font-bold border border-border mt-2 flex items-center justify-center gap-2 hover:bg-secondary/80 transition-colors">
+             <button 
+               onClick={() => setShowArchives(true)}
+               className="w-full py-2.5 bg-secondary text-secondary-foreground rounded-xl text-sm font-bold border border-border mt-2 flex items-center justify-center gap-2 hover:bg-secondary/80 transition-colors"
+             >
                <FileText className="w-4 h-4" />
                View Archived Records
              </button>
@@ -176,25 +318,98 @@ export function OperationsSettings() {
               <CardTitle>Data Retention Policy</CardTitle>
               <CardDescription>Automatically purge archived data to comply with regulations.</CardDescription>
             </div>
-            <Toggle defaultChecked={true} />
+            <Toggle 
+              checked={data.retention_policy.auto_delete} 
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setData((prev: OperationsSettingsData | null) => prev ? {
+                ...prev,
+                retention_policy: { ...prev.retention_policy, auto_delete: e.target.checked }
+              } : null)}
+            />
           </CardHeader>
           <CardContent className="space-y-6">
              <div className="flex items-end gap-3">
-                <Input label="Auto-delete records older than:" type="number" defaultValue="7" className="flex-1" />
-                <Select options={[{label: 'Years', value:'y'}, {label: 'Months', value:'m'}]} defaultValue="y" className="w-[110px]" />
+                <Input 
+                  label="Auto-delete records older than:" 
+                  type="number" 
+                  className="flex-1" 
+                  value={data.retention_policy.delete_older_than_value}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setData((prev: OperationsSettingsData | null) => prev ? {
+                    ...prev,
+                    retention_policy: { ...prev.retention_policy, delete_older_than_value: parseInt(e.target.value) || 0 }
+                  } : null)}
+                />
+                <Select 
+                  options={[{label: 'Years', value:'y'}, {label: 'Months', value:'m'}]} 
+                  value={data.retention_policy.delete_older_than_unit}
+                  onChange={(e: ChangeEvent<HTMLSelectElement>) => setData((prev: OperationsSettingsData | null) => prev ? {
+                    ...prev,
+                    retention_policy: { ...prev.retention_policy, delete_older_than_unit: e.target.value }
+                  } : null)}
+                  className="w-[110px]" 
+                />
+             </div>
+             <div className="space-y-2">
+                <Input 
+                  label="Daily Maintenance Window" 
+                  type="time" 
+                  value={data.retention_policy.maintenance_time}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setData((prev: OperationsSettingsData | null) => prev ? {
+                    ...prev,
+                    retention_policy: { ...prev.retention_policy, maintenance_time: e.target.value }
+                  } : null)}
+                />
+                <p className="text-[10px] text-muted-foreground italic px-1 mt-1">
+                    System-wide archival and purging tasks will run daily at this time.
+                </p>
              </div>
              <div className="space-y-2">
                <label className="text-sm font-semibold text-foreground px-1">Exclusion List (Mark as Never Purge)</label>
                <div className="flex flex-wrap gap-2">
-                 {['Financial Audit', 'Asset History', 'Legal Holds'].map((tag) => (
+                 {data.retention_policy.exclusion_list.map((tag, idx) => (
                    <span key={tag} className="px-3 py-1 bg-muted rounded-lg text-xs font-medium border border-border flex items-center gap-1.5">
                      {tag}
-                     <Trash2 className="w-3 h-3 text-muted-foreground hover:text-rose-500 cursor-pointer transition-colors" />
+                     <Trash2 
+                       className="w-3 h-3 text-muted-foreground hover:text-rose-500 cursor-pointer transition-colors" 
+                       onClick={() => {
+                         setData((prev: OperationsSettingsData | null) => {
+                           if (!prev) return null;
+                           const newList = [...prev.retention_policy.exclusion_list];
+                           newList.splice(idx, 1);
+                           return {
+                             ...prev,
+                             retention_policy: { ...prev.retention_policy, exclusion_list: newList }
+                           };
+                         });
+                       }}
+                     />
                    </span>
                  ))}
-                 <button className="px-3 py-1 bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 rounded-lg text-xs font-bold hover:bg-indigo-500/20 transition-colors">
-                   + Add Entry
-                 </button>
+                 <div className="flex gap-2 w-full mt-2">
+                    <Input 
+                      placeholder="Add tag..." 
+                      className="h-8 text-xs flex-1" 
+                      value={newExclusion}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => setNewExclusion(e.target.value)}
+                    />
+                    <button 
+                      onClick={() => {
+                        if (newExclusion.trim()) {
+                          setData((prev: OperationsSettingsData | null) => prev ? {
+                            ...prev,
+                            retention_policy: { 
+                              ...prev.retention_policy, 
+                              exclusion_list: [...prev.retention_policy.exclusion_list, newExclusion.trim()] 
+                            }
+                          } : null);
+                          setNewExclusion('');
+                        }
+                      }}
+                      className="px-3 py-1 bg-indigo-500 text-white rounded-lg text-xs font-bold hover:bg-indigo-600 transition-colors flex items-center gap-1"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Add
+                    </button>
+                 </div>
                </div>
              </div>
           </CardContent>
@@ -204,13 +419,17 @@ export function OperationsSettings() {
       <div className="flex justify-end pt-4">
         <button 
           onClick={handleSave}
-          disabled={loading}
+          disabled={saving}
           className="flex items-center gap-2 px-8 py-3 bg-primary hover:bg-primary/95 disabled:opacity-50 text-primary-foreground rounded-lg text-sm font-bold shadow-lg shadow-primary/20 transition-all active:scale-[0.98]"
         >
           <Save className="w-5 h-5" />
-          {loading ? 'Processing changes...' : 'Save Operations Configuration'}
+          {saving ? 'Processing changes...' : 'Save Operations Configuration'}
         </button>
       </div>
+      <ArchivesModal 
+        isOpen={showArchives} 
+        onClose={() => setShowArchives(false)} 
+      />
     </div>
   );
 }

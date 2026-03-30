@@ -29,6 +29,7 @@ services:
       - .env.local
     environment:
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-lendr}
+      TZ: Asia/Manila
     volumes:
       - ./backend:/app
     ports:
@@ -43,6 +44,9 @@ services:
       dockerfile: Dockerfile.frontend
     env_file:
       - .env.local
+    environment:
+      WATCHPACK_POLLING: "true"
+      NEXT_TELEMETRY_DISABLED: 1
     volumes:
       - ./frontend:/usr/src/app
       - /usr/src/app/node_modules
