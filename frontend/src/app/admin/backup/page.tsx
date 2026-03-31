@@ -35,7 +35,7 @@ export default function BackupPage() {
           </p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-          <select 
+          <select
             className="w-full sm:w-auto h-10 px-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 outline-none"
             value={destination}
             onChange={(e) => setDestination(e.target.value)}
@@ -46,7 +46,7 @@ export default function BackupPage() {
           </select>
           <div className="flex gap-2">
             <button
-              onClick={refreshRuns}
+              onClick={() => refreshRuns()}
               disabled={loading}
               className="px-3 h-10 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors flex items-center justify-center disabled:opacity-50"
               title="Refresh Runs"
@@ -86,8 +86,8 @@ export default function BackupPage() {
                 </tr>
               ) : (
                 runs.map((run) => (
-                  <tr 
-                    key={run.backup_id} 
+                  <tr
+                    key={run.backup_id}
                     className="border-b border-slate-200 dark:border-slate-700 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-750/50 transition-colors"
                   >
                     <td className="px-5 py-4 text-slate-600 dark:text-slate-300">

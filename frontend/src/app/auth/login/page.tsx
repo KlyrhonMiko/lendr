@@ -54,7 +54,7 @@ export default function LoginPage() {
               Username
             </label>
             <div className="relative group">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-muted-foreground/60 group-focus-within:text-indigo-500 transition-colors">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-muted-foreground/60 group-focus-within:text-yellow-600 transition-colors">
                 <User className="w-[18px] h-[18px]" />
               </div>
               <input
@@ -62,7 +62,7 @@ export default function LoginPage() {
                 type="text"
                 required
                 autoComplete="username"
-                className="w-full bg-background border border-border focus:border-indigo-500/50 focus:ring-[3px] focus:ring-indigo-500/10 rounded-xl py-3 pl-11 pr-4 text-foreground placeholder:text-muted-foreground/50 outline-none transition-all text-[15px]"
+                className="w-full bg-background border border-border focus:border-yellow-500/50 focus:ring-[3px] focus:ring-yellow-500/10 rounded-xl py-3 pl-11 pr-4 text-foreground placeholder:text-muted-foreground/50 outline-none transition-all text-[15px]"
                 placeholder="Enter your username"
                 value={formData.username}
                 onChange={(e) => setFormData({ ...formData, username: e.target.value })}
@@ -76,7 +76,7 @@ export default function LoginPage() {
               Password
             </label>
             <div className="relative group">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-muted-foreground/60 group-focus-within:text-indigo-500 transition-colors">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-muted-foreground/60 group-focus-within:text-yellow-600 transition-colors">
                 <KeyRound className="w-[18px] h-[18px]" />
               </div>
               <input
@@ -84,7 +84,7 @@ export default function LoginPage() {
                 type="password"
                 required
                 autoComplete="current-password"
-                className="w-full bg-background border border-border focus:border-indigo-500/50 focus:ring-[3px] focus:ring-indigo-500/10 rounded-xl py-3 pl-11 pr-4 text-foreground placeholder:text-muted-foreground/50 outline-none transition-all text-[15px]"
+                className="w-full bg-background border border-border focus:border-yellow-500/50 focus:ring-[3px] focus:ring-yellow-500/10 rounded-xl py-3 pl-11 pr-4 text-foreground placeholder:text-muted-foreground/50 outline-none transition-all text-[15px]"
                 placeholder="Enter your password"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
@@ -96,7 +96,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 text-white font-semibold py-3 rounded-xl hover:from-indigo-600 hover:to-indigo-700 active:scale-[0.99] transition-all flex items-center justify-center gap-2 group disabled:opacity-60 disabled:cursor-not-allowed shadow-md shadow-indigo-500/15 text-[15px]"
+            className="w-full bg-gradient-to-r from-yellow-400 to-yellow-500 text-yellow-950 font-semibold py-3 rounded-xl hover:from-yellow-500 hover:to-yellow-600 active:scale-[0.99] transition-all flex items-center justify-center gap-2 group disabled:opacity-60 disabled:cursor-not-allowed shadow-md shadow-yellow-500/15 text-[15px]"
           >
             {isLoading ? (
               <Loader2 className="w-5 h-5 animate-spin" />

@@ -18,7 +18,7 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Lendr - Enterprise POS",
+  title: "Powergold Engineering Enterprises - Enterprise POS",
   description: "Enterprise POS and Inventory Management for Equipment",
 };
 
