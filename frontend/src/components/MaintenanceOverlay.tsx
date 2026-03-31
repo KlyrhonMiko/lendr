@@ -13,8 +13,8 @@ export function MaintenanceOverlay() {
     <div className="fixed inset-0 z-[9999] bg-background/80 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in duration-500">
       <div className="max-w-md w-full bg-card border border-border shadow-2xl rounded-3xl p-8 text-center space-y-8 relative overflow-hidden">
         {/* Decorative background element */}
-        <div className="absolute -top-24 -right-24 w-48 h-48 bg-amber-500/10 blur-3xl rounded-full" />
-        <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-indigo-500/10 blur-3xl rounded-full" />
+        <div className="absolute -top-24 -right-24 w-48 h-48 bg-amber-500/15 blur-3xl rounded-full" />
+        <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-yellow-400/15 blur-3xl rounded-full" />
 
         <div className="relative">
           <div className="w-20 h-20 bg-amber-500/10 rounded-2xl flex items-center justify-center text-amber-600 mx-auto mb-6 transform hover:rotate-12 transition-transform duration-500">
@@ -49,7 +49,7 @@ export function MaintenanceOverlay() {
         </div>
 
         <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
-          Lendr Platform Services
+          Powergold Engineering Enterprises Platform
         </p>
       </div>
     </div>
