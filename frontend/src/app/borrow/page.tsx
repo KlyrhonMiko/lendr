@@ -180,10 +180,20 @@ export default function BorrowPage() {
 
     setIsPinVerifying(true);
     try {
-      await api.borrowerVerifyPin({
+      const loginRes = await api.borrowerLogin({
         username: employeeId.trim(),
         password: cleaned,
       });
+
+      // Revoke verification session immediately; request submission will open a fresh session.
+      auth.setToken(loginRes.access_token);
+      try {
+        await api.post('/auth/logout');
+      } catch {
+        // Keep flow usable even if logout request fails; local token is still cleared below.
+      } finally {
+        auth.clearToken();
+      }
 
       setEmployeePin(cleaned);
       setIsPinModalOpen(false);
@@ -222,6 +232,8 @@ export default function BorrowPage() {
     }
     setIsSubmitting(true);
 
+    let hasBorrowerSession = false;
+
     try {
       // 1. Validate credentials (Login) as borrower
       const loginRes = await api.borrowerLogin({
@@ -231,6 +243,7 @@ export default function BorrowPage() {
 
       // 2. Set token temporarily for the borrow request
       auth.setToken(loginRes.access_token);
+      hasBorrowerSession = true;
 
       // 3. Submit borrow request
       await posApi.createBatchBorrow({
@@ -270,6 +283,14 @@ export default function BorrowPage() {
       handleClear();
       fetchData();
     } catch (error: unknown) {
+      if (hasBorrowerSession) {
+        try {
+          await api.post('/auth/logout');
+        } catch {
+          // Clear local token even if remote revoke fails.
+        }
+      }
+
       // Ensure token is cleared even on error
       auth.clearToken();
       const message =

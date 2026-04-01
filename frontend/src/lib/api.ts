@@ -111,26 +111,11 @@ export const api = {
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || errorData.detail || 'Invalid borrower pin');
-    }
-
-    return response.json();
-  },
-
-  borrowerVerifyPin: async (formData: LoginCredentials) => {
-    const body = new FormData();
-    body.append('username', formData.username);
-    body.append('password', formData.password);
-
-    const response = await fetch(`${API_BASE_URL}/api/auth/borrower/verify-pin`, {
-      method: 'POST',
-      body,
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || errorData.detail || 'Invalid borrower pin');
+      const errorData = (await response.json().catch(() => ({}))) as ErrorPayload;
+      throw new AuthApiError(
+        response.status,
+        resolveAuthErrorMessage(errorData, 'Invalid borrower pin'),
+      );
     }
 
     return response.json();
