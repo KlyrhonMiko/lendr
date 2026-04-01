@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
+    INITIAL_ADMIN_USERNAME: str = "admin"
+    INITIAL_ADMIN_PASSWORD: str | None = None
+    ALLOW_INSECURE_DEV_DEFAULT_ADMIN: bool = False
+
 settings = Settings()
 if not settings.DATABASE_URL:
     raise RuntimeError("DATABASE_URL is required — set it in the environment or .env(.local) file.")

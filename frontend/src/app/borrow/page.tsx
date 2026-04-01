@@ -2,25 +2,19 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { ShieldCheck, CheckCircle2, X, Delete, Loader2 } from 'lucide-react';
-import { inventoryApi, InventoryItem } from '@/app/inventory/items/api';
-import { posApi } from './api';
+import { posApi, BorrowCatalogItem } from './api';
 import { toast } from 'sonner';
 import { auth } from '@/lib/auth';
 import { api } from '@/lib/api';
 import { CartItem } from './lib/types';
 import { SelectionView } from './components/SelectionView';
-import { CheckoutView } from './components/CheckoutView';
-
-type Step = 'selection' | 'checkout';
 
 export default function BorrowPage() {
-  const [items, setItems] = useState<InventoryItem[]>([]);
+  const [items, setItems] = useState<BorrowCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [step, setStep] = useState<Step>('selection');
 
   const [employeeId, setEmployeeId] = useState('');
   const [employeePin, setEmployeePin] = useState('');
@@ -31,7 +25,6 @@ export default function BorrowPage() {
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [isPinVerifying, setIsPinVerifying] = useState(false);
   const [pinDraft, setPinDraft] = useState('');
-  const [submittedByEmployeeName, setSubmittedByEmployeeName] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -40,7 +33,7 @@ export default function BorrowPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const invRes = await inventoryApi.list({ per_page: 500 });
+      const invRes = await posApi.listCatalog({ per_page: 200 });
       setItems(invRes.data);
     } catch {
       toast.error('Failed to load inventory data');
@@ -70,7 +63,7 @@ export default function BorrowPage() {
 
   const totalCartItems = cart.reduce((acc, curr) => acc + curr.cartQty, 0);
 
-  const addToCart = (item: InventoryItem) => {
+  const addToCart = (item: BorrowCatalogItem) => {
     setCart((prev) => {
       const existing = prev.find((i) => i.item_id === item.item_id);
       if (existing) {
@@ -108,11 +101,9 @@ export default function BorrowPage() {
     setCollaborators('');
     setEmployeeId('');
     setEmployeePin('');
-    setSubmittedByEmployeeName(null);
     setIsPinModalOpen(false);
     setIsPinVerifying(false);
     setPinDraft('');
-    setStep('selection');
   };
 
   const pinInputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -211,18 +202,6 @@ export default function BorrowPage() {
     pinInputRefs.current[0]?.focus();
   };
 
-  const handleProceedToCheckout = () => {
-    if (cart.length === 0) {
-      toast.error('Add at least one item to proceed');
-      return;
-    }
-    setStep('checkout');
-  };
-
-  const handleBackToSelection = () => {
-    setStep('selection');
-  };
-
   const handleSubmit = async () => {
     if (cart.length === 0) return;
     if (!employeeId.trim()) {
@@ -267,24 +246,29 @@ export default function BorrowPage() {
         location_name: locationName.trim(),
       });
 
-      // 4. Fetch borrower profile for success message (before clearing token)
-      const borrowerUser = await auth.getUser();
-      const displayName = borrowerUser
-        ? [borrowerUser.first_name, borrowerUser.last_name].filter(Boolean).join(' ').trim() || borrowerUser.username
-        : employeeId.trim();
+      let displayName = employeeId.trim();
+      try {
+        const borrowerUser = await auth.getUser();
+        if (borrowerUser) {
+          displayName =
+            [borrowerUser.first_name, borrowerUser.last_name].filter(Boolean).join(' ').trim() ||
+            borrowerUser.username;
+        }
+      } catch {
+        // Continue with fallback display name when profile lookup fails.
+      }
 
-      // 5. Clear token (Security - shared kiosk)
+      // Explicitly revoke the session server-side, then clear local token for shared devices.
+      try {
+        await api.post('/auth/logout');
+      } catch {
+        // Ensure local logout still happens even if network/session revoke fails.
+      }
       auth.clearToken();
 
-      setSubmittedByEmployeeName(displayName);
-      setSuccess(true);
-      toast.success(`Borrow request submitted for ${cart.length} item(s)`);
-
-      setTimeout(() => {
-        setSuccess(false);
-        handleClear();
-        fetchData();
-      }, 3000);
+      toast.success(`Borrow request submitted for ${cart.length} item(s) by ${displayName}`);
+      handleClear();
+      fetchData();
     } catch (error: unknown) {
       // Ensure token is cleared even on error
       auth.clearToken();
@@ -298,50 +282,38 @@ export default function BorrowPage() {
 
   return (
     <div className="h-screen p-4 animate-in fade-in duration-300 relative">
-      {step === 'selection' ? (
-        <SelectionView
-          items={filteredItems}
-          loading={loading}
-          search={search}
-          onSearchChange={setSearch}
-          categories={categories}
-          selectedCategory={selectedCategory}
-          onCategoryChange={setSelectedCategory}
-          totalItems={items.length}
-          cart={cart}
-          totalCartItems={totalCartItems}
-          onAddToCart={addToCart}
-          onUpdateCartQty={updateCartQty}
-          onRemoveFromCart={removeFromCart}
-          onClear={handleClear}
-          onProceedToCheckout={handleProceedToCheckout}
-        />
-      ) : (
-        <CheckoutView
-          cart={cart}
-          totalCartItems={totalCartItems}
-          employeeId={employeeId}
-          onEmployeeIdChange={setEmployeeId}
-          employeePin={employeePin}
-          onEmployeePinChange={setEmployeePin}
-          customerName={customerName}
-          onCustomerNameChange={setCustomerName}
-          locationName={locationName}
-          onLocationNameChange={setLocationName}
-          collaborators={collaborators}
-          onCollaboratorsChange={setCollaborators}
-          notes={notes}
-          onNotesChange={setNotes}
-          onBack={handleBackToSelection}
-          onSubmit={handleSubmit}
-          isSubmitting={isSubmitting}
-          success={success}
-          submittedByEmployeeName={submittedByEmployeeName}
-          onOpenPinModal={handleOpenPinModal}
-        />
-      )}
+      <SelectionView
+        items={filteredItems}
+        loading={loading}
+        search={search}
+        onSearchChange={setSearch}
+        categories={categories}
+        selectedCategory={selectedCategory}
+        onCategoryChange={setSelectedCategory}
+        totalItems={items.length}
+        cart={cart}
+        totalCartItems={totalCartItems}
+        onAddToCart={addToCart}
+        onUpdateCartQty={updateCartQty}
+        onRemoveFromCart={removeFromCart}
+        onClear={handleClear}
+        employeeId={employeeId}
+        onEmployeeIdChange={setEmployeeId}
+        employeePin={employeePin}
+        customerName={customerName}
+        onCustomerNameChange={setCustomerName}
+        locationName={locationName}
+        onLocationNameChange={setLocationName}
+        collaborators={collaborators}
+        onCollaboratorsChange={setCollaborators}
+        notes={notes}
+        onNotesChange={setNotes}
+        onOpenPinModal={handleOpenPinModal}
+        onSubmit={handleSubmit}
+        isSubmitting={isSubmitting}
+      />
 
-      {step === 'checkout' && isPinModalOpen && (
+      {isPinModalOpen && (
         <div
           className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-sm"
           onClick={handleClosePinModal}

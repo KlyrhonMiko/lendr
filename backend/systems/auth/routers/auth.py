@@ -13,13 +13,18 @@ from core.schemas import GenericResponse, create_success_response
 from systems.admin.models.user import User
 from systems.admin.schemas.user_schemas import UserRead
 from systems.auth.dependencies import get_current_user, require_permission
-from systems.auth.schemas.auth_schemas import RolePolicyRead, Token
+from systems.auth.schemas.auth_schemas import BootstrapPasswordRotateRequest, RolePolicyRead, Token
 from systems.auth.services.auth_service import AuthService
 from systems.auth.services.rbac_service import rbac_service
 from systems.admin.services.audit_service import audit_service
 
 router = APIRouter()
 auth_service = AuthService()
+
+BOOTSTRAP_ROTATION_REQUIRED_DETAIL = (
+    "Bootstrap admin password rotation required. "
+    "Use /api/auth/bootstrap/rotate-password before signing in."
+)
 
 
 @router.post("/login", response_model=Token)
@@ -42,6 +47,12 @@ async def login_for_access_token(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Borrower accounts cannot sign in here. Please use the Borrow portal instead.",
+        )
+
+    if auth_service.should_force_bootstrap_password_rotation(user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=BOOTSTRAP_ROTATION_REQUIRED_DETAIL,
         )
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -89,6 +100,12 @@ async def borrower_login(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect PIN",
+        )
+
+    if auth_service.should_force_bootstrap_password_rotation(user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=BOOTSTRAP_ROTATION_REQUIRED_DETAIL,
         )
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -142,6 +159,12 @@ async def borrower_verify_pin(
             detail="Incorrect PIN",
         )
 
+    if auth_service.should_force_bootstrap_password_rotation(user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=BOOTSTRAP_ROTATION_REQUIRED_DETAIL,
+        )
+
     # Ensure the authenticated user is allowed to access the borrower portal.
     if not rbac_service.has_permission(session, user, "inventory:borrower_portal:access"):
         raise HTTPException(
@@ -150,6 +173,47 @@ async def borrower_verify_pin(
         )
 
     return create_success_response(data=None, message="PIN verified", request=request)
+
+
+@router.post("/bootstrap/rotate-password", response_model=GenericResponse)
+async def rotate_bootstrap_password(
+    request: Request,
+    payload: BootstrapPasswordRotateRequest,
+    session: Session = Depends(get_session),
+):
+    if payload.new_password == payload.current_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from current password",
+        )
+
+    user = auth_service.authenticate_bootstrap_admin(
+        session,
+        payload.username,
+        payload.current_password,
+    )
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid bootstrap admin credentials",
+        )
+
+    auth_service.rotate_bootstrap_admin_password(session, user, payload.new_password)
+    auth_service.revoke_sessions_for_user(session, user.id)
+
+    audit_service.log_action(
+        db=session,
+        entity_type="user",
+        entity_id=user.user_id,
+        action="bootstrap_password_rotated",
+        actor_id=user.id,
+    )
+
+    return create_success_response(
+        data=None,
+        message="Bootstrap admin password rotated successfully",
+        request=request,
+    )
 
 
 @router.get("/me", response_model=GenericResponse[UserRead], responses={401: {"model": GenericResponse}})

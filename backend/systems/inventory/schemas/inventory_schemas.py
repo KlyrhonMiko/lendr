@@ -34,3 +34,19 @@ class InventoryItemRead(InventoryItemBase):
         from_attributes = True
 
 
+class InventoryCatalogItemRead(BaseModel):
+    item_id: str
+    name: str
+    category: Optional[str] = None
+    total_qty: int
+    available_qty: int
+    condition: str
+    item_type: Optional[str] = None
+    classification: Optional[str] = None
+    description: Optional[str] = None
+    status_condition: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+

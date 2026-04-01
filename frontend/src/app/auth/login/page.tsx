@@ -6,30 +6,117 @@ import { KeyRound, User, Loader2, ArrowRight, ShieldCheck } from 'lucide-react';
 import { auth } from '@/lib/auth';
 import { loginApi } from './api';
 import { toast } from "sonner";
+import { AuthApiError } from '@/lib/api';
+
+const BOOTSTRAP_ROTATION_REQUIRED_TEXT =
+  'bootstrap admin password rotation required';
+
+interface LoginCredentials {
+  username: string;
+  password: string;
+}
 
 export default function LoginPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({ username: '', password: '' });
   const [isLoading, setIsLoading] = useState(false);
+  const [showRotationModal, setShowRotationModal] = useState(false);
+  const [isRotating, setIsRotating] = useState(false);
+  const [rotationForm, setRotationForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+
+  const completeLogin = async (credentials: LoginCredentials) => {
+    const data = await loginApi.login(credentials);
+    auth.setToken(data.access_token);
+
+    const user = await auth.getUser();
+    const redirectPath = auth.getRedirectPath(user?.role);
+
+    toast.success("Welcome back! Logging you in...");
+    router.push(redirectPath);
+  };
+
+  const maybeOpenRotationGate = (error: unknown): boolean => {
+    if (!(error instanceof AuthApiError) || error.status !== 403) {
+      return false;
+    }
+
+    if (!error.message.toLowerCase().includes(BOOTSTRAP_ROTATION_REQUIRED_TEXT)) {
+      return false;
+    }
+
+    setRotationForm({
+      currentPassword: formData.password,
+      newPassword: '',
+      confirmPassword: '',
+    });
+    setShowRotationModal(true);
+    toast.info('Bootstrap admin must rotate password before first sign-in.');
+    return true;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      const data = await loginApi.login(formData);
-      auth.setToken(data.access_token);
-      
-      const user = await auth.getUser();
-      const redirectPath = auth.getRedirectPath(user?.role);
-      
-      toast.success("Welcome back! Logging you in...");
-      router.push(redirectPath);
+      await completeLogin(formData);
     } catch (err: unknown) {
+      if (maybeOpenRotationGate(err)) {
+        return;
+      }
       const msg = err instanceof Error ? err.message : 'Invalid username or password';
       toast.error(msg);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleRotatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.username.trim()) {
+      toast.error('Username is required before rotating password.');
+      return;
+    }
+    if (!rotationForm.currentPassword || !rotationForm.newPassword) {
+      toast.error('Current and new password are required.');
+      return;
+    }
+    if (rotationForm.newPassword !== rotationForm.confirmPassword) {
+      toast.error('New password and confirmation do not match.');
+      return;
+    }
+    if (rotationForm.newPassword === rotationForm.currentPassword) {
+      toast.error('New password must be different from current password.');
+      return;
+    }
+
+    setIsRotating(true);
+    try {
+      await loginApi.rotateBootstrapPassword({
+        username: formData.username,
+        current_password: rotationForm.currentPassword,
+        new_password: rotationForm.newPassword,
+      });
+
+      toast.success('Password rotated. Signing you in...');
+      setShowRotationModal(false);
+
+      const nextCredentials = {
+        username: formData.username,
+        password: rotationForm.newPassword,
+      };
+      setFormData(nextCredentials);
+      await completeLogin(nextCredentials);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to rotate password';
+      toast.error(msg);
+    } finally {
+      setIsRotating(false);
     }
   };
 
@@ -117,6 +204,94 @@ export default function LoginPage() {
           Accounts are managed by your administrator
         </p>
       </div>
+
+      {showRotationModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="bootstrap-rotate-title"
+        >
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl">
+            <h2 id="bootstrap-rotate-title" className="text-lg font-semibold text-foreground">
+              Change bootstrap password
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              This account must rotate its initial password before first sign-in.
+            </p>
+
+            <form onSubmit={handleRotatePassword} className="mt-5 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground" htmlFor="current-password">
+                  Current password
+                </label>
+                <input
+                  id="current-password"
+                  type="password"
+                  required
+                  value={rotationForm.currentPassword}
+                  onChange={(e) =>
+                    setRotationForm({ ...rotationForm, currentPassword: e.target.value })
+                  }
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-indigo-500/50 focus:ring-[3px] focus:ring-indigo-500/10"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground" htmlFor="new-password">
+                  New password
+                </label>
+                <input
+                  id="new-password"
+                  type="password"
+                  required
+                  minLength={8}
+                  value={rotationForm.newPassword}
+                  onChange={(e) =>
+                    setRotationForm({ ...rotationForm, newPassword: e.target.value })
+                  }
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-indigo-500/50 focus:ring-[3px] focus:ring-indigo-500/10"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground" htmlFor="confirm-password">
+                  Confirm new password
+                </label>
+                <input
+                  id="confirm-password"
+                  type="password"
+                  required
+                  minLength={8}
+                  value={rotationForm.confirmPassword}
+                  onChange={(e) =>
+                    setRotationForm({ ...rotationForm, confirmPassword: e.target.value })
+                  }
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-indigo-500/50 focus:ring-[3px] focus:ring-indigo-500/10"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
+                  onClick={() => setShowRotationModal(false)}
+                  disabled={isRotating}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+                  disabled={isRotating}
+                >
+                  {isRotating ? 'Updating...' : 'Update password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

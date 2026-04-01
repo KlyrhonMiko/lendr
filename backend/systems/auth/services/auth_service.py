@@ -6,7 +6,7 @@ from sqlmodel import Session, select
 from systems.admin.models.user import User
 from systems.admin.services.user_service import UserService
 from utils.id_generator import get_next_sequence
-from utils.security import verify_password
+from utils.security import get_password_hash, verify_password
 from systems.auth.models.user_session import UserSession
 from systems.auth.models.borrower_session import BorrowerSession
 from utils.time_utils import get_now_manila
@@ -26,6 +26,42 @@ class AuthService:
         if not verify_password(password, user.hashed_password):
             return None
 
+        return user
+
+    def is_bootstrap_admin(self, user: User | None) -> bool:
+        return bool(user and user.user_id == "ADMIN-001")
+
+    def should_force_bootstrap_password_rotation(self, user: User | None) -> bool:
+        return bool(self.is_bootstrap_admin(user) and user.must_change_password)
+
+    def authenticate_bootstrap_admin(
+        self,
+        session: Session,
+        username_or_email: str,
+        password: str,
+    ) -> User | None:
+        user = self.authenticate_user(session, username_or_email, password)
+        if not self.is_bootstrap_admin(user):
+            return None
+        return user
+
+    def rotate_bootstrap_admin_password(
+        self,
+        session: Session,
+        user: User,
+        new_password: str,
+    ) -> User:
+        if not self.is_bootstrap_admin(user):
+            raise ValueError("Only ADMIN-001 can use bootstrap password rotation")
+
+        user.hashed_password = get_password_hash(new_password)
+        user.must_change_password = False
+        user.password_rotated_at = get_now_manila()
+        user.updated_at = get_now_manila()
+
+        session.add(user)
+        session.commit()
+        session.refresh(user)
         return user
 
     def create_access_token(self, data: dict, expires_delta: timedelta | None = None) -> str:
@@ -157,6 +193,34 @@ class AuthService:
             bs.is_revoked = True
             session.add(bs)
             
+        session.commit()
+
+    def revoke_sessions_for_user(self, session: Session, user_uuid: UUID):
+        """Revoke all non-expired sessions owned by a specific user."""
+        now = get_now_manila()
+
+        user_sessions = session.exec(
+            select(UserSession).where(
+                UserSession.user_uuid == user_uuid,
+                UserSession.is_revoked.is_(False),
+                UserSession.expires_at > now,
+            )
+        ).all()
+        for db_session in user_sessions:
+            db_session.is_revoked = True
+            session.add(db_session)
+
+        borrower_sessions = session.exec(
+            select(BorrowerSession).where(
+                BorrowerSession.borrower_uuid == user_uuid,
+                BorrowerSession.is_revoked.is_(False),
+                BorrowerSession.expires_at > now,
+            )
+        ).all()
+        for db_session in borrower_sessions:
+            db_session.is_revoked = True
+            session.add(db_session)
+
         session.commit()
 
 auth_service = AuthService()

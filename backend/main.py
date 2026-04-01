@@ -184,6 +184,7 @@ app.include_router(
     inventory,
     prefix="/api/inventory/items",
     tags=["Inventory - Items"],
+    dependencies=inventory_access,
 )
 app.include_router(
     borrowing,
@@ -213,7 +214,6 @@ app.include_router(
     borrower,
     prefix="/api/inventory/borrower",
     tags=["Inventory - Borrower Portal"],
-    dependencies=inventory_access,
 )
 app.include_router(
     inv_config,

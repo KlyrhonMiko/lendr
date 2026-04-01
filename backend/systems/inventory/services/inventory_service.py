@@ -155,6 +155,43 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
 
         return list(items), total_count
 
+    def get_catalog(
+        self,
+        session: Session,
+        skip: int = 0,
+        limit: int = 100,
+        search: Optional[str] = None,
+        category: Optional[str] = None,
+        item_type: Optional[str] = None,
+        classification: Optional[str] = None,
+        in_stock_only: bool = False,
+    ) -> tuple[list[InventoryItem], int]:
+        """Get borrower-facing inventory catalog items."""
+        statement = select(InventoryItem).where(
+            InventoryItem.is_deleted.is_(False),
+            InventoryItem.is_archived.is_(False),
+        )
+
+        if search:
+            statement = statement.where(InventoryItem.name.ilike(f"%{search}%"))
+        if category is not None:
+            statement = statement.where(InventoryItem.category == category)
+        if item_type is not None:
+            statement = statement.where(InventoryItem.item_type == item_type)
+        if classification is not None:
+            statement = statement.where(InventoryItem.classification == classification)
+        if in_stock_only:
+            statement = statement.where(InventoryItem.available_qty > 0)
+
+        count_statement = select(func.count()).select_from(statement.subquery())
+        total_count = session.exec(count_statement).one()
+
+        items = session.exec(
+            statement.order_by(InventoryItem.name.asc()).offset(skip).limit(limit)
+        ).all()
+
+        return list(items), total_count
+
     def create(
         self, 
         session: Session, 

@@ -5,7 +5,7 @@ This script populates the system_settings table with all configurable enums,
 statuses, and conditions based on the Phase 5.5 implementation plan.
 
 Features:
-- Direct database query to pre-create admin123 user if needed (idempotent)
+- Uses initialization service to pre-create bootstrap admin user if needed (idempotent)
 - Uses REST API endpoints for all configuration creation (idempotent)
 - Logs all requests/responses
 - Requires DATABASE_URL to be set for direct DB access
@@ -36,7 +36,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from time import perf_counter
 from typing import Any
-from uuid import uuid4
 
 import requests
 from sqlmodel import Session, select
@@ -45,8 +44,8 @@ from sqlalchemy import create_engine
 # Import settings and models from the backend
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from core.config import settings
+from core.initialization_service import InitializationService, resolve_bootstrap_admin_credentials
 from systems.admin.models.user import User
-from utils.security import get_password_hash
 
 BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 
@@ -255,7 +254,7 @@ def login(username: str, password: str, label: str) -> tuple[dict[str, str] | No
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# DATABASE INITIALIZATION — Pre-create admin123 user if needed
+# DATABASE INITIALIZATION — Pre-create bootstrap admin user if needed
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _get_db_engine():
@@ -267,49 +266,39 @@ def _get_db_engine():
 
 
 def ensure_admin_exists() -> None:
-    """Pre-create admin123 user directly in database if it doesn't exist (idempotent)."""
+    """Pre-create bootstrap admin user directly in database if it doesn't exist (idempotent)."""
     global pass_count, fail_count
     
-    section("DATABASE INIT — Ensure admin123 user exists")
+    section("DATABASE INIT — Ensure bootstrap admin user exists")
     
     try:
         engine = _get_db_engine()
         
         with Session(engine) as db_session:
-            # Check if admin123 already exists
+            # Check if bootstrap admin already exists.
             existing = db_session.exec(
-                select(User).where(User.username == "admin123", User.is_deleted.is_(False))
+                select(User).where(User.user_id == "ADMIN-001", User.is_deleted.is_(False))
             ).first()
             
             if existing:
-                print(f"  {GREEN}✓{RESET}  admin123 user already exists               {GREEN}ok{RESET}")
+                print(f"  {GREEN}✓{RESET}  bootstrap admin already exists             {GREEN}ok{RESET}")
                 _log_event("admin_check", {"status": "already_exists", "user_id": str(existing.id)})
                 pass_count += 1
                 return
-            
-            # Create admin123 user directly
-            admin_user = User(
-                id=uuid4(),
-                user_id="ADMIN-001",
-                username="admin123",
-                email="admin@lendr.system",
-                hashed_password=get_password_hash("admin123"),
-                first_name="System",
-                last_name="Administrator",
-                middle_name="Init",
-                contact_number="",
-                employee_id="SYS-ADMIN-001",
-                role="admin",
-                shift_type="day",
-                created_at=datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc),
-            )
-            
-            db_session.add(admin_user)
+
+            init_service = InitializationService()
+            init_service.ensure_admin_user(db_session)
             db_session.commit()
+
+            admin_user = db_session.exec(
+                select(User).where(User.user_id == "ADMIN-001", User.is_deleted.is_(False))
+            ).first()
+            if not admin_user:
+                raise RuntimeError("Bootstrap admin was not created during initialization.")
+
             db_session.refresh(admin_user)
-            
-            print(f"  {GREEN}✓{RESET}  admin123 user created                     {GREEN}created{RESET}")
+
+            print(f"  {GREEN}✓{RESET}  bootstrap admin created                  {GREEN}created{RESET}")
             _log_event("admin_created", {
                 "user_id": str(admin_user.id),
                 "username": admin_user.username,
@@ -320,7 +309,7 @@ def ensure_admin_exists() -> None:
             
     except Exception as e:
         fail_count += 1
-        print(f"  {RED}✗{RESET}  admin123 user creation                 {RED}failed{RESET}")
+        print(f"  {RED}✗{RESET}  bootstrap admin creation               {RED}failed{RESET}")
         print(f"     {YELLOW}↳ {str(e)[:200]}{RESET}")
         _log_event("admin_creation_error", {
             "error": str(e),
@@ -330,13 +319,19 @@ def ensure_admin_exists() -> None:
 
 
 def bootstrap_admin() -> dict[str, str]:
-    """Login as admin123 and return auth headers."""
+    """Login as bootstrap admin and return auth headers."""
     section("BOOTSTRAP — Admin Authentication (API)")
+
+    bootstrap_username, bootstrap_password = resolve_bootstrap_admin_credentials()
     
     # Retry login up to 3 times (in case API is starting)
     max_retries = 3
     for attempt in range(max_retries):
-        admin_headers, resp = login("admin123", "admin123", "POST /api/auth/login (admin123)")
+        admin_headers, resp = login(
+            bootstrap_username,
+            bootstrap_password,
+            f"POST /api/auth/login ({bootstrap_username})",
+        )
         if admin_headers:
             return admin_headers
         
@@ -345,7 +340,7 @@ def bootstrap_admin() -> dict[str, str]:
             import time
             time.sleep(2)
     
-    print(f"\n{RED}Cannot authenticate as admin123. Aborting.{RESET}")
+    print(f"\n{RED}Cannot authenticate as bootstrap admin. Aborting.{RESET}")
     _log_event("admin_auth_failed", {"attempts": max_retries})
     sys.exit(1)
 
@@ -1105,7 +1100,7 @@ def print_summary() -> int:
 def main() -> int:
     """Main entry point."""
     try:
-        # Step 1: Ensure admin123 exists in database (direct DB query, idempotent)
+        # Step 1: Ensure bootstrap admin exists in database (idempotent)
         ensure_admin_exists()
         
         # Step 2: Authenticate and get API headers

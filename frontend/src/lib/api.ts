@@ -21,6 +21,31 @@ interface LoginCredentials {
   password: string;
 }
 
+interface BootstrapRotatePasswordPayload {
+  username: string;
+  current_password: string;
+  new_password: string;
+}
+
+interface ErrorPayload {
+  message?: string;
+  detail?: string;
+}
+
+export class AuthApiError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'AuthApiError';
+    this.status = status;
+  }
+}
+
+function resolveAuthErrorMessage(payload: ErrorPayload, fallback: string): string {
+  return payload.message || payload.detail || fallback;
+}
+
 export const api = {
   getDeviceId,
 
@@ -40,8 +65,31 @@ export const api = {
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || 'Invalid username or password');
+      const errorData = (await response.json().catch(() => ({}))) as ErrorPayload;
+      throw new AuthApiError(
+        response.status,
+        resolveAuthErrorMessage(errorData, 'Invalid username or password'),
+      );
+    }
+
+    return response.json();
+  },
+
+  rotateBootstrapPassword: async (payload: BootstrapRotatePasswordPayload) => {
+    const response = await fetch(`${API_BASE_URL}/api/auth/bootstrap/rotate-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorData = (await response.json().catch(() => ({}))) as ErrorPayload;
+      throw new AuthApiError(
+        response.status,
+        resolveAuthErrorMessage(errorData, 'Failed to rotate bootstrap password'),
+      );
     }
 
     return response.json();

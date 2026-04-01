@@ -86,6 +86,9 @@ async def list_items(
     condition: Optional[str] = Query(default=None, description="Filter by condition (e.g. good, damaged)"),
     include_deleted: bool = Query(default=False, description="Include soft-deleted items"),
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("inventory:items:view")),
+    __: None = Depends(require_system_access("inventory")),
 ):
     skip = (page - 1) * per_page
     items, total = inventory_service.get_all(
@@ -122,6 +125,9 @@ async def get_item(
     item_id: str,
     request: Request,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("inventory:items:view")),
+    __: None = Depends(require_system_access("inventory")),
 ):
     item = inventory_service.get(session, item_id)
     if not item:

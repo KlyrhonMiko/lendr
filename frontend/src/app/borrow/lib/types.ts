@@ -1,6 +1,6 @@
-import type { InventoryItem } from '@/app/inventory/items/api';
+import type { BorrowCatalogItem } from '../api';
 
-export interface CartItem extends InventoryItem {
+export interface CartItem extends BorrowCatalogItem {
   cartQty: number;
 }
 
