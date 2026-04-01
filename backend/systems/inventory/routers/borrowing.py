@@ -281,6 +281,8 @@ async def get_assigned_batches(
     request_id: str,
     request: Request,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("inventory:borrow_requests:manage")),
 ):
     db_request = borrow_service.get(session, request_id)
     if not db_request:
