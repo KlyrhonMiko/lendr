@@ -13,6 +13,7 @@ from utils.security import get_password_hash
 from data.system_init_data import SYSTEM_CONFIGS, RBAC_ROLES
 from utils.logging import get_logger
 from utils.migrations import run_migrations
+from systems.auth.services.rbac_service import normalize_role, validate_role_policy_payload
 
 logger = get_logger("core.init")
 
@@ -175,12 +176,20 @@ class InitializationService:
         """Idempotently seed RBAC role-specific permissions."""
         count = 0
         for role_data in RBAC_ROLES:
-            role_key = role_data["role"].lower()
-            payload = {
-                "systems": role_data["systems"],
-                "permissions": role_data["permissions"],
-                "display_name": role_data["display_name"]
-            }
+            role_key = normalize_role(str(role_data.get("role", "")))
+            try:
+                payload = validate_role_policy_payload(
+                    role_key,
+                    {
+                        "systems": role_data.get("systems"),
+                        "permissions": role_data.get("permissions"),
+                        "display_name": role_data.get("display_name"),
+                    },
+                )
+            except ValueError as exc:
+                raise RuntimeError(
+                    f"Invalid RBAC seed payload for role '{role_data.get('role')}'"
+                ) from exc
             
             existing = session.exec(
                 select(AdminConfig).where(

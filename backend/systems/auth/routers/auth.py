@@ -5,13 +5,12 @@ import threading
 import time
 from dataclasses import dataclass
 
-from jose import JWTError, jwt
+from jose import JWTError
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session
 
-from core.config import settings
 from core.database import get_session
 from core.schemas import GenericResponse, create_success_response
 from systems.admin.models.user import User
@@ -22,6 +21,8 @@ from systems.auth.schemas.auth_schemas import BootstrapPasswordRotateRequest, Ro
 from systems.auth.services.auth_service import AuthService
 from systems.auth.services.rbac_service import rbac_service
 from utils.logging import get_logger
+from utils.security import decode_access_token
+from core.config import settings
 
 router = APIRouter()
 auth_service = AuthService()
@@ -391,7 +392,7 @@ async def refresh_token(
 ):
     try:
         # Decode token to get session_id and user payload
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = decode_access_token(token)
         session_id = payload.get("session_id")
         user_id = payload.get("sub")
         
@@ -434,7 +435,7 @@ async def logout(
 ):
     try:
         # Decode token to get session_id and user role
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = decode_access_token(token)
         session_id = payload.get("session_id")
         user_id = payload.get("sub")
         

@@ -32,6 +32,14 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    JWT_ISSUER: str | None = None
+    JWT_AUDIENCE: str | None = None
+
+    ARGON2_TIME_COST: int = 3
+    ARGON2_MEMORY_COST: int = 65536
+    ARGON2_PARALLELISM: int = 4
+    ARGON2_HASH_LEN: int = 32
+    ARGON2_SALT_SIZE: int = 16
 
     INITIAL_ADMIN_USERNAME: str = "admin"
     INITIAL_ADMIN_PASSWORD: str | None = None

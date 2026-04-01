@@ -1,6 +1,8 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, Request, BackgroundTasks
 from sqlmodel import Session, select
-from core.database import get_session
+from core.database import engine, get_session
 from core.deps import get_current_user
 from systems.auth.dependencies import require_permission, reusable_oauth2
 from core.schemas import GenericResponse, create_success_response
@@ -15,12 +17,23 @@ from systems.admin.schemas.operations_settings import (
 from systems.admin.models.settings import AdminConfig as Configuration
 from systems.admin.services.scheduler_service import scheduler_service
 from systems.auth.services.auth_service import auth_service
-from core.config import settings
-from jose import jwt
+from utils.security import decode_access_token
 from utils.time_utils import get_now_manila
 import json
 
 router = APIRouter()
+
+
+def _revoke_sessions_background(
+    exclude_session_id: str | None,
+    actor_id: UUID | None,
+) -> None:
+    with Session(engine) as background_session:
+        auth_service.revoke_all_other_sessions(
+            background_session,
+            exclude_session_id=exclude_session_id,
+            actor_id=actor_id,
+        )
 
 @router.get("/", response_model=GenericResponse[OperationsSettingsPayload])
 async def get_operations_settings(
@@ -146,13 +159,17 @@ async def update_operations_settings(
     if now_enabled and not was_enabled:
         # Extract session_id to exclude it from revocation
         try:
-            decoded = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+            decoded = decode_access_token(token)
             current_session_id = decoded.get("session_id")
         except Exception:
             current_session_id = None
             
         # Run heavy maintenance tasks in background to keep UI responsive
-        background_tasks.add_task(auth_service.revoke_all_other_sessions, session, current_session_id)
+        background_tasks.add_task(
+            _revoke_sessions_background,
+            current_session_id,
+            current_user.id,
+        )
         background_tasks.add_task(scheduler_service._run_ops_maintenance_job)
     
     # Trigger scheduler re-sync for any time changes

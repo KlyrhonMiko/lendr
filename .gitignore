@@ -44,6 +44,7 @@ yarn-error.log*
 /.logs
 /.tests
 /.todo
+/.scripts
 
 # backend-specific local artifacts
 backend/.logs

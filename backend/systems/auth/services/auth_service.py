@@ -4,9 +4,10 @@ from uuid import UUID
 from sqlmodel import Session, select
 
 from systems.admin.models.user import User
+from systems.admin.services.audit_service import audit_service
 from systems.admin.services.user_service import UserService
 from utils.id_generator import get_next_sequence
-from utils.security import get_password_hash, verify_password
+from utils.security import get_password_hash, verify_and_update_password
 from systems.auth.models.user_session import UserSession
 from systems.auth.models.borrower_session import BorrowerSession
 from utils.time_utils import get_now_manila
@@ -23,8 +24,14 @@ class AuthService:
         if not user:
             return None
 
-        if not verify_password(password, user.hashed_password):
+        verified, upgraded_hash = verify_and_update_password(password, user.hashed_password)
+        if not verified:
             return None
+
+        if upgraded_hash:
+            user.hashed_password = upgraded_hash
+            user.updated_at = get_now_manila()
+            session.add(user)
 
         return user
 
@@ -67,7 +74,7 @@ class AuthService:
     def create_access_token(self, data: dict, expires_delta: timedelta | None = None) -> str:
         from utils.security import create_access_token as create_jwt
         
-        return create_jwt(data) 
+        return create_jwt(data, expires_delta=expires_delta)
 
     def create_borrower_session(
         self,
@@ -163,7 +170,12 @@ class AuthService:
             session.add(db_session)
             session.commit()
 
-    def revoke_all_other_sessions(self, session: Session, exclude_session_id: str | None = None):
+    def revoke_all_other_sessions(
+        self,
+        session: Session,
+        exclude_session_id: str | None = None,
+        actor_id: UUID | None = None,
+    ):
         """Revoke all active user and borrower sessions, except for the specified exclude_session_id."""
         now = get_now_manila()
         
@@ -192,6 +204,19 @@ class AuthService:
         for bs in borrower_sessions:
             bs.is_revoked = True
             session.add(bs)
+
+        audit_service.log_action(
+            db=session,
+            entity_type="session",
+            entity_id=exclude_session_id or "all",
+            action="revoke_all_other_sessions",
+            actor_id=actor_id,
+            after={
+                "revoked_user_sessions": len(user_sessions),
+                "revoked_borrower_sessions": len(borrower_sessions),
+                "excluded_session_id": exclude_session_id,
+            },
+        )
             
         session.commit()
 

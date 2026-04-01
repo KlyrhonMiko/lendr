@@ -1,15 +1,15 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import jwt
+from jose import JWTError
 from pydantic import ValidationError
 from sqlmodel import Session
 
-from core.config import settings
 from core.database import get_session
 from systems.admin.models.user import User
 from systems.admin.services.user_service import UserService
 from systems.admin.services.audit_service import audit_service
 from systems.auth.services.rbac_service import rbac_service
+from utils.security import decode_access_token
 
 reusable_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 user_service = UserService()
@@ -17,7 +17,7 @@ user_service = UserService()
 
 def get_current_user(session: Session = Depends(get_session), token: str = Depends(reusable_oauth2)) -> User:
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = decode_access_token(token)
         user_id = payload.get("sub")
         session_id = payload.get("session_id")
         
@@ -26,7 +26,7 @@ def get_current_user(session: Session = Depends(get_session), token: str = Depen
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Could not validate credentials",
             )
-    except (jwt.JWTError, ValidationError):
+    except (JWTError, ValidationError):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Could not validate credentials",

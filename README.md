@@ -1032,6 +1032,15 @@ For any new feature:
 - [ ] Manual testing via API docs (/docs)
 - [ ] Test script exercises the endpoint
 
+### Security Policy Lint
+
+Validate RBAC role payloads and permission reference formatting:
+
+```bash
+cd backend
+python .scripts/check_rbac_policies.py
+```
+
 ---
 
 ## Test Data Scripts
