@@ -50,6 +50,7 @@ yarn-error.log*
 backend/.logs
 backend/.tests
 backend/.todo
+backend/.scripts
 backend/data/logs
 
 # vercel
