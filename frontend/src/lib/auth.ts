@@ -1,4 +1,5 @@
-import { http, getDeviceId } from '@/lib/http';
+import { http } from '@/lib/http';
+import { tokenStore } from '@/lib/tokenStore';
 
 export interface User {
   user_id: string;
@@ -12,34 +13,58 @@ export interface User {
 }
 
 
-const TOKEN_KEY = 'lendr_auth_token';
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 let logoutTimer: NodeJS.Timeout | null = null;
 let lastActivityTime = Date.now();
+let listenersBound = false;
 
-if (typeof window !== 'undefined') {
-  const updateActivity = () => {
-    lastActivityTime = Date.now();
-  };
-  window.addEventListener('mousemove', updateActivity, { passive: true });
-  window.addEventListener('keydown', updateActivity, { passive: true });
-  window.addEventListener('click', updateActivity, { passive: true });
-  window.addEventListener('scroll', updateActivity, { passive: true });
+const activityEvents: Array<keyof WindowEventMap> = ['mousemove', 'keydown', 'click', 'scroll'];
+
+const updateActivity = () => {
+  lastActivityTime = Date.now();
+};
+
+function bindActivityListeners(): void {
+  if (typeof window === 'undefined' || listenersBound) return;
+
+  for (const eventName of activityEvents) {
+    window.addEventListener(eventName, updateActivity, { passive: true });
+  }
+  listenersBound = true;
+}
+
+function unbindActivityListeners(): void {
+  if (typeof window === 'undefined' || !listenersBound) return;
+
+  for (const eventName of activityEvents) {
+    window.removeEventListener(eventName, updateActivity);
+  }
+  listenersBound = false;
+}
+
+function parseJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const payloadBase64Url = token.split('.')[1];
+    if (!payloadBase64Url) return null;
+    const payloadBase64 = payloadBase64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const payloadJson = atob(payloadBase64);
+    return JSON.parse(payloadJson) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
 }
 
 export const auth = {
   setupTokenTimer: (token: string) => {
     if (typeof window === 'undefined') return;
     auth.clearTokenTimer();
+    bindActivityListeners();
     
     try {
-      const payloadBase64Url = token.split('.')[1];
-      const payloadBase64 = payloadBase64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const payloadJson = atob(payloadBase64);
-      const payload = JSON.parse(payloadJson);
+      const payload = parseJwtPayload(token);
       
-      if (!payload.exp) return;
+      if (!payload || typeof payload.exp !== 'number') return;
       
       const checkInterval = 60 * 1000; // Check every 1 minute
       const REFRESH_THRESHOLD = 5 * 60 * 1000; // Refresh when <= 5 mins left
@@ -53,8 +78,12 @@ export const auth = {
         }
 
         try {
-          const currentPayloadJson = atob(currentToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'));
-          const currentPayload = JSON.parse(currentPayloadJson);
+          const currentPayload = parseJwtPayload(currentToken);
+          if (!currentPayload || typeof currentPayload.exp !== 'number') {
+            auth.logout();
+            return;
+          }
+
           const currentExpTime = currentPayload.exp * 1000;
           const now = Date.now();
           const timeRemaining = currentExpTime - now;
@@ -71,24 +100,24 @@ export const auth = {
                 if (response.ok) {
                   const data = await response.json();
                   // Update the token in storage, this restarts the cycle
-                  localStorage.setItem(TOKEN_KEY, data.access_token);
+                  tokenStore.setToken(data.access_token);
                 } else if (response.status === 401) {
                   auth.logout();
                 }
-              } catch (e) {
-                console.error("Failed to refresh token", e);
+              } catch {
+                // Keep existing token until expiry if refresh fails transiently.
               }
             } else {
               // User is idle but token not yet expired. Just wait for natural expiration.
             }
           }
-        } catch (e) {
+        } catch {
           auth.clearTokenTimer();
         }
       }, checkInterval);
       
-    } catch (e) {
-      console.error('Failed to parse token expiration', e);
+    } catch {
+      auth.clearTokenTimer();
     }
   },
 
@@ -99,36 +128,32 @@ export const auth = {
     }
   },
   setToken: (token: string) => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(TOKEN_KEY, token);
-      auth.setupTokenTimer(token);
-    }
+    tokenStore.setToken(token);
+    auth.setupTokenTimer(token);
   },
 
   getToken: () => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem(TOKEN_KEY);
-    }
-    return null;
+    return tokenStore.getToken();
   },
 
   clearToken: () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(TOKEN_KEY);
-      auth.clearTokenTimer();
-    }
+    tokenStore.clearToken();
+    auth.clearTokenTimer();
+    unbindActivityListeners();
   },
 
   logout: async (redirectTo = '/auth/login') => {
     if (typeof window !== 'undefined') {
-      const token = localStorage.getItem(TOKEN_KEY);
-      localStorage.removeItem(TOKEN_KEY);
-      auth.clearTokenTimer();
+      const token = tokenStore.getToken();
+      auth.clearToken();
 
       if (token) {
         try {
-          await http.request('/auth/logout', {
+          await fetch(`${API_BASE_URL}/api/auth/logout`, {
             method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
             keepalive: true,
           });
         } catch {
@@ -141,10 +166,7 @@ export const auth = {
   },
 
   isAuthenticated: () => {
-    if (typeof window !== 'undefined') {
-      return !!localStorage.getItem(TOKEN_KEY);
-    }
-    return false;
+    return tokenStore.hasToken();
   },
 
   getUser: async (): Promise<User | null> => {

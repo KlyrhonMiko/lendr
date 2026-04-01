@@ -9,6 +9,7 @@ from core.schemas import GenericResponse, create_success_response, make_paginati
 from systems.admin.models.user import User
 from systems.admin.schemas.user_schemas import UserCreate, UserRead, UserUpdate
 from systems.admin.services.user_service import UserService
+from systems.auth.services.auth_service import auth_service
 
 router = APIRouter()
 user_service = UserService()
@@ -103,9 +104,19 @@ async def update_user(
     user = user_service.get(session, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    should_revoke_sessions = user_service.requires_session_revocation(user, user_data)
     updated_user = user_service.update(session, user, user_data)
+
+    message = "User updated successfully"
+    if should_revoke_sessions:
+        auth_service.revoke_sessions_for_user(session, updated_user.id)
+        message = "User updated successfully. Active sessions were revoked for security."
+
     return create_success_response(
-        data=updated_user, message="User updated successfully", request=request
+        data=updated_user,
+        message=message,
+        request=request,
     )
 
 

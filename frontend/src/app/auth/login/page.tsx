@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { KeyRound, User, Loader2, ArrowRight, ShieldCheck } from 'lucide-react';
 import { auth } from '@/lib/auth';
+import { useAuth } from '@/contexts/AuthContext';
 import { loginApi } from './api';
 import { toast } from "sonner";
 import { AuthApiError } from '@/lib/api';
@@ -18,6 +19,7 @@ interface LoginCredentials {
 
 export default function LoginPage() {
   const router = useRouter();
+  const { hydrateUser } = useAuth();
   const [formData, setFormData] = useState({ username: '', password: '' });
   const [isLoading, setIsLoading] = useState(false);
   const [showRotationModal, setShowRotationModal] = useState(false);
@@ -33,6 +35,7 @@ export default function LoginPage() {
     auth.setToken(data.access_token);
 
     const user = await auth.getUser();
+    hydrateUser(user);
     const redirectPath = auth.getRedirectPath(user?.role);
 
     toast.success("Welcome back! Logging you in...");

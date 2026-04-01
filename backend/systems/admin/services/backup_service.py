@@ -58,9 +58,11 @@ class BackupService:
             if destination in ["local", "both"]:
                 self._run_local_backup(session, backup_run)
             
-            # 3. Handle S3 (Placeholder for now)
+            # 3. Execute S3 backup if requested
             if destination in ["s3", "both"]:
-                pass
+                self._run_s3_backup(session, backup_run)
+
+            self._assert_required_artifacts(session, backup_run, destination)
 
             self._require_setting(
                 session,
@@ -96,6 +98,36 @@ class BackupService:
             
             # We raise the exception so the API returns a proper 500 error instead of "Success"
             raise RuntimeError(error_msg) from e
+
+    def _run_s3_backup(self, session: Session, backup_run: BackupRun) -> None:
+        raise NotImplementedError(
+            "S3 backup destination is not implemented yet. "
+            "Use destination='local' until S3 uploader support is added."
+        )
+
+    def _assert_required_artifacts(
+        self,
+        session: Session,
+        backup_run: BackupRun,
+        destination: str,
+    ) -> None:
+        artifacts = session.exec(
+            select(BackupArtifact).where(BackupArtifact.backup_run_id == backup_run.id)
+        ).all()
+        target_types = {artifact.target_type for artifact in artifacts}
+
+        required_targets: set[str]
+        if destination == "local":
+            required_targets = {"local"}
+        elif destination == "s3":
+            required_targets = {"s3"}
+        else:
+            required_targets = {"local", "s3"}
+
+        missing_targets = required_targets - target_types
+        if missing_targets:
+            missing = ", ".join(sorted(missing_targets))
+            raise RuntimeError(f"Backup artifacts missing required targets: {missing}")
 
     def _run_local_backup(self, session: Session, backup_run: BackupRun):
         timestamp = get_now_manila().strftime("%Y%m%d_%H%M%S")

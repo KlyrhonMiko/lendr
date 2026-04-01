@@ -60,10 +60,19 @@ async def import_inventory(
 ):
     if not file.filename.endswith('.csv'):
         raise HTTPException(status_code=400, detail="Only CSV files are supported")
-        
-    history = await import_service.process_inventory_import(
-        session, file, mode, current_user.id
-    )
+
+    try:
+        history = await import_service.process_inventory_import(
+            session,
+            file,
+            mode,
+            current_user.id,
+        )
+    except ValueError as exc:
+        detail = str(exc)
+        if "maximum allowed size" in detail:
+            raise HTTPException(status_code=413, detail=detail) from exc
+        raise HTTPException(status_code=400, detail=detail) from exc
     
     data = ImportResponse(
         history_id=history.id,

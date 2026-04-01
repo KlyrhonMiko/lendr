@@ -1,8 +1,9 @@
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from sqlmodel import Session, select
 
+from core.config import settings
 from systems.admin.models.user import User
 from systems.admin.services.audit_service import audit_service
 from systems.admin.services.user_service import UserService
@@ -16,6 +17,115 @@ from utils.time_utils import get_now_manila
 class AuthService:
     def __init__(self):
         self.user_service = UserService()
+
+    def _session_inactivity_timeout(self) -> timedelta | None:
+        timeout_minutes = max(settings.AUTH_SESSION_INACTIVITY_TIMEOUT_MINUTES, 0)
+        if timeout_minutes == 0:
+            return None
+        return timedelta(minutes=timeout_minutes)
+
+    def _activity_touch_interval_seconds(self) -> int:
+        return max(settings.AUTH_ACTIVITY_TOUCH_INTERVAL_SECONDS, 0)
+
+    def _is_session_inactive(self, last_activity_at: datetime, now: datetime) -> bool:
+        timeout = self._session_inactivity_timeout()
+        if timeout is None:
+            return False
+        return last_activity_at <= (now - timeout)
+
+    def _normalize_timestamp(self, value: datetime, reference: datetime) -> datetime:
+        if value.tzinfo is None and reference.tzinfo is not None:
+            as_reference_tz = value.replace(tzinfo=reference.tzinfo)
+            skew_seconds = abs((reference - as_reference_tz).total_seconds())
+
+            # PostgreSQL `timestamp without time zone` can round-trip aware values as
+            # naive UTC. If the naive/local interpretation is wildly skewed, treat
+            # the stored value as UTC and convert to the reference timezone.
+            if skew_seconds > 6 * 60 * 60:
+                return value.replace(tzinfo=UTC).astimezone(reference.tzinfo)
+
+            return as_reference_tz
+        return value
+
+    def _should_touch_activity(self, last_activity_at: datetime, now: datetime) -> bool:
+        touch_interval_seconds = self._activity_touch_interval_seconds()
+        if touch_interval_seconds == 0:
+            return True
+        elapsed_seconds = (now - last_activity_at).total_seconds()
+        return elapsed_seconds >= touch_interval_seconds
+
+    def _validate_session_activity(
+        self,
+        session: Session,
+        db_session: UserSession | BorrowerSession,
+        touch_activity: bool,
+    ) -> bool:
+        now = get_now_manila()
+        last_activity_at = db_session.last_activity_at or db_session.issued_at or db_session.created_at
+        last_activity_at = self._normalize_timestamp(last_activity_at, now)
+
+        if self._is_session_inactive(last_activity_at, now):
+            db_session.is_revoked = True
+            db_session.updated_at = now
+            session.add(db_session)
+            session.commit()
+            return False
+
+        if touch_activity and self._should_touch_activity(last_activity_at, now):
+            db_session.last_activity_at = now
+            db_session.updated_at = now
+            session.add(db_session)
+            session.commit()
+
+        return True
+
+    def _enforce_user_session_limit(self, session: Session, user_uuid: UUID) -> None:
+        max_sessions = max(settings.AUTH_MAX_ACTIVE_USER_SESSIONS, 1)
+        now = get_now_manila()
+        active_sessions = list(
+            session.exec(
+                select(UserSession)
+                .where(
+                    UserSession.user_uuid == user_uuid,
+                    UserSession.is_revoked.is_(False),
+                    UserSession.expires_at > now,
+                )
+                .order_by(UserSession.issued_at.asc())
+            ).all()
+        )
+
+        sessions_to_revoke = len(active_sessions) - max_sessions + 1
+        if sessions_to_revoke <= 0:
+            return
+
+        for existing_session in active_sessions[:sessions_to_revoke]:
+            existing_session.is_revoked = True
+            existing_session.updated_at = now
+            session.add(existing_session)
+
+    def _enforce_borrower_session_limit(self, session: Session, borrower_uuid: UUID) -> None:
+        max_sessions = max(settings.AUTH_MAX_ACTIVE_BORROWER_SESSIONS, 1)
+        now = get_now_manila()
+        active_sessions = list(
+            session.exec(
+                select(BorrowerSession)
+                .where(
+                    BorrowerSession.borrower_uuid == borrower_uuid,
+                    BorrowerSession.is_revoked.is_(False),
+                    BorrowerSession.expires_at > now,
+                )
+                .order_by(BorrowerSession.issued_at.asc())
+            ).all()
+        )
+
+        sessions_to_revoke = len(active_sessions) - max_sessions + 1
+        if sessions_to_revoke <= 0:
+            return
+
+        for existing_session in active_sessions[:sessions_to_revoke]:
+            existing_session.is_revoked = True
+            existing_session.updated_at = now
+            session.add(existing_session)
 
     def authenticate_user(self, session: Session, username_or_email: str, password: str) -> User | None:
         statement = select(User).where((User.username == username_or_email) | (User.email == username_or_email)).where(User.is_deleted.is_(False))
@@ -84,12 +194,17 @@ class AuthService:
         user_uuid: UUID | None = None,
         device_id: str | None = None,
     ) -> BorrowerSession:
-        expires_at = get_now_manila() + expires_delta
+        now = get_now_manila()
+        expires_at = now + expires_delta
+        if user_uuid:
+            self._enforce_borrower_session_limit(session, user_uuid)
+
         db_session = BorrowerSession(
             session_id=get_next_sequence(session, BorrowerSession, "session_id", "BSE"),
             borrower_uuid=user_uuid,
             expires_at=expires_at,
             device_id=device_id,
+            last_activity_at=now,
         )
         session.add(db_session)
         session.commit()
@@ -97,15 +212,22 @@ class AuthService:
 
         return db_session
 
-    def is_borrower_session_valid(self, session: Session, session_id: str) -> bool:
+    def is_borrower_session_valid(
+        self,
+        session: Session,
+        session_id: str,
+        touch_activity: bool = False,
+    ) -> bool:
         statement = select(BorrowerSession).where(
             BorrowerSession.session_id == session_id,
             BorrowerSession.is_revoked.is_(False),
             BorrowerSession.expires_at > get_now_manila()
         )
         db_session = session.exec(statement).first()
+        if not db_session:
+            return False
 
-        return db_session is not None
+        return self._validate_session_activity(session, db_session, touch_activity=touch_activity)
 
     def revoke_borrower_session(self, session: Session, session_id: str):
         statement = select(BorrowerSession).where(BorrowerSession.session_id == session_id)
@@ -113,6 +235,7 @@ class AuthService:
 
         if db_session:
             db_session.is_revoked = True
+            db_session.updated_at = get_now_manila()
             session.add(db_session)
             session.commit()
 
@@ -120,7 +243,10 @@ class AuthService:
         statement = select(BorrowerSession).where(BorrowerSession.session_id == session_id)
         db_session = session.exec(statement).first()
         if db_session:
-            db_session.expires_at = get_now_manila() + expires_delta
+            now = get_now_manila()
+            db_session.expires_at = now + expires_delta
+            db_session.last_activity_at = now
+            db_session.updated_at = now
             session.add(db_session)
             session.commit()
 
@@ -131,12 +257,16 @@ class AuthService:
         expires_delta: timedelta,
         device_id: str | None = None,
     ) -> UserSession:
-        expires_at = get_now_manila() + expires_delta
+        now = get_now_manila()
+        expires_at = now + expires_delta
+        self._enforce_user_session_limit(session, user_uuid)
+
         db_session = UserSession(
             session_id=get_next_sequence(session, UserSession, "session_id", "USE"),
             user_uuid=user_uuid,
             expires_at=expires_at,
             device_id=device_id,
+            last_activity_at=now,
         )
         session.add(db_session)
         session.commit()
@@ -144,29 +274,89 @@ class AuthService:
 
         return db_session
 
-    def is_user_session_valid(self, session: Session, session_id: str) -> bool:
+    def is_user_session_valid(
+        self,
+        session: Session,
+        session_id: str,
+        touch_activity: bool = False,
+    ) -> bool:
         statement = select(UserSession).where(
             UserSession.session_id == session_id,
             UserSession.is_revoked.is_(False),
             UserSession.expires_at > get_now_manila()
         )
         db_session = session.exec(statement).first()
+        if not db_session:
+            return False
 
-        return db_session is not None
+        return self._validate_session_activity(session, db_session, touch_activity=touch_activity)
 
     def revoke_user_session(self, session: Session, session_id: str):
         statement = select(UserSession).where(UserSession.session_id == session_id)
         db_session = session.exec(statement).first()
         if db_session:
             db_session.is_revoked = True
+            db_session.updated_at = get_now_manila()
             session.add(db_session)
             session.commit()
+
+    def revoke_session_by_id(self, session: Session, session_id: str) -> bool:
+        """Revoke a session by session_id regardless of role/table origin."""
+        now = get_now_manila()
+
+        if session_id.startswith("USE"):
+            db_session = session.exec(
+                select(UserSession).where(UserSession.session_id == session_id)
+            ).first()
+            if db_session:
+                db_session.is_revoked = True
+                db_session.updated_at = now
+                session.add(db_session)
+                session.commit()
+                return True
+
+        if session_id.startswith("BSE"):
+            db_session = session.exec(
+                select(BorrowerSession).where(BorrowerSession.session_id == session_id)
+            ).first()
+            if db_session:
+                db_session.is_revoked = True
+                db_session.updated_at = now
+                session.add(db_session)
+                session.commit()
+                return True
+
+        # Defensive fallback for any legacy/non-standard prefix.
+        db_user_session = session.exec(
+            select(UserSession).where(UserSession.session_id == session_id)
+        ).first()
+        if db_user_session:
+            db_user_session.is_revoked = True
+            db_user_session.updated_at = now
+            session.add(db_user_session)
+            session.commit()
+            return True
+
+        db_borrower_session = session.exec(
+            select(BorrowerSession).where(BorrowerSession.session_id == session_id)
+        ).first()
+        if db_borrower_session:
+            db_borrower_session.is_revoked = True
+            db_borrower_session.updated_at = now
+            session.add(db_borrower_session)
+            session.commit()
+            return True
+
+        return False
 
     def extend_user_session(self, session: Session, session_id: str, expires_delta: timedelta):
         statement = select(UserSession).where(UserSession.session_id == session_id)
         db_session = session.exec(statement).first()
         if db_session:
-            db_session.expires_at = get_now_manila() + expires_delta
+            now = get_now_manila()
+            db_session.expires_at = now + expires_delta
+            db_session.last_activity_at = now
+            db_session.updated_at = now
             session.add(db_session)
             session.commit()
 

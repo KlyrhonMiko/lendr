@@ -29,11 +29,33 @@ class Settings(BaseSettings):
     LOG_DIR: str = ".logs"
     SKIP_INIT: bool = False
 
+    SECURITY_HEADERS_ENABLED: bool = True
+    SECURITY_HSTS_MAX_AGE_SECONDS: int = 31536000
+    SECURITY_API_CONTENT_SECURITY_POLICY: str = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+
+    CORS_ALLOW_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
+    CORS_ALLOW_METHODS: str = "GET,POST,PUT,PATCH,DELETE,OPTIONS"
+    CORS_ALLOW_HEADERS: str = "Authorization,Content-Type,X-Device-ID"
+    CORS_ALLOW_CREDENTIALS: bool = True
+
+    DB_POOL_SIZE: int = 10
+    DB_MAX_OVERFLOW: int = 20
+    DB_POOL_TIMEOUT_SECONDS: int = 30
+    DB_POOL_RECYCLE_SECONDS: int = 1800
+    DB_POOL_PRE_PING: bool = True
+
+    IMPORT_MAX_CSV_SIZE_BYTES: int = 5242880
+
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     JWT_ISSUER: str | None = None
     JWT_AUDIENCE: str | None = None
+
+    AUTH_SESSION_INACTIVITY_TIMEOUT_MINUTES: int = 30
+    AUTH_ACTIVITY_TOUCH_INTERVAL_SECONDS: int = 60
+    AUTH_MAX_ACTIVE_USER_SESSIONS: int = 3
+    AUTH_MAX_ACTIVE_BORROWER_SESSIONS: int = 1
 
     ARGON2_TIME_COST: int = 3
     ARGON2_MEMORY_COST: int = 65536

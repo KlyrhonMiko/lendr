@@ -1,12 +1,14 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { auth, User } from '@/lib/auth';
+import { tokenStore } from '@/lib/tokenStore';
 import { MaintenanceError } from '@/lib/api';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  hydrateUser: (user: User | null) => void;
   logout: (redirectTo?: string) => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -17,7 +19,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     if (!auth.isAuthenticated()) {
       setUser(null);
       setLoading(false);
@@ -36,7 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -79,13 +81,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  useEffect(() => {
+    const unsubscribe = tokenStore.subscribe(() => {
+      void refreshUser();
+    });
+
+    return unsubscribe;
+  }, [refreshUser]);
+
+  const hydrateUser = (nextUser: User | null) => {
+    setUser(nextUser);
+    setLoading(false);
+  };
+
   const logout = async (redirectTo = '/auth/login') => {
     setUser(null);
     await auth.logout(redirectTo);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, hydrateUser, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

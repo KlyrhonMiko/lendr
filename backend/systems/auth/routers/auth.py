@@ -88,9 +88,10 @@ def _safe_log_auth_event(
     username: str,
     device_id: str | None,
 ) -> None:
+    username_hash = _hash_value(username)
     metadata = {
         "endpoint": endpoint,
-        "username": username,
+        "username_hash": username_hash,
         "ip_hash": _hash_value(_get_client_ip(request)),
         "device_id_hash": _hash_value(device_id),
     }
@@ -99,7 +100,7 @@ def _safe_log_auth_event(
         audit_service.log_action(
             db=session,
             entity_type="auth",
-            entity_id=username[:100] or endpoint,
+            entity_id=username_hash,
             action=action,
             after=metadata,
         )
@@ -431,27 +432,19 @@ async def logout(
     request: Request,
     session: Session = Depends(get_session),
     token: str = Depends(reusable_oauth2),
-    _: None = Depends(require_permission("auth:session:manage")),
+    current_user: User = Depends(get_current_user),
 ):
     try:
-        # Decode token to get session_id and user role
+        # Decode token and revoke the exact server-side session by id.
         payload = decode_access_token(token)
         session_id = payload.get("session_id")
-        user_id = payload.get("sub")
-        
-        user = auth_service.user_service.get(session, user_id)
-        if user and session_id:
-            if user.role == "borrower":
-                auth_service.revoke_borrower_session(session, session_id)
-            else:
-                auth_service.revoke_user_session(session, session_id)
-
+        if session_id and auth_service.revoke_session_by_id(session, session_id):
             audit_service.log_action(
                 db=session,
                 entity_type="session",
                 entity_id=session_id,
                 action="logout",
-                actor_id=user.id
+                actor_id=current_user.id,
             )
             session.commit()
                 
