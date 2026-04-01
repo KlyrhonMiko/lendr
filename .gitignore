@@ -116,6 +116,8 @@ dmypy.json
 
 # Claude/agent files (local agent state, memories)
 .agents/
+.github/
 .claude/
 memories/
 CLAUDE.md
+.claudesignore
