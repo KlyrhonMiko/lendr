@@ -120,9 +120,9 @@ class SystemHealthService:
         statement = (
             select(UserSession, User)
             .join(User, UserSession.user_uuid == User.id, isouter=True)
-            .where(not UserSession.is_revoked)
+            .where(UserSession.is_revoked.is_(False))
             .where(UserSession.expires_at > now)
-            .where(not UserSession.is_deleted)
+            .where(UserSession.is_deleted.is_(False))
             .offset(skip).limit(limit)
         )
         
