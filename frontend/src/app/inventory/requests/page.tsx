@@ -18,6 +18,7 @@ import { RequestsToolbar } from './components/RequestsToolbar';
 import { RequestsTable } from './components/RequestsTable';
 import { ConfirmBorrowActionModal } from './components/ConfirmBorrowActionModal';
 import { ReleaseReceiptModal } from './components/ReleaseReceiptModal';
+import { logger } from '@/lib/logger';
 
 export default function BorrowsPage() {
 
@@ -62,7 +63,7 @@ export default function BorrowsPage() {
       const res = await borrowApi.getEvents(requestId);
       setRequestEvents(prev => ({ ...prev, [requestId]: res.data as BorrowRequestEvent[] }));
     } catch (err) {
-      console.error('Failed to fetch events:', err);
+      logger.error('Failed to fetch borrow request events', { error: err, requestId });
     } finally {
       setLoadingEvents(prev => ({ ...prev, [requestId]: false }));
     }
@@ -79,7 +80,7 @@ export default function BorrowsPage() {
         [requestId]: { units: units.data, batches: batches.data }
       }));
     } catch (err) {
-      console.error('Failed to fetch assignments:', err);
+      logger.error('Failed to fetch borrow request assignments', { error: err, requestId });
     }
   }, []);
 

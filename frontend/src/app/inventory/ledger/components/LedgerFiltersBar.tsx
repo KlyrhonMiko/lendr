@@ -46,6 +46,7 @@ export function LedgerFiltersBar({
             <button
               type="button"
               onClick={() => onItemIdChange('')}
+              aria-label="Clear item search"
               className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted transition-colors"
             >
               <X className="w-4 h-4" />

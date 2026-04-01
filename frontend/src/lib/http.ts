@@ -2,6 +2,7 @@
 
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 import { tokenStore } from '@/lib/tokenStore';
+import { logger } from '@/lib/logger';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -48,7 +49,7 @@ export async function getDeviceId(): Promise<string> {
         window.sessionStorage.setItem('lendr_fp_id', visitorId);
         return visitorId;
       } catch (error) {
-        console.error('Fingerprint failed, falling back to UUID', error);
+        logger.error('Fingerprint failed, falling back to UUID', { error });
         let fallbackId = window.sessionStorage.getItem('lendr_device_id');
         if (!fallbackId) {
           fallbackId = `DEV-${crypto.randomUUID()}`;

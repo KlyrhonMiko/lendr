@@ -274,7 +274,7 @@ export function UnitSelectionModal({ request, onClose, onSuccess }: UnitSelectio
                 Auto Assign All
               </button>
             )}
-            <button onClick={onClose} className="p-2 text-muted-foreground hover:bg-secondary rounded-full transition-colors">
+            <button onClick={onClose} aria-label="Close assignment modal" className="p-2 text-muted-foreground hover:bg-secondary rounded-full transition-colors">
               <X className="w-5 h-5" />
             </button>
           </div>

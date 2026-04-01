@@ -283,7 +283,7 @@ export function ReleaseReceiptModal({
               <p className="text-xs text-muted-foreground">{receipt ? receipt.receipt_number : 'Loading...'}</p>
             </div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-muted/50 flex items-center justify-center transition-colors" type="button">
+          <button onClick={onClose} aria-label="Close release receipt" className="w-8 h-8 rounded-lg hover:bg-muted/50 flex items-center justify-center transition-colors" type="button">
             <X className="w-4 h-4" />
           </button>
         </div>

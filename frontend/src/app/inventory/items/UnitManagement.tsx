@@ -20,6 +20,7 @@ import {
 import { toast } from 'sonner';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { cn, parseSystemDate } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 
 interface UnitManagementProps {
   itemId: string;
@@ -176,7 +177,7 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
       setStatusConfigs(statusRes.data);
       setConditionConfigs(conditionRes.data);
     } catch (err) {
-      console.error('Failed to fetch configs:', err);
+      logger.error('Failed to fetch inventory unit configs', { error: err });
     }
   }, []);
 
@@ -309,6 +310,7 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
           </div>
           <button
             onClick={onClose}
+            aria-label="Close unit management"
             className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />
@@ -374,6 +376,7 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
                 <button
                   type="button"
                   onClick={closeForm}
+                  aria-label="Close unit form"
                   className="p-1 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted transition-colors"
                 >
                   <X className="w-4 h-4" />

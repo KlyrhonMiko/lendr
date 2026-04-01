@@ -203,7 +203,7 @@ export function SecuritySettings() {
               <CardTitle>Shift Definitions</CardTitle>
               <CardDescription>Manage working hours for system-wide scheduling.</CardDescription>
             </div>
-            <button className="p-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors shadow-sm">
+            <button aria-label="Add shift definition" className="p-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors shadow-sm">
               <Plus className="w-4 h-4" />
             </button>
           </CardHeader>
@@ -226,8 +226,8 @@ export function SecuritySettings() {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                       <button className="p-2 hover:bg-muted rounded-lg border border-border"><Edit2 className="w-4 h-4"/></button>
-                       <button className="p-2 hover:bg-rose-500/10 hover:text-rose-500 rounded-lg border border-border"><Trash2 className="w-4 h-4"/></button>
+                       <button aria-label={`Edit ${shift.name} shift`} className="p-2 hover:bg-muted rounded-lg border border-border"><Edit2 className="w-4 h-4"/></button>
+                       <button aria-label={`Delete ${shift.name} shift`} className="p-2 hover:bg-rose-500/10 hover:text-rose-500 rounded-lg border border-border"><Trash2 className="w-4 h-4"/></button>
                     </div>
                  </div>
                ))}

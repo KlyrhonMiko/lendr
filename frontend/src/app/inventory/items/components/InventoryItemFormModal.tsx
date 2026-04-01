@@ -111,6 +111,7 @@ export function InventoryItemFormModal({
               resetForm();
               onClose();
             }}
+            aria-label="Close equipment form"
             className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
             type="button"
           >

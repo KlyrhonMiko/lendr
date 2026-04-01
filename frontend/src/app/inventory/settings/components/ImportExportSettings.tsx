@@ -40,6 +40,7 @@ import {
 import { useInventoryItems } from '@/app/inventory/items/lib/useItemQueries';
 import { User as SystemUser } from '@/app/admin/users/api';
 import { format } from 'date-fns';
+import { logger } from '@/lib/logger';
 
 export function ImportExportSettings() {
   const [page, setPage] = useState(1);
@@ -66,7 +67,7 @@ export function ImportExportSettings() {
         const res = await api.get<SystemUser[]>('/inventory/data/borrowers');
         setUsers(res.data);
       } catch (err) {
-        console.error('Failed to fetch borrowers for export filter:', err);
+        logger.error('Failed to fetch borrowers for export filter', { error: err });
       }
     };
     fetchUsers();
@@ -513,7 +514,7 @@ export function ImportExportSettings() {
             <div className="space-y-4 p-6 rounded-3xl bg-indigo-500/5 border border-indigo-500/20 flex flex-col">
               <div className="flex items-center justify-between mb-4">
                  <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-500 bg-indigo-500/10 px-2 py-1 rounded-full">Weekly</span>
-                 <button className="text-rose-500"><XCircle className="w-4 h-4" /></button>
+                 <button aria-label="Remove weekly report schedule" className="text-rose-500"><XCircle className="w-4 h-4" /></button>
               </div>
               <p className="text-sm font-bold truncate">Audit Logs Weekly Report</p>
               <p className="text-xs text-muted-foreground">Every Monday at 8:00 AM</p>
@@ -526,7 +527,7 @@ export function ImportExportSettings() {
             <div className="space-y-4 p-6 rounded-3xl bg-blue-500/5 border border-blue-500/20 flex flex-col">
               <div className="flex items-center justify-between mb-4">
                  <span className="text-[10px] font-bold uppercase tracking-widest text-blue-500 bg-blue-500/10 px-2 py-1 rounded-full">Daily</span>
-                 <button className="text-rose-500"><XCircle className="w-4 h-4" /></button>
+                 <button aria-label="Remove daily report schedule" className="text-rose-500"><XCircle className="w-4 h-4" /></button>
               </div>
               <p className="text-sm font-bold truncate">Daily Movements Summary</p>
               <p className="text-xs text-muted-foreground">Daily at 11:59 PM</p>

@@ -124,6 +124,7 @@ export function ArchivesModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
           </div>
           <button 
             onClick={onClose} 
+            aria-label="Close archives modal"
             className="p-2 hover:bg-secondary rounded-full transition-colors"
           >
             <X className="w-5 h-5" />
@@ -373,6 +374,7 @@ function TagSelector({
       <div className="flex items-center justify-between mb-2 px-1">
         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Select Tags</span>
         <button onClick={onClose} className="p-1 hover:bg-muted rounded-full transition-colors">
+          <span className="sr-only">Close tag selector</span>
             <X className="w-3 h-3" />
         </button>
       </div>

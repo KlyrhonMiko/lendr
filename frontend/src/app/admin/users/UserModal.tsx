@@ -149,6 +149,7 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
           </div>
           <button
             onClick={onClose}
+            aria-label="Close user modal"
             className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />

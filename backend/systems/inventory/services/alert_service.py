@@ -2,6 +2,10 @@ import json
 from sqlmodel import Session, select
 from systems.inventory.services.configuration_service import InventoryConfigService
 from systems.admin.models.user import User
+from utils.logging import get_logger
+
+
+logger = get_logger("inventory.alerts")
 
 class AlertService:
     def __init__(self):
@@ -65,13 +69,14 @@ class AlertService:
                 label = f"{rec.get('name')} ({rec.get('email') or rec.get('phone')})"
                 specific_labels.append(label)
 
-        # For now, we log to stdout and could eventually write to a 'notifications' table
-        print(f"\n[ALERT SYSTEM] Triggered {alert_type}")
-        print(f"Message: {message}")
-        print(f"Channels: {', '.join(channels)}")
-        print(f"System Recipients ({len(user_ids)}): {', '.join(user_ids)}")
-        if specific_labels:
-            print(f"Specific External Recipients ({len(specific_labels)}): {', '.join(specific_labels)}")
-        print("-" * 40)
+        # For now, this writes to structured logs and can later feed a notifications table.
+        logger.info(
+            "Triggered inventory alert type=%s channels=%s system_recipients=%s external_recipients=%s message=%s",
+            alert_type,
+            ",".join(channels),
+            ",".join(user_ids),
+            ",".join(specific_labels),
+            message,
+        )
 
 alert_service = AlertService()

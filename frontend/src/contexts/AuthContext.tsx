@@ -4,6 +4,7 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { auth, User } from '@/lib/auth';
 import { tokenStore } from '@/lib/tokenStore';
 import { MaintenanceError } from '@/lib/api';
+import { logger } from '@/lib/logger';
 
 interface AuthContextType {
   user: User | null;
@@ -33,7 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error instanceof MaintenanceError) {
         setUser(null);
       } else {
-        console.error('Failed to refresh user:', error);
+        logger.error('Failed to refresh user', { error });
       }
     } finally {
       setLoading(false);
@@ -68,7 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(null);
           setLoading(false);
           if (!(error instanceof MaintenanceError)) {
-            console.error('Initial user fetch failed:', error);
+            logger.error('Initial user fetch failed', { error });
           }
         }
       }

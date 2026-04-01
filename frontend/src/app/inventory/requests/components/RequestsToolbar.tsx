@@ -41,6 +41,7 @@ export function RequestsToolbar({
         {searchInput && (
           <button
             onClick={() => onSearchInputChange('')}
+            aria-label="Clear search"
             className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
             type="button"
           >

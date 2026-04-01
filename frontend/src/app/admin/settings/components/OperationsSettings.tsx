@@ -220,11 +220,12 @@ export function OperationsSettings() {
                         </span>
                      </td>
                      <td className="px-6 py-4 text-right space-x-2">
-                        <button className="p-2 hover:bg-indigo-500/10 hover:text-indigo-500 rounded-lg transition-colors" title="Download">
+                        <button aria-label="Download backup" className="p-2 hover:bg-indigo-500/10 hover:text-indigo-500 rounded-lg transition-colors" title="Download">
                           <FileText className="w-4 h-4" />
                         </button>
                         <button 
                           onClick={() => deleteBackup.mutate(backup.backup_id)}
+                          aria-label={`Delete backup ${backup.backup_id}`}
                           className="p-2 hover:bg-rose-500/10 hover:text-rose-500 rounded-lg transition-colors" 
                           title="Delete"
                           disabled={deleteBackup.isPending}

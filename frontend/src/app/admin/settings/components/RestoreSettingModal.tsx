@@ -19,7 +19,7 @@ export function RestoreSettingModal({
       <div className="w-full max-w-md bg-card border border-border rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between p-6 border-b border-border/50">
           <h2 className="text-xl font-bold font-heading">Restore Deleted Setting</h2>
-          <button onClick={onCancel} className="p-2 text-muted-foreground hover:bg-secondary rounded-full transition-colors">
+          <button onClick={onCancel} aria-label="Close restore setting modal" className="p-2 text-muted-foreground hover:bg-secondary rounded-full transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>

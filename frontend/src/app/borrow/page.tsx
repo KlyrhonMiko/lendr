@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { auth } from '@/lib/auth';
 import { api } from '@/lib/api';
 import { CartItem } from './lib/types';
+import { validateBorrowSubmission, validatePinVerificationInput } from './lib/validation';
 import { SelectionView } from './components/SelectionView';
 
 export default function BorrowPage() {
@@ -168,15 +169,13 @@ export default function BorrowPage() {
   }, []);
 
   const handleConfirmPin = async () => {
+    const pinValidationError = validatePinVerificationInput(employeeId, pinDraft);
+    if (pinValidationError) {
+      toast.error(pinValidationError);
+      return;
+    }
+
     const cleaned = pinDraft.replace(/\D/g, '');
-    if (cleaned.length !== 6) {
-      toast.error('Employee PIN must be 6 digits');
-      return;
-    }
-    if (!employeeId.trim()) {
-      toast.error('Employee ID is required to verify PIN');
-      return;
-    }
 
     setIsPinVerifying(true);
     try {
@@ -213,23 +212,18 @@ export default function BorrowPage() {
   };
 
   const handleSubmit = async () => {
-    if (cart.length === 0) return;
-    if (!employeeId.trim()) {
-      toast.error('Employee ID is required');
+    const validationError = validateBorrowSubmission({
+      cart,
+      employeeId,
+      employeePin,
+      customerName,
+      locationName,
+    });
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
-    if (employeePin.trim().length !== 6) {
-      toast.error('Employee PIN must be 6 digits');
-      return;
-    }
-    if (!customerName.trim()) {
-      toast.error('Client name is required');
-      return;
-    }
-    if (!locationName.trim()) {
-      toast.error('Client location is required');
-      return;
-    }
+
     setIsSubmitting(true);
 
     let hasBorrowerSession = false;
@@ -347,6 +341,7 @@ export default function BorrowPage() {
             <div className="px-7 pt-7 pb-5 text-center relative">
               <button
                 onClick={handleClosePinModal}
+                aria-label="Close PIN modal"
                 className="absolute right-4 top-4 w-10 h-10 flex items-center justify-center rounded-xl text-muted-foreground hover:bg-muted transition-colors active:scale-95"
               >
                 <X className="w-5 h-5" />

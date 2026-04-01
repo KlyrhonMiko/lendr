@@ -70,6 +70,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
 
         <button
           onClick={() => void logout()}
+          aria-label="Sign out"
           className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-muted-foreground/60 hover:text-destructive hover:bg-destructive/5 border border-transparent hover:border-destructive/10 transition-all active:scale-95"
           title="Sign out"
         >

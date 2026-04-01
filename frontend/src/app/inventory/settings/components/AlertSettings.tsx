@@ -421,6 +421,7 @@ export function AlertSettings() {
                     </div>
                     <button 
                       onClick={() => removeSpecificRecipient(idx)}
+                      aria-label={`Remove recipient ${rec.name}`}
                       className="opacity-0 group-hover:opacity-100 p-2 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-all"
                     >
                         <X className="w-3.5 h-3.5" />

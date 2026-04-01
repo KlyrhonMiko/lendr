@@ -108,6 +108,7 @@ export function SelectionView({
             {search && (
               <button
                 onClick={() => onSearchChange('')}
+                aria-label="Clear search"
                 className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-muted transition-colors active:scale-95"
               >
                 <X className="w-4 h-4" />
@@ -240,6 +241,7 @@ export function SelectionView({
           {cart.length > 0 && (
             <button
               onClick={onClear}
+              aria-label="Clear cart"
               className="w-10 h-10 flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl transition-colors active:scale-95"
               title="Clear cart"
             >
@@ -278,6 +280,7 @@ export function SelectionView({
                   <div className="flex items-center gap-1 bg-secondary/60 rounded-xl p-1 shrink-0">
                     <button
                       onClick={() => onUpdateCartQty(item.item_id, -1)}
+                      aria-label={`Decrease quantity for ${item.name}`}
                       className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-background transition-colors text-muted-foreground active:scale-95"
                     >
                       <Minus className="w-4 h-4" />
@@ -287,6 +290,7 @@ export function SelectionView({
                     </span>
                     <button
                       onClick={() => onUpdateCartQty(item.item_id, 1)}
+                      aria-label={`Increase quantity for ${item.name}`}
                       className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-background transition-colors text-muted-foreground active:scale-95"
                     >
                       <Plus className="w-4 h-4" />
@@ -294,6 +298,7 @@ export function SelectionView({
                   </div>
                   <button
                     onClick={() => onRemoveFromCart(item.item_id)}
+                    aria-label={`Remove ${item.name} from cart`}
                     className="w-9 h-9 flex items-center justify-center text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors shrink-0 active:scale-95"
                   >
                     <X className="w-4 h-4" />

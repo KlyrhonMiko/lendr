@@ -38,7 +38,7 @@ export function ItemHistory({ itemId, onClose }: ItemHistoryProps) {
             <h2 className="text-xl font-bold font-heading">Movement Ledger & Health</h2>
             <p className="text-sm text-muted-foreground">Historical equipment movement and reconciliation status.</p>
           </div>
-          <button onClick={onClose} className="p-2 text-muted-foreground hover:bg-secondary rounded-full">
+          <button onClick={onClose} aria-label="Close item history" className="p-2 text-muted-foreground hover:bg-secondary rounded-full">
             <X className="w-5 h-5" />
           </button>
         </div>
