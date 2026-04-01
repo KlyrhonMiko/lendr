@@ -44,11 +44,13 @@ yarn-error.log*
 /.logs
 /.tests
 /.todo
+/.scripts
 
 # backend-specific local artifacts
 backend/.logs
 backend/.tests
 backend/.todo
+backend/.scripts
 backend/data/logs
 
 # vercel
@@ -116,6 +118,8 @@ dmypy.json
 
 # Claude/agent files (local agent state, memories)
 .agents/
+.github/
 .claude/
 memories/
 CLAUDE.md
+.claudesignore

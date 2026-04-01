@@ -68,6 +68,8 @@ async def create_inventory_setting(
         description=setting_data.description,
         actor_id=current_user.id,
     )
+    session.commit()
+
     setting = inventory_service.get_by_key(
         session, setting_data.key, category=setting_data.category
     )
@@ -94,6 +96,7 @@ async def delete_inventory_setting(
         raise HTTPException(status_code=404, detail="Setting not found")
 
     inventory_service.delete(session, setting, actor_id=current_user.id)
+    session.commit()
     return create_success_response(data=setting, request=request)
 
 
@@ -145,6 +148,8 @@ async def create_borrower_setting(
         description=setting_data.description,
         actor_id=current_user.id,
     )
+    session.commit()
+
     setting = borrower_service.get_by_key(
         session, setting_data.key, category=setting_data.category
     )
@@ -171,4 +176,5 @@ async def delete_borrower_setting(
         raise HTTPException(status_code=404, detail="Setting not found")
 
     borrower_service.delete(session, setting, actor_id=current_user.id)
+    session.commit()
     return create_success_response(data=setting, request=request)

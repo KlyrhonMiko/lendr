@@ -29,7 +29,7 @@ export interface UserCreate {
   shift_type: string;
 }
 
-export interface UserUpdate extends Partial<UserCreate> {}
+export type UserUpdate = Partial<UserCreate>;
 
 export interface UserListParams {
   page?: number;

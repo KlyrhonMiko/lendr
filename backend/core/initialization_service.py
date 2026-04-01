@@ -8,15 +8,41 @@ from systems.admin.models.user import User
 from systems.admin.models.settings import AdminConfig
 from systems.auth.models.settings import AuthConfig
 from systems.inventory.models.settings import InventoryConfig, BorrowerConfig
+from core.config import settings
 from utils.security import get_password_hash
 from data.system_init_data import SYSTEM_CONFIGS, RBAC_ROLES
 from utils.logging import get_logger
 from utils.migrations import run_migrations
+from systems.auth.services.rbac_service import normalize_role, validate_role_policy_payload
 
 logger = get_logger("core.init")
 
 AUTH_CONFIG_CATEGORIES = {"users_role", "users_shift_type"}
 ConfigModel = Type[AdminConfig] | Type[InventoryConfig] | Type[BorrowerConfig] | Type[AuthConfig]
+
+
+def resolve_bootstrap_admin_credentials() -> tuple[str, str]:
+    """Resolve bootstrap admin credentials from environment-backed settings."""
+    bootstrap_username = (settings.INITIAL_ADMIN_USERNAME or "").strip() or "admin"
+    bootstrap_password = settings.INITIAL_ADMIN_PASSWORD
+
+    if bootstrap_password:
+        return bootstrap_username, bootstrap_password
+
+    if settings.DEBUG and settings.ALLOW_INSECURE_DEV_DEFAULT_ADMIN:
+        # Development-only deterministic fallback derived from SECRET_KEY.
+        derived_password = f"dev-{settings.SECRET_KEY[:12]}"
+        logger.warning(
+            "Using insecure development fallback for bootstrap admin password. "
+            "Set INITIAL_ADMIN_PASSWORD to avoid derived development credentials."
+        )
+        return bootstrap_username, derived_password
+
+    raise RuntimeError(
+        "INITIAL_ADMIN_PASSWORD is required to bootstrap ADMIN-001. "
+        "Set INITIAL_ADMIN_PASSWORD or enable ALLOW_INSECURE_DEV_DEFAULT_ADMIN=true "
+        "with DEBUG=true for local development only."
+    )
 
 class InitializationService:
     def _resolve_config_model(self, config_data: dict) -> tuple[ConfigModel, str]:
@@ -33,18 +59,20 @@ class InitializationService:
         return AdminConfig, "admin"
 
     def ensure_admin_user(self, session: Session):
-        """Pre-create admin123 user directly in database if it doesn't exist."""
+        """Pre-create bootstrap admin user if it doesn't exist."""
         existing = session.exec(
-            select(User).where(User.username == "admin123", User.is_deleted.is_(False))
+            select(User).where(User.user_id == "ADMIN-001", User.is_deleted.is_(False))
         ).first()
 
         if not existing:
+            bootstrap_username, bootstrap_password = resolve_bootstrap_admin_credentials()
+
             admin_user = User(
                 id=uuid4(),
                 user_id="ADMIN-001",
-                username="admin123",
+                username=bootstrap_username,
                 email="admin@lendr.system",
-                hashed_password=get_password_hash("admin123"),
+                hashed_password=get_password_hash(bootstrap_password),
                 first_name="System",
                 last_name="Administrator",
                 last_active=datetime.now(timezone.utc),
@@ -53,11 +81,12 @@ class InitializationService:
                 employee_id="SYS-ADMIN-001",
                 role="admin",
                 shift_type="day",
+                must_change_password=True,
                 created_at=datetime.now(timezone.utc),
                 updated_at=datetime.now(timezone.utc),
             )
             session.add(admin_user)
-            logger.info("Created default administrator (admin123)")
+            logger.info("Created bootstrap administrator (%s)", bootstrap_username)
         else:
             logger.debug("Administrator account already exists.")
 
@@ -147,12 +176,20 @@ class InitializationService:
         """Idempotently seed RBAC role-specific permissions."""
         count = 0
         for role_data in RBAC_ROLES:
-            role_key = role_data["role"].lower()
-            payload = {
-                "systems": role_data["systems"],
-                "permissions": role_data["permissions"],
-                "display_name": role_data["display_name"]
-            }
+            role_key = normalize_role(str(role_data.get("role", "")))
+            try:
+                payload = validate_role_policy_payload(
+                    role_key,
+                    {
+                        "systems": role_data.get("systems"),
+                        "permissions": role_data.get("permissions"),
+                        "display_name": role_data.get("display_name"),
+                    },
+                )
+            except ValueError as exc:
+                raise RuntimeError(
+                    f"Invalid RBAC seed payload for role '{role_data.get('role')}'"
+                ) from exc
             
             existing = session.exec(
                 select(AdminConfig).where(

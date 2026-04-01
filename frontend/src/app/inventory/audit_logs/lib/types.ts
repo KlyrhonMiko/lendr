@@ -1,3 +1,5 @@
+import type { JsonValue } from '@/lib/types/json';
+
 export interface AuditLog {
   audit_id: string;
   entity_type: string;
@@ -7,8 +9,8 @@ export interface AuditLog {
   user_id?: string;
   employee_id?: string;
   created_at: string;
-  before_json?: Record<string, any>;
-  after_json?: Record<string, any>;
+  before_json?: Record<string, JsonValue>;
+  after_json?: Record<string, JsonValue>;
 }
 
 export interface AuditLogParams {

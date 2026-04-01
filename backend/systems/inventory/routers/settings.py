@@ -30,4 +30,6 @@ async def update_alert_settings(
 ):
     """Update aggregate alert settings."""
     settings = settings_service.update_alert_settings(session, settings_data, actor_id=current_user.id)
+    session.commit()
+
     return create_success_response(data=settings, request=request)

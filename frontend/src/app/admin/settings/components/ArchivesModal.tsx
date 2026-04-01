@@ -8,6 +8,10 @@ import { Check } from 'lucide-react';
 
 type ArchiveTab = 'audit' | 'borrow';
 
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
 export function ArchivesModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const [activeTab, setActiveTab] = useState<ArchiveTab>('audit');
   const [loading, setLoading] = useState(false);
@@ -28,8 +32,8 @@ export function ArchivesModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
         const res = await archivesApi.getBorrowRequests();
         setBorrowRequests(res.data);
       }
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to fetch archived records');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to fetch archived records'));
     } finally {
       setLoading(false);
     }
@@ -66,8 +70,8 @@ export function ArchivesModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
       toast.success('Record restored successfully');
       // Refresh data
       fetchData();
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to restore record');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to restore record'));
     } finally {
       setRestoringId(null);
     }
@@ -80,8 +84,8 @@ export function ArchivesModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
       await archivesApi.updateTags(entityType, id, tags);
       toast.success('Retention tags updated');
       fetchData();
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to update tags');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to update tags'));
     }
   };
 
@@ -120,6 +124,7 @@ export function ArchivesModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
           </div>
           <button 
             onClick={onClose} 
+            aria-label="Close archives modal"
             className="p-2 hover:bg-secondary rounded-full transition-colors"
           >
             <X className="w-5 h-5" />
@@ -369,6 +374,7 @@ function TagSelector({
       <div className="flex items-center justify-between mb-2 px-1">
         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Select Tags</span>
         <button onClick={onClose} className="p-1 hover:bg-muted rounded-full transition-colors">
+          <span className="sr-only">Close tag selector</span>
             <X className="w-3 h-3" />
         </button>
       </div>

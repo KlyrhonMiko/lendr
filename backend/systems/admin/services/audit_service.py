@@ -16,6 +16,34 @@ class AuditService(BaseService[AuditLog, Any, Any]):
         super().__init__(AuditLog, lookup_field="audit_id")
 
     @staticmethod
+    def _is_sensitive_key(key: str) -> bool:
+        lowered = key.lower()
+        sensitive_tokens = (
+            "password",
+            "token",
+            "secret",
+            "authorization",
+            "api_key",
+            "cookie",
+        )
+        return any(token in lowered for token in sensitive_tokens)
+
+    def _redact_sensitive_payload(self, value: Any, parent_key: str | None = None) -> Any:
+        if parent_key and self._is_sensitive_key(parent_key):
+            return "[REDACTED]"
+
+        if isinstance(value, dict):
+            return {
+                key: self._redact_sensitive_payload(nested_value, parent_key=key)
+                for key, nested_value in value.items()
+            }
+
+        if isinstance(value, list):
+            return [self._redact_sensitive_payload(item, parent_key=parent_key) for item in value]
+
+        return value
+
+    @staticmethod
     def _uuid_key_to_human_key(key: str) -> str:
         key_map = {
             "borrower_uuid": "borrower_id",
@@ -169,6 +197,8 @@ class AuditService(BaseService[AuditLog, Any, Any]):
         from utils.id_generator import get_next_sequence
         
         audit_id = get_next_sequence(db, self.model, "audit_id", "AUDIT")
+        sanitized_before = self._redact_sensitive_payload(before)
+        sanitized_after = self._redact_sensitive_payload(after)
         
         log_entry = AuditLog(
             audit_id=audit_id,
@@ -177,11 +207,11 @@ class AuditService(BaseService[AuditLog, Any, Any]):
             action=action,
             reason_code=reason_code,
             actor_id=actor_id,
-            before_json=before,
-            after_json=after
+            before_json=sanitized_before,
+            after_json=sanitized_after,
         )
         db.add(log_entry)
-        db.commit()
+        db.flush()
         db.refresh(log_entry)
         return log_entry
 

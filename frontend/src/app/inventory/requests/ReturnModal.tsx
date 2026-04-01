@@ -7,6 +7,7 @@ import { inventoryApi, ConfigRead } from '../items/api';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
 
 interface ReturnModalProps {
   request: BorrowRequest;
@@ -32,7 +33,7 @@ export function ReturnModal({ request, onClose, onSuccess }: ReturnModalProps) {
   const [globalConditionOpen, setGlobalConditionOpen] = useState(false);
   const [openConditionUnit, setOpenConditionUnit] = useState<string | null>(null);
 
-  const hasTrackableItems = request.items.some(item => (item as any).is_trackable);
+  const hasTrackableItems = request.items.some((item) => !!item.is_trackable);
 
   const conditionStyle = (condition: string) => {
     if (!condition) return 'bg-muted/40 border-border text-muted-foreground';
@@ -65,7 +66,7 @@ export function ReturnModal({ request, onClose, onSuccess }: ReturnModalProps) {
           notes: '',
         })));
       } catch (err) {
-        console.error('Failed to load return data:', err);
+        logger.error('Failed to load return modal data', { error: err, requestId: request.request_id });
         toast.error('Failed to load assigned units');
       } finally {
         setLoading(false);
@@ -127,7 +128,7 @@ export function ReturnModal({ request, onClose, onSuccess }: ReturnModalProps) {
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 text-muted-foreground hover:bg-secondary rounded-full transition-colors">
+          <button onClick={onClose} aria-label="Close return modal" className="p-2 text-muted-foreground hover:bg-secondary rounded-full transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>

@@ -48,6 +48,7 @@ export default function BackupPage() {
             <button
               onClick={() => refreshRuns()}
               disabled={loading}
+              aria-label="Refresh backup runs"
               className="px-3 h-10 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors flex items-center justify-center disabled:opacity-50"
               title="Refresh Runs"
             >
@@ -112,6 +113,7 @@ export default function BackupPage() {
                         <button
                           key={artifact.artifact_id}
                           onClick={() => handleDownload(artifact.artifact_id, `backup_${run.destination}_${artifact.target_type}.sql`)}
+                          aria-label={`Download ${artifact.target_type} backup artifact`}
                           className="p-2 text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg transition-colors ml-1 inline-flex"
                           title={`Download ${artifact.target_type}`}
                         >

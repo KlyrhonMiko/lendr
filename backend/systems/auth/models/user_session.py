@@ -14,5 +14,6 @@ class UserSession(BaseModel, table=True):
     device_id: str | None = Field(default=None, max_length=100)
     
     issued_at: datetime = Field(default_factory=get_now_manila)
+    last_activity_at: datetime | None = Field(default_factory=get_now_manila)
     expires_at: datetime
     is_revoked: bool = Field(default=False)

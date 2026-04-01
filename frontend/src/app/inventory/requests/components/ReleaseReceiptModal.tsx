@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
+import DOMPurify from 'dompurify';
 import {
   X,
   Printer,
@@ -152,15 +153,24 @@ function buildReceiptHtml(receipt: ReleaseReceipt, signatureDataUrl: string | nu
   </div>`;
 }
 
+function sanitizeReceiptHtml(html: string): string {
+  return DOMPurify.sanitize(html, {
+    USE_PROFILES: { html: true },
+    ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|data:image\/(?:png|jpeg|jpg|gif|webp);base64,)/i,
+  });
+}
+
 function ReceiptPreview({
   receipt, signatureDataUrl,
 }: {
   receipt: ReleaseReceipt;
   signatureDataUrl: string | null;
 }) {
+  const sanitizedHtml = sanitizeReceiptHtml(buildReceiptHtml(receipt, signatureDataUrl));
+
   return (
     <div className="bg-white border border-gray-200 rounded-lg mx-auto my-4 shadow-sm" style={{ maxWidth: '340px' }}>
-      <div className="p-5" dangerouslySetInnerHTML={{ __html: buildReceiptHtml(receipt, signatureDataUrl) }} />
+      <div className="p-5" dangerouslySetInnerHTML={{ __html: sanitizedHtml }} />
     </div>
   );
 }
@@ -238,7 +248,7 @@ export function ReleaseReceiptModal({
   const openPrintWindow = useCallback(
     (styles: string, autoClose: boolean) => {
       if (!receipt) return;
-      const html = buildReceiptHtml(receipt, signatureDataUrl);
+      const html = sanitizeReceiptHtml(buildReceiptHtml(receipt, signatureDataUrl));
       const w = window.open('', '_blank', 'width=500,height=800');
       if (!w) return;
       w.document.write(`<!DOCTYPE html><html><head>
@@ -273,7 +283,7 @@ export function ReleaseReceiptModal({
               <p className="text-xs text-muted-foreground">{receipt ? receipt.receipt_number : 'Loading...'}</p>
             </div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-muted/50 flex items-center justify-center transition-colors" type="button">
+          <button onClick={onClose} aria-label="Close release receipt" className="w-8 h-8 rounded-lg hover:bg-muted/50 flex items-center justify-center transition-colors" type="button">
             <X className="w-4 h-4" />
           </button>
         </div>

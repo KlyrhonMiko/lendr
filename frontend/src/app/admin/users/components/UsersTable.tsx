@@ -123,6 +123,7 @@ export function UsersTable({
             <div className="flex items-center justify-end gap-2">
               <button
                 onClick={() => onEdit(user)}
+                aria-label={`Edit ${user.first_name} ${user.last_name}`}
                 className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-muted-foreground hover:text-indigo-600 hover:bg-indigo-500/10 rounded-lg transition-colors"
               >
                 <Pencil className="w-4 h-4" />
@@ -132,6 +133,7 @@ export function UsersTable({
               {!user.is_deleted ? (
                 <button
                   onClick={() => onRequestAction({ type: 'delete', user })}
+                  aria-label={`Deactivate ${user.first_name} ${user.last_name}`}
                   className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -140,6 +142,7 @@ export function UsersTable({
               ) : (
                 <button
                   onClick={() => onRequestAction({ type: 'restore', user })}
+                  aria-label={`Restore ${user.first_name} ${user.last_name}`}
                   className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-muted-foreground hover:text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition-colors"
                 >
                   <RotateCcw className="w-4 h-4" />

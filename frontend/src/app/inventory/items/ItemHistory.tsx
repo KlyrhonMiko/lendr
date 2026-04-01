@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { inventoryApi } from './api';
+import { inventoryApi, InventoryMovement } from './api';
 import { X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -11,7 +11,7 @@ interface ItemHistoryProps {
 }
 
 export function ItemHistory({ itemId, onClose }: ItemHistoryProps) {
-  const [history, setHistory] = useState<any[]>([]);
+  const [history, setHistory] = useState<InventoryMovement[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
@@ -19,7 +19,7 @@ export function ItemHistory({ itemId, onClose }: ItemHistoryProps) {
     try {
       const historyRes = await inventoryApi.getHistory(itemId);
       setHistory(historyRes.data);
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error('Failed to load item activity');
     } finally {
       setLoading(false);
@@ -38,7 +38,7 @@ export function ItemHistory({ itemId, onClose }: ItemHistoryProps) {
             <h2 className="text-xl font-bold font-heading">Movement Ledger & Health</h2>
             <p className="text-sm text-muted-foreground">Historical equipment movement and reconciliation status.</p>
           </div>
-          <button onClick={onClose} className="p-2 text-muted-foreground hover:bg-secondary rounded-full">
+          <button onClick={onClose} aria-label="Close item history" className="p-2 text-muted-foreground hover:bg-secondary rounded-full">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -51,7 +51,7 @@ export function ItemHistory({ itemId, onClose }: ItemHistoryProps) {
                 <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>
               ) : history.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">No movement records found for this item.</div>
-              ) : history.map((move, i) => (
+              ) : history.map((move) => (
                 <div key={move.movement_id} className="relative pl-10">
                   <div className={`absolute left-2.5 top-1.5 w-3.5 h-3.5 rounded-full border-2 border-background z-10 ${
                     move.qty_change > 0 ? 'bg-emerald-500' : 'bg-rose-500'

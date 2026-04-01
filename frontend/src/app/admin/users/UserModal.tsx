@@ -13,6 +13,11 @@ interface UserModalProps {
   onSuccess: () => void;
 }
 
+type EditableUserUpdate = UserUpdate & {
+  employee_id?: string;
+  password?: string;
+};
+
 export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
   const isEdit = !!user;
   const [loading, setLoading] = useState(false);
@@ -72,17 +77,12 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
           toast.error('PIN must be exactly 6 digits');
           return;
         }
-        const updateData: UserUpdate = { ...formData };
-        if (employeeId) {
-          updateData.username = employeeId;
-          updateData.employee_id = employeeId;
-        } else {
-          updateData.username = effectiveUsername;
-          delete (updateData as any).employee_id;
-        }
-        if (!updateData.password) {
-          delete (updateData as any).password;
-        }
+          const updateData: EditableUserUpdate = {
+          ...formData,
+          username: employeeId || effectiveUsername,
+          ...(employeeId ? { employee_id: employeeId } : {}),
+          ...(pin ? { password: pin } : {}),
+        };
         await userApi.update(user.user_id, updateData);
         toast.success('User updated successfully');
       } else {
@@ -105,8 +105,9 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
         toast.success('User registered successfully');
       }
       onSuccess();
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to save user');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to save user';
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -148,6 +149,7 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
           </div>
           <button
             onClick={onClose}
+            aria-label="Close user modal"
             className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />

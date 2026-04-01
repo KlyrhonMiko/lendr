@@ -1,5 +1,6 @@
 import random
 import string
+from datetime import datetime
 
 from sqlalchemy import Index, text
 from sqlmodel import Field
@@ -34,6 +35,8 @@ class User(BaseModel, table=True):
     role: str = Field(max_length=50)
     employee_id: str | None = Field(default=None, index=True, max_length=50)
     shift_type: str = Field(default="day", max_length=20)
+    must_change_password: bool = Field(default=False, nullable=False)
+    password_rotated_at: datetime | None = Field(default=None, nullable=True)
 
     @property
     def full_name(self) -> str:

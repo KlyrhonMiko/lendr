@@ -10,6 +10,7 @@ import { ReturnModal } from './ReturnModal';
 import type { PaginationMeta } from '@/lib/api';
 import { toast } from 'sonner';
 import type { StatusTab, BorrowRecord, BorrowAction } from './lib/types';
+import type { BorrowRequestBatch, BorrowRequestUnit } from './api';
 import { DEFAULT_PER_PAGE } from './lib/types';
 import { useDebounce } from './lib/useDebounce';
 import { RequestsHeader } from './components/RequestsHeader';
@@ -17,6 +18,7 @@ import { RequestsToolbar } from './components/RequestsToolbar';
 import { RequestsTable } from './components/RequestsTable';
 import { ConfirmBorrowActionModal } from './components/ConfirmBorrowActionModal';
 import { ReleaseReceiptModal } from './components/ReleaseReceiptModal';
+import { logger } from '@/lib/logger';
 
 export default function BorrowsPage() {
 
@@ -36,7 +38,7 @@ export default function BorrowsPage() {
   const [assigningRequest, setAssigningRequest] = useState<BorrowRecord | null>(null);
   const [returningRequest, setReturningRequest] = useState<BorrowRecord | null>(null);
   const [actionNotes, setActionNotes] = useState('');
-  const [assignmentsMap, setAssignmentsMap] = useState<Record<string, { units: any[], batches: any[] }>>({});
+  const [assignmentsMap, setAssignmentsMap] = useState<Record<string, { units: BorrowRequestUnit[]; batches: BorrowRequestBatch[] }>>({});
   const [receiptRequestId, setReceiptRequestId] = useState<string | null>(null);
 
   const debouncedSearch = useDebounce(searchInput, 400);
@@ -61,7 +63,7 @@ export default function BorrowsPage() {
       const res = await borrowApi.getEvents(requestId);
       setRequestEvents(prev => ({ ...prev, [requestId]: res.data as BorrowRequestEvent[] }));
     } catch (err) {
-      console.error('Failed to fetch events:', err);
+      logger.error('Failed to fetch borrow request events', { error: err, requestId });
     } finally {
       setLoadingEvents(prev => ({ ...prev, [requestId]: false }));
     }
@@ -78,7 +80,7 @@ export default function BorrowsPage() {
         [requestId]: { units: units.data, batches: batches.data }
       }));
     } catch (err) {
-      console.error('Failed to fetch assignments:', err);
+      logger.error('Failed to fetch borrow request assignments', { error: err, requestId });
     }
   }, []);
 
@@ -88,7 +90,7 @@ export default function BorrowsPage() {
     
     const totalRequested = record.items.reduce((sum, item) => sum + item.qty_requested, 0);
     const totalAssignedUnits = assignments.units.length;
-    const totalAssignedBatches = assignments.batches.reduce((sum: number, b: any) => sum + b.qty_assigned, 0);
+    const totalAssignedBatches = assignments.batches.reduce((sum: number, b: BorrowRequestBatch) => sum + b.qty_assigned, 0);
     
     return (totalAssignedUnits + totalAssignedBatches) >= totalRequested;
   }, [assignmentsMap]);

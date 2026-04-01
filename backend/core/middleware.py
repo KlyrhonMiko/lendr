@@ -4,14 +4,13 @@ from fastapi.responses import JSONResponse
 from sqlmodel import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
-from jose import jwt
 
 from core.database import engine
 from core.schemas import create_error_response
-from core.config import settings
 from systems.admin.services.configuration_service import ConfigurationService
 from systems.admin.services.user_service import UserService
 from systems.auth.services.auth_service import auth_service
+from utils.security import decode_access_token
 
 logger = logging.getLogger("app")
 
@@ -56,7 +55,7 @@ class MaintenanceMiddleware(BaseHTTPMiddleware):
                 try:
                     token = auth_header.split(" ")[1]
                     # Manually decode token to check role
-                    payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+                    payload = decode_access_token(token)
                     user_id = payload.get("sub")
                     session_id = payload.get("session_id")
                     
@@ -67,6 +66,8 @@ class MaintenanceMiddleware(BaseHTTPMiddleware):
                             is_valid = False
                             if str(session_id).startswith("USE"):
                                 is_valid = auth_service.is_user_session_valid(session, session_id)
+                                if session.new or session.dirty or session.deleted:
+                                    session.commit()
                             
                             if is_valid:
                                 is_admin = True

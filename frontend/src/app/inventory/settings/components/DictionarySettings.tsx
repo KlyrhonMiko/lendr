@@ -142,6 +142,7 @@ export function DictionarySettings({
               </div>
               <button 
                 onClick={() => setIsAdding(false)}
+                aria-label="Close new entry form"
                 className="w-8 h-8 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground"
               >
                 <X className="w-4 h-4" />
@@ -281,12 +282,14 @@ export function DictionarySettings({
                            <>
                              <button 
                                 onClick={handleSaveEdit}
+                                aria-label="Save dictionary entry"
                                 className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center hover:bg-emerald-500/20 transition-all"
                              >
                                <Check className="w-4 h-4" />
                              </button>
                              <button 
                                 onClick={handleCancelEdit}
+                                aria-label="Cancel dictionary edit"
                                 className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-500 flex items-center justify-center hover:bg-rose-500/20 transition-all"
                              >
                                <X className="w-4 h-4" />
@@ -296,12 +299,14 @@ export function DictionarySettings({
                            <>
                              <button 
                                 onClick={() => handleStartEdit(setting)}
+                                aria-label={`Edit ${setting.key}`}
                                 className="w-8 h-8 rounded-lg text-muted-foreground flex items-center justify-center hover:bg-indigo-500/10 hover:text-indigo-500 transition-all"
                              >
                                <Edit2 className="w-4 h-4" />
                              </button>
                              <button 
                                 onClick={() => handleDelete(setting)}
+                                aria-label={`Delete ${setting.key}`}
                                 className="w-8 h-8 rounded-lg text-muted-foreground flex items-center justify-center hover:bg-rose-500/10 hover:text-rose-500 transition-all"
                              >
                                <Trash2 className="w-4 h-4" />

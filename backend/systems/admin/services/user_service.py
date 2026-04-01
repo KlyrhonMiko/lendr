@@ -12,6 +12,20 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
     def __init__(self):
         super().__init__(User, lookup_field="user_id")
 
+    def requires_session_revocation(self, user: User, schema: UserUpdate) -> bool:
+        updates = schema.model_dump(exclude_unset=True)
+        if not updates:
+            return False
+
+        if updates.get("password"):
+            return True
+
+        for field_name in ("email", "username", "role"):
+            if field_name in updates and updates[field_name] != getattr(user, field_name):
+                return True
+
+        return False
+
     def get_all(
         self,
         session: Session,
@@ -96,7 +110,7 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
 
         db_obj = self.model(**data)
         session.add(db_obj)
-        session.commit()
+        session.flush()
         session.refresh(db_obj)
         return db_obj
 
@@ -111,6 +125,6 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
 
         db_obj.updated_at = get_now_manila()
         session.add(db_obj)
-        session.commit()
+        session.flush()
         session.refresh(db_obj)
         return db_obj

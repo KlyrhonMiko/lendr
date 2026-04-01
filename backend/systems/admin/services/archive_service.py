@@ -95,7 +95,7 @@ class ArchiveService:
         
         statement = select(model).where(
             model.created_at < cutoff,
-            ~model.is_archived
+            model.is_archived.is_(False)
         )
         records = session.exec(statement).all()
         
@@ -124,7 +124,7 @@ class ArchiveService:
         # We only purge records that are already archived
         statement = select(model).where(
             model.created_at < cutoff,
-            model.is_archived
+            model.is_archived.is_(True)
         )
         records = session.exec(statement).all()
         

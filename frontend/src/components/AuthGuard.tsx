@@ -31,7 +31,7 @@ export function AuthGuard({
             <div className="absolute -inset-4 rounded-3xl bg-gradient-to-br from-yellow-400/20 to-amber-600/20 blur-xl animate-pulse" />
             <div className="relative w-20 h-20 rounded-2xl bg-white flex items-center justify-center shadow-lg shadow-yellow-500/20 p-2">
               <Image
-                src="/image/Powergold Enterprise Logo.png"
+                src="/Image/Powergold Enterprise Logo.png"
                 alt="Powergold"
                 width={64}
                 height={64}

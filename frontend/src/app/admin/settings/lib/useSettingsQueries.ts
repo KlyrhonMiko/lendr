@@ -1,7 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { settingsApi, healthApi, archivesApi, SettingsListParams, SystemSettingCreate, SystemSetting } from '../api';
+import {
+  settingsApi,
+  healthApi,
+  archivesApi,
+  SettingsListParams,
+  SystemSettingCreate,
+  GeneralSettingsData,
+  BrandingSettingsData,
+  OperationsSettingsData,
+} from '../api';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
+import type { BackupRun } from '../../backup/api';
 
 const STALE_TIME_CONFIG = Infinity;
 const STALE_TIME_LIST = 1000 * 30; // 30 seconds
@@ -80,7 +90,7 @@ export function useHealthLogs(params: { page?: number; per_page?: number }) {
 export function useGeneralSettings() {
   return useQuery({
     queryKey: ['admin', 'settings', 'general'],
-    queryFn: () => api.get<any>('/admin/settings/general'),
+    queryFn: () => api.get<GeneralSettingsData>('/admin/settings/general'),
     staleTime: Infinity,
   });
 }
@@ -88,7 +98,7 @@ export function useGeneralSettings() {
 export function useBrandingSettings() {
   return useQuery({
     queryKey: ['admin', 'settings', 'branding'],
-    queryFn: () => api.get<any>('/admin/settings/branding'),
+    queryFn: () => api.get<BrandingSettingsData>('/admin/settings/branding'),
     staleTime: Infinity, // Branding changes very rarely
   });
 }
@@ -98,7 +108,7 @@ export function useBrandingSettings() {
 export function useOperationsSettings() {
   return useQuery({
     queryKey: ['admin', 'settings', 'operations'],
-    queryFn: () => api.get<any>('/admin/settings/operations'),
+    queryFn: () => api.get<OperationsSettingsData>('/admin/settings/operations'),
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
@@ -106,7 +116,7 @@ export function useOperationsSettings() {
 export function useBackupRuns() {
   return useQuery({
     queryKey: ['admin', 'backups', 'runs'],
-    queryFn: () => api.get<any[]>('/admin/backups/runs'),
+    queryFn: () => api.get<BackupRun[]>('/admin/backups/runs'),
     staleTime: 1000 * 60, // 1 minute
   });
 }
@@ -195,7 +205,7 @@ export function useOperationsMutations() {
   const queryClient = useQueryClient();
 
   const updateOperations = useMutation({
-    mutationFn: (data: any) => api.put('/admin/settings/operations', data),
+    mutationFn: (data: OperationsSettingsData) => api.put('/admin/settings/operations', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'settings', 'operations'] });
       toast.success('System operations updated successfully');
@@ -209,7 +219,7 @@ export function useGeneralMutations() {
   const queryClient = useQueryClient();
 
   const updateGeneral = useMutation({
-    mutationFn: (data: any) => api.put('/admin/settings/general', data),
+    mutationFn: (data: GeneralSettingsData) => api.put('/admin/settings/general', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'settings', 'general'] });
       toast.success('General settings updated successfully');
@@ -223,7 +233,7 @@ export function useBrandingMutations() {
   const queryClient = useQueryClient();
 
   const updateBranding = useMutation({
-    mutationFn: (data: any) => api.put('/admin/settings/branding', data),
+    mutationFn: (data: BrandingSettingsData) => api.put('/admin/settings/branding', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'settings', 'branding'] });
       toast.success('Branding settings updated successfully');

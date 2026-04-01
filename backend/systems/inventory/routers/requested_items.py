@@ -31,11 +31,14 @@ async def create_requested_item(
     create_schema = RequestedItemCreate(**payload)
     try:
         db_obj = req_service.create_request(session, create_schema)
+        session.commit()
+        session.refresh(db_obj)
 
         return create_success_response(
             data=db_obj, message="Requested item created", request=request
         )
     except ValueError as e:
+        session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 

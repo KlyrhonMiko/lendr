@@ -91,6 +91,8 @@ async def restore_archived_record(
         borrow_request_service.restore_archive(session, obj, actor_id=current_user.id)
     else:
         raise HTTPException(status_code=400, detail="Invalid entity type")
+
+    session.commit()
         
     return create_success_response(
         data=None,

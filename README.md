@@ -274,7 +274,7 @@ docker compose exec backend python data/seed_configuration.py
 
 | Service        | URL                          | Login              |
 |----------------|------------------------------|--------------------|
-| Frontend       | http://localhost:3000        | admin123/admin123  |
+| Frontend       | http://localhost:3000        | Set via INITIAL_ADMIN_USERNAME/INITIAL_ADMIN_PASSWORD |
 | Backend API    | http://localhost:8000        | —                  |
 | API Docs       | http://localhost:8000/docs   | —                  |
 | Adminer (DB)   | http://localhost:8080        | —                  |
@@ -327,6 +327,8 @@ SECRET_KEY=your_super_secret_jwt_key_change_this_in_production
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 DEBUG=true
+INITIAL_ADMIN_USERNAME=admin
+INITIAL_ADMIN_PASSWORD=change_me_now
 ```
 
 **Run database migrations:**
@@ -341,7 +343,7 @@ alembic upgrade head
 python data/seed_configuration.py
 ```
 
-This creates the admin123 user and seeds all system configuration settings.
+This creates (or verifies) the bootstrap admin user and seeds all system configuration settings.
 
 **Start the backend server:**
 
@@ -351,9 +353,9 @@ uvicorn main:app --reload
 
 The API will be available at http://localhost:8000 and interactive docs at http://localhost:8000/docs.
 
-**Default login credentials:**
-- **Username:** admin123
-- **Password:** admin123
+**Bootstrap login credentials:**
+- **Username:** value of `INITIAL_ADMIN_USERNAME` (default: `admin`)
+- **Password:** value of `INITIAL_ADMIN_PASSWORD`
 
 #### Step 3 — Set up the Frontend
 
@@ -434,7 +436,7 @@ After running migrations, populate the system with essential configuration setti
 
 ```bash
 cd backend
-# Pre-creates admin123 user + seeds all configuration enums
+# Pre-creates bootstrap admin user + seeds all configuration enums
 python data/seed_configuration.py
 ```
 
@@ -445,7 +447,7 @@ docker compose exec backend python data/seed_configuration.py
 ```
 
 This script:
-- ✓ **Pre-creates admin123** user directly in the database (if not exists)
+- ✓ **Pre-creates bootstrap admin** user directly in the database (if not exists)
 - ✓ **Seeds configuration categories** via API (inventory types, borrow statuses, etc.)
 - ✓ **Idempotent** — safe to run multiple times
 - ✓ **Logs all operations** to `.tests/logs/` for audit trail
@@ -467,9 +469,9 @@ docker compose exec backend python data/seed_configuration.py
 
 **Access the API:**
 
-Once seeded, login with default credentials:
-- **Username:** admin123
-- **Password:** admin123
+Once seeded, login with bootstrap credentials:
+- **Username:** value of `INITIAL_ADMIN_USERNAME` (default: `admin`)
+- **Password:** value of `INITIAL_ADMIN_PASSWORD`
 - **Endpoint:** http://localhost:8000/api/auth/login
 
 ---
@@ -734,7 +736,7 @@ lendr/
 │   │   └── models/
 │   │       └── audit_log.py
 │   ├── data/
-│   │   └── seed_configuration.py   # Creates admin123 + seeds system settings
+│   │   └── seed_configuration.py   # Ensures bootstrap admin + seeds system settings
 │   ├── systems/
 │   │   ├── admin/
 │   │   │   ├── models/             # user, settings, backup
@@ -1029,6 +1031,15 @@ For any new feature:
 - [ ] Response uses GenericResponse envelope
 - [ ] Manual testing via API docs (/docs)
 - [ ] Test script exercises the endpoint
+
+### Security Policy Lint
+
+Validate RBAC role payloads and permission reference formatting:
+
+```bash
+cd backend
+python .scripts/check_rbac_policies.py
+```
 
 ---
 

@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from utils.logging import get_logger
 
 # Default: Manila is GMT+8
 DEFAULT_TZ = ZoneInfo("Asia/Manila")
@@ -10,6 +11,7 @@ MANILA_TZ = DEFAULT_TZ # Alias for existing system services
 CURRENT_DISPLAY_TZ = DEFAULT_TZ
 CURRENT_DATE_FORMAT = "%m/%d/%Y"
 CURRENT_TIME_FORMAT = "%I:%M:%S %p"
+logger = get_logger("utils.time")
 
 def get_now_manila() -> datetime:
     """
@@ -23,11 +25,11 @@ def update_system_timezone(tz_name: str) -> bool:
     global CURRENT_DISPLAY_TZ
     try:
         CURRENT_DISPLAY_TZ = ZoneInfo(tz_name)
-        print(f"[TIME-UTILS] Display Timezone updated to: {tz_name}")
+        logger.info("Display timezone updated to %s", tz_name)
         return True
     except (ZoneInfoNotFoundError, ValueError):
         CURRENT_DISPLAY_TZ = DEFAULT_TZ
-        print(f"[TIME-UTILS] FAILED to update display timezone to: {tz_name}. Falling back to Manila.")
+        logger.warning("Invalid timezone '%s'; falling back to Asia/Manila", tz_name)
         return False
 
 def update_system_format(date_format: str, time_format: str):

@@ -1,6 +1,8 @@
 'use client';
 
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
+import { tokenStore } from '@/lib/tokenStore';
+import { logger } from '@/lib/logger';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -35,7 +37,7 @@ let fpPromise: Promise<string> | null = null;
 export async function getDeviceId(): Promise<string> {
   if (typeof window === 'undefined') return 'server';
   
-  const cachedId = localStorage.getItem('lendr_fp_id');
+  const cachedId = window.sessionStorage.getItem('lendr_fp_id');
   if (cachedId) return cachedId;
 
   if (!fpPromise) {
@@ -44,14 +46,14 @@ export async function getDeviceId(): Promise<string> {
         const fp = await FingerprintJS.load();
         const result = await fp.get();
         const visitorId = `FP-${result.visitorId}`;
-        localStorage.setItem('lendr_fp_id', visitorId);
+        window.sessionStorage.setItem('lendr_fp_id', visitorId);
         return visitorId;
       } catch (error) {
-        console.error('Fingerprint failed, falling back to UUID', error);
-        let fallbackId = localStorage.getItem('lendr_device_id');
+        logger.error('Fingerprint failed, falling back to UUID', { error });
+        let fallbackId = window.sessionStorage.getItem('lendr_device_id');
         if (!fallbackId) {
           fallbackId = `DEV-${crypto.randomUUID()}`;
-          localStorage.setItem('lendr_device_id', fallbackId);
+          window.sessionStorage.setItem('lendr_device_id', fallbackId);
         }
         return fallbackId;
       }
@@ -61,14 +63,9 @@ export async function getDeviceId(): Promise<string> {
   return fpPromise;
 }
 
-const TOKEN_KEY = 'lendr_auth_token';
-
 export const http = {
   getToken: () => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem(TOKEN_KEY);
-    }
-    return null;
+    return tokenStore.getToken();
   },
 
   request: async <T>(
@@ -108,7 +105,7 @@ export const http = {
       if (response.status === 401) {
         if (typeof window !== 'undefined') {
           // Token is invalid, clear it
-          localStorage.removeItem(TOKEN_KEY);
+          tokenStore.clearToken();
           
           // Only redirect if not already on login page to avoid infinite loops
           if (window.location.pathname !== '/auth/login' && window.location.pathname !== '/auth/admin/login') {

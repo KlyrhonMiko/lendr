@@ -6,6 +6,7 @@ from sqlmodel import Session, select, func
 from fastapi import UploadFile
 from datetime import datetime
 
+from core.config import settings
 from systems.inventory.models.inventory import InventoryItem
 from systems.inventory.models.import_history import ImportHistory
 from systems.inventory.services.inventory_service import InventoryService
@@ -46,6 +47,12 @@ class ImportService:
         actor_id: Optional[UUID] = None
     ) -> ImportHistory:
         content = await file.read()
+        max_size = max(settings.IMPORT_MAX_CSV_SIZE_BYTES, 1)
+        if len(content) > max_size:
+            raise ValueError(
+                f"CSV file exceeds maximum allowed size of {max_size} bytes"
+            )
+
         decoded = content.decode("utf-8")
         # Pre-process the string IO to strip spaces from headers
         input_stream = io.StringIO(decoded)

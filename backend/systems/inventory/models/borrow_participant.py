@@ -1,7 +1,11 @@
 from uuid import UUID
+from typing import TYPE_CHECKING
 
 from sqlmodel import Field, Relationship
 from core.base_model import BaseModel
+
+if TYPE_CHECKING:
+    from systems.inventory.models.borrow_request import BorrowRequest
 
 class BorrowParticipant(BaseModel, table=True):
     __tablename__ = "borrow_participants"

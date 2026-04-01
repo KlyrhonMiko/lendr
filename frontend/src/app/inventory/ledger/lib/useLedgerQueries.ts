@@ -29,7 +29,7 @@ export function useReasonCodes() {
     queryFn: async () => {
       try {
         const res = await inventorySettingsApi.listInventory({ category: 'inventory_movements_reason_code' });
-        return res.data.length > 0 ? res.data.map((s: any) => s.key) : ['CORRECTION', 'ERROR', 'DUPLICATE_ENTRY', 'DAMAGED_ON_ARRIVAL'];
+        return res.data.length > 0 ? res.data.map((s) => s.key) : ['CORRECTION', 'ERROR', 'DUPLICATE_ENTRY', 'DAMAGED_ON_ARRIVAL'];
       } catch {
         return ['CORRECTION', 'ERROR', 'DUPLICATE_ENTRY', 'DAMAGED_ON_ARRIVAL'];
       }

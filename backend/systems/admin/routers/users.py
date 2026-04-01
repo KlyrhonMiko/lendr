@@ -9,9 +9,21 @@ from core.schemas import GenericResponse, create_success_response, make_paginati
 from systems.admin.models.user import User
 from systems.admin.schemas.user_schemas import UserCreate, UserRead, UserUpdate
 from systems.admin.services.user_service import UserService
+from systems.auth.services.auth_service import auth_service
 
 router = APIRouter()
 user_service = UserService()
+
+
+def _commit_and_refresh(session: Session, obj: User) -> None:
+    """Commit and refresh when the provided session supports these operations."""
+    commit = getattr(session, "commit", None)
+    if callable(commit):
+        commit()
+
+    refresh = getattr(session, "refresh", None)
+    if callable(refresh):
+        refresh(obj)
 
 
 @router.post(
@@ -28,6 +40,7 @@ async def register_user(
     _: None = Depends(require_permission("admin:users:manage")),
 ):
     user = user_service.create(session, user_data)
+    _commit_and_refresh(session, user)
     return create_success_response(
         data=user, message="User registered successfully", request=request
     )
@@ -103,9 +116,21 @@ async def update_user(
     user = user_service.get(session, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    should_revoke_sessions = user_service.requires_session_revocation(user, user_data)
     updated_user = user_service.update(session, user, user_data)
+
+    message = "User updated successfully"
+    if should_revoke_sessions:
+        auth_service.revoke_sessions_for_user(session, updated_user.id)
+        message = "User updated successfully. Active sessions were revoked for security."
+
+    _commit_and_refresh(session, updated_user)
+
     return create_success_response(
-        data=updated_user, message="User updated successfully", request=request
+        data=updated_user,
+        message=message,
+        request=request,
     )
 
 
@@ -125,6 +150,9 @@ async def delete_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     deleted_user = user_service.delete(session, user)
+    session.commit()
+    session.refresh(deleted_user)
+
     return create_success_response(
         data=deleted_user, message="User deleted successfully", request=request
     )
@@ -146,6 +174,9 @@ async def restore_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     restored_user = user_service.restore(session, user)
+    session.commit()
+    session.refresh(restored_user)
+
     return create_success_response(
         data=restored_user, message="User restored successfully", request=request
     )

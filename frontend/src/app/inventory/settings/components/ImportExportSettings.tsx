@@ -29,17 +29,25 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
-import { useImportHistory, useImportInventory, useExportData, useDownloadTemplate } from '../lib/useImportExport';
+import {
+  useImportHistory,
+  useImportInventory,
+  useExportData,
+  useDownloadTemplate,
+  ImportHistoryItem,
+  ImportHistoryErrorLogEntry,
+} from '../lib/useImportExport';
 import { useInventoryItems } from '@/app/inventory/items/lib/useItemQueries';
 import { User as SystemUser } from '@/app/admin/users/api';
 import { format } from 'date-fns';
+import { logger } from '@/lib/logger';
 
 export function ImportExportSettings() {
   const [page, setPage] = useState(1);
   const perPage = 5;
   const [duplicateMode, setDuplicateMode] = useState('skip');
   const [isIntegrityModalOpen, setIsIntegrityModalOpen] = useState(false);
-  const [selectedHistory, setSelectedHistory] = useState<any | null>(null);
+  const [selectedHistory, setSelectedHistory] = useState<ImportHistoryItem | null>(null);
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -59,7 +67,7 @@ export function ImportExportSettings() {
         const res = await api.get<SystemUser[]>('/inventory/data/borrowers');
         setUsers(res.data);
       } catch (err) {
-        console.error('Failed to fetch borrowers for export filter:', err);
+        logger.error('Failed to fetch borrowers for export filter', { error: err });
       }
     };
     fetchUsers();
@@ -506,7 +514,7 @@ export function ImportExportSettings() {
             <div className="space-y-4 p-6 rounded-3xl bg-indigo-500/5 border border-indigo-500/20 flex flex-col">
               <div className="flex items-center justify-between mb-4">
                  <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-500 bg-indigo-500/10 px-2 py-1 rounded-full">Weekly</span>
-                 <button className="text-rose-500"><XCircle className="w-4 h-4" /></button>
+                 <button aria-label="Remove weekly report schedule" className="text-rose-500"><XCircle className="w-4 h-4" /></button>
               </div>
               <p className="text-sm font-bold truncate">Audit Logs Weekly Report</p>
               <p className="text-xs text-muted-foreground">Every Monday at 8:00 AM</p>
@@ -519,7 +527,7 @@ export function ImportExportSettings() {
             <div className="space-y-4 p-6 rounded-3xl bg-blue-500/5 border border-blue-500/20 flex flex-col">
               <div className="flex items-center justify-between mb-4">
                  <span className="text-[10px] font-bold uppercase tracking-widest text-blue-500 bg-blue-500/10 px-2 py-1 rounded-full">Daily</span>
-                 <button className="text-rose-500"><XCircle className="w-4 h-4" /></button>
+                 <button aria-label="Remove daily report schedule" className="text-rose-500"><XCircle className="w-4 h-4" /></button>
               </div>
               <p className="text-sm font-bold truncate">Daily Movements Summary</p>
               <p className="text-xs text-muted-foreground">Daily at 11:59 PM</p>
@@ -772,11 +780,11 @@ export function ImportExportSettings() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/50">
-                  {Array.isArray(selectedHistory.error_log) && selectedHistory.error_log.map((err: any, idx: number) => (
+                  {Array.isArray(selectedHistory.error_log) && selectedHistory.error_log.map((err: ImportHistoryErrorLogEntry, idx: number) => (
                     <tr key={idx} className="hover:bg-muted/30 transition-colors align-top">
-                      <td className="p-4 pl-6 font-mono font-bold text-rose-500">{err.row}</td>
+                      <td className="p-4 pl-6 font-mono font-bold text-rose-500">{err.row ?? '-'}</td>
                       <td className="p-4 text-sm font-medium text-foreground leading-relaxed">
-                        {err.error}
+                        {err.error ?? 'Unknown error'}
                       </td>
                       <td className="p-4 pr-6">
                          <div className="p-3 rounded-xl bg-muted/30 font-mono text-[10px] text-muted-foreground break-all max-h-32 overflow-y-auto">

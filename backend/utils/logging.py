@@ -76,7 +76,7 @@ def setup_logging(log_level: str = "INFO", log_dir: str = ".logs"):
 
     return logger
 
-def setup_health_logging(log_file: str = "system_logs/health.log"):
+def setup_health_logging(log_file: str = ".logs/health/health.log"):
     """
     Initialize a separate logger for System Health / Operational metrics.
     This file is intended for long-term health monitoring and user-facing dashboards.

@@ -8,20 +8,12 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { useGeneralSettings, useGeneralMutations } from '../lib/useSettingsQueries';
+import type { GeneralSettingsData } from '../api';
 
-interface LocalizationSettings {
-  timezone: string;
-  date_format: string;
-  time_format: string;
-  language: string;
-}
-
-interface GeneralSettingsPayload {
-  localization: LocalizationSettings;
-}
+type LocalizationSettings = GeneralSettingsData['localization'];
 
 export function GeneralSettings() {
-  const [localSettings, setLocalSettings] = useState<GeneralSettingsPayload | null>(null);
+  const [localSettings, setLocalSettings] = useState<GeneralSettingsData | null>(null);
 
   // Queries
   const { data: settingsRes, isLoading } = useGeneralSettings();

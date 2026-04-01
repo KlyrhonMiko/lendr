@@ -46,6 +46,41 @@ setup_health_logging()
 logger = get_logger("app")
 health_logger = get_logger("health")
 
+
+def _parse_csv_setting(raw_value: str, fallback: list[str]) -> list[str]:
+    values = [value.strip() for value in raw_value.split(",") if value.strip()]
+    return values or fallback
+
+
+def _normalize_cors_origins(raw_value: str) -> list[str]:
+    fallback = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    configured = _parse_csv_setting(raw_value, fallback)
+
+    normalized: list[str] = []
+    for origin in configured:
+        if origin == "*":
+            normalized.append(origin)
+            continue
+
+        if origin.startswith("http://") or origin.startswith("https://"):
+            normalized.append(origin.rstrip("/"))
+            continue
+
+        logger.warning("Ignoring invalid CORS origin: %s", origin)
+
+    if not normalized:
+        logger.warning("No valid CORS origins configured. Falling back to localhost defaults.")
+        return fallback
+
+    return normalized
+
+
+def _is_secure_request(request: Request) -> bool:
+    forwarded_proto = request.headers.get("X-Forwarded-Proto", "")
+    if forwarded_proto:
+        return forwarded_proto.split(",", maxsplit=1)[0].strip().lower() == "https"
+    return request.url.scheme == "https"
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # System Initialization
@@ -110,17 +145,49 @@ async def logging_middleware(request: Request, call_next):
         )
         raise e
 
+
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+
+    if not settings.SECURITY_HEADERS_ENABLED:
+        return response
+
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("X-Permitted-Cross-Domain-Policies", "none")
+    response.headers.setdefault("Content-Security-Policy", settings.SECURITY_API_CONTENT_SECURITY_POLICY)
+
+    if _is_secure_request(request):
+        response.headers.setdefault(
+            "Strict-Transport-Security",
+            f"max-age={settings.SECURITY_HSTS_MAX_AGE_SECONDS}; includeSubDomains",
+        )
+
+    return response
+
 # 2. Maintenance Mode Middleware
 app.add_middleware(MaintenanceMiddleware)
 
 # 1. CORSMiddleware (Outermost)
 # We add this last so it wraps all other middlewares, including Maintenance
+cors_allow_origins = _normalize_cors_origins(settings.CORS_ALLOW_ORIGINS)
+cors_allow_methods = _parse_csv_setting(
+    settings.CORS_ALLOW_METHODS,
+    ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+)
+cors_allow_headers = _parse_csv_setting(
+    settings.CORS_ALLOW_HEADERS,
+    ["Authorization", "Content-Type", "X-Device-ID"],
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=cors_allow_origins,
+    allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
+    allow_methods=cors_allow_methods,
+    allow_headers=cors_allow_headers,
 )
 
 # Global Exception Handlers
@@ -184,6 +251,7 @@ app.include_router(
     inventory,
     prefix="/api/inventory/items",
     tags=["Inventory - Items"],
+    dependencies=inventory_access,
 )
 app.include_router(
     borrowing,
@@ -213,7 +281,6 @@ app.include_router(
     borrower,
     prefix="/api/inventory/borrower",
     tags=["Inventory - Borrower Portal"],
-    dependencies=inventory_access,
 )
 app.include_router(
     inv_config,

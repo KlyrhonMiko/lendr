@@ -12,9 +12,11 @@ from systems.admin.schemas.general_settings import (
 from systems.admin.models.settings import AdminConfig as Configuration
 from systems.admin.services.configuration_service import ConfigurationService
 from utils.time_utils import update_system_timezone, update_system_format, get_now_manila
+from utils.logging import get_logger
 
 router = APIRouter()
 config_service = ConfigurationService()
+logger = get_logger("admin.general_settings")
 
 @router.get("/", response_model=GenericResponse[GeneralSettingsPayload])
 async def get_general_settings(
@@ -97,7 +99,12 @@ async def update_general_settings(
     update_system_timezone(payload.localization.timezone)
     update_system_format(payload.localization.date_format, payload.localization.time_format)
     
-    print(f"[API] General Settings UPDATED - TZ: {payload.localization.timezone}, Format: {payload.localization.date_format} {payload.localization.time_format}")
+    logger.info(
+        "General settings updated (timezone=%s, date_format=%s, time_format=%s)",
+        payload.localization.timezone,
+        payload.localization.date_format,
+        payload.localization.time_format,
+    )
 
     return create_success_response(
         message="General configuration synchronized successfully",

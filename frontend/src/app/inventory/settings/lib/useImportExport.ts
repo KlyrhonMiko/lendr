@@ -1,7 +1,21 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, ApiResponse } from '@/lib/api';
+import { api } from '@/lib/api';
 import { auth } from '@/lib/auth';
 import { toast } from 'sonner';
+
+export interface ImportHistoryErrorLogEntry {
+  row?: number | string;
+  error?: string;
+  data?: Record<string, unknown>;
+}
+
+interface ImportMutationResult {
+  status: string;
+  success_count?: number;
+  error_count?: number;
+  success?: number;
+  failed?: number;
+}
 
 export interface ImportHistoryItem {
   id: string;
@@ -12,7 +26,14 @@ export interface ImportHistoryItem {
   error_count: number;
   status: string;
   created_at: string;
-  error_log?: any;
+  error_log?: ImportHistoryErrorLogEntry[];
+}
+
+function resolveErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return fallback;
 }
 
 export function useImportHistory(page: number, perPage: number) {
@@ -32,36 +53,41 @@ export function useImportInventory() {
     mutationFn: async ({ file, mode }: { file: File; mode: string }) => {
       const formData = new FormData();
       formData.append('file', file);
-      const response = await api.post<any>(`/inventory/data/import?mode=${mode}`, formData);
+      const response = await api.post<ImportMutationResult>(`/inventory/data/import?mode=${mode}`, formData);
       return response.data;
     },
-    onSuccess: (data: ImportHistoryItem) => {
+    onSuccess: (data: ImportMutationResult) => {
       queryClient.invalidateQueries({ queryKey: ['inventory', 'import', 'history'] });
       // Also invalidate items as they might have been updated/added
       queryClient.invalidateQueries({ queryKey: ['inventory', 'items'] });
+
+      const successCount = data.success_count ?? data.success ?? 0;
+      const errorCount = data.error_count ?? data.failed ?? 0;
       
       if (data.status === 'completed') {
         toast.success('Import completed successfully');
       } else if (data.status === 'partial_success') {
-        toast.warning(`Imported with some errors (${data.success_count} success, ${data.error_count} failed)`);
+        toast.warning(`Imported with some errors (${successCount} success, ${errorCount} failed)`);
       } else if (data.status === 'failed') {
         toast.error('Import failed completely. Check history for details.');
       } else {
         toast.success('Import process initiated');
       }
     },
-    onError: (err: any) => {
-      toast.error(err.message || 'Import failed');
+    onError: (err: unknown) => {
+      toast.error(resolveErrorMessage(err, 'Import failed'));
     }
   });
 }
 
 export function useExportData() {
   return {
-    exportData: async (type: string, params: Record<string, any>) => {
+    exportData: async (type: string, params: Record<string, unknown>) => {
       const queryParams = new URLSearchParams();
       Object.entries(params).forEach(([key, val]) => {
-        if (val) queryParams.append(key, val);
+        if (val !== null && val !== undefined && val !== '') {
+          queryParams.append(key, String(val));
+        }
       });
       
       const endpointMap: Record<string, string> = {
@@ -101,8 +127,8 @@ export function useExportData() {
         link.remove();
         window.URL.revokeObjectURL(downloadUrl);
         toast.success('File downloaded successfully');
-      } catch (err: any) {
-        toast.error(err.message || 'Export failed');
+      } catch (err: unknown) {
+        toast.error(resolveErrorMessage(err, 'Export failed'));
       }
     }
   };
@@ -128,8 +154,8 @@ export function useDownloadTemplate() {
                 link.click();
                 link.remove();
                 window.URL.revokeObjectURL(downloadUrl);
-            } catch (err: any) {
-                toast.error(err.message || 'Download failed');
+              } catch (err: unknown) {
+                toast.error(resolveErrorMessage(err, 'Download failed'));
             }
         }
     }

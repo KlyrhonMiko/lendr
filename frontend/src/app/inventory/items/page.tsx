@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { useDebounce } from './lib/useDebounce';
 import { useInventoryItems, useInventoryConfigs, useInventoryItemMutations } from './lib/useItemQueries';
 import type { InventoryItemFormData } from './lib/inventoryItemForm';
+import { validateInventoryItemForm } from './lib/validation';
 import { InventoryItemsHeader } from './components/InventoryItemsHeader';
 import { InventoryItemsToolbar } from './components/InventoryItemsToolbar';
 import { InventoryItemsTable } from './components/InventoryItemsTable';
@@ -94,6 +95,17 @@ export default function InventoryPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const validationError = validateInventoryItemForm(formData, {
+      categories: categories.map((entry) => entry.key),
+      itemTypes: itemTypes.map((entry) => entry.key),
+      conditions: conditions.map((entry) => entry.key),
+    });
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+
     try {
       if (editingItem) {
         await updateItem.mutateAsync({

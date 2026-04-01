@@ -71,6 +71,54 @@ export interface InventoryBatchUpdate {
   description?: string;
 }
 
+export interface InventoryUnit {
+  unit_id: string;
+  serial_number: string;
+  status: string;
+  condition: string;
+  expiration_date?: string | null;
+  description?: string;
+}
+
+export interface InventoryUnitListParams {
+  page?: number;
+  per_page?: number;
+  status?: string;
+  condition?: string;
+  serial_number?: string;
+  expiring_before?: string;
+  include_expired?: boolean;
+  search?: string;
+}
+
+export interface InventoryUnitCreate {
+  serial_number: string;
+  expiration_date?: string;
+  condition?: string;
+  description?: string;
+}
+
+export interface InventoryUnitUpdate {
+  status?: string;
+  condition?: string;
+  expiration_date?: string;
+  description?: string;
+}
+
+export interface InventoryMovement {
+  movement_id: string;
+  qty_change: number;
+  movement_type: string;
+  occurred_at: string;
+  note?: string;
+  reference_id?: string;
+  borrower_name?: string;
+  customer_name?: string;
+  location_name?: string;
+}
+
+export type InventoryMovementSummary = Record<string, unknown>;
+
 export interface StockAdjustmentPayload {
   qty_change: number;
   movement_type: string;
@@ -99,29 +147,20 @@ export const inventoryApi = {
   restore: (id: string) => api.post<InventoryItem>(`/inventory/items/${id}/restore`, {}),
 
   // Units
-  listUnits: (itemId: string, params: { 
-    page?: number; 
-    per_page?: number; 
-    status?: string; 
-    condition?: string;
-    serial_number?: string;
-    expiring_before?: string;
-    include_expired?: boolean;
-    search?: string; 
-  } = {}) =>
-    api.get<any[]>(`/inventory/items/${itemId}/units${buildQueryString(params as Record<string, unknown>)}`),
+  listUnits: (itemId: string, params: InventoryUnitListParams = {}) =>
+    api.get<InventoryUnit[]>(`/inventory/items/${itemId}/units${buildQueryString(params as Record<string, unknown>)}`),
 
-  createUnit: (itemId: string, data: { serial_number: string; expiration_date?: string; condition?: string; description?: string }) =>
-    api.post<any>(`/inventory/items/${itemId}/units`, data),
+  createUnit: (itemId: string, data: InventoryUnitCreate) =>
+    api.post<InventoryUnit>(`/inventory/items/${itemId}/units`, data),
 
-  createUnitsBatch: (itemId: string, units: Array<{ serial_number: string; expiration_date?: string; condition?: string; description?: string }>) =>
-    api.post<any[]>(`/inventory/items/${itemId}/units/batch`, { units }),
+  createUnitsBatch: (itemId: string, units: InventoryUnitCreate[]) =>
+    api.post<InventoryUnit[]>(`/inventory/items/${itemId}/units/batch`, { units }),
 
-  updateUnit: (itemId: string, unitId: string, data: { status?: string; condition?: string; expiration_date?: string; description?: string }) =>
-    api.patch<any>(`/inventory/items/${itemId}/units/${unitId}`, data),
+  updateUnit: (itemId: string, unitId: string, data: InventoryUnitUpdate) =>
+    api.patch<InventoryUnit>(`/inventory/items/${itemId}/units/${unitId}`, data),
 
   retireUnit: (itemId: string, unitId: string) =>
-    api.delete<any>(`/inventory/items/${itemId}/units/${unitId}`),
+    api.delete<InventoryUnit>(`/inventory/items/${itemId}/units/${unitId}`),
 
   // Batches
   listBatches: (itemId: string, params: { page?: number; per_page?: number; status?: string; include_expired?: boolean } = {}) =>
@@ -138,11 +177,11 @@ export const inventoryApi = {
 
   // Movements
   getHistory: (itemId: string, params: { page?: number; per_page?: number; movement_type?: string } = {}) =>
-    api.get<any[]>(`/inventory/items/${itemId}/movement-history${buildQueryString(params as Record<string, unknown>)}`),
+    api.get<InventoryMovement[]>(`/inventory/items/${itemId}/movement-history${buildQueryString(params as Record<string, unknown>)}`),
 
   getSummary: (itemId: string) =>
-    api.get<any>(`/inventory/items/${itemId}/movements/summary`),
+    api.get<InventoryMovementSummary>(`/inventory/items/${itemId}/movements/summary`),
 
   reconcile: (itemId: string) =>
-    api.post<any>(`/inventory/items/${itemId}/movements/reconcile`, {}),
+    api.post<InventoryMovementSummary>(`/inventory/items/${itemId}/movements/reconcile`, {}),
 };

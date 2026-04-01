@@ -20,14 +20,14 @@ from systems.admin.schemas.health import (
 from utils.time_utils import get_now_manila
 
 # Constants for storage scanning
-HEALTH_LOG_FILE = "system_logs/health.log"
+HEALTH_LOG_FILE = ".logs/health/health.log"
 BACKUP_DIR = "./.backups"
 ATTACHMENTS_DIR = "./uploads" # Assuming this is the standard location
 
 class SystemHealthService:
     def __init__(self):
         # Ensure essential directories exist for scanning (backups handled by BackupService)
-        for d in ["system_logs", ATTACHMENTS_DIR]:
+        for d in [".logs/health", ATTACHMENTS_DIR]:
             if not os.path.exists(d):
                 os.makedirs(d)
 
@@ -120,9 +120,9 @@ class SystemHealthService:
         statement = (
             select(UserSession, User)
             .join(User, UserSession.user_uuid == User.id, isouter=True)
-            .where(UserSession.is_revoked == False)
+            .where(UserSession.is_revoked.is_(False))
             .where(UserSession.expires_at > now)
-            .where(UserSession.is_deleted == False)
+            .where(UserSession.is_deleted.is_(False))
             .offset(skip).limit(limit)
         )
         
@@ -155,7 +155,7 @@ class SystemHealthService:
         session_obj.is_revoked = True
         session_obj.is_deleted = True
         session.add(session_obj)
-        session.commit()
+        session.flush()
         return True
 
     def get_recent_logs(self, skip: int = 0, limit: int = 100) -> tuple[List[LogEntryRead], int]:

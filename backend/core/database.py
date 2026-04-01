@@ -5,7 +5,23 @@ from sqlmodel import Session, SQLModel, create_engine
 from .config import settings
 
 assert settings.DATABASE_URL, "DATABASE_URL is required"
-engine = create_engine(settings.DATABASE_URL, echo=settings.SQL_ECHO)
+
+engine_kwargs: dict[str, object] = {
+    "echo": settings.SQL_ECHO,
+}
+
+if not settings.DATABASE_URL.startswith("sqlite"):
+    engine_kwargs.update(
+        {
+            "pool_size": settings.DB_POOL_SIZE,
+            "max_overflow": settings.DB_MAX_OVERFLOW,
+            "pool_timeout": settings.DB_POOL_TIMEOUT_SECONDS,
+            "pool_recycle": settings.DB_POOL_RECYCLE_SECONDS,
+            "pool_pre_ping": settings.DB_POOL_PRE_PING,
+        }
+    )
+
+engine = create_engine(settings.DATABASE_URL, **engine_kwargs)
 
 
 def init_db() -> None:

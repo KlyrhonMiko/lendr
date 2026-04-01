@@ -9,7 +9,7 @@ interface HeaderProps {
 }
 
 export function Header({ onMenuToggle }: HeaderProps) {
-  const { user, logout } = useAuth();
+  const { user, loading, logout } = useAuth();
   const pathname = usePathname();
 
   const breadcrumbs = pathname
@@ -55,10 +55,14 @@ export function Header({ onMenuToggle }: HeaderProps) {
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         <div className="hidden md:flex flex-col text-right">
           <span className="text-xs font-bold text-foreground leading-tight tracking-tight">
-            {user ? `${user.first_name} ${user.last_name}` : 'Loading...'}
+            {loading
+              ? 'Loading...'
+              : user
+                ? `${user.first_name} ${user.last_name}`
+                : 'Guest'}
           </span>
           <span className="text-[10px] font-bold text-primary/70 uppercase tracking-widest leading-tight mt-0.5">
-            {user?.role.replace('_', ' ') || 'User'}
+            {loading ? 'Loading...' : user?.role.replace('_', ' ') || 'User'}
           </span>
         </div>
 
@@ -66,6 +70,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
 
         <button
           onClick={() => void logout()}
+          aria-label="Sign out"
           className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-muted-foreground/60 hover:text-destructive hover:bg-destructive/5 border border-transparent hover:border-destructive/10 transition-all active:scale-95"
           title="Sign out"
         >

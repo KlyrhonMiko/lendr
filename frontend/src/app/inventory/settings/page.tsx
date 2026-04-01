@@ -40,8 +40,9 @@ export default function InventorySettingsPage() {
     try {
       await deleteSetting.mutateAsync({ category, key });
       toast.success(`Deleted ${key} from ${category}`);
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to delete setting');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to delete setting';
+      toast.error(message);
     }
   };
 
@@ -85,8 +86,9 @@ export default function InventorySettingsPage() {
                try {
                  await createSetting.mutateAsync(data);
                  toast.success('Added new dictionary entry');
-               } catch (err: any) {
-                 toast.error(err.message || 'Failed to add entry');
+               } catch (err: unknown) {
+                 const message = err instanceof Error ? err.message : 'Failed to add entry';
+                 toast.error(message);
                }
             }}
           />

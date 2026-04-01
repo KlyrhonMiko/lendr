@@ -88,8 +88,9 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
       }
       resetForms();
       invalidateBatches();
-    } catch (err: any) {
-      toast.error(err.message || 'Action failed');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Action failed';
+      toast.error(message);
     }
   };
 
@@ -108,8 +109,9 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
       toast.success('Stock adjusted successfully');
       resetForms();
       invalidateBatches();
-    } catch (err: any) {
-      toast.error(err.message || 'Adjustment failed');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Adjustment failed';
+      toast.error(message);
     }
   };
 
@@ -150,7 +152,7 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
             <h2 className="text-xl font-bold font-heading">Batch Management</h2>
             <p className="text-sm text-muted-foreground">Manage groups and expiration for untrackable stock.</p>
           </div>
-          <button onClick={onClose} className="p-2 text-muted-foreground hover:bg-secondary rounded-full">
+          <button onClick={onClose} aria-label="Close batch management" className="p-2 text-muted-foreground hover:bg-secondary rounded-full">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -324,10 +326,10 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
                     </td>
                     <td className="p-3 text-right pr-4">
                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => openAdjust(batch)} title="Adjust Stock" className="p-1.5 hover:bg-indigo-500/10 text-indigo-400 rounded-lg">
+                        <button onClick={() => openAdjust(batch)} aria-label={`Adjust stock for batch ${batch.batch_id}`} title="Adjust Stock" className="p-1.5 hover:bg-indigo-500/10 text-indigo-400 rounded-lg">
                           <History className="w-4 h-4" />
                         </button>
-                        <button onClick={() => openEdit(batch)} title="Edit Metadata" className="p-1.5 hover:bg-secondary text-muted-foreground rounded-lg">
+                        <button onClick={() => openEdit(batch)} aria-label={`Edit metadata for batch ${batch.batch_id}`} title="Edit Metadata" className="p-1.5 hover:bg-secondary text-muted-foreground rounded-lg">
                           <Edit2 className="w-4 h-4" />
                         </button>
                       </div>
