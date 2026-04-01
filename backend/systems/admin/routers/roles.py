@@ -37,6 +37,7 @@ async def update_role_permissions(
         category="rbac_roles",
         description=f"Dynamic override for role: {data.role}"
     )
+    session.commit()
 
     return create_success_response(
         message=f"Permissions for role '{data.role}' updated successfully",

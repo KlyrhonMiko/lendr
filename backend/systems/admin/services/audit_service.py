@@ -181,7 +181,7 @@ class AuditService(BaseService[AuditLog, Any, Any]):
             after_json=after
         )
         db.add(log_entry)
-        db.commit()
+        db.flush()
         db.refresh(log_entry)
         return log_entry
 

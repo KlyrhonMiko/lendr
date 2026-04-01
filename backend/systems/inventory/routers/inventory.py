@@ -61,6 +61,9 @@ async def create_item(
         item_data,
         actor_id=current_user.id,
     )
+    session.commit()
+    session.refresh(item)
+
     item_read = InventoryItemRead.model_validate(item)
     item_read.status_condition = inventory_service.get_item_status(session, item)
 
@@ -162,6 +165,9 @@ async def update_item(
         item_data,
         actor_id=current_user.id,
     )
+    session.commit()
+    session.refresh(updated_item)
+
     item_read = InventoryItemRead.model_validate(updated_item)
     item_read.status_condition = inventory_service.get_item_status(
         session, updated_item
@@ -239,6 +245,9 @@ async def delete_item(
         item,
         actor_id=current_user.id,
     )
+    session.commit()
+    session.refresh(deleted_item)
+
     item_read = InventoryItemRead.model_validate(deleted_item)
     item_read.status_condition = inventory_service.get_item_status(
         session, deleted_item
@@ -279,6 +288,9 @@ async def restore_item(
         item,
         actor_id=current_user.id,
     )
+    session.commit()
+    session.refresh(restored_item)
+
     item_read = InventoryItemRead.model_validate(restored_item)
     item_read.status_condition = inventory_service.get_item_status(
         session, restored_item

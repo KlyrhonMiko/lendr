@@ -62,6 +62,8 @@ async def create_auth_setting(
         description=setting_data.description,
         actor_id=current_user.id,
     )
+    session.commit()
+
     setting = config_service.get_by_key(
         session, setting_data.key, category=setting_data.category
     )

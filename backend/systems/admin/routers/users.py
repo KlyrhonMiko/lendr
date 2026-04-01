@@ -125,6 +125,9 @@ async def delete_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     deleted_user = user_service.delete(session, user)
+    session.commit()
+    session.refresh(deleted_user)
+
     return create_success_response(
         data=deleted_user, message="User deleted successfully", request=request
     )
@@ -146,6 +149,9 @@ async def restore_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     restored_user = user_service.restore(session, user)
+    session.commit()
+    session.refresh(restored_user)
+
     return create_success_response(
         data=restored_user, message="User restored successfully", request=request
     )

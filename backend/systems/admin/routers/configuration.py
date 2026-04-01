@@ -148,6 +148,7 @@ async def create_setting(
         description=setting_data.description,
         actor_id=current_user.id,
     )
+    session.commit()
 
     if setting_data.category == "operations_settings":
         scheduler_service.sync_schedule()
@@ -203,6 +204,7 @@ async def update_setting(
         description=setting_data.description,
         actor_id=current_user.id,
     )
+    session.commit()
 
     if category == "operations_settings":
         scheduler_service.sync_schedule()
@@ -235,6 +237,7 @@ async def delete_setting(
         )
 
     config_service.delete(session, setting, actor_id=current_user.id)
+    session.commit()
 
     return create_success_response(
         message=f"Setting '{key}' deleted successfully",
@@ -266,6 +269,7 @@ async def restore_setting(
         )
 
     config_service.restore(session, setting, actor_id=current_user.id)
+    session.commit()
 
     if category == "operations_settings":
         scheduler_service.sync_schedule()

@@ -102,6 +102,7 @@ def _safe_log_auth_event(
             action=action,
             after=metadata,
         )
+        session.commit()
     except Exception as exc:
         logger.warning("Failed to write auth audit event: %s", exc)
 
@@ -222,6 +223,7 @@ async def login_for_access_token(
         action="login",
         actor_id=user.id
     )
+    session.commit()
 
     return Token(access_token=access_token, token_type="bearer")
 
@@ -302,6 +304,7 @@ async def borrower_login(
         action="login",
         actor_id=user.id
     )
+    session.commit()
 
     return Token(access_token=access_token, token_type="bearer")
 
@@ -339,6 +342,7 @@ async def rotate_bootstrap_password(
         action="bootstrap_password_rotated",
         actor_id=user.id,
     )
+    session.commit()
 
     return create_success_response(
         data=None,
@@ -448,6 +452,7 @@ async def logout(
                 action="logout",
                 actor_id=user.id
             )
+            session.commit()
                 
         return create_success_response(
             data=None,

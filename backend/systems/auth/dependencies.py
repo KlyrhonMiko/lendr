@@ -68,6 +68,7 @@ def require_system_access(system: str):
                 reason_code="403-FORBIDDEN",
                 actor_id=current_user.id
             )
+            session.commit()
             
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

@@ -54,12 +54,15 @@ async def create_request(
             request_channel="inventory_manager",
             actor_id=current_user.id,
         )
+        session.commit()
+
         return create_success_response(
             data=borrow_service.serialize_borrow_request(session, borrow_req),
             message="Borrow request created",
             request=request,
         )
     except ValueError as e:
+        session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -131,12 +134,15 @@ async def approve_request(
             current_user.id,
             note=payload.notes,
         )
+        session.commit()
+
         return create_success_response(
             data=borrow_service.serialize_borrow_request(session, updated_req),
             message="Request approved",
             request=request,
         )
     except ValueError as e:
+        session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -165,12 +171,15 @@ async def reject_request(
             current_user.id,
             note=payload.notes,
         )
+        session.commit()
+
         return create_success_response(
             data=borrow_service.serialize_borrow_request(session, updated_req),
             message="Request rejected",
             request=request,
         )
     except ValueError as e:
+        session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -199,12 +208,15 @@ async def release_request(
             current_user.id,
             note=payload.notes,
         )
+        session.commit()
+
         return create_success_response(
             data=borrow_service.serialize_borrow_request(session, updated_req),
             message="Request released",
             request=request,
         )
     except ValueError as e:
+        session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -235,10 +247,13 @@ async def assign_units_to_request(
             item_id=payload.item_id,
             note=payload.notes,
         )
+        session.commit()
+
         return create_success_response(
             data=assignments, message="Units assigned to request", request=request
         )
     except ValueError as e:
+        session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -265,10 +280,13 @@ async def assign_batches_to_request(
             item_id=payload.item_id,
             note=payload.notes,
         )
+        session.commit()
+
         return create_success_response(
             data=assignments, message="Batches assigned to request", request=request
         )
     except ValueError as e:
+        session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -335,12 +353,15 @@ async def return_request(
             note=payload.notes,
             unit_returns=payload.unit_returns,
         )
+        session.commit()
+
         return create_success_response(
             data=borrow_service.serialize_borrow_request(session, updated_req),
             message="Request returned",
             request=request,
         )
     except ValueError as e:
+        session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -369,12 +390,15 @@ async def reopen_request(
             actor_id=current_user.id,
             note=payload.notes,
         )
+        session.commit()
+
         return create_success_response(
             data=borrow_service.serialize_borrow_request(session, updated_req),
             message="Request reopened",
             request=request,
         )
     except ValueError as e:
+        session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -499,10 +523,13 @@ async def close_request(
         updated_req = borrow_service.close_request(
             session, request_id, current_user.id, notes=payload.notes
         )
+        session.commit()
+
         return create_success_response(
             data=borrow_service.serialize_borrow_request(session, updated_req),
             message="Request closed",
             request=request,
         )
     except ValueError as e:
+        session.rollback()
         raise HTTPException(status_code=400, detail=str(e))

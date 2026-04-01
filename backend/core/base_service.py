@@ -16,6 +16,13 @@ UpdateSchemaType = TypeVar("UpdateSchemaType")
 
 
 class BaseService(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
+    """Generic CRUD service.
+
+    Transaction policy:
+    - Services mutate session state and flush when needed for DB-generated values.
+    - API/application boundaries own commit and rollback decisions.
+    """
+
     def __init__(self, model: Type[ModelType], lookup_field: str = "id"):
         self.model = model
         self.lookup_field = lookup_field
@@ -124,7 +131,7 @@ class BaseService(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             actor_id=actor_id,
         )
 
-        session.commit()
+        session.flush()
         session.refresh(db_obj)
 
         return db_obj
@@ -155,7 +162,7 @@ class BaseService(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             actor_id=actor_id,
         )
 
-        session.commit()
+        session.flush()
         session.refresh(db_obj)
 
         return db_obj
@@ -181,7 +188,7 @@ class BaseService(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             actor_id=actor_id,
         )
 
-        session.commit()
+        session.flush()
         session.refresh(db_obj)
 
         return db_obj
@@ -207,7 +214,7 @@ class BaseService(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             actor_id=actor_id,
         )
 
-        session.commit()
+        session.flush()
         session.refresh(db_obj)
 
         return db_obj
@@ -233,7 +240,7 @@ class BaseService(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             actor_id=actor_id,
         )
 
-        session.commit()
+        session.flush()
         session.refresh(db_obj)
 
         return db_obj
@@ -259,7 +266,7 @@ class BaseService(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             actor_id=actor_id,
         )
 
-        session.commit()
+        session.flush()
         session.refresh(db_obj)
 
         return db_obj
@@ -286,7 +293,7 @@ class BaseService(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             actor_id=actor_id,
         )
 
-        session.commit()
+        session.flush()
 
     def validate_uniqueness(
         self,
@@ -440,7 +447,7 @@ class ConfigBaseService(Generic[ConfigModelType]):
             after = new_setting.model_dump(mode="json")
             self._log_audit(session, "created", entity_id, None, after, actor_id)
 
-        session.commit()
+        session.flush()
 
     def require_key(
         self,
@@ -529,7 +536,7 @@ class ConfigBaseService(Generic[ConfigModelType]):
         after = db_obj.model_dump(mode="json")
         entity_id = f"{db_obj.category}:{db_obj.key}"
         self._log_audit(session, "deleted", entity_id, before, after, actor_id)
-        session.commit()
+        session.flush()
         session.refresh(db_obj)
 
         return db_obj
@@ -544,7 +551,7 @@ class ConfigBaseService(Generic[ConfigModelType]):
         after = db_obj.model_dump(mode="json")
         entity_id = f"{db_obj.category}:{db_obj.key}"
         self._log_audit(session, "restored", entity_id, before, after, actor_id)
-        session.commit()
+        session.flush()
         session.refresh(db_obj)
 
         return db_obj
