@@ -68,14 +68,14 @@ class AuthService:
             db_session.is_revoked = True
             db_session.updated_at = now
             session.add(db_session)
-            session.commit()
+            session.flush()
             return False
 
         if touch_activity and self._should_touch_activity(last_activity_at, now):
             db_session.last_activity_at = now
             db_session.updated_at = now
             session.add(db_session)
-            session.commit()
+            session.flush()
 
         return True
 
@@ -177,7 +177,7 @@ class AuthService:
         user.updated_at = get_now_manila()
 
         session.add(user)
-        session.commit()
+        session.flush()
         session.refresh(user)
         return user
 
@@ -207,7 +207,7 @@ class AuthService:
             last_activity_at=now,
         )
         session.add(db_session)
-        session.commit()
+        session.flush()
         session.refresh(db_session)
 
         return db_session
@@ -237,7 +237,7 @@ class AuthService:
             db_session.is_revoked = True
             db_session.updated_at = get_now_manila()
             session.add(db_session)
-            session.commit()
+            session.flush()
 
     def extend_borrower_session(self, session: Session, session_id: str, expires_delta: timedelta):
         statement = select(BorrowerSession).where(BorrowerSession.session_id == session_id)
@@ -248,7 +248,7 @@ class AuthService:
             db_session.last_activity_at = now
             db_session.updated_at = now
             session.add(db_session)
-            session.commit()
+            session.flush()
 
     def create_user_session(
         self,
@@ -269,7 +269,7 @@ class AuthService:
             last_activity_at=now,
         )
         session.add(db_session)
-        session.commit()
+        session.flush()
         session.refresh(db_session)
 
         return db_session
@@ -298,7 +298,7 @@ class AuthService:
             db_session.is_revoked = True
             db_session.updated_at = get_now_manila()
             session.add(db_session)
-            session.commit()
+            session.flush()
 
     def revoke_session_by_id(self, session: Session, session_id: str) -> bool:
         """Revoke a session by session_id regardless of role/table origin."""
@@ -312,7 +312,7 @@ class AuthService:
                 db_session.is_revoked = True
                 db_session.updated_at = now
                 session.add(db_session)
-                session.commit()
+                session.flush()
                 return True
 
         if session_id.startswith("BSE"):
@@ -323,7 +323,7 @@ class AuthService:
                 db_session.is_revoked = True
                 db_session.updated_at = now
                 session.add(db_session)
-                session.commit()
+                session.flush()
                 return True
 
         # Defensive fallback for any legacy/non-standard prefix.
@@ -334,7 +334,7 @@ class AuthService:
             db_user_session.is_revoked = True
             db_user_session.updated_at = now
             session.add(db_user_session)
-            session.commit()
+            session.flush()
             return True
 
         db_borrower_session = session.exec(
@@ -344,7 +344,7 @@ class AuthService:
             db_borrower_session.is_revoked = True
             db_borrower_session.updated_at = now
             session.add(db_borrower_session)
-            session.commit()
+            session.flush()
             return True
 
         return False
@@ -358,7 +358,7 @@ class AuthService:
             db_session.last_activity_at = now
             db_session.updated_at = now
             session.add(db_session)
-            session.commit()
+            session.flush()
 
     def revoke_all_other_sessions(
         self,
@@ -407,8 +407,8 @@ class AuthService:
                 "excluded_session_id": exclude_session_id,
             },
         )
-            
-        session.commit()
+
+        session.flush()
 
     def revoke_sessions_for_user(self, session: Session, user_uuid: UUID):
         """Revoke all non-expired sessions owned by a specific user."""
@@ -436,6 +436,6 @@ class AuthService:
             db_session.is_revoked = True
             session.add(db_session)
 
-        session.commit()
+        session.flush()
 
 auth_service = AuthService()

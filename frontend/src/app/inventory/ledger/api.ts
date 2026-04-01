@@ -12,7 +12,7 @@ export const ledgerApi = {
     api.get<Anomaly[]>(`/inventory/items/movements/anomalies${buildQueryString(params as Record<string, unknown>)}`),
 
   reverse: (movementId: string, reason: string, reason_code?: string) =>
-    api.post<any>(`/inventory/items/movements/${movementId}/reverse`, { reason, reason_code }),
+    api.post<unknown>(`/inventory/items/movements/${movementId}/reverse`, { reason, reason_code }),
 };
 
 export type { Anomaly, LedgerMovement, MovementLedgerParams };

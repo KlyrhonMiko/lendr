@@ -112,11 +112,13 @@ async def borrower_submit_request(
             request_channel="borrower_portal",
             actor_id=current_user.id,
         )
+        session.commit()
         return create_success_response(
             data=borrow_service.serialize_borrow_request(session, created_request),
             message="Request submitted successfully via Portal",
             request=request
         )
     except ValueError as e:
+        session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 

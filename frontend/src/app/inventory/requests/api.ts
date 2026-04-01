@@ -12,6 +12,7 @@ export interface BorrowRequest {
     qty_requested: number;
     classification?: string;
     item_type?: string;
+    is_trackable?: boolean;
   }>;
   status: string;
   notes?: string;

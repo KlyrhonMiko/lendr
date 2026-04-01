@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Activity, Database, Server, HardDrive, Users, AlertCircle, Download, ShieldCheck, ShieldAlert, ShieldX, RefreshCw, ChevronLeft, ChevronRight, FileText, Paperclip, Archive, Layers, Laptop } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProgressBar } from './ProgressBar';
 import { toast } from 'sonner';
@@ -393,14 +394,35 @@ export function HealthSettings() {
   );
 }
 
-function StatusCard({ title, status, icon: Icon, color }: any) {
-  const colorMap: any = {
+type StatusCardColor = 'primary' | 'secondary' | 'destructive';
+
+interface StatusCardProps {
+  title: string;
+  status: string;
+  icon: LucideIcon;
+  color: StatusCardColor;
+}
+
+function StatusCard({ title, status, icon: Icon, color }: StatusCardProps) {
+  const colorMap: Record<StatusCardColor, string> = {
     primary: 'text-primary bg-primary/10 border-primary/20',
     secondary: 'text-secondary-foreground bg-secondary-80 border-border/50',
     destructive: 'text-destructive bg-destructive/10 border-destructive/20',
   };
 
-  const statusIcons: any = {
+  const barColorMap: Record<StatusCardColor, string> = {
+    primary: 'bg-primary',
+    secondary: 'bg-secondary',
+    destructive: 'bg-destructive',
+  };
+
+  const statusIconColorMap: Record<StatusCardColor, string> = {
+    primary: 'text-primary',
+    secondary: 'text-secondary-foreground',
+    destructive: 'text-destructive',
+  };
+
+  const statusIcons: Record<string, LucideIcon> = {
     'Connected': ShieldCheck,
     'Degraded': ShieldAlert,
     'Disconnected': ShieldX,
@@ -412,7 +434,7 @@ function StatusCard({ title, status, icon: Icon, color }: any) {
 
   return (
     <Card className="border border-border/50 shadow-sm overflow-hidden group hover:shadow-md transition-shadow">
-      <div className={`h-1 w-full bg-${color}`} />
+      <div className={`h-1 w-full ${barColorMap[color]}`} />
       <CardContent className="p-6 flex items-center gap-4">
          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${colorMap[color]}`}>
             <Icon className="w-6 h-6" />
@@ -421,7 +443,7 @@ function StatusCard({ title, status, icon: Icon, color }: any) {
             <p className="text-xs font-bold text-muted-foreground uppercase mb-0.5 tracking-tight">{title}</p>
             <div className="flex items-center gap-2">
                <p className="text-xl font-bold font-heading text-foreground">{status}</p>
-               {statusIcons[status] && <StatusIcon className={`w-4 h-4 text-${color}`} />}
+               {statusIcons[status] && <StatusIcon className={`w-4 h-4 ${statusIconColorMap[color]}`} />}
             </div>
          </div>
       </CardContent>
@@ -429,7 +451,15 @@ function StatusCard({ title, status, icon: Icon, color }: any) {
   );
 }
 
-function StorageItem({ label, value, percentage, color, icon: Icon }: any) {
+interface StorageItemProps {
+  label: string;
+  value: string;
+  percentage: number;
+  color: string;
+  icon?: LucideIcon;
+}
+
+function StorageItem({ label, value, percentage, color, icon: Icon }: StorageItemProps) {
   return (
     <div className="group space-y-2">
        <div className="flex justify-between items-end px-0.5">

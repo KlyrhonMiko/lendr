@@ -1,5 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { inventoryApi, InventoryListParams, InventoryItemCreate, InventoryItemUpdate } from '../api';
+import {
+  inventoryApi,
+  InventoryListParams,
+  InventoryItemCreate,
+  InventoryItemUpdate,
+  InventoryUnitListParams,
+} from '../api';
 
 const STALE_TIME = 1000 * 60; // 1 minute
 
@@ -62,7 +68,7 @@ export function useInventoryItemMutations() {
 }
 
 // Units
-export function useInventoryUnits(itemId: string, params: any) {
+export function useInventoryUnits(itemId: string, params: InventoryUnitListParams) {
   return useQuery({
     queryKey: ['inventory', 'items', itemId, 'units', params],
     queryFn: async () => await inventoryApi.listUnits(itemId, params),
@@ -71,7 +77,7 @@ export function useInventoryUnits(itemId: string, params: any) {
 }
 
 // Batches
-export function useInventoryBatches(itemId: string, params: any) {
+export function useInventoryBatches(itemId: string, params: { page?: number; per_page?: number; status?: string; include_expired?: boolean }) {
   return useQuery({
     queryKey: ['inventory', 'items', itemId, 'batches', params],
     queryFn: async () => await inventoryApi.listBatches(itemId, params),

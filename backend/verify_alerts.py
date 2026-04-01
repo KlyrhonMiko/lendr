@@ -1,6 +1,6 @@
 import sys
 import os
-from sqlmodel import Session, create_engine, select
+from sqlmodel import Session, select
 
 # Add current directory to path to import backend modules
 sys.path.append(os.path.abspath(os.path.curdir))
@@ -14,7 +14,7 @@ def verify_alerts():
     
     with Session(engine) as session:
         # 1. Find an untrackable item
-        item = session.exec(select(InventoryItem).where(InventoryItem.is_trackable == False, InventoryItem.is_deleted == False)).first()
+        item = session.exec(select(InventoryItem).where(~InventoryItem.is_trackable, ~InventoryItem.is_deleted)).first()
         if not item:
             print("No untrackable items found to test.")
             return

@@ -34,6 +34,7 @@ def _revoke_sessions_background(
             exclude_session_id=exclude_session_id,
             actor_id=actor_id,
         )
+        background_session.commit()
 
 @router.get("/", response_model=GenericResponse[OperationsSettingsPayload])
 async def get_operations_settings(

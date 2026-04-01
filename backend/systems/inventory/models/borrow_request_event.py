@@ -1,8 +1,12 @@
 from datetime import datetime
+from typing import TYPE_CHECKING
 from uuid import UUID
 from sqlmodel import Field, Relationship
 from core.base_model import BaseModel
 from utils.time_utils import get_now_manila
+
+if TYPE_CHECKING:
+    from systems.inventory.models.borrow_request import BorrowRequest
 
 class BorrowRequestEvent(BaseModel, table=True):
     __tablename__ = "borrow_request_events"

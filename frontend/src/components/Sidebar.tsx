@@ -81,7 +81,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         <div className="flex items-center justify-between h-20 px-6 shrink-0 border-b border-sidebar-border/30 mb-2 pt-2">
           <div className="flex items-center gap-3">
             <Image
-              src="/image/Powergold Enterprise Logo.png"
+              src="/Image/Powergold Enterprise Logo.png"
               alt="Powergold"
               width={36}
               height={36}

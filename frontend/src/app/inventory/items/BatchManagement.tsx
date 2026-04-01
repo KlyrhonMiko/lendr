@@ -88,8 +88,9 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
       }
       resetForms();
       invalidateBatches();
-    } catch (err: any) {
-      toast.error(err.message || 'Action failed');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Action failed';
+      toast.error(message);
     }
   };
 
@@ -108,8 +109,9 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
       toast.success('Stock adjusted successfully');
       resetForms();
       invalidateBatches();
-    } catch (err: any) {
-      toast.error(err.message || 'Adjustment failed');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Adjustment failed';
+      toast.error(message);
     }
   };
 

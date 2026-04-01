@@ -109,6 +109,11 @@ def _safe_log_auth_event(
         logger.warning("Failed to write auth audit event: %s", exc)
 
 
+def _commit_if_needed(session: Session) -> None:
+    if session.new or session.dirty or session.deleted:
+        session.commit()
+
+
 def _enforce_auth_rate_limit(
     *,
     request: Request,
@@ -414,6 +419,8 @@ async def refresh_token(
             if not auth_service.is_user_session_valid(session, session_id):
                 raise HTTPException(status_code=401, detail="Session expired or invalid")
             auth_service.extend_user_session(session, session_id, access_token_expires)
+
+        _commit_if_needed(session)
 
         # Generate new token
         access_token = auth_service.create_access_token(

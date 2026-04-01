@@ -20,7 +20,7 @@ export default function AuthLayout({
         <div className="relative z-10 flex flex-col items-center text-center max-w-lg pr-12">
           <div className="mb-10">
             <Image
-              src="/image/Powergold Enterprise Logo.png"
+              src="/Image/Powergold Enterprise Logo.png"
               alt="Powergold Logo"
               width={260}
               height={260}

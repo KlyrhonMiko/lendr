@@ -51,18 +51,20 @@ export function useBorrowMutations() {
     queryClient.invalidateQueries({ queryKey: ['inventory', 'requests'] });
   };
 
+  type BorrowActionHandler = (id: string, payload?: BorrowActionPayload | BorrowReturnPayload) => Promise<unknown>;
+
   const executeAction = useMutation({
     mutationFn: async ({ action, id, payload }: { action: BorrowAction; id: string; payload?: BorrowActionPayload | BorrowReturnPayload }) => {
-      const handlers = {
+      const handlers: Record<BorrowAction, BorrowActionHandler> = {
         approve: borrowApi.approve,
         reject: borrowApi.reject,
         release: borrowApi.release,
         return: borrowApi.return,
         reopen: borrowApi.reopen,
         close: borrowApi.close,
-      } as const;
+      };
       
-      return handlers[action](id, payload as any);
+      return handlers[action](id, payload);
     },
     onSuccess: (_, { id }) => {
       invalidateList();

@@ -66,6 +66,8 @@ class MaintenanceMiddleware(BaseHTTPMiddleware):
                             is_valid = False
                             if str(session_id).startswith("USE"):
                                 is_valid = auth_service.is_user_session_valid(session, session_id)
+                                if session.new or session.dirty or session.deleted:
+                                    session.commit()
                             
                             if is_valid:
                                 is_admin = True

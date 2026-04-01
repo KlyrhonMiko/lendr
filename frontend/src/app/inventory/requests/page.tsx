@@ -10,6 +10,7 @@ import { ReturnModal } from './ReturnModal';
 import type { PaginationMeta } from '@/lib/api';
 import { toast } from 'sonner';
 import type { StatusTab, BorrowRecord, BorrowAction } from './lib/types';
+import type { BorrowRequestBatch, BorrowRequestUnit } from './api';
 import { DEFAULT_PER_PAGE } from './lib/types';
 import { useDebounce } from './lib/useDebounce';
 import { RequestsHeader } from './components/RequestsHeader';
@@ -36,7 +37,7 @@ export default function BorrowsPage() {
   const [assigningRequest, setAssigningRequest] = useState<BorrowRecord | null>(null);
   const [returningRequest, setReturningRequest] = useState<BorrowRecord | null>(null);
   const [actionNotes, setActionNotes] = useState('');
-  const [assignmentsMap, setAssignmentsMap] = useState<Record<string, { units: any[], batches: any[] }>>({});
+  const [assignmentsMap, setAssignmentsMap] = useState<Record<string, { units: BorrowRequestUnit[]; batches: BorrowRequestBatch[] }>>({});
   const [receiptRequestId, setReceiptRequestId] = useState<string | null>(null);
 
   const debouncedSearch = useDebounce(searchInput, 400);
@@ -88,7 +89,7 @@ export default function BorrowsPage() {
     
     const totalRequested = record.items.reduce((sum, item) => sum + item.qty_requested, 0);
     const totalAssignedUnits = assignments.units.length;
-    const totalAssignedBatches = assignments.batches.reduce((sum: number, b: any) => sum + b.qty_assigned, 0);
+    const totalAssignedBatches = assignments.batches.reduce((sum: number, b: BorrowRequestBatch) => sum + b.qty_assigned, 0);
     
     return (totalAssignedUnits + totalAssignedBatches) >= totalRequested;
   }, [assignmentsMap]);

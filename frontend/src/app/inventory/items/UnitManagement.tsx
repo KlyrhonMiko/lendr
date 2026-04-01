@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { inventoryApi, ConfigRead } from './api';
+import { inventoryApi, ConfigRead, InventoryUnit } from './api';
 import { useQueryClient } from '@tanstack/react-query';
 import { useInventoryUnits } from './lib/useItemQueries';
 import {
@@ -207,7 +207,7 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
     resetForm();
   };
 
-  const startEdit = (unit: any) => {
+  const startEdit = (unit: InventoryUnit) => {
     setEditingUnitId(unit.unit_id);
     
     let dateVal = '';
@@ -265,8 +265,9 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
       }
       closeForm();
       invalidateQueries();
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to save unit');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to save unit';
+      toast.error(message);
     }
   };
 
@@ -276,8 +277,9 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
       await inventoryApi.retireUnit(itemId, unitId);
       toast.success('Unit retired');
       invalidateQueries();
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to retire unit');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to retire unit';
+      toast.error(message);
     }
   };
 

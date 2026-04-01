@@ -63,8 +63,9 @@ export default function MovementLedgerPage() {
       await reverseMovement.mutateAsync({ id: selectedMovement.movement_id, reason: reversalReason, reasonCode: reversalReasonCode });
       toast.success('Movement reversal record created successfully');
       setIsReversalModalOpen(false);
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to reverse movement');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to reverse movement';
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }

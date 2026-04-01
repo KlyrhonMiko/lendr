@@ -1,10 +1,13 @@
 'use client';
 
-import { ChevronRight, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+
+type JsonPrimitive = string | number | boolean | null;
+type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
 
 interface DataDiffViewProps {
-  before?: Record<string, any>;
-  after?: Record<string, any>;
+  before?: Record<string, JsonValue>;
+  after?: Record<string, JsonValue>;
 }
 
 export function DataDiffView({ before, after }: DataDiffViewProps) {
@@ -18,7 +21,7 @@ export function DataDiffView({ before, after }: DataDiffViewProps) {
     ...Object.keys(after || {})
   ])).sort();
 
-  const renderValue = (val: any) => {
+  const renderValue = (val: JsonValue | undefined) => {
     if (val === null) return <span className="text-muted-foreground font-mono italic">null</span>;
     if (val === undefined) return <span className="text-muted-foreground font-mono italic">undefined</span>;
     if (typeof val === 'object') return <span className="text-indigo-400 font-mono text-[10px]">{JSON.stringify(val)}</span>;

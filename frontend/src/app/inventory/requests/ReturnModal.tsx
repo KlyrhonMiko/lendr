@@ -32,7 +32,7 @@ export function ReturnModal({ request, onClose, onSuccess }: ReturnModalProps) {
   const [globalConditionOpen, setGlobalConditionOpen] = useState(false);
   const [openConditionUnit, setOpenConditionUnit] = useState<string | null>(null);
 
-  const hasTrackableItems = request.items.some(item => (item as any).is_trackable);
+  const hasTrackableItems = request.items.some((item) => !!item.is_trackable);
 
   const conditionStyle = (condition: string) => {
     if (!condition) return 'bg-muted/40 border-border text-muted-foreground';

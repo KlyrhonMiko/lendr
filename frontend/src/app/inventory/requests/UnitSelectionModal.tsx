@@ -50,7 +50,7 @@ export function UnitSelectionModal({ request, onClose, onSuccess }: UnitSelectio
       itemId: item.item_id,
       name: item.name,
       qtyRequested: item.qty_requested,
-      isTrackable: !!(item as any).is_trackable,
+      isTrackable: !!item.is_trackable,
       availableUnits: [],
       selectedUnitIds: [],
       availableBatches: [],

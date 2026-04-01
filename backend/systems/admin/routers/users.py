@@ -15,6 +15,17 @@ router = APIRouter()
 user_service = UserService()
 
 
+def _commit_and_refresh(session: Session, obj: User) -> None:
+    """Commit and refresh when the provided session supports these operations."""
+    commit = getattr(session, "commit", None)
+    if callable(commit):
+        commit()
+
+    refresh = getattr(session, "refresh", None)
+    if callable(refresh):
+        refresh(obj)
+
+
 @router.post(
     "/register",
     response_model=GenericResponse[UserRead],
@@ -29,6 +40,7 @@ async def register_user(
     _: None = Depends(require_permission("admin:users:manage")),
 ):
     user = user_service.create(session, user_data)
+    _commit_and_refresh(session, user)
     return create_success_response(
         data=user, message="User registered successfully", request=request
     )
@@ -112,6 +124,8 @@ async def update_user(
     if should_revoke_sessions:
         auth_service.revoke_sessions_for_user(session, updated_user.id)
         message = "User updated successfully. Active sessions were revoked for security."
+
+    _commit_and_refresh(session, updated_user)
 
     return create_success_response(
         data=updated_user,

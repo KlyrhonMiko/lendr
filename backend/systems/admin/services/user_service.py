@@ -110,7 +110,7 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
 
         db_obj = self.model(**data)
         session.add(db_obj)
-        session.commit()
+        session.flush()
         session.refresh(db_obj)
         return db_obj
 
@@ -125,6 +125,6 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
 
         db_obj.updated_at = get_now_manila()
         session.add(db_obj)
-        session.commit()
+        session.flush()
         session.refresh(db_obj)
         return db_obj

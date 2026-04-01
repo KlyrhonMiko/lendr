@@ -61,6 +61,8 @@ async def terminate_session(
     success = health_service.terminate_session(session, session_id, current_user.id)
     if not success:
         raise HTTPException(status_code=404, detail="Session not found")
+
+    session.commit()
     
     return create_success_response(
         data=None,

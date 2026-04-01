@@ -72,7 +72,7 @@ class RequestedItemService(BaseService[RequestedItem, RequestedItemCreate, Reque
 
         db_obj = self.model(**data)
         session.add(db_obj)
-        session.commit()
+        session.flush()
         session.refresh(db_obj)
         return db_obj
 

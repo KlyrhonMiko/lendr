@@ -29,7 +29,14 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
-import { useImportHistory, useImportInventory, useExportData, useDownloadTemplate } from '../lib/useImportExport';
+import {
+  useImportHistory,
+  useImportInventory,
+  useExportData,
+  useDownloadTemplate,
+  ImportHistoryItem,
+  ImportHistoryErrorLogEntry,
+} from '../lib/useImportExport';
 import { useInventoryItems } from '@/app/inventory/items/lib/useItemQueries';
 import { User as SystemUser } from '@/app/admin/users/api';
 import { format } from 'date-fns';
@@ -39,7 +46,7 @@ export function ImportExportSettings() {
   const perPage = 5;
   const [duplicateMode, setDuplicateMode] = useState('skip');
   const [isIntegrityModalOpen, setIsIntegrityModalOpen] = useState(false);
-  const [selectedHistory, setSelectedHistory] = useState<any | null>(null);
+  const [selectedHistory, setSelectedHistory] = useState<ImportHistoryItem | null>(null);
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -772,11 +779,11 @@ export function ImportExportSettings() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/50">
-                  {Array.isArray(selectedHistory.error_log) && selectedHistory.error_log.map((err: any, idx: number) => (
+                  {Array.isArray(selectedHistory.error_log) && selectedHistory.error_log.map((err: ImportHistoryErrorLogEntry, idx: number) => (
                     <tr key={idx} className="hover:bg-muted/30 transition-colors align-top">
-                      <td className="p-4 pl-6 font-mono font-bold text-rose-500">{err.row}</td>
+                      <td className="p-4 pl-6 font-mono font-bold text-rose-500">{err.row ?? '-'}</td>
                       <td className="p-4 text-sm font-medium text-foreground leading-relaxed">
-                        {err.error}
+                        {err.error ?? 'Unknown error'}
                       </td>
                       <td className="p-4 pr-6">
                          <div className="p-3 rounded-xl bg-muted/30 font-mono text-[10px] text-muted-foreground break-all max-h-32 overflow-y-auto">

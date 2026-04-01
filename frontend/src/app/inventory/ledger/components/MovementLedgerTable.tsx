@@ -33,6 +33,43 @@ function getMovementLabel(type?: string) {
   return type ? MOVEMENT_TYPE_LABELS[type] || type.replace(/_/g, ' ') : '—';
 }
 
+type LedgerTableRow = LedgerMovement | Anomaly;
+
+function isAnomalyRow(row: LedgerTableRow): row is Anomaly {
+  return 'anomaly_type' in row;
+}
+
+function getRowItemId(row: LedgerTableRow): string {
+  return isAnomalyRow(row) ? row.item_id : row.item_id || '';
+}
+
+function getRowItemName(row: LedgerTableRow): string {
+  return isAnomalyRow(row) ? row.item_name : row.item_name || 'Unknown item';
+}
+
+function getRowInventoryOrItemId(row: LedgerTableRow): string {
+  if (isAnomalyRow(row)) return row.item_id;
+  return row.inventory_id || row.item_id || '';
+}
+
+function getRowQty(row: LedgerTableRow): number {
+  return isAnomalyRow(row) ? row.details?.delta ?? 0 : row.qty_change ?? 0;
+}
+
+function getRowPrimaryMessage(row: LedgerTableRow): string {
+  if (isAnomalyRow(row)) return row.message;
+  return row.note || row.message || getMovementLabel(row.movement_type);
+}
+
+function getRowTimestamp(row: LedgerTableRow): string {
+  return isAnomalyRow(row) ? row.detected_at : row.occurred_at || '';
+}
+
+function getRowActor(row: LedgerTableRow): string {
+  if (isAnomalyRow(row)) return 'System';
+  return row.actor_name || row.user_id || 'System';
+}
+
 export function MovementLedgerTable({
   activeTab,
   loading,
@@ -111,14 +148,11 @@ export function MovementLedgerTable({
             const isExpanded =
               activeTab === 'anomalies' && anomalyKey ? expandedAnomalyId === anomalyKey : false;
             const rowKey =
-              (move as LedgerMovement).movement_id || anomalyKey || `${(move as any).item_id}-${(move as any).anomaly_type}`;
+              (move as LedgerMovement).movement_id || anomalyKey || `${getRowItemId(move)}-${isAnomalyRow(move) ? move.anomaly_type : 'movement'}`;
 
-            const qty =
-              activeTab === 'anomalies'
-                ? (move as any).details?.delta ?? 0
-                : (move as any).qty_change ?? 0;
+            const qty = getRowQty(move);
             const isIn = qty > 0;
-            const isReversed = (move as any).is_reversed;
+            const isReversed = isAnomalyRow(move) ? false : !!move.is_reversed;
 
             return (
               <Fragment key={rowKey}>
@@ -137,10 +171,10 @@ export function MovementLedgerTable({
                       </div>
                       <div className="min-w-0">
                         <p className="font-semibold text-sm text-foreground truncate">
-                          {(move as any).item_name || 'Unknown item'}
+                          {getRowItemName(move)}
                         </p>
                         <p className="text-[11px] text-muted-foreground/60 font-mono mt-0.5">
-                          {(move as any).inventory_id || (move as any).item_id}
+                          {getRowInventoryOrItemId(move)}
                         </p>
                       </div>
                     </div>
@@ -164,7 +198,7 @@ export function MovementLedgerTable({
                         )}
                       </div>
                       <span className="text-sm text-muted-foreground">
-                        {activeTab === 'anomalies' ? 'Balance mismatch' : getMovementLabel((move as any).movement_type)}
+                        {activeTab === 'anomalies' ? 'Balance mismatch' : getMovementLabel(isAnomalyRow(move) ? undefined : move.movement_type)}
                       </span>
                     </div>
                   </td>
@@ -187,22 +221,22 @@ export function MovementLedgerTable({
                   <td className="px-4 py-3.5">
                     <p className="text-sm text-foreground truncate max-w-[220px]">
                       {isReversed
-                        ? `[Voided] ${(move as any).note || (move as any).message || getMovementLabel((move as any).movement_type)}`
-                        : (move as any).note || (move as any).message || getMovementLabel((move as any).movement_type)}
+                        ? `[Voided] ${getRowPrimaryMessage(move)}`
+                        : getRowPrimaryMessage(move)}
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {(move as any).occurred_at || (move as any).detected_at}
+                      {getRowTimestamp(move)}
                     </p>
-                    {(move as any).reference_id && (move as any).movement_type === 'reversal' && (
+                    {!isAnomalyRow(move) && move.reference_id && move.movement_type === 'reversal' && (
                       <span className="inline-block mt-1 text-[11px] font-mono bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded">
-                        Ref: {(move as any).reference_id}
+                        Ref: {move.reference_id}
                       </span>
                     )}
                   </td>
 
                   <td className="px-4 py-3.5 hidden sm:table-cell">
                     <span className="text-sm text-muted-foreground">
-                      {(move as any).actor_name || (move as any).user_id || 'System'}
+                      {getRowActor(move)}
                     </span>
                   </td>
 
@@ -214,16 +248,16 @@ export function MovementLedgerTable({
                             Voided
                           </span>
                         )}
-                        {(move as any).movement_type === 'reversal' && !isReversed && (
+                        {!isAnomalyRow(move) && move.movement_type === 'reversal' && !isReversed && (
                           <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-500">
                             Correction
                           </span>
                         )}
-                        {!isReversed && (move as any).movement_type !== 'reversal' && (
+                        {!isReversed && !isAnomalyRow(move) && move.movement_type !== 'reversal' && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              onOpenReversalModal(move as LedgerMovement);
+                              onOpenReversalModal(move);
                             }}
                             className="p-2 rounded-lg text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
                             title="Reverse movement"
@@ -237,12 +271,12 @@ export function MovementLedgerTable({
                       <div className="flex items-center justify-end gap-2">
                         <span
                           className={`text-xs font-semibold px-2 py-0.5 rounded-md ${
-                            (move as any).severity === 'high'
+                            (move as Anomaly).severity === 'high'
                               ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
                               : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
                           }`}
                         >
-                          {(move as any).severity}
+                          {(move as Anomaly).severity}
                         </span>
                         <span className="text-muted-foreground">
                           {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -262,7 +296,7 @@ export function MovementLedgerTable({
                             Ledger balance
                           </p>
                           <p className="text-xl font-semibold text-foreground">
-                            {(move as any).details?.ledger_balance}
+                            {(move as Anomaly).details?.ledger_balance}
                           </p>
                         </div>
                         <div className="p-4 rounded-xl bg-background border border-border">
@@ -271,7 +305,7 @@ export function MovementLedgerTable({
                             Actual balance
                           </p>
                           <p className="text-xl font-semibold text-foreground">
-                            {(move as any).details?.actual_balance}
+                            {(move as Anomaly).details?.actual_balance}
                           </p>
                         </div>
                         <div className="p-4 rounded-xl bg-background border border-border">
@@ -281,11 +315,11 @@ export function MovementLedgerTable({
                           </p>
                           <p
                             className={`text-xl font-semibold ${
-                              (move as any).details?.delta < 0 ? 'text-rose-600' : 'text-amber-600'
+                              (move as Anomaly).details?.delta < 0 ? 'text-rose-600' : 'text-amber-600'
                             }`}
                           >
-                            {(move as any).details?.delta > 0 ? '+' : ''}
-                            {(move as any).details?.delta}
+                            {(move as Anomaly).details?.delta > 0 ? '+' : ''}
+                            {(move as Anomaly).details?.delta}
                           </p>
                         </div>
                         <div className="p-4 rounded-xl bg-background border border-border">
@@ -294,7 +328,7 @@ export function MovementLedgerTable({
                             Transactions
                           </p>
                           <p className="text-xl font-semibold text-foreground">
-                            {(move as any).details?.movement_count}
+                            {(move as Anomaly).details?.movement_count}
                           </p>
                         </div>
                       </div>

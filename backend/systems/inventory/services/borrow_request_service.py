@@ -818,7 +818,7 @@ class BorrowService(
             actor_id=actor_id,
         )
 
-        session.commit()
+        session.flush()
         for assignment in created_assignments:
             session.refresh(assignment, ["inventory_unit"])
         return created_assignments
@@ -929,7 +929,7 @@ class BorrowService(
             actor_id=actor_id,
         )
 
-        session.commit()
+        session.flush()
         for assignment in created_assignments:
             session.refresh(assignment, ["inventory_batch"])
         return created_assignments
@@ -1056,7 +1056,7 @@ class BorrowService(
         )
         session.add(event)
 
-        session.commit()
+        session.flush()
         session.refresh(db_obj)
         return db_obj
 
@@ -1114,7 +1114,7 @@ class BorrowService(
         session.add(event)
 
         session.add(db_request)
-        session.commit()
+        session.flush()
         session.refresh(db_request)
         return db_request
 
@@ -1160,7 +1160,7 @@ class BorrowService(
         session.add(event)
 
         session.add(db_request)
-        session.commit()
+        session.flush()
         session.refresh(db_request)
         return db_request
 
@@ -1305,7 +1305,7 @@ class BorrowService(
         session.add(event)
 
         session.add(db_request)
-        session.commit()
+        session.flush()
         session.refresh(db_request)
         return db_request
 
@@ -1470,7 +1470,7 @@ class BorrowService(
         session.add(event)
 
         session.add(db_request)
-        session.commit()
+        session.flush()
         session.refresh(db_request)
         return db_request
 
@@ -1528,7 +1528,7 @@ class BorrowService(
         session.add(event)
 
         session.add(db_request)
-        session.commit()
+        session.flush()
         session.refresh(db_request)
         return db_request
 
@@ -1610,7 +1610,7 @@ class BorrowService(
 
         session.add(event)
         session.add(db_request)
-        session.commit()
+        session.flush()
         session.refresh(db_request)
         return db_request
 

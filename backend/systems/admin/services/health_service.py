@@ -155,7 +155,7 @@ class SystemHealthService:
         session_obj.is_revoked = True
         session_obj.is_deleted = True
         session.add(session_obj)
-        session.commit()
+        session.flush()
         return True
 
     def get_recent_logs(self, skip: int = 0, limit: int = 100) -> tuple[List[LogEntryRead], int]:

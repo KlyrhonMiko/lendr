@@ -17,6 +17,13 @@ reusable_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 user_service = UserService()
 
 
+def _commit_if_needed(session: Session) -> None:
+    commit = getattr(session, "commit", None)
+    has_changes = bool(getattr(session, "new", ())) or bool(getattr(session, "dirty", ())) or bool(getattr(session, "deleted", ()))
+    if callable(commit) and has_changes:
+        commit()
+
+
 def _hash_value(value: str | None) -> str:
     if not value:
         return "unknown"
@@ -131,6 +138,8 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Session has expired or been revoked. Please log in again.",
         )
+
+    _commit_if_needed(session)
 
     return user
 

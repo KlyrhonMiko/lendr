@@ -1,4 +1,5 @@
 import { api, buildQueryString } from '@/lib/api';
+import type { JsonValue } from '@/lib/types/json';
 export { api, buildQueryString };
 
 export interface SystemSetting {
@@ -105,6 +106,56 @@ export interface HealthLog {
   severity: 'Critical' | 'Warning' | 'Info';
 }
 
+export interface GeneralSettingsData {
+  localization: {
+    timezone: string;
+    date_format: string;
+    time_format: string;
+    language: string;
+  };
+}
+
+export interface BrandingSettingsData {
+  visual_identity: {
+    brand_name: string;
+    system_theme: string;
+    logo_url: string | null;
+    favicon_url: string | null;
+  };
+  banner: {
+    is_enabled: boolean;
+    message: string | null;
+    banner_type: string;
+    expiry_date: string | null;
+    expiry_time: string | null;
+  };
+}
+
+export interface OperationsSettingsData {
+  maintenance: {
+    enabled: boolean;
+    message: string;
+  };
+  backup_schedule: {
+    frequency: string;
+    time: string;
+    storage_location: string;
+  };
+  archive_policy: {
+    audit_logs_value: number;
+    audit_logs_unit: string;
+    borrow_records_value: number;
+    borrow_records_unit: string;
+  };
+  retention_policy: {
+    auto_delete: boolean;
+    delete_older_than_value: number;
+    delete_older_than_unit: string;
+    exclusion_list: string[];
+    maintenance_time: string;
+  };
+}
+
 export const healthApi = {
   getStatus: () => api.get<HealthStatus>('/admin/health/status'),
   getStorage: () => api.get<HealthStorage>('/admin/health/storage'),
@@ -123,8 +174,8 @@ export interface ArchivedAuditLog {
   entity_id: string;
   action: string;
   reason_code: string | null;
-  before_json: any;
-  after_json: any;
+  before_json: JsonValue;
+  after_json: JsonValue;
   user_id: string | null;
   employee_id: string | null;
   created_at: string;

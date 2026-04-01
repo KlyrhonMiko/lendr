@@ -4,6 +4,10 @@ import { toast } from 'sonner';
 
 const STALE_TIME_BACKUP = 1000 * 60; // 1 minute
 
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
 export function useBackupRuns() {
   return useQuery({
     queryKey: ['admin', 'backups', 'runs'],
@@ -28,8 +32,8 @@ export function useBackupMutations() {
       queryClient.invalidateQueries({ queryKey: ['admin', 'backups', 'runs'] });
       toast.success('Backup triggered successfully');
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to trigger backup');
+    onError: (error: unknown) => {
+      toast.error(getErrorMessage(error, 'Failed to trigger backup'));
     }
   });
 
@@ -39,8 +43,8 @@ export function useBackupMutations() {
     onSuccess: () => {
       toast.success('Backup downloaded successfully');
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to download backup');
+    onError: (error: unknown) => {
+      toast.error(getErrorMessage(error, 'Failed to download backup'));
     }
   });
 
