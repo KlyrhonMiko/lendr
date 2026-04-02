@@ -11,6 +11,7 @@ class InventoryMovementRead(BaseModel):
     reason_code: Optional[str] = None
 
     reference_id: Optional[str] = None
+    reference_type: Optional[str] = None
     note: Optional[str] = None
     
     user_id: Optional[str] = None
@@ -39,6 +40,7 @@ class InventoryMovementAdjust(BaseModel):
     movement_type: str = Field(..., min_length=1, max_length=50)
     reason_code: Optional[str] = Field(default=None, max_length=50)
     reference_id: Optional[str] = Field(default=None, max_length=50)
+    reference_type: Optional[str] = Field(default=None, max_length=50)
     batch_id: Optional[str] = Field(default=None, max_length=50)
     note: str = Field(..., min_length=5, max_length=500)
 

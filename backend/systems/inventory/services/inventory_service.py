@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import re
 from fastapi import HTTPException
 from collections import Counter
 from typing import Any, Optional, cast
@@ -50,6 +51,25 @@ ALLOWED_STATUS_TRANSITIONS = {
     "expired": {"discarded"},
     "discarded": set(),
 }
+
+VALID_MOVEMENT_REFERENCE_TYPES = {
+    "borrow_request",
+    "inventory_movement",
+    "external_reference",
+}
+
+REFERENCE_TYPE_BY_MOVEMENT = {
+    "borrow_release": "borrow_request",
+    "borrow_return": "borrow_request",
+    "reversal": "inventory_movement",
+}
+
+UNIT_STATUS_CHANGE_NOTE_PATTERN = re.compile(
+    r"^Status changed from (?P<from_status>[a-z_]+) to (?P<to_status>[a-z_]+) for unit: (?P<unit_id>[A-Za-z0-9\-]+)$"
+)
+UNIT_RETIRED_NOTE_PATTERN = re.compile(
+    r"^Unit retired: (?P<unit_id>[A-Za-z0-9\-]+) \(Previous status: (?P<from_status>[a-z_]+)\)$"
+)
 
 class InventoryService(BaseService[InventoryItem, InventoryItemCreate, InventoryItemUpdate]):
     def __init__(self):
@@ -573,6 +593,49 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         
         return batch
 
+    def _resolve_reference_context(
+        self,
+        movement_type: str,
+        reference_id: str | None,
+        reference_type: str | None,
+    ) -> str | None:
+        normalized_reference_type = (
+            reference_type.strip().lower().replace(" ", "_") if reference_type else None
+        )
+
+        if (
+            normalized_reference_type is not None
+            and normalized_reference_type not in VALID_MOVEMENT_REFERENCE_TYPES
+        ):
+            raise ValueError(
+                f"Invalid reference_type '{reference_type}'. Allowed values: "
+                f"{sorted(VALID_MOVEMENT_REFERENCE_TYPES)}"
+            )
+
+        expected_reference_type = REFERENCE_TYPE_BY_MOVEMENT.get(movement_type)
+        if expected_reference_type:
+            if not reference_id:
+                raise ValueError(
+                    f"reference_id is required for movement_type '{movement_type}'"
+                )
+            if (
+                normalized_reference_type is not None
+                and normalized_reference_type != expected_reference_type
+            ):
+                raise ValueError(
+                    f"reference_type '{reference_type}' is not valid for movement_type "
+                    f"'{movement_type}'. Expected '{expected_reference_type}'."
+                )
+            return expected_reference_type
+
+        if normalized_reference_type is not None and not reference_id:
+            raise ValueError("reference_type cannot be set without reference_id")
+
+        if reference_id and normalized_reference_type is None:
+            return "external_reference"
+
+        return normalized_reference_type
+
     def adjust_stock(
         self, 
         session: Session, 
@@ -580,6 +643,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         qty_change: int, 
         movement_type: str = "manual_adjustment",
         reference_id: str | None = None,
+        reference_type: str | None = None,
         reason_code: str | None = None,
         note: str | None = None,
         actor_id: UUID | None = None,
@@ -641,6 +705,12 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
 
         old_qty = db_obj.available_qty
 
+        resolved_reference_type = self._resolve_reference_context(
+            movement_type=movement_type,
+            reference_id=reference_id,
+            reference_type=reference_type,
+        )
+
         # Sync Item quantities (Purely Aggregate)
         self._sync_item_quantities(session, item_id)
 
@@ -657,6 +727,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             movement_type=movement_type,
             reason_code=reason_code,
             reference_id=reference_id,
+            reference_type=resolved_reference_type,
             note=note,
             actor_id=actor_id,
         )
@@ -667,6 +738,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             "movement_type": movement_type,
             "reason_code": reason_code,
             "reference_id": reference_id,
+            "reference_type": resolved_reference_type,
             "note": note,
         }
         if batch:
@@ -795,6 +867,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             for m, _, _ in results
             if m.reference_id
             and m.movement_type in ("borrow_release", "borrow_return")
+            and (m.reference_type in (None, "borrow_request"))
         ]
         borrow_map: dict[str, dict[str, Any]] = {}
         if borrow_ref_ids:
@@ -880,6 +953,53 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         if original.inventory_uuid is None:
             raise ValueError(f"Movement {movement_id} has no inventory_uuid")
 
+        unit_reversal_context = self._build_unit_reversal_context(session, original)
+        if unit_reversal_context is not None:
+            item, reversal_qty_change = unit_reversal_context
+            reversal = InventoryMovement(
+                movement_id=get_next_sequence(session, InventoryMovement, "movement_id", "MOV"),
+                inventory_uuid=item.id,
+                actor_id=actor_id,
+                qty_change=reversal_qty_change,
+                movement_type="reversal",
+                reason_code=reason_code,
+                reference_id=original.movement_id,
+                reference_type="inventory_movement",
+                note=reason,
+            )
+
+            audit_service.log_action(
+                db=session,
+                entity_type="inventory_movement",
+                entity_id=original.movement_id,
+                action="reversed",
+                reason_code=reason_code,
+                before={
+                    "movement_id": original.movement_id,
+                    "inventory_id": item.item_id,
+                    "qty_change": original.qty_change,
+                    "movement_type": original.movement_type,
+                    "reason_code": original.reason_code,
+                    "reference_id": original.reference_id,
+                    "reference_type": original.reference_type,
+                },
+                after={
+                    "movement_id": reversal.movement_id,
+                    "inventory_id": item.item_id,
+                    "qty_change": reversal.qty_change,
+                    "movement_type": reversal.movement_type,
+                    "reason_code": reversal.reason_code,
+                    "reference_id": reversal.reference_id,
+                    "reference_type": reversal.reference_type,
+                    "reason": reason,
+                },
+                actor_id=actor_id,
+            )
+
+            session.add(reversal)
+            session.add(item)
+            return reversal
+
         item = session.exec(
             select(InventoryItem).where(
                 InventoryItem.id == original.inventory_uuid,
@@ -912,6 +1032,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             movement_type="reversal",
             reason_code=reason_code,
             reference_id=original.movement_id,
+            reference_type="inventory_movement",
             note=reason,
         )
 
@@ -931,6 +1052,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                 "movement_type": original.movement_type,
                 "reason_code": original.reason_code,
                 "reference_id": original.reference_id,
+                "reference_type": original.reference_type,
             },
             after={
                 "movement_id": reversal.movement_id,
@@ -939,6 +1061,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                 "movement_type": reversal.movement_type,
                 "reason_code": reversal.reason_code,
                 "reference_id": reversal.reference_id,
+                "reference_type": reversal.reference_type,
                 "reason": reason,
             },
             actor_id=actor_id,
@@ -947,6 +1070,113 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         session.add(reversal)
         session.add(item)
         return reversal
+
+    def _extract_unit_transition_from_movement(
+        self,
+        movement: InventoryMovement,
+    ) -> tuple[str, str, str] | None:
+        note = (movement.note or "").strip()
+        if not note:
+            return None
+
+        match = UNIT_STATUS_CHANGE_NOTE_PATTERN.match(note)
+        if match:
+            return (
+                match.group("unit_id"),
+                match.group("from_status"),
+                match.group("to_status"),
+            )
+
+        retired_match = UNIT_RETIRED_NOTE_PATTERN.match(note)
+        if retired_match:
+            return (
+                retired_match.group("unit_id"),
+                retired_match.group("from_status"),
+                "retired",
+            )
+
+        return None
+
+    def _build_unit_reversal_context(
+        self,
+        session: Session,
+        movement: InventoryMovement,
+    ) -> tuple[InventoryItem, int] | None:
+        transition = self._extract_unit_transition_from_movement(movement)
+        if transition is None:
+            return None
+
+        unit_id, from_status, to_status = transition
+
+        unit = self.get_unit(session, unit_id)
+        if not unit:
+            raise ValueError(
+                f"Cannot reverse movement {movement.movement_id}: unit {unit_id} was not found"
+            )
+        if unit.inventory_uuid is None:
+            raise ValueError(
+                f"Cannot reverse movement {movement.movement_id}: unit {unit_id} has no inventory link"
+            )
+        if movement.inventory_uuid and unit.inventory_uuid != movement.inventory_uuid:
+            raise ValueError(
+                f"Cannot reverse movement {movement.movement_id}: unit {unit_id} belongs to a different item"
+            )
+        if unit.status != to_status:
+            raise ValueError(
+                "Cannot reverse movement because the unit status has changed since the original action"
+            )
+
+        self._require_config_key(
+            session,
+            key=from_status,
+            table_name="inventory_units",
+            field_name="status",
+            field_label="inventory unit status",
+        )
+
+        item = session.exec(
+            select(InventoryItem).where(
+                InventoryItem.id == unit.inventory_uuid,
+                InventoryItem.is_deleted.is_(False),
+            )
+        ).first()
+        if not item:
+            raise ValueError(
+                f"Cannot reverse movement {movement.movement_id}: item for unit {unit_id} was not found"
+            )
+
+        old_available_qty = item.available_qty
+        before_state = {
+            "status": unit.status,
+            "condition": unit.condition,
+            "description": unit.description,
+            "expiration_date": unit.expiration_date.isoformat() if unit.expiration_date else None,
+        }
+
+        unit.status = from_status
+        session.add(unit)
+
+        synced_item = self._sync_item_quantities(session, item.item_id)
+        new_available_qty = synced_item.available_qty
+        qty_change = new_available_qty - old_available_qty
+
+        audit_service.log_action(
+            db=session,
+            entity_type="inventory_unit",
+            entity_id=unit.unit_id,
+            action="status_reversal_restored",
+            before=before_state,
+            after={
+                "status": unit.status,
+                "condition": unit.condition,
+                "description": unit.description,
+                "expiration_date": unit.expiration_date.isoformat() if unit.expiration_date else None,
+                "restored_from_movement_id": movement.movement_id,
+                "restored_from_status": to_status,
+            },
+        )
+
+        return synced_item, qty_change
 
     def get_movements_summary(self, session: Session, item_id: str) -> InventoryMovementSummaryRead:
         item = self.get(session, item_id)
@@ -1077,6 +1307,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         inventory_id: str | None = None,
         reason_code: str | None = None,
         reference_id: str | None = None,
+        reference_type: str | None = None,
         date_from: Optional[datetime] = None,
         date_to: Optional[datetime] = None,
     ) -> tuple[list[dict[str, Any]], int]:
@@ -1106,6 +1337,8 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             statement = statement.where(InventoryMovement.reason_code == reason_code)
         if reference_id:
             statement = statement.where(InventoryMovement.reference_id == reference_id)
+        if reference_type:
+            statement = statement.where(InventoryMovement.reference_type == reference_type)
         if date_from:
             statement = statement.where(InventoryMovement.occurred_at >= date_from)
         if date_to:
@@ -1573,6 +1806,8 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                     inventory_uuid=item.id,
                     qty_change=ledger_qty_change,
                     movement_type=m_type,
+                    reference_id=unit.unit_id,
+                    reference_type="external_reference",
                     note=f"Status changed from {before_state['status']} to {after_state['status']} for unit: {unit.unit_id}",
                     actor_id=actor_id,
                 )
@@ -1647,6 +1882,8 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                 inventory_uuid=item.id,
                 qty_change=ledger_qty_change,
                 movement_type="retirement",
+                reference_id=unit.unit_id,
+                reference_type="external_reference",
                 note=f"Unit retired: {unit.unit_id} (Previous status: {before_state['status']})",
                 actor_id=actor_id,
             )

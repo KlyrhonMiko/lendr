@@ -15,20 +15,36 @@ const MOVEMENT_TYPE_OPTIONS = [
   { key: 'damage', value: 'Damage or loss' },
 ];
 
+const REFERENCE_TYPE_OPTIONS = [
+  { key: '', value: 'All reference types' },
+  { key: 'borrow_request', value: 'Borrow request' },
+  { key: 'inventory_movement', value: 'Inventory movement' },
+  { key: 'external_reference', value: 'External reference' },
+];
+
 export function LedgerFiltersBar({
   itemId,
   onItemIdChange,
   movementType,
   onMovementTypeChange,
+  referenceId,
+  onReferenceIdChange,
+  referenceType,
+  onReferenceTypeChange,
   meta,
 }: {
   itemId: string;
   onItemIdChange: (v: string) => void;
   movementType: string;
   onMovementTypeChange: (v: string) => void;
+  referenceId: string;
+  onReferenceIdChange: (v: string) => void;
+  referenceType: string;
+  onReferenceTypeChange: (v: string) => void;
   meta?: PaginationMeta | null;
 }) {
   const [movementTypeOpen, setMovementTypeOpen] = useState(false);
+  const [referenceTypeOpen, setReferenceTypeOpen] = useState(false);
 
   return (
     <div className="flex flex-col gap-3 p-4 border-b border-border">
@@ -87,6 +103,57 @@ export function LedgerFiltersBar({
                 )}
               >
                 <Check className={cn('w-4 h-4 shrink-0', movementType === opt.key ? 'opacity-100' : 'opacity-0')} />
+                {opt.value}
+              </button>
+            ))}
+          </PopoverContent>
+        </Popover>
+
+        <div className="relative min-w-[220px]">
+          <input
+            type="text"
+            placeholder="Reference ID"
+            value={referenceId}
+            onChange={(e) => onReferenceIdChange(e.target.value)}
+            className="w-full h-10 pl-3 pr-9 rounded-lg bg-muted/50 border border-border text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/40 transition-all"
+          />
+          {referenceId && (
+            <button
+              type="button"
+              onClick={() => onReferenceIdChange('')}
+              aria-label="Clear reference id"
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        <Popover open={referenceTypeOpen} onOpenChange={setReferenceTypeOpen}>
+          <PopoverTrigger
+            type="button"
+            className="h-10 px-3 rounded-lg bg-muted/50 border border-border text-sm font-medium cursor-pointer flex items-center gap-2"
+          >
+            <span className="truncate">
+              {REFERENCE_TYPE_OPTIONS.find((o) => o.key === referenceType)?.value ?? 'All reference types'}
+            </span>
+            <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+          </PopoverTrigger>
+          <PopoverContent align="start" sideOffset={4} className="w-56 p-1 max-h-60 overflow-y-auto">
+            {REFERENCE_TYPE_OPTIONS.map((opt) => (
+              <button
+                key={opt.key || 'all'}
+                type="button"
+                onClick={() => {
+                  onReferenceTypeChange(opt.key);
+                  setReferenceTypeOpen(false);
+                }}
+                className={cn(
+                  'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left',
+                  referenceType === opt.key ? 'bg-indigo-500/10 text-indigo-600 font-medium' : 'hover:bg-muted'
+                )}
+              >
+                <Check className={cn('w-4 h-4 shrink-0', referenceType === opt.key ? 'opacity-100' : 'opacity-0')} />
                 {opt.value}
               </button>
             ))}

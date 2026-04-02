@@ -1233,6 +1233,7 @@ class BorrowService(
                     -borrow_item.qty_requested,
                     movement_type="borrow_release",
                     reference_id=db_request.request_id,
+                    reference_type="borrow_request",
                     actor_id=actor_id,
                 )
             else:
@@ -1251,6 +1252,7 @@ class BorrowService(
                         -ba.qty_assigned,
                         movement_type="borrow_release",
                         reference_id=db_request.request_id,
+                        reference_type="borrow_request",
                         actor_id=actor_id,
                         batch_id=ba.inventory_batch.batch_id,
                     )
@@ -1391,6 +1393,7 @@ class BorrowService(
                     borrow_item.qty_requested,
                     movement_type="borrow_return",
                     reference_id=db_request.request_id,
+                    reference_type="borrow_request",
                     actor_id=actor_id,
                 )
             else:
@@ -1412,6 +1415,7 @@ class BorrowService(
                             ba.qty_assigned,
                             movement_type="borrow_return",
                             reference_id=db_request.request_id,
+                            reference_type="borrow_request",
                             actor_id=actor_id,
                             batch_id=ba.inventory_batch.batch_id,
                         )
@@ -1423,6 +1427,7 @@ class BorrowService(
                         borrow_item.qty_requested,
                         movement_type="borrow_return",
                         reference_id=db_request.request_id,
+                        reference_type="borrow_request",
                         actor_id=actor_id,
                     )
 

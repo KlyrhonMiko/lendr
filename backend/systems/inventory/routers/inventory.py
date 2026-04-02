@@ -203,6 +203,7 @@ async def adjust_stock(
             movement_type=payload.movement_type,
             reason_code=payload.reason_code,
             reference_id=payload.reference_id,
+            reference_type=payload.reference_type,
             batch_id=payload.batch_id,
             note=payload.note,
             actor_id=current_user.id,
@@ -311,6 +312,7 @@ async def get_all_movements_ledger(
     inventory_id: Optional[str] = Query(default=None, description="Filter by inventory item ID"),
     reason_code: Optional[str] = Query(default=None, description="Filter by reason code (exact match)"),
     reference_id: Optional[str] = Query(default=None, description="Filter by reference ID (e.g. borrow request ID)"),
+    reference_type: Optional[str] = Query(default=None, description="Filter by reference type (e.g. borrow_request, inventory_movement, external_reference)"),
     date_from: Optional[datetime] = Query(default=None, description="Filter movements from this datetime (inclusive)"),
     date_to: Optional[datetime] = Query(default=None, description="Filter movements up to this datetime (inclusive)"),
     session: Session = Depends(get_session),
@@ -328,6 +330,7 @@ async def get_all_movements_ledger(
         inventory_id=inventory_id,
         reason_code=reason_code,
         reference_id=reference_id,
+        reference_type=reference_type,
         date_from=date_from,
         date_to=date_to,
     )

@@ -23,6 +23,8 @@ export default function MovementLedgerPage() {
   const [perPage, setPerPage] = useState(10);
   const [movementType, setMovementType] = useState('');
   const [itemId, setItemId] = useState('');
+  const [referenceId, setReferenceId] = useState('');
+  const [referenceType, setReferenceType] = useState('');
 
   // Reversal Modal State
   const [isReversalModalOpen, setIsReversalModalOpen] = useState(false);
@@ -32,7 +34,14 @@ export default function MovementLedgerPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { data: movementsResponse, isLoading: movementsLoading } = useLedgerMovements(
-    { page, per_page: perPage, movement_type: movementType || undefined, inventory_id: itemId || undefined },
+    {
+      page,
+      per_page: perPage,
+      movement_type: movementType || undefined,
+      inventory_id: itemId || undefined,
+      reference_id: referenceId || undefined,
+      reference_type: referenceType || undefined,
+    },
     activeTab === 'ledger'
   );
 
@@ -92,6 +101,10 @@ export default function MovementLedgerPage() {
             onItemIdChange={setItemId}
             movementType={movementType}
             onMovementTypeChange={setMovementType}
+            referenceId={referenceId}
+            onReferenceIdChange={setReferenceId}
+            referenceType={referenceType}
+            onReferenceTypeChange={setReferenceType}
             meta={meta}
           />
         )}

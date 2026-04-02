@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     SECURITY_HSTS_MAX_AGE_SECONDS: int = 31536000
     SECURITY_API_CONTENT_SECURITY_POLICY: str = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
 
+    SWAGGER_UI_ENABLED: bool = True
+
     CORS_ALLOW_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
     CORS_ALLOW_METHODS: str = "GET,POST,PUT,PATCH,DELETE,OPTIONS"
     CORS_ALLOW_HEADERS: str = "Authorization,Content-Type,X-Device-ID"

@@ -80,6 +80,23 @@ def _is_secure_request(request: Request) -> bool:
         return forwarded_proto.split(",", maxsplit=1)[0].strip().lower() == "https"
     return request.url.scheme == "https"
 
+
+def _is_docs_request(request: Request) -> bool:
+    return request.url.path in {"/docs", "/redoc", "/openapi.json"}
+
+
+def _docs_content_security_policy() -> str:
+    return (
+        "default-src 'none'; "
+        "base-uri 'none'; "
+        "frame-ancestors 'none'; "
+        "connect-src 'self'; "
+        "img-src 'self' data: https://fastapi.tiangolo.com; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "font-src 'self' https://cdn.jsdelivr.net"
+    )
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # System Initialization
@@ -113,7 +130,17 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Lendr Unified API", lifespan=lifespan)
+docs_url = "/docs" if settings.SWAGGER_UI_ENABLED else None
+redoc_url = "/redoc" if settings.SWAGGER_UI_ENABLED else None
+openapi_url = "/openapi.json" if settings.SWAGGER_UI_ENABLED else None
+
+app = FastAPI(
+    title="Lendr Unified API",
+    lifespan=lifespan,
+    docs_url=docs_url,
+    redoc_url=redoc_url,
+    openapi_url=openapi_url,
+)
 
 # Mount Static Assets
 app.mount("/api/assets", StaticFiles(directory="assets"), name="assets")
@@ -150,6 +177,14 @@ async def security_headers_middleware(request: Request, call_next):
     response = await call_next(request)
 
     if not settings.SECURITY_HEADERS_ENABLED:
+        return response
+
+    if _is_docs_request(request):
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault("X-Permitted-Cross-Domain-Policies", "none")
+        response.headers.setdefault("Content-Security-Policy", _docs_content_security_policy())
         return response
 
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
