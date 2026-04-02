@@ -51,7 +51,7 @@ export function ArchivesModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
             try {
               const tags = JSON.parse(setting.value);
               setAvailableTags(Array.isArray(tags) ? tags : []);
-            } catch (e) {
+            } catch {
               setAvailableTags(['permanent_record']); // Fallback
             }
           }

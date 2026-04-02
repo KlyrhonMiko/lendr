@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { borrowApi, BorrowRequestEvent, BorrowRequest } from './api';
 import { useBorrowRequests, useBorrowMutations } from './lib/useRequestQueries';
 import { Pagination } from '@/components/ui/Pagination';
 import { UnitSelectionModal } from './UnitSelectionModal';
 import { ReturnModal } from './ReturnModal';
-import type { PaginationMeta } from '@/lib/api';
 import { toast } from 'sonner';
 import type { StatusTab, BorrowRecord, BorrowAction } from './lib/types';
 import type { BorrowRequestBatch, BorrowRequestUnit } from './api';
@@ -50,7 +49,10 @@ export default function BorrowsPage() {
     search: debouncedSearch || undefined,
   });
 
-  const records = (requestsResponse?.data as unknown as BorrowRecord[]) || [];
+  const records = useMemo(
+    () => (requestsResponse?.data as unknown as BorrowRecord[]) || [],
+    [requestsResponse?.data]
+  );
   const meta = requestsResponse?.meta || null;
   const error = requestsError ? (requestsError as Error).message : null;
 
@@ -97,7 +99,7 @@ export default function BorrowsPage() {
 
   useEffect(() => {
     records.forEach(record => {
-      if (['approved', 'warehouse_approved'].includes(record.status) && !assignmentsMap[record.request_id]) {
+      if (record.status === 'approved' && !assignmentsMap[record.request_id]) {
         fetchAssignments(record.request_id);
       }
     });

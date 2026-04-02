@@ -1,5 +1,7 @@
 from contextlib import asynccontextmanager
 import time
+from uuid import uuid4
+
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
@@ -10,6 +12,7 @@ from sqlmodel import Session
 from core.database import engine
 from core.config import settings
 from core.initialization_service import InitializationService
+from core.request_context import reset_correlation_id, set_correlation_id
 from core.schemas import create_error_response
 from utils.logging import setup_logging, get_logger, setup_health_logging, log_operation
 
@@ -31,7 +34,6 @@ from core.middleware import MaintenanceMiddleware
 from systems.auth.routers.auth import router as auth
 from systems.auth.routers.configuration import router as auth_config
 from systems.inventory.routers.borrowing import router as borrowing
-from systems.inventory.routers.requested_items import router as requested_items
 from systems.inventory.routers.inventory import router as inventory
 from systems.inventory.routers.dashboard import router as dashboard
 from systems.inventory.routers.audit_log import router as audit_log
@@ -81,6 +83,30 @@ def _is_secure_request(request: Request) -> bool:
         return forwarded_proto.split(",", maxsplit=1)[0].strip().lower() == "https"
     return request.url.scheme == "https"
 
+
+def _is_docs_request(request: Request) -> bool:
+    return request.url.path in {"/docs", "/redoc", "/openapi.json"}
+
+
+def _docs_content_security_policy() -> str:
+    return (
+        "default-src 'none'; "
+        "base-uri 'none'; "
+        "frame-ancestors 'none'; "
+        "connect-src 'self'; "
+        "img-src 'self' data: https://fastapi.tiangolo.com; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "font-src 'self' https://cdn.jsdelivr.net"
+    )
+
+
+def _resolve_request_correlation_id(request: Request) -> str:
+    incoming = request.headers.get("X-Correlation-ID", "").strip()
+    if incoming:
+        return incoming[:128]
+    return f"req-{uuid4().hex}"
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # System Initialization
@@ -114,7 +140,17 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Lendr Unified API", lifespan=lifespan)
+docs_url = "/docs" if settings.SWAGGER_UI_ENABLED else None
+redoc_url = "/redoc" if settings.SWAGGER_UI_ENABLED else None
+openapi_url = "/openapi.json" if settings.SWAGGER_UI_ENABLED else None
+
+app = FastAPI(
+    title="Lendr Unified API",
+    lifespan=lifespan,
+    docs_url=docs_url,
+    redoc_url=redoc_url,
+    openapi_url=openapi_url,
+)
 
 # Mount Static Assets
 app.mount("/api/assets", StaticFiles(directory="assets"), name="assets")
@@ -125,12 +161,17 @@ app.mount("/api/assets", StaticFiles(directory="assets"), name="assets")
 @app.middleware("http")
 async def logging_middleware(request: Request, call_next):
     """Global middleware to log every request and its outcome."""
+    correlation_id = _resolve_request_correlation_id(request)
+    request.state.correlation_id = correlation_id
+    context_token = set_correlation_id(correlation_id)
     start_time = time.time()
-    
+
     try:
         response = await call_next(request)
         process_time = round((time.time() - start_time) * 1000, 2)
-        
+
+        response.headers.setdefault("X-Correlation-ID", correlation_id)
+
         # Log basic request info
         logger.info(
             f"{request.method} {request.url.path} - {response.status_code} ({process_time}ms)"
@@ -144,6 +185,8 @@ async def logging_middleware(request: Request, call_next):
             exc_info=True
         )
         raise e
+    finally:
+        reset_correlation_id(context_token)
 
 
 @app.middleware("http")
@@ -151,6 +194,14 @@ async def security_headers_middleware(request: Request, call_next):
     response = await call_next(request)
 
     if not settings.SECURITY_HEADERS_ENABLED:
+        return response
+
+    if _is_docs_request(request):
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault("X-Permitted-Cross-Domain-Policies", "none")
+        response.headers.setdefault("Content-Security-Policy", _docs_content_security_policy())
         return response
 
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
@@ -215,12 +266,13 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     log_operation("500-INTERNAL", f"Crash in {request.url.path}: {str(exc)}", level="ERROR")
+    debug_mode = settings.DEBUG
     return JSONResponse(
         status_code=500,
         content=create_error_response(
             message="Internal server error",
-            error_type=exc.__class__.__name__,
-            details=str(exc),
+            error_type=exc.__class__.__name__ if debug_mode else "InternalServerError",
+            details=str(exc) if debug_mode else None,
             request=request
         ).model_dump(mode="json")
     )
@@ -257,12 +309,6 @@ app.include_router(
     borrowing,
     prefix="/api/inventory/borrowing",
     tags=["Inventory - Borrowing"],
-    dependencies=inventory_access,
-)
-app.include_router(
-    requested_items,
-    prefix="/api/inventory/requested-items",
-    tags=["Inventory - Requested Items"],
     dependencies=inventory_access,
 )
 app.include_router(

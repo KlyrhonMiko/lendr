@@ -1,7 +1,7 @@
 from typing import Optional
 from datetime import datetime
 from uuid import UUID
-from pydantic import BaseModel, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from utils.time_utils import format_datetime
 
 class InventoryBatchBase(BaseModel):
@@ -19,6 +19,8 @@ class InventoryBatchUpdate(BaseModel):
     description: Optional[str] = Field(default=None, max_length=1000)
 
 class InventoryBatchRead(InventoryBatchBase):
+    model_config = ConfigDict(from_attributes=True)
+
     """Batch read schema with server-assigned fields."""
     batch_id: str
     inventory_uuid: UUID
@@ -38,5 +40,3 @@ class InventoryBatchRead(InventoryBatchBase):
             return None
         return format_datetime(dt)
 
-    class Config:
-        from_attributes = True

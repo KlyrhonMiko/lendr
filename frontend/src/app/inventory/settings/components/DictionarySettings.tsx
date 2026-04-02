@@ -4,20 +4,16 @@ import { useState } from 'react';
 import { 
   Plus, 
   Search, 
-  Filter, 
   Edit2, 
   Trash2, 
   Check, 
   X, 
-  ChevronRight, 
-  MoreVertical,
   BookOpen,
-  Calendar,
   Layers,
+  Lock,
   Key as KeyIcon,
-  Type
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { toast } from 'sonner';
@@ -36,7 +32,6 @@ interface DictionarySettingsProps {
   onCategoryFilterChange: (val: string) => void;
   onPageChange: (page: number) => void;
   onPerPageChange: (perPage: number) => void;
-  onEdit: (setting: SystemSetting) => void;
   onDelete: (key: string, category: string) => void;
   onAdd: (data: SystemSettingCreate) => Promise<void>;
 }
@@ -52,7 +47,6 @@ export function DictionarySettings({
   onCategoryFilterChange,
   onPageChange,
   onPerPageChange,
-  onEdit,
   onDelete,
   onAdd
 }: DictionarySettingsProps) {
@@ -70,6 +64,11 @@ export function DictionarySettings({
   });
 
   const handleStartEdit = (setting: SystemSetting) => {
+    if (setting.crucial) {
+      toast.error('Required settings cannot be edited from UI.');
+      return;
+    }
+
     setEditingRow(`${setting.category}-${setting.key}`);
     setEditData(setting);
   };
@@ -90,6 +89,11 @@ export function DictionarySettings({
   };
 
   const handleDelete = (setting: SystemSetting) => {
+    if (setting.crucial) {
+      toast.error('Required settings cannot be deleted.');
+      return;
+    }
+
     if (confirm(`Are you sure you want to delete "${setting.key}"?`)) {
       onDelete(setting.key, setting.category);
     }
@@ -246,7 +250,15 @@ export function DictionarySettings({
                               onChange={(e) => setEditData({...editData, key: e.target.value})}
                             />
                           ) : (
-                            <span className="font-semibold text-foreground font-mono text-sm">{setting.key}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-foreground font-mono text-sm">{setting.key}</span>
+                              {setting.crucial && (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-600">
+                                  <Lock className="h-3 w-3" />
+                                  Required
+                                </span>
+                              )}
+                            </div>
                           )}
                        </div>
                     </td>
@@ -300,14 +312,18 @@ export function DictionarySettings({
                              <button 
                                 onClick={() => handleStartEdit(setting)}
                                 aria-label={`Edit ${setting.key}`}
-                                className="w-8 h-8 rounded-lg text-muted-foreground flex items-center justify-center hover:bg-indigo-500/10 hover:text-indigo-500 transition-all"
+                                className="w-8 h-8 rounded-lg text-muted-foreground flex items-center justify-center hover:bg-indigo-500/10 hover:text-indigo-500 transition-all disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+                                title={setting.crucial ? 'Required setting cannot be edited from UI' : `Edit ${setting.key}`}
+                                disabled={setting.crucial}
                              >
                                <Edit2 className="w-4 h-4" />
                              </button>
                              <button 
                                 onClick={() => handleDelete(setting)}
                                 aria-label={`Delete ${setting.key}`}
-                                className="w-8 h-8 rounded-lg text-muted-foreground flex items-center justify-center hover:bg-rose-500/10 hover:text-rose-500 transition-all"
+                                className="w-8 h-8 rounded-lg text-muted-foreground flex items-center justify-center hover:bg-rose-500/10 hover:text-rose-500 transition-all disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+                                title={setting.crucial ? 'Required setting cannot be deleted' : `Delete ${setting.key}`}
+                                disabled={setting.crucial}
                              >
                                <Trash2 className="w-4 h-4" />
                              </button>

@@ -37,6 +37,8 @@ _DEFAULT_STATUSES = [
     "approved",
     "released",
     "returned",
+    "rejected",
+    "closed",
 ]
 
 
@@ -91,12 +93,6 @@ class BorrowService(
         if not settings:
             return _DEFAULT_STATUSES
         return [s.key for s in sorted(settings, key=lambda s: int(s.value))]
-
-    def _stage(self, session: Session, index: int) -> str:
-        workflow = self._get_workflow(session)
-        if index >= len(workflow):
-            raise ValueError(f"Workflow has no stage at position {index}")
-        return workflow[index]
 
     def _active_statuses(self, session: Session) -> list[str]:
         workflow = self._get_workflow(session)
@@ -1067,8 +1063,8 @@ class BorrowService(
         actor_id: UUID,
         note: str | None = None,
     ) -> BorrowRequest:
-        stage_0 = self._stage(session, 0)
-        stage_1 = self._stage(session, 1)
+        stage_0 = "pending"
+        stage_1 = "approved"
         db_request = self.get(session, request)
         if not db_request or db_request.status != stage_0:
             raise ValueError(f"Request not found or not in '{stage_0}' status")
@@ -1126,7 +1122,7 @@ class BorrowService(
         actor_id: UUID,
         note: str | None = None,
     ) -> BorrowRequest:
-        stage_0 = self._stage(session, 0)
+        stage_0 = "pending"
         db_request = self.get(session, request_id)
         if not db_request or db_request.status != stage_0:
             raise ValueError(f"Request not found or not in '{stage_0}' status")
@@ -1171,8 +1167,8 @@ class BorrowService(
         actor_id: UUID,
         note: str | None = None,
     ) -> BorrowRequest:
-        stage_approved = self._stage(session, 1)
-        stage_released = self._stage(session, 4)
+        stage_approved = "approved"
+        stage_released = "released"
         db_request = self.get(session, request_id)
         if not db_request:
             raise ValueError("Request not found")
@@ -1237,6 +1233,7 @@ class BorrowService(
                     -borrow_item.qty_requested,
                     movement_type="borrow_release",
                     reference_id=db_request.request_id,
+                    reference_type="borrow_request",
                     actor_id=actor_id,
                 )
             else:
@@ -1255,6 +1252,7 @@ class BorrowService(
                         -ba.qty_assigned,
                         movement_type="borrow_release",
                         reference_id=db_request.request_id,
+                        reference_type="borrow_request",
                         actor_id=actor_id,
                         batch_id=ba.inventory_batch.batch_id,
                     )
@@ -1317,8 +1315,8 @@ class BorrowService(
         note: str | None = None,
         unit_returns: list[BorrowRequestUnitReturn] | None = None,
     ) -> BorrowRequest:
-        stage_4 = self._stage(session, 4)
-        stage_5 = self._stage(session, 5)
+        stage_4 = "released"
+        stage_5 = "returned"
         db_request = self.get(session, request_id)
         if not db_request or db_request.status != stage_4:
             raise ValueError(f"Request not found or not in '{stage_4}' status")
@@ -1395,6 +1393,7 @@ class BorrowService(
                     borrow_item.qty_requested,
                     movement_type="borrow_return",
                     reference_id=db_request.request_id,
+                    reference_type="borrow_request",
                     actor_id=actor_id,
                 )
             else:
@@ -1416,6 +1415,7 @@ class BorrowService(
                             ba.qty_assigned,
                             movement_type="borrow_return",
                             reference_id=db_request.request_id,
+                            reference_type="borrow_request",
                             actor_id=actor_id,
                             batch_id=ba.inventory_batch.batch_id,
                         )
@@ -1427,6 +1427,7 @@ class BorrowService(
                         borrow_item.qty_requested,
                         movement_type="borrow_return",
                         reference_id=db_request.request_id,
+                        reference_type="borrow_request",
                         actor_id=actor_id,
                     )
 
@@ -1481,7 +1482,7 @@ class BorrowService(
         actor_id: UUID,
         note: str | None = None,
     ) -> BorrowRequest:
-        pending_stage = self._stage(session, 0)
+        pending_stage = "pending"
         db_request = self.get(session, request_id)
         if not db_request or db_request.status != "rejected":
             raise ValueError("Request must be in 'rejected' status")
@@ -1583,6 +1584,15 @@ class BorrowService(
 
         if not can_close:
             raise ValueError("Conditions for closure not met")
+
+        self._require_borrow_status(session, "closed")
+        self._require_setting(
+            session,
+            key="closed",
+            table_name="borrow_request_events",
+            field_name="event_type",
+            field_label="borrow request event type",
+        )
 
         db_request.status = "closed"
         db_request.closed_at = get_now_manila()

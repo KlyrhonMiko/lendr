@@ -8,12 +8,9 @@ const TAB_LABELS: Record<string, string> = {
   ALL: 'All',
   pending: 'Pending',
   approved: 'Approved',
-  sent_to_warehouse: 'Sent to WH',
-  warehouse_approved: 'WH Approved',
   released: 'Released',
   returned: 'Returned',
   rejected: 'Rejected',
-  warehouse_rejected: 'WH Rejected',
 };
 
 export function RequestsToolbar({

@@ -41,16 +41,33 @@ class RateLimitRule:
     window_seconds: int
 
 
-AUTH_RATE_LIMIT_RULES: dict[str, tuple[RateLimitRule, ...]] = {
-    "login": (
-        RateLimitRule(scope="ip", max_attempts=5, window_seconds=60),
-        RateLimitRule(scope="identity", max_attempts=20, window_seconds=3600),
-    ),
-    "borrower_login": (
-        RateLimitRule(scope="ip", max_attempts=5, window_seconds=60),
-        RateLimitRule(scope="identity", max_attempts=20, window_seconds=3600),
-    ),
-}
+def _build_rate_limit_rules() -> dict[str, tuple[RateLimitRule, ...]]:
+    return {
+        "login": (
+            RateLimitRule(
+                scope="ip",
+                max_attempts=max(settings.AUTH_RATE_LIMIT_IP_MAX_ATTEMPTS, 1),
+                window_seconds=max(settings.AUTH_RATE_LIMIT_IP_WINDOW_SECONDS, 1),
+            ),
+            RateLimitRule(
+                scope="identity",
+                max_attempts=max(settings.AUTH_RATE_LIMIT_IDENTITY_MAX_ATTEMPTS, 1),
+                window_seconds=max(settings.AUTH_RATE_LIMIT_IDENTITY_WINDOW_SECONDS, 1),
+            ),
+        ),
+        "borrower_login": (
+            RateLimitRule(
+                scope="ip",
+                max_attempts=max(settings.AUTH_RATE_LIMIT_IP_MAX_ATTEMPTS, 1),
+                window_seconds=max(settings.AUTH_RATE_LIMIT_IP_WINDOW_SECONDS, 1),
+            ),
+            RateLimitRule(
+                scope="identity",
+                max_attempts=max(settings.AUTH_RATE_LIMIT_IDENTITY_MAX_ATTEMPTS, 1),
+                window_seconds=max(settings.AUTH_RATE_LIMIT_IDENTITY_WINDOW_SECONDS, 1),
+            ),
+        ),
+    }
 
 # Process-local limiter store. For multi-worker deployments, replace with shared storage.
 _rate_limit_store: dict[str, deque[float]] = {}
@@ -87,14 +104,17 @@ def _safe_log_auth_event(
     action: str,
     username: str,
     device_id: str | None,
+    extra_metadata: dict[str, int | str] | None = None,
 ) -> None:
     username_hash = _hash_value(username)
-    metadata = {
+    metadata_payload: dict[str, str | int] = {
         "endpoint": endpoint,
         "username_hash": username_hash,
         "ip_hash": _hash_value(_get_client_ip(request)),
         "device_id_hash": _hash_value(device_id),
     }
+    if extra_metadata:
+        metadata_payload.update(extra_metadata)
 
     try:
         audit_service.log_action(
@@ -102,7 +122,7 @@ def _safe_log_auth_event(
             entity_type="auth",
             entity_id=username_hash,
             action=action,
-            after=metadata,
+            after=metadata_payload,
         )
         session.commit()
     except Exception as exc:
@@ -120,7 +140,7 @@ def _enforce_auth_rate_limit(
     endpoint_key: str,
     identity: str,
 ) -> None:
-    rules = AUTH_RATE_LIMIT_RULES.get(endpoint_key)
+    rules = _build_rate_limit_rules().get(endpoint_key)
     if not rules:
         return
 
@@ -169,7 +189,7 @@ async def login_for_access_token(
             endpoint_key="login",
             identity=username,
         )
-    except HTTPException:
+    except HTTPException as exc:
         _safe_log_auth_event(
             session=session,
             request=request,
@@ -177,6 +197,9 @@ async def login_for_access_token(
             action="rate_limit_triggered",
             username=username,
             device_id=device_id,
+            extra_metadata={"retry_after_seconds": int(exc.headers.get("Retry-After", "0"))}
+            if exc.headers and exc.headers.get("Retry-After")
+            else None,
         )
         raise
 
@@ -190,6 +213,7 @@ async def login_for_access_token(
             username=username,
             device_id=device_id,
         )
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -249,7 +273,7 @@ async def borrower_login(
             endpoint_key="borrower_login",
             identity=username,
         )
-    except HTTPException:
+    except HTTPException as exc:
         _safe_log_auth_event(
             session=session,
             request=request,
@@ -257,6 +281,9 @@ async def borrower_login(
             action="rate_limit_triggered",
             username=username,
             device_id=device_id,
+            extra_metadata={"retry_after_seconds": int(exc.headers.get("Retry-After", "0"))}
+            if exc.headers and exc.headers.get("Retry-After")
+            else None,
         )
         raise
 
@@ -270,6 +297,7 @@ async def borrower_login(
             username=username,
             device_id=device_id,
         )
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect PIN",

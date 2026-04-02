@@ -13,6 +13,21 @@ from systems.admin.services.audit_service import audit_service
 
 router = APIRouter()
 
+ENTITY_TYPE_ALIASES = {
+    "unit": "inventory_unit",
+    "movement": "inventory_movement",
+    "batch": "inventory_batch",
+}
+
+DEFAULT_INVENTORY_ENTITY_TYPES = [
+    "inventory",
+    "inventory_unit",
+    "inventory_movement",
+    "inventory_batch",
+    "borrow",
+    "borrow_request",
+]
+
 
 @router.get(
     "/logs",
@@ -37,15 +52,17 @@ async def list_audit_logs(
     Query inventory-related activity logs via the AuditService.
     Automatically filters by inventory-related entity types if none specified.
     """
-    # If no specific entity_type is provided, filter for inventory systems
+    normalized_entity_type = ENTITY_TYPE_ALIASES.get(entity_type or "", entity_type)
+
+    # If no specific entity_type is provided, filter for inventory systems.
     entity_types = None
-    if not entity_type:
-        entity_types = ["inventory", "unit", "movement", "borrow", "borrow_request"]
+    if not normalized_entity_type:
+        entity_types = DEFAULT_INVENTORY_ENTITY_TYPES
 
     skip = (page - 1) * per_page
     logs, total_count = audit_service.get_logs(
         session,
-        entity_type=entity_type,
+        entity_type=normalized_entity_type,
         entity_types=entity_types,
         entity_id=entity_id,
         action=action,

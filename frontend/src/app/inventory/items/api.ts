@@ -46,6 +46,7 @@ export interface ConfigRead {
   value: string;
   category: string;
   description?: string;
+  crucial?: boolean;
 }
 
 export interface InventoryBatch {
@@ -112,6 +113,7 @@ export interface InventoryMovement {
   occurred_at: string;
   note?: string;
   reference_id?: string;
+  reference_type?: string;
   borrower_name?: string;
   customer_name?: string;
   location_name?: string;
@@ -124,6 +126,7 @@ export interface StockAdjustmentPayload {
   movement_type: string;
   reason_code?: string;
   reference_id?: string;
+  reference_type?: string;
   batch_id?: string;
   note: string;
 }

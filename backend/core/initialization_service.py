@@ -18,7 +18,48 @@ from systems.auth.services.rbac_service import normalize_role, validate_role_pol
 logger = get_logger("core.init")
 
 AUTH_CONFIG_CATEGORIES = {"users_role", "users_shift_type"}
+NON_CRUCIAL_SEED_CATEGORIES = {
+    "inventory_item_type",
+    "inventory_classification",
+    "inventory_category",
+    "inventory_movements_reason_code",
+}
+LEGACY_BORROWER_CONFIG_KEYS_BY_CATEGORY = {
+    "borrow_requests_status": {
+        "sent_to_warehouse",
+        "warehouse_approved",
+        "warehouse_rejected",
+    },
+    "borrow_requests_approval_channel": {
+        "warehouse_manual",
+        "warehouse_shortage_auto",
+        "warehouse_standard",
+        "warehouse_provisioned",
+    },
+    "borrow_request_events_event_type": {
+        "sent_to_warehouse",
+        "warehouse_approved",
+        "warehouse_rejected",
+    },
+}
+LEGACY_ADMIN_CONFIG_KEYS_BY_CATEGORY = {
+    "audit_logs_action": {"warehouse_approve", "warehouse_reject"},
+}
 ConfigModel = Type[AdminConfig] | Type[InventoryConfig] | Type[BorrowerConfig] | Type[AuthConfig]
+
+
+def _required_borrower_keys(category: str) -> set[str]:
+    return {
+        str(entry["key"])
+        for entry in SYSTEM_CONFIGS
+        if entry.get("system") == "borrower"
+        and entry.get("category") == category
+    }
+
+
+def _is_seed_config_crucial(config_data: dict) -> bool:
+    category = str(config_data.get("category", ""))
+    return category not in NON_CRUCIAL_SEED_CATEGORIES
 
 
 def resolve_bootstrap_admin_credentials() -> tuple[str, str]:
@@ -127,6 +168,7 @@ class InitializationService:
                         value=row.value,
                         category=row.category,
                         description=row.description,
+                        crucial=row.crucial,
                     )
                 )
                 moved += 1
@@ -145,9 +187,12 @@ class InitializationService:
 
     def seed_configurations(self, session: Session):
         """Idempotently seed general system configurations."""
-        count = 0
+        created_count = 0
+        reconciled_count = 0
+        restored_count = 0
         for config_data in SYSTEM_CONFIGS:
             model, normalized_system = self._resolve_config_model(config_data)
+            should_be_crucial = _is_seed_config_crucial(config_data)
             
             existing = session.exec(
                 select(model).where(
@@ -163,12 +208,38 @@ class InitializationService:
                     value=config_data["value"],
                     category=config_data["category"],
                     description=config_data.get("description"),
+                    crucial=should_be_crucial,
                 )
                 session.add(config)
-                count += 1
-        
-        if count > 0:
-            logger.info(f"Synchronized {count} new system configurations.")
+                created_count += 1
+                continue
+
+            changed = False
+            if existing.system != normalized_system:
+                existing.system = normalized_system
+                changed = True
+
+            if should_be_crucial and existing.is_deleted:
+                existing.is_deleted = False
+                existing.deleted_at = None
+                existing.crucial = True
+                changed = True
+                restored_count += 1
+            elif not existing.is_deleted and existing.crucial != should_be_crucial:
+                existing.crucial = should_be_crucial
+                changed = True
+
+            if changed:
+                session.add(existing)
+                reconciled_count += 1
+
+        if created_count or reconciled_count:
+            logger.info(
+                "Synchronized system configurations: created=%s reconciled=%s restored=%s",
+                created_count,
+                reconciled_count,
+                restored_count,
+            )
         else:
             logger.debug("System configurations are up to date.")
 
@@ -213,6 +284,78 @@ class InitializationService:
         else:
             logger.debug("Role permissions are up to date.")
 
+    def validate_borrow_workflow_integrity(self, session: Session) -> None:
+        """Ensure required borrow workflow taxonomy is present after seeding."""
+        required_status_keys = _required_borrower_keys("borrow_requests_status")
+        required_event_type_keys = _required_borrower_keys(
+            "borrow_request_events_event_type"
+        )
+
+        status_keys = set(
+            session.exec(
+                select(BorrowerConfig.key).where(
+                    BorrowerConfig.category == "borrow_requests_status",
+                    BorrowerConfig.is_deleted.is_(False),
+                )
+            ).all()
+        )
+        missing_status = sorted(required_status_keys - status_keys)
+
+        event_type_keys = set(
+            session.exec(
+                select(BorrowerConfig.key).where(
+                    BorrowerConfig.category == "borrow_request_events_event_type",
+                    BorrowerConfig.is_deleted.is_(False),
+                )
+            ).all()
+        )
+        missing_event_types = sorted(required_event_type_keys - event_type_keys)
+
+        if missing_status or missing_event_types:
+            problems: list[str] = []
+            if missing_status:
+                problems.append(f"missing borrow status keys: {', '.join(missing_status)}")
+            if missing_event_types:
+                problems.append(
+                    "missing borrow event type keys: "
+                    f"{', '.join(missing_event_types)}"
+                )
+            raise RuntimeError(
+                "Borrow workflow taxonomy integrity check failed: "
+                + "; ".join(problems)
+            )
+
+    def purge_legacy_configuration_keys(self, session: Session) -> None:
+        """Remove deprecated warehouse-era workflow keys from existing configuration tables."""
+        purged_rows = 0
+
+        for category, keys in LEGACY_BORROWER_CONFIG_KEYS_BY_CATEGORY.items():
+            legacy_rows = session.exec(
+                select(BorrowerConfig).where(
+                    BorrowerConfig.category == category,
+                    BorrowerConfig.key.in_(list(keys)),
+                    BorrowerConfig.is_deleted.is_(False),
+                )
+            ).all()
+            for row in legacy_rows:
+                session.delete(row)
+                purged_rows += 1
+
+        for category, keys in LEGACY_ADMIN_CONFIG_KEYS_BY_CATEGORY.items():
+            legacy_rows = session.exec(
+                select(AdminConfig).where(
+                    AdminConfig.category == category,
+                    AdminConfig.key.in_(list(keys)),
+                    AdminConfig.is_deleted.is_(False),
+                )
+            ).all()
+            for row in legacy_rows:
+                session.delete(row)
+                purged_rows += 1
+
+        if purged_rows:
+            logger.info("Removed %s legacy configuration keys.", purged_rows)
+
     def run(self, session: Session):
         """Run all initialization steps in sequence."""
         # 1. Automate Database Migrations
@@ -224,5 +367,7 @@ class InitializationService:
         self.rebalance_misplaced_configurations(session)
         self.seed_configurations(session)
         self.seed_rbac_roles(session)
+        self.purge_legacy_configuration_keys(session)
+        self.validate_borrow_workflow_integrity(session)
         session.commit()
         logger.info("System Initialization Sequence Completed Successfully.")

@@ -6,11 +6,8 @@ import {
   XCircle,
   PackageOpen,
   Undo2,
-  Send,
-  Warehouse,
   Archive,
   RotateCcw,
-  AlertTriangle,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 
@@ -39,21 +36,6 @@ const ACTION_CONFIG: Record<string, { icon: ReactNode; color: string; btnClass: 
     icon: <RotateCcw className="w-5 h-5" />,
     color: 'text-primary bg-primary/10',
     btnClass: 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm',
-  },
-  send_to_warehouse: {
-    icon: <Send className="w-5 h-5" />,
-    color: 'text-violet-600 bg-violet-50',
-    btnClass: 'bg-violet-600 hover:bg-violet-700 text-white shadow-sm',
-  },
-  warehouse_approve: {
-    icon: <Warehouse className="w-5 h-5" />,
-    color: 'text-emerald-600 bg-emerald-50',
-    btnClass: 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm',
-  },
-  warehouse_reject: {
-    icon: <AlertTriangle className="w-5 h-5" />,
-    color: 'text-rose-600 bg-rose-50',
-    btnClass: 'bg-rose-600 hover:bg-rose-700 text-white shadow-sm',
   },
   close: {
     icon: <Archive className="w-5 h-5" />,

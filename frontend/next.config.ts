@@ -1,14 +1,34 @@
 import type { NextConfig } from "next";
 
 const isDevelopment = process.env.NODE_ENV !== "production";
+const defaultApiOrigin = "http://localhost:8000";
+
+function toOrigin(value: string | undefined, fallback?: string): string {
+  const candidate = value?.trim() || fallback || "";
+  try {
+    return new URL(candidate).origin;
+  } catch {
+    return new URL(defaultApiOrigin).origin;
+  }
+}
+
+const apiOrigin = toOrigin(process.env.NEXT_PUBLIC_API_URL, defaultApiOrigin);
+
+const connectSrc = ["'self'", apiOrigin];
+const imgSrc = ["'self'", "data:", "blob:", apiOrigin];
+
+if (isDevelopment) {
+  connectSrc.push("ws://localhost:3000", "ws://127.0.0.1:3000");
+}
 
 const contentSecurityPolicy = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  `img-src ${imgSrc.join(" ")}`,
   "font-src 'self' data:",
-  "connect-src 'self' https: http: ws: wss:",
+  `connect-src ${connectSrc.join(" ")}`,
+  "object-src 'none'",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",

@@ -423,6 +423,7 @@ class ConfigBaseService(Generic[ConfigModelType]):
         value: str,
         category: str = "general",
         description: str | None = None,
+        crucial: bool | None = None,
         actor_id: Optional[UUID] = None,
     ) -> None:
         setting = self.get_by_key(session, key, category=category)
@@ -433,6 +434,8 @@ class ConfigBaseService(Generic[ConfigModelType]):
             setting.value = str(value)
             if description:
                 setting.description = description
+            if crucial:
+                setting.crucial = True
             session.add(setting)
             after = setting.model_dump(mode="json")
             self._log_audit(session, "updated", entity_id, before, after, actor_id)
@@ -442,6 +445,7 @@ class ConfigBaseService(Generic[ConfigModelType]):
                 value=str(value),
                 category=category,
                 description=description,
+                crucial=bool(crucial),
             )
             session.add(new_setting)
             after = new_setting.model_dump(mode="json")
@@ -529,6 +533,15 @@ class ConfigBaseService(Generic[ConfigModelType]):
     def delete(
         self, session: Session, db_obj: ConfigModelType, actor_id: Optional[UUID] = None
     ) -> ConfigModelType:
+        if db_obj.crucial:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Setting '{db_obj.key}' in category '{db_obj.category}' is crucial "
+                    "and cannot be deleted."
+                ),
+            )
+
         before = db_obj.model_dump(mode="json")
         db_obj.is_deleted = True
         db_obj.deleted_at = get_now_manila()

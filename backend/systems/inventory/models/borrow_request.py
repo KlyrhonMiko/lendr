@@ -3,7 +3,7 @@ from uuid import UUID
 
 from sqlalchemy import Index, text, Column, JSON
 from sqlmodel import Field, Relationship
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .borrow_request_event import BorrowRequestEvent
@@ -11,7 +11,6 @@ if TYPE_CHECKING:
     from .borrow_request_unit import BorrowRequestUnit
     from .borrow_request_batch import BorrowRequestBatch
     from .borrow_request_item import BorrowRequestItem
-    from .warehouse_approval import WarehouseApproval
 
 from core.base_model import BaseModel
 from utils.time_utils import get_now_manila
@@ -77,13 +76,6 @@ class BorrowRequest(BaseModel, table=True):
     assigned_batches: list["BorrowRequestBatch"] = Relationship(
         back_populates="borrow_request",
         sa_relationship_kwargs={"foreign_keys": "[BorrowRequestBatch.borrow_uuid]"},
-    )
-    warehouse_approval: Optional["WarehouseApproval"] = Relationship(
-        back_populates="borrow_request",
-        sa_relationship_kwargs={
-            "uselist": False,
-            "foreign_keys": "[WarehouseApproval.borrow_uuid]",
-        },
     )
 
     __table_args__ = (

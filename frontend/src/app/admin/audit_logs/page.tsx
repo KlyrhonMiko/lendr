@@ -21,9 +21,7 @@ export default function AdminAuditLogsPage() {
     setTimeframe,
     expandedAuditId,
     toggleExpand,
-    page,
     setPage,
-    perPage,
     setPerPage,
   } = useAuditLogsManagement();
 

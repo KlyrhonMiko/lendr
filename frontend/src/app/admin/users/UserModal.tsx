@@ -50,10 +50,12 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
         setRoles(rolesRes.data);
         setShifts(shiftsRes.data);
 
-        if (!isEdit && !formData.role && rolesRes.data.length > 0) {
-          setFormData(prev => ({ ...prev, role: rolesRes.data[0].key }));
+        if (!isEdit && rolesRes.data.length > 0) {
+          setFormData((prev) =>
+            prev.role ? prev : { ...prev, role: rolesRes.data[0].key }
+          );
         }
-      } catch (err) {
+      } catch {
         toast.error('Failed to load roles and shift types');
       } finally {
         setConfigsLoading(false);

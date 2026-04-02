@@ -13,7 +13,6 @@ import {
   ShieldCheck,
   TrendingDown,
   TrendingUp,
-  X,
   Undo2,
 } from 'lucide-react';
 import type { Anomaly, LedgerMovement } from '../lib/types';
@@ -227,9 +226,9 @@ export function MovementLedgerTable({
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {getRowTimestamp(move)}
                     </p>
-                    {!isAnomalyRow(move) && move.reference_id && move.movement_type === 'reversal' && (
+                    {!isAnomalyRow(move) && move.reference_id && (
                       <span className="inline-block mt-1 text-[11px] font-mono bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded">
-                        Ref: {move.reference_id}
+                        Ref ({move.reference_type || 'external_reference'}): {move.reference_id}
                       </span>
                     )}
                   </td>

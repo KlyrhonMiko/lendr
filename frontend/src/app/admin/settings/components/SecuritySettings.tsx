@@ -1,9 +1,9 @@
 'use client';
 
 import { Shield, Key, Lock, Clock, Globe, Users, Calendar, Plus, Trash2, Edit2, Save } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Toggle } from '@/components/ui/toggle';
-import { Input, Textarea } from '@/components/ui/input';
+import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { useState } from 'react';
 import { toast } from 'sonner';

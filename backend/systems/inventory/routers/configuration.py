@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlmodel import Session
 
 from core.database import get_session
@@ -13,12 +13,14 @@ from systems.inventory.services.configuration_service import (
     BorrowerConfigService,
     InventoryConfigService,
 )
+from systems.admin.services.configuration_service import ConfigurationService
 from systems.auth.dependencies import require_permission, get_current_user
 from systems.admin.models.user import User
 
 router = APIRouter()
 inventory_service = InventoryConfigService()
 borrower_service = BorrowerConfigService()
+config_catalog_service = ConfigurationService()
 
 # --- Inventory Config ---
 
@@ -60,12 +62,18 @@ async def create_inventory_setting(
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_permission("inventory:config:manage")),
 ):
+    try:
+        config_catalog_service.validate_category_exists(setting_data.category)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     inventory_service.set_value(
         session,
         setting_data.key,
         setting_data.value,
         category=setting_data.category,
         description=setting_data.description,
+        crucial=False,
         actor_id=current_user.id,
     )
     session.commit()
@@ -91,8 +99,6 @@ async def delete_inventory_setting(
 ):
     setting = inventory_service.get_by_key(session, key, category=category)
     if not setting:
-        from fastapi import HTTPException
-
         raise HTTPException(status_code=404, detail="Setting not found")
 
     inventory_service.delete(session, setting, actor_id=current_user.id)
@@ -140,12 +146,18 @@ async def create_borrower_setting(
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_permission("inventory:config:manage")),
 ):
+    try:
+        config_catalog_service.validate_category_exists(setting_data.category)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     borrower_service.set_value(
         session,
         setting_data.key,
         setting_data.value,
         category=setting_data.category,
         description=setting_data.description,
+        crucial=False,
         actor_id=current_user.id,
     )
     session.commit()
@@ -171,8 +183,6 @@ async def delete_borrower_setting(
 ):
     setting = borrower_service.get_by_key(session, key, category=category)
     if not setting:
-        from fastapi import HTTPException
-
         raise HTTPException(status_code=404, detail="Setting not found")
 
     borrower_service.delete(session, setting, actor_id=current_user.id)

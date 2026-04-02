@@ -3,7 +3,7 @@ from uuid import UUID
 from typing import Any, Generic, Optional, TypeVar
 
 from fastapi import Request
-from pydantic import BaseModel, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 from utils.time_utils import format_datetime, get_now_manila
 
@@ -42,6 +42,7 @@ class GenericResponse(BaseModel, Generic[T]):
     timestamp: str = Field(default_factory=lambda: format_datetime(get_now_manila()))
     path: Optional[str] = None
     method: Optional[str] = None
+    correlation_id: Optional[str] = None
     
     # Success Specific
     data: Optional[T] = None
@@ -50,6 +51,23 @@ class GenericResponse(BaseModel, Generic[T]):
     # Error Specific
     error_type: Optional[str] = None
     details: Optional[Any] = None
+
+
+def _resolve_correlation_id(request: Request | None) -> str | None:
+    if not request:
+        return None
+
+    request_state = getattr(request, "state", None)
+    if request_state is not None:
+        request_id = getattr(request_state, "correlation_id", None)
+        if isinstance(request_id, str) and request_id.strip():
+            return request_id
+
+    header_value = request.headers.get("X-Correlation-ID")
+    if header_value and header_value.strip():
+        return header_value
+
+    return None
 
 def create_success_response(
     data: T, 
@@ -63,7 +81,8 @@ def create_success_response(
         message=message,
         meta=meta,
         path=str(request.url.path) if request else None,
-        method=request.method if request else None
+        method=request.method if request else None,
+        correlation_id=_resolve_correlation_id(request),
     )
 
 def create_error_response(
@@ -78,7 +97,8 @@ def create_error_response(
         error_type=error_type,
         details=details,
         path=str(request.url.path) if request else None,
-        method=request.method if request else None
+        method=request.method if request else None,
+        correlation_id=_resolve_correlation_id(request),
     )
 
 # Generic Configuration Schemas
@@ -87,10 +107,11 @@ class ConfigBase(BaseModel):
 
 
 class ConfigCreate(ConfigBase):
-    system: str = Field(..., max_length=50)
+    system: str | None = Field(default=None, max_length=50)
     key: str = Field(..., max_length=100)
     category: str = Field(default="general", max_length=50)
     description: Optional[str] = None
+    crucial: bool = False
 
 
 class ConfigUpdate(ConfigBase):
@@ -99,18 +120,18 @@ class ConfigUpdate(ConfigBase):
 
 
 class ConfigRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     system: str
     key: str
     category: str
     value: str
     description: Optional[str] = None
+    crucial: bool
     created_at: datetime
     updated_at: datetime
 
     @field_serializer("created_at", "updated_at")
     def serialize_dates(self, dt: datetime) -> str:
         return format_datetime(dt)
-
-    class Config:
-        from_attributes = True

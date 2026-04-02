@@ -30,6 +30,9 @@ class BackupService:
         destination: str = "local",
         actor_id: UUID | None = None,
     ) -> BackupRun:
+        if destination != "local":
+            raise ValueError("Unsupported backup destination. Only 'local' is currently available.")
+
         self._require_setting(
             session,
             destination,
@@ -54,13 +57,7 @@ class BackupService:
         session.refresh(backup_run)
 
         try:
-            # 2. Execute local backup if requested
-            if destination in ["local", "both"]:
-                self._run_local_backup(session, backup_run)
-            
-            # 3. Execute S3 backup if requested
-            if destination in ["s3", "both"]:
-                self._run_s3_backup(session, backup_run)
+            self._run_local_backup(session, backup_run)
 
             self._assert_required_artifacts(session, backup_run, destination)
 

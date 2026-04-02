@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Activity, Database, Server, HardDrive, Users, AlertCircle, Download, ShieldCheck, ShieldAlert, ShieldX, RefreshCw, ChevronLeft, ChevronRight, FileText, Paperclip, Archive, Layers, Laptop } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProgressBar } from './ProgressBar';
 import { toast } from 'sonner';
-import { healthApi, HealthStatus, HealthStorage, HealthSession, HealthLog, api } from '../api';
+import { api } from '../api';
 import { useHealthStatus, useHealthStorage, useHealthSessions, useHealthLogs, useHealthMutations } from '../lib/useSettingsQueries';
 
 export function HealthSettings() {

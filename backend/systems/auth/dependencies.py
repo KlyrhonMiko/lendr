@@ -1,4 +1,5 @@
 import hashlib
+from uuid import UUID
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
@@ -6,7 +7,7 @@ from jose import JWTError
 from pydantic import ValidationError
 from sqlmodel import Session
 
-from core.database import get_session
+from core.database import engine, get_session
 from systems.admin.models.user import User
 from systems.admin.services.user_service import UserService
 from systems.admin.services.audit_service import audit_service
@@ -17,11 +18,62 @@ reusable_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 user_service = UserService()
 
 
-def _commit_if_needed(session: Session) -> None:
-    commit = getattr(session, "commit", None)
-    has_changes = bool(getattr(session, "new", ())) or bool(getattr(session, "dirty", ())) or bool(getattr(session, "deleted", ()))
-    if callable(commit) and has_changes:
-        commit()
+def _persist_audit_event(
+    *,
+    entity_type: str,
+    entity_id: str,
+    action: str,
+    reason_code: str | None = None,
+    actor_id: UUID | None = None,
+    after: dict | None = None,
+) -> None:
+    """Persist dependency-level security telemetry outside request transactions."""
+    try:
+        with Session(engine) as audit_session:
+            audit_service.log_action(
+                db=audit_session,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                action=action,
+                reason_code=reason_code,
+                actor_id=actor_id,
+                after=after,
+            )
+            audit_session.commit()
+    except Exception:
+        # Authentication and authorization checks should not fail due to telemetry issues.
+        pass
+
+
+def _validate_session_with_activity_touch(session_id: str) -> bool:
+    """Validate and touch session activity in an isolated session boundary."""
+    from systems.auth.services.auth_service import auth_service
+
+    with Session(engine) as validation_session:
+        if str(session_id).startswith("BSE"):
+            is_valid = auth_service.is_borrower_session_valid(
+                validation_session,
+                session_id,
+                touch_activity=True,
+            )
+        elif str(session_id).startswith("USE"):
+            is_valid = auth_service.is_user_session_valid(
+                validation_session,
+                session_id,
+                touch_activity=True,
+            )
+        else:
+            is_valid = False
+
+        has_changes = (
+            bool(validation_session.new)
+            or bool(validation_session.dirty)
+            or bool(validation_session.deleted)
+        )
+        if has_changes:
+            validation_session.commit()
+
+        return is_valid
 
 
 def _hash_value(value: str | None) -> str:
@@ -31,7 +83,6 @@ def _hash_value(value: str | None) -> str:
 
 
 def _log_auth_validation_failure(
-    session: Session,
     request: Request,
     action: str,
     *,
@@ -47,18 +98,12 @@ def _log_auth_validation_failure(
         "session_hash": _hash_value(session_id),
     }
 
-    try:
-        audit_service.log_action(
-            db=session,
-            entity_type="auth",
-            entity_id=metadata["user_hash"],
-            action=action,
-            after=metadata,
-        )
-        session.commit()
-    except Exception:
-        # Auth validation should not fail due to telemetry issues.
-        pass
+    _persist_audit_event(
+        entity_type="auth",
+        entity_id=metadata["user_hash"],
+        action=action,
+        after=metadata,
+    )
 
 
 def get_current_user(
@@ -76,7 +121,6 @@ def get_current_user(
         
         if not user_id or not session_id:
             _log_auth_validation_failure(
-                session,
                 _request,
                 "token_missing_subject_or_session",
                 user_id=user_id,
@@ -88,7 +132,6 @@ def get_current_user(
             )
     except (JWTError, ValidationError):
         _log_auth_validation_failure(
-            session,
             _request,
             "token_decode_failure",
             user_id=user_id,
@@ -102,7 +145,6 @@ def get_current_user(
     user = user_service.get(session, user_id)
     if not user:
         _log_auth_validation_failure(
-            session,
             _request,
             "token_subject_not_found",
             user_id=user_id,
@@ -110,25 +152,10 @@ def get_current_user(
         )
         raise HTTPException(status_code=404, detail="User not found")
 
-    from systems.auth.services.auth_service import auth_service
-    
-    is_valid = False
-    if str(session_id).startswith("BSE"):
-        is_valid = auth_service.is_borrower_session_valid(
-            session,
-            session_id,
-            touch_activity=True,
-        )
-    elif str(session_id).startswith("USE"):
-        is_valid = auth_service.is_user_session_valid(
-            session,
-            session_id,
-            touch_activity=True,
-        )
+    is_valid = _validate_session_with_activity_touch(session_id)
 
     if not is_valid:
         _log_auth_validation_failure(
-            session,
             _request,
             "session_validation_failed",
             user_id=user_id,
@@ -139,8 +166,6 @@ def get_current_user(
             detail="Session has expired or been revoked. Please log in again.",
         )
 
-    _commit_if_needed(session)
-
     return user
 
 
@@ -149,18 +174,15 @@ def require_system_access(system: str):
     def _checker(session: Session = Depends(get_session), current_user: User = Depends(get_current_user),) -> None:
         if not rbac_service.has_system_access(session, current_user, system):
             detail = f"Role '{current_user.role}' cannot access {system} system"
-            
-            # Log security violation for cross-system attempts (especially admin)
-            audit_service.log_action(
-                db=session,
+
+            _persist_audit_event(
                 entity_type="security",
                 entity_id=system,
                 action="unauthorized_access",
                 reason_code="403-FORBIDDEN",
-                actor_id=current_user.id
+                actor_id=current_user.id,
             )
-            session.commit()
-            
+
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=detail,

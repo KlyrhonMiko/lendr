@@ -1,4 +1,4 @@
-import { Bell, FileBarChart, BookOpen, Settings } from 'lucide-react';
+import { Bell, FileBarChart, BookOpen } from 'lucide-react';
 
 export type InventorySettingsTab = 'system' | 'import-export' | 'dictionary';
 

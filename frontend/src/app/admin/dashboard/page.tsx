@@ -1,11 +1,5 @@
 'use client';
 
-import type {
-  AdminStats,
-  ActivityPoint,
-  UserInsights,
-  SystemRegistry,
-} from './lib/types';
 import { useAdminDashboardData } from './lib/useDashboardQueries';
 
 import { DashboardHeader } from './components/DashboardHeader';

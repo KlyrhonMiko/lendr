@@ -21,7 +21,7 @@ export interface BackupRun {
 }
 
 export interface BackupTriggerPayload {
-  destination: string;
+  destination: 'local';
 }
 
 export const backupApi = {

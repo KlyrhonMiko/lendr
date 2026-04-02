@@ -25,8 +25,9 @@ class InventoryMovement(BaseModel, table=True):
 
     reason_code: str | None = Field(default=None, index=True, max_length=50)
     
-    # Optional link to the transaction (Borrow ID or Request Ref)
-    reference_id: str | None = Field(default=None, max_length=50)
+    # Optional link to an external or internal domain record.
+    reference_id: str | None = Field(default=None, index=True, max_length=50)
+    reference_type: str | None = Field(default=None, index=True, max_length=50)
     
     note: str | None = Field(default=None, max_length=500)
     occurred_at: datetime = Field(default_factory=get_now_manila)

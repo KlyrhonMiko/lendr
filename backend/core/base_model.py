@@ -24,3 +24,4 @@ class ConfigurationBase(BaseModel):
     value: str = Field(sa_type=Text)
     category: str = Field(default="general", max_length=50)
     description: str | None = Field(default=None, max_length=500)
+    crucial: bool = Field(default=False, nullable=False)

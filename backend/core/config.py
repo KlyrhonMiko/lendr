@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     SECURITY_HSTS_MAX_AGE_SECONDS: int = 31536000
     SECURITY_API_CONTENT_SECURITY_POLICY: str = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
 
+    SWAGGER_UI_ENABLED: bool = True
+
     CORS_ALLOW_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
     CORS_ALLOW_METHODS: str = "GET,POST,PUT,PATCH,DELETE,OPTIONS"
     CORS_ALLOW_HEADERS: str = "Authorization,Content-Type,X-Device-ID"
@@ -56,6 +58,10 @@ class Settings(BaseSettings):
     AUTH_ACTIVITY_TOUCH_INTERVAL_SECONDS: int = 60
     AUTH_MAX_ACTIVE_USER_SESSIONS: int = 3
     AUTH_MAX_ACTIVE_BORROWER_SESSIONS: int = 1
+    AUTH_RATE_LIMIT_IP_MAX_ATTEMPTS: int = 5
+    AUTH_RATE_LIMIT_IP_WINDOW_SECONDS: int = 60
+    AUTH_RATE_LIMIT_IDENTITY_MAX_ATTEMPTS: int = 20
+    AUTH_RATE_LIMIT_IDENTITY_WINDOW_SECONDS: int = 3600
 
     ARGON2_TIME_COST: int = 3
     ARGON2_MEMORY_COST: int = 65536

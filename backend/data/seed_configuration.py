@@ -687,12 +687,10 @@ def seed_borrow_request_configurations(headers: dict[str, str]) -> None:
     statuses = [
         ("pending",            "1", "Request awaiting approval"),
         ("approved",           "2", "Request has been approved"),
-        ("sent_to_warehouse",  "3", "Request sent to warehouse for fulfillment"),
-        ("warehouse_approved", "4", "Warehouse has approved and prepared items"),
-        ("released",           "5", "Items released to borrower"),
-        ("returned",           "6", "Items have been returned (terminal)"),
-        ("rejected",           "7", "Request rejected by approver (terminal)"),
-        ("warehouse_rejected", "8", "Request rejected by warehouse (terminal)"),
+        ("released",           "3", "Items released to borrower"),
+        ("returned",           "4", "Items have been returned (terminal)"),
+        ("rejected",           "5", "Request rejected by approver (terminal)"),
+        ("closed",             "6", "Request administratively closed (terminal)"),
     ]
     for key, value, desc in statuses:
         create_setting(headers, system="borrower", key=key, value=value, category="borrow_requests_status", description=desc, endpoint="/api/inventory/config/borrower")
@@ -701,10 +699,6 @@ def seed_borrow_request_configurations(headers: dict[str, str]) -> None:
     print(f"\n  {CYAN}Category: borrow_requests_approval_channel{RESET}")
     channels = [
         ("standard", "Standard", "Standard approval workflow"),
-        ("warehouse_manual", "Warehouse Manual", "Manual warehouse approval"),
-        ("warehouse_shortage_auto", "Warehouse Shortage Auto", "Automatic approval for warehouse shortage"),
-        ("warehouse_standard", "Warehouse Standard", "Standard warehouse approval"),
-        ("warehouse_provisioned", "Warehouse Pre-provisioned", "Pre-provisioned warehouse approval"),
         ("emergency_bypass", "Emergency Bypass", "Emergency bypass approval"),
     ]
     for key, value, desc in channels:
@@ -744,9 +738,7 @@ def seed_borrow_request_configurations(headers: dict[str, str]) -> None:
         ("reopened", "Reopened", "Request reopened"),
         ("released", "Released", "Items released"),
         ("returned", "Returned", "Items returned"),
-        ("sent_to_warehouse", "Sent To Warehouse", "Sent to warehouse"),
-        ("warehouse_approved", "Warehouse Approved", "Warehouse approved"),
-        ("warehouse_rejected", "Warehouse Rejected", "Warehouse rejected"),
+        ("closed", "Closed", "Request closed"),
         ("units_assigned", "Units Assigned", "Units assigned"),
         ("unit_assignment_skipped", "Unit Assignment Skipped", "Unit assignment skipped"),
     ]
@@ -760,21 +752,6 @@ def seed_borrow_request_configurations(headers: dict[str, str]) -> None:
             description=desc,
             endpoint="/api/inventory/config/borrower",
         )
-
-
-def seed_requested_item_configurations(headers: dict[str, str]) -> None:
-    """Seed requested item status configurations."""
-    section("REQUESTED ITEMS CONFIGURATIONS")
-    
-    print(f"\n  {CYAN}Category: requested_items_status{RESET}")
-    statuses = [
-        ("pending", "Pending", "Request pending procurement"),
-        ("procurement", "Procurement", "Item is being procured"),
-        ("cancelled", "Cancelled", "Procurement cancelled (terminal)"),
-        ("fulfilled", "Fulfilled", "Item has been fulfilled (terminal)"),
-    ]
-    for key, value, desc in statuses:
-        create_setting(headers, system="borrower", key=key, value=value, category="requested_items_status", description=desc, endpoint="/api/inventory/config/borrower")
 
 
 def seed_borrow_participant_configurations(headers: dict[str, str]) -> None:
@@ -850,8 +827,6 @@ def seed_rbac_role_permissions(headers: dict[str, str]) -> None:
                 "inventory:movements:manage",
                 "inventory:movements:view",
                 "inventory:borrow_requests:manage",
-                "inventory:warehouse:manage",
-                "inventory:requested_items:manage",
                 "inventory:dashboard:view",
                 "inventory:audit:view",
                 "inventory:borrower_portal:access",
@@ -878,7 +853,6 @@ def seed_rbac_role_permissions(headers: dict[str, str]) -> None:
             "permissions": [
                 "auth:session:manage",
                 "inventory:borrower_portal:access",
-                "inventory:requested_items:manage",
                 "inventory:items:view", 
             ],
         },
@@ -889,7 +863,6 @@ def seed_rbac_role_permissions(headers: dict[str, str]) -> None:
             "permissions": [
                 "auth:session:manage",
                 "inventory:items:view",
-                "inventory:requested_items:manage",
                 "inventory:borrower_portal:access",
             ],
         },
@@ -913,7 +886,6 @@ def seed_rbac_role_permissions(headers: dict[str, str]) -> None:
                 "auth:session:manage",
                 "inventory:items:view",
                 "inventory:movements:view",
-                "inventory:requested_items:manage",
                 "inventory:dashboard:view",
                 "inventory:audit:view",
             ],
@@ -971,7 +943,6 @@ def seed_audit_configurations(headers: dict[str, str]) -> None:
         ("inventory_unit", "Inventory Unit", "Inventory unit entity"),
         ("inventory_movement", "Inventory Movement", "Inventory movement entity"),
         ("borrow_request", "Borrow Request", "Borrow request entity"),
-        ("requested_item", "Requested Item", "Requested item entity"),
         ("user", "User", "User entity"),
         ("system_setting", "System Setting", "System configuration entity"),
         ("audit_log", "Audit Log", "System audit log entity"),
@@ -989,8 +960,6 @@ def seed_audit_configurations(headers: dict[str, str]) -> None:
         ("reject", "Reject", "Request rejected"),
         ("release", "Release", "Items released"),
         ("return", "Return", "Items returned"),
-        ("warehouse_approve", "Warehouse Approve", "Warehouse approval"),
-        ("warehouse_reject", "Warehouse Reject", "Warehouse rejection"),
         ("assign", "Assign", "Units assigned"),
         ("adjust_stock", "Adjust Stock", "Stock adjustment"),
         ("transition", "Transition", "Status transition"),
@@ -1113,7 +1082,6 @@ def main() -> int:
         seed_inventory_weight_configurations(admin_headers)
         seed_inventory_movement_configurations(admin_headers)
         seed_borrow_request_configurations(admin_headers)
-        seed_requested_item_configurations(admin_headers)
         seed_borrow_participant_configurations(admin_headers)
         seed_rbac_role_permissions(admin_headers)
         seed_user_configurations(admin_headers)

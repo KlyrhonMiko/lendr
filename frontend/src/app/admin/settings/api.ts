@@ -8,6 +8,7 @@ export interface SystemSetting {
   category: string;
   system: string;
   description: string | null;
+  crucial: boolean;
   last_modified?: string;
 }
 

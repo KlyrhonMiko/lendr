@@ -1,15 +1,13 @@
 'use client';
 
-import { useState } from 'react';
 import { useBackupManagement } from './lib/useBackupManagement';
 import { Database, Download, RefreshCw, Plus, CheckCircle, XCircle, Clock } from 'lucide-react';
 
 export default function BackupPage() {
   const { runs, loading, triggering, triggerBackup, handleDownload, refreshRuns } = useBackupManagement();
-  const [destination, setDestination] = useState('local');
 
   const onTrigger = () => {
-    triggerBackup(destination);
+    triggerBackup('local');
   };
 
   const getStatusIcon = (status: string) => {
@@ -35,15 +33,9 @@ export default function BackupPage() {
           </p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-          <select
-            className="w-full sm:w-auto h-10 px-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 outline-none"
-            value={destination}
-            onChange={(e) => setDestination(e.target.value)}
-          >
-            <option value="local">Local Only</option>
-            <option value="s3">S3 Only</option>
-            <option value="both">Both (Local & S3)</option>
-          </select>
+          <div className="h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-300 flex items-center">
+            Destination: Local Only
+          </div>
           <div className="flex gap-2">
             <button
               onClick={() => refreshRuns()}

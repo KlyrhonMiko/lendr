@@ -5,6 +5,7 @@ export interface MovementLedgerParams {
   inventory_id?: string;
   reason_code?: string;
   reference_id?: string;
+  reference_type?: string;
   date_from?: string;
   date_to?: string;
 }
@@ -40,6 +41,7 @@ export interface LedgerMovement {
   occurred_at?: string;
   detected_at?: string;
   reference_id?: string;
+  reference_type?: string;
   user_id?: string;
   actor_name?: string;
   actor_id?: string;

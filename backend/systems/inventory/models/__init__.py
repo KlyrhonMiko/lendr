@@ -3,8 +3,6 @@
 from .borrow_request import BorrowRequest
 from .borrow_request_event import BorrowRequestEvent
 from .borrow_request_item import BorrowRequestItem
-from .requested_item import RequestedItem
-from .warehouse_approval import WarehouseApproval
 from core.models.audit_log import AuditLog 
 from .inventory import InventoryItem
 from .inventory_unit import InventoryUnit
@@ -24,8 +22,6 @@ __all__ = [
     "BorrowParticipant",
     "BorrowRequestUnit",
     "BorrowRequestBatch",
-    "RequestedItem",
-    "WarehouseApproval",
     "InventoryUnit",
     "InventoryBatch",
     "InventoryMovement",

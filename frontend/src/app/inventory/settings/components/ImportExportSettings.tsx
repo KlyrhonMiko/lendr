@@ -9,8 +9,6 @@ import {
   Upload, 
   History, 
   FileText, 
-  Filter, 
-  Calendar, 
   Clock, 
   CheckCircle2, 
   XCircle, 
@@ -27,7 +25,6 @@ import {
   Sparkles,
   Table as TableIcon
 } from 'lucide-react';
-import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import {
   useImportHistory,
@@ -39,7 +36,6 @@ import {
 } from '../lib/useImportExport';
 import { useInventoryItems } from '@/app/inventory/items/lib/useItemQueries';
 import { User as SystemUser } from '@/app/admin/users/api';
-import { format } from 'date-fns';
 import { logger } from '@/lib/logger';
 
 export function ImportExportSettings() {
@@ -228,7 +224,7 @@ export function ImportExportSettings() {
                         Loading history...
                       </td>
                     </tr>
-                  ) : importHistory.map((item, i) => (
+                  ) : importHistory.map((item) => (
                     <tr key={item.id} className="hover:bg-muted/30 transition-colors">
                       <td className="p-4 pl-6 text-muted-foreground font-mono">
                          {item.created_at}

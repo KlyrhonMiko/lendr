@@ -25,7 +25,6 @@ export default function UsersPage() {
     setShiftFilter,
     statusFilter,
     setStatusFilter,
-    page,
     setPage,
     isModalOpen,
     selectedUser,

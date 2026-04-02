@@ -1,7 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { AuditLogParams } from '../api';
+import { useCallback, useMemo, useState } from 'react';
 import { useAuditLogs } from './useAuditLogQueries';
 
 const DEFAULT_PER_PAGE = 10;

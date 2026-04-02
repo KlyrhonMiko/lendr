@@ -88,7 +88,7 @@ export function BorrowingTrendsPanel({ trends, loading }: { trends: BorrowingTre
             No recent activity recorded
           </div>
         ) : (
-          trends.map((day, i) => (
+          trends.map((day) => (
             <div 
               key={day.date} 
               className="flex-1 bg-violet-500/20 hover:bg-violet-500/40 rounded-t-sm transition-all group relative cursor-help"

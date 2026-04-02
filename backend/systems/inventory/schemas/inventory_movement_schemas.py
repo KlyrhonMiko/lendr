@@ -1,9 +1,11 @@
 from datetime import datetime
 from typing import Any, Literal, Optional
-from pydantic import BaseModel, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from utils.time_utils import format_datetime
 
 class InventoryMovementRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     movement_id: str
 
     qty_change: int
@@ -11,6 +13,7 @@ class InventoryMovementRead(BaseModel):
     reason_code: Optional[str] = None
 
     reference_id: Optional[str] = None
+    reference_type: Optional[str] = None
     note: Optional[str] = None
     
     user_id: Optional[str] = None
@@ -30,15 +33,12 @@ class InventoryMovementRead(BaseModel):
     def serialize_date(self, dt: datetime) -> str:
         return format_datetime(dt)
 
-    class Config:
-        from_attributes = True
-
-
 class InventoryMovementAdjust(BaseModel):
     qty_change: int = Field(..., allow_inf_nan=False)
     movement_type: str = Field(..., min_length=1, max_length=50)
     reason_code: Optional[str] = Field(default=None, max_length=50)
     reference_id: Optional[str] = Field(default=None, max_length=50)
+    reference_type: Optional[str] = Field(default=None, max_length=50)
     batch_id: Optional[str] = Field(default=None, max_length=50)
     note: str = Field(..., min_length=5, max_length=500)
 

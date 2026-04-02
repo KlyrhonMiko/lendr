@@ -8,8 +8,9 @@ import { cn } from '@/lib/utils';
 const ENTITY_OPTIONS = [
   { key: '', value: 'All Inventory' },
   { key: 'inventory', value: 'Inventory' },
-  { key: 'unit', value: 'Unit' },
-  { key: 'movement', value: 'Movement' },
+  { key: 'inventory_unit', value: 'Unit' },
+  { key: 'inventory_movement', value: 'Movement' },
+  { key: 'inventory_batch', value: 'Batch' },
   { key: 'borrow', value: 'Borrow' },
   { key: 'borrow_request', value: 'Borrow Request' },
 ];
