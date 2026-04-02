@@ -3,6 +3,7 @@ export interface SystemSetting {
   value: string;
   category: string;
   description: string | null;
+  crucial: boolean;
 }
 
 export interface SystemSettingCreate {

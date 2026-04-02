@@ -51,8 +51,7 @@ export default function RequestHistoryPage() {
     switch (type.toLowerCase()) {
       case 'created': return 'bg-sky-500/10 text-sky-500 border-sky-500/20';
       case 'approved': return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
-      case 'rejected':
-      case 'warehouse_rejected': return 'bg-rose-500/10 text-rose-500 border-rose-500/20';
+      case 'rejected': return 'bg-rose-500/10 text-rose-500 border-rose-500/20';
       case 'released': return 'bg-amber-500/10 text-amber-500 border-amber-500/20';
       case 'returned': return 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20';
       case 'closed': return 'bg-slate-500/10 text-slate-500 border-slate-500/20';
@@ -109,7 +108,6 @@ export default function RequestHistoryPage() {
                 <option value="created">Created</option>
                 <option value="approved">Approved</option>
                 <option value="rejected">Rejected</option>
-                <option value="warehouse_rejected">WH Reject</option>
                 <option value="released">Released</option>
                 <option value="returned">Returned</option>
                 <option value="reopened">Reopened</option>

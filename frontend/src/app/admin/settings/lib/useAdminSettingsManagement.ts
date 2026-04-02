@@ -79,6 +79,11 @@ export function useAdminSettingsManagement() {
   }, []);
 
   const openEditModal = useCallback((setting: SystemSetting) => {
+    if (setting.crucial) {
+      toast.error('Required settings cannot be edited from UI.');
+      return;
+    }
+
     setEditingKey(setting.key);
     setFormData({
       key: setting.key,

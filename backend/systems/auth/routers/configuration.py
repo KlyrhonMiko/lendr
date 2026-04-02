@@ -60,6 +60,7 @@ async def create_auth_setting(
         setting_data.value,
         category=setting_data.category,
         description=setting_data.description,
+        crucial=False,
         actor_id=current_user.id,
     )
     session.commit()

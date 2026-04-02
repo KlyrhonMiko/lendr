@@ -31,7 +31,6 @@ from core.middleware import MaintenanceMiddleware
 from systems.auth.routers.auth import router as auth
 from systems.auth.routers.configuration import router as auth_config
 from systems.inventory.routers.borrowing import router as borrowing
-from systems.inventory.routers.requested_items import router as requested_items
 from systems.inventory.routers.inventory import router as inventory
 from systems.inventory.routers.dashboard import router as dashboard
 from systems.inventory.routers.audit_log import router as audit_log
@@ -215,12 +214,13 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     log_operation("500-INTERNAL", f"Crash in {request.url.path}: {str(exc)}", level="ERROR")
+    debug_mode = settings.DEBUG
     return JSONResponse(
         status_code=500,
         content=create_error_response(
             message="Internal server error",
-            error_type=exc.__class__.__name__,
-            details=str(exc),
+            error_type=exc.__class__.__name__ if debug_mode else "InternalServerError",
+            details=str(exc) if debug_mode else None,
             request=request
         ).model_dump(mode="json")
     )
@@ -257,12 +257,6 @@ app.include_router(
     borrowing,
     prefix="/api/inventory/borrowing",
     tags=["Inventory - Borrowing"],
-    dependencies=inventory_access,
-)
-app.include_router(
-    requested_items,
-    prefix="/api/inventory/requested-items",
-    tags=["Inventory - Requested Items"],
     dependencies=inventory_access,
 )
 app.include_router(

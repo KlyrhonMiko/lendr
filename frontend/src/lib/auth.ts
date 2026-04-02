@@ -189,7 +189,6 @@ export const auth = {
       'admin': '/admin/dashboard',
       'inventory_manager': '/inventory/dashboard',
       'dispatch': '/inventory/dashboard',
-      'warehouse_manager': '/inventory/dashboard',
       'borrower': '/borrow_portal/request_form',
       'finance_manager': '/inventory/dashboard',
       'accountant': '/inventory/dashboard',

@@ -87,10 +87,11 @@ class ConfigBase(BaseModel):
 
 
 class ConfigCreate(ConfigBase):
-    system: str = Field(..., max_length=50)
+    system: str | None = Field(default=None, max_length=50)
     key: str = Field(..., max_length=100)
     category: str = Field(default="general", max_length=50)
     description: Optional[str] = None
+    crucial: bool = False
 
 
 class ConfigUpdate(ConfigBase):
@@ -105,6 +106,7 @@ class ConfigRead(BaseModel):
     category: str
     value: str
     description: Optional[str] = None
+    crucial: bool
     created_at: datetime
     updated_at: datetime
 

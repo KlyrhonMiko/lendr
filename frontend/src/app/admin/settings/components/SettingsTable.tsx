@@ -1,6 +1,6 @@
 'use client';
 
-import { Edit2, Loader2, Settings as SettingsIcon, Sliders, Trash2 } from 'lucide-react';
+import { Edit2, Loader2, Lock, Settings as SettingsIcon, Sliders, Trash2 } from 'lucide-react';
 import type { SystemSetting } from '../api';
 
 export function SettingsTable({
@@ -44,6 +44,12 @@ export function SettingsTable({
                   <div className="flex flex-col">
                     <span className="font-semibold text-foreground font-mono text-sm">{setting.key}</span>
                     <span className="text-xs text-muted-foreground line-clamp-1">{setting.description || 'No description provided.'}</span>
+                    {setting.crucial && (
+                      <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-600">
+                        <Lock className="h-3 w-3" />
+                        Required
+                      </span>
+                    )}
                   </div>
                 </div>
               </td>
@@ -66,17 +72,19 @@ export function SettingsTable({
                 <div className="flex items-center justify-end gap-1">
                   <button
                     onClick={() => onEdit(setting)}
-                    className="p-2 hover:bg-secondary rounded-lg text-muted-foreground hover:text-indigo-400 transition-colors opacity-0 group-hover:opacity-100"
+                    className="p-2 hover:bg-secondary rounded-lg text-muted-foreground hover:text-indigo-400 transition-colors opacity-0 group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
                     type="button"
-                    title="Edit"
+                    title={setting.crucial ? 'Required setting cannot be edited from UI' : 'Edit'}
+                    disabled={setting.crucial}
                   >
                     <Edit2 className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => onDelete(setting.key, setting.category)}
-                    className="p-2 hover:bg-rose-500/10 rounded-lg text-muted-foreground hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
+                    className="p-2 hover:bg-rose-500/10 rounded-lg text-muted-foreground hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
                     type="button"
-                    title="Delete"
+                    title={setting.crucial ? 'Required setting cannot be deleted' : 'Delete'}
+                    disabled={setting.crucial}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

@@ -46,6 +46,7 @@ export interface ConfigRead {
   value: string;
   category: string;
   description?: string;
+  crucial?: boolean;
 }
 
 export interface InventoryBatch {

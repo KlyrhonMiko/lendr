@@ -125,18 +125,12 @@ SYSTEM_CONFIGS = [
     # Borrow Request Workflow
     {"system": "borrower", "key": "pending", "value": "1", "category": "borrow_requests_status", "description": "Request awaiting approval"},
     {"system": "borrower", "key": "approved", "value": "2", "category": "borrow_requests_status", "description": "Request has been approved"},
-    {"system": "borrower", "key": "sent_to_warehouse", "value": "3", "category": "borrow_requests_status", "description": "Request sent to warehouse for fulfillment"},
-    {"system": "borrower", "key": "warehouse_approved", "value": "4", "category": "borrow_requests_status", "description": "Warehouse has approved and prepared items"},
-    {"system": "borrower", "key": "released", "value": "5", "category": "borrow_requests_status", "description": "Items released to borrower"},
-    {"system": "borrower", "key": "returned", "value": "6", "category": "borrow_requests_status", "description": "Items have been returned (terminal)"},
-    {"system": "borrower", "key": "rejected", "value": "7", "category": "borrow_requests_status", "description": "Request rejected by approver (terminal)"},
-    {"system": "borrower", "key": "warehouse_rejected", "value": "8", "category": "borrow_requests_status", "description": "Request rejected by warehouse (terminal)"},
+    {"system": "borrower", "key": "released", "value": "3", "category": "borrow_requests_status", "description": "Items released to borrower"},
+    {"system": "borrower", "key": "returned", "value": "4", "category": "borrow_requests_status", "description": "Items have been returned (terminal)"},
+    {"system": "borrower", "key": "rejected", "value": "5", "category": "borrow_requests_status", "description": "Request rejected by approver (terminal)"},
+    {"system": "borrower", "key": "closed", "value": "6", "category": "borrow_requests_status", "description": "Request administratively closed (terminal)"},
 
     {"system": "borrower", "key": "standard", "value": "Standard", "category": "borrow_requests_approval_channel", "description": "Standard approval workflow"},
-    {"system": "borrower", "key": "warehouse_manual", "value": "Warehouse Manual", "category": "borrow_requests_approval_channel", "description": "Manual warehouse approval"},
-    {"system": "borrower", "key": "warehouse_shortage_auto", "value": "Warehouse Shortage Auto", "category": "borrow_requests_approval_channel", "description": "Automatic approval for warehouse shortage"},
-    {"system": "borrower", "key": "warehouse_standard", "value": "Warehouse Standard", "category": "borrow_requests_approval_channel", "description": "Standard warehouse approval"},
-    {"system": "borrower", "key": "warehouse_provisioned", "value": "Warehouse Pre-provisioned", "category": "borrow_requests_approval_channel", "description": "Pre-provisioned warehouse approval"},
     {"system": "borrower", "key": "emergency_bypass", "value": "Emergency Bypass", "category": "borrow_requests_approval_channel", "description": "Emergency bypass approval"},
 
     {"system": "borrower", "key": "inventory_manager", "value": "Inventory Manager", "category": "borrow_requests_request_channel", "description": "Request from inventory manager"},
@@ -148,17 +142,9 @@ SYSTEM_CONFIGS = [
     {"system": "borrower", "key": "reopened", "value": "Reopened", "category": "borrow_request_events_event_type", "description": "Request reopened"},
     {"system": "borrower", "key": "released", "value": "Released", "category": "borrow_request_events_event_type", "description": "Items released"},
     {"system": "borrower", "key": "returned", "value": "Returned", "category": "borrow_request_events_event_type", "description": "Items returned"},
-    {"system": "borrower", "key": "sent_to_warehouse", "value": "Sent To Warehouse", "category": "borrow_request_events_event_type", "description": "Sent to warehouse"},
-    {"system": "borrower", "key": "warehouse_approved", "value": "Warehouse Approved", "category": "borrow_request_events_event_type", "description": "Warehouse approved"},
-    {"system": "borrower", "key": "warehouse_rejected", "value": "Warehouse Rejected", "category": "borrow_request_events_event_type", "description": "Warehouse rejected"},
+    {"system": "borrower", "key": "closed", "value": "Closed", "category": "borrow_request_events_event_type", "description": "Request closed"},
     {"system": "borrower", "key": "units_assigned", "value": "Units Assigned", "category": "borrow_request_events_event_type", "description": "Units assigned"},
     {"system": "borrower", "key": "unit_assignment_skipped", "value": "Unit Assignment Skipped", "category": "borrow_request_events_event_type", "description": "Unit assignment skipped"},
-
-    # Requested Items Status
-    {"system": "borrower", "key": "pending", "value": "Pending", "category": "requested_items_status", "description": "Request pending procurement"},
-    {"system": "borrower", "key": "procurement", "value": "Procurement", "category": "requested_items_status", "description": "Item is being procured"},
-    {"system": "borrower", "key": "cancelled", "value": "Cancelled", "category": "requested_items_status", "description": "Procurement cancelled (terminal)"},
-    {"system": "borrower", "key": "fulfilled", "value": "Fulfilled", "category": "requested_items_status", "description": "Item has been fulfilled (terminal)"},
 
     # Participants
     {"system": "borrower", "key": "witness", "value": "Witness", "category": "borrow_participants_role_in_request", "description": "Witness to the borrow transaction"},
@@ -196,7 +182,6 @@ SYSTEM_CONFIGS = [
     {"system": "admin", "key": "inventory_unit", "value": "Inventory Unit", "category": "audit_logs_entity_type", "description": "Inventory unit entity"},
     {"system": "admin", "key": "inventory_movement", "value": "Inventory Movement", "category": "audit_logs_entity_type", "description": "Inventory movement entity"},
     {"system": "admin", "key": "borrow_request", "value": "Borrow Request", "category": "audit_logs_entity_type", "description": "Borrow request entity"},
-    {"system": "admin", "key": "requested_item", "value": "Requested Item", "category": "audit_logs_entity_type", "description": "Requested item entity"},
     {"system": "admin", "key": "user", "value": "User", "category": "audit_logs_entity_type", "description": "User entity"},
     {"system": "admin", "key": "system_setting", "value": "System Setting", "category": "audit_logs_entity_type", "description": "System configuration entity"},
     {"system": "admin", "key": "audit_log", "value": "Audit Log", "category": "audit_logs_entity_type", "description": "System audit log entity"},
@@ -208,8 +193,6 @@ SYSTEM_CONFIGS = [
     {"system": "admin", "key": "reject", "value": "Reject", "category": "audit_logs_action", "description": "Request rejected"},
     {"system": "admin", "key": "release", "value": "Release", "category": "audit_logs_action", "description": "Items released"},
     {"system": "admin", "key": "return", "value": "Return", "category": "audit_logs_action", "description": "Items returned"},
-    {"system": "admin", "key": "warehouse_approve", "value": "Warehouse Approve", "category": "audit_logs_action", "description": "Warehouse approval"},
-    {"system": "admin", "key": "warehouse_reject", "value": "Warehouse Reject", "category": "audit_logs_action", "description": "Warehouse rejection"},
     {"system": "admin", "key": "assign", "value": "Assign", "category": "audit_logs_action", "description": "Units assigned"},
     {"system": "admin", "key": "adjust_stock", "value": "Adjust Stock", "category": "audit_logs_action", "description": "Stock adjustment"},
     {"system": "admin", "key": "transition", "value": "Transition", "category": "audit_logs_action", "description": "Status transition"},
@@ -245,7 +228,7 @@ RBAC_ROLES = [
         "permissions": [
              "auth:session:manage", "inventory:items:manage", "inventory:items:view", "inventory:units:manage",
              "inventory:units:view", "inventory:movements:manage", "inventory:movements:view",
-             "inventory:borrow_requests:manage", "inventory:warehouse:manage", "inventory:requested_items:manage",
+               "inventory:borrow_requests:manage",
              "inventory:dashboard:view", "inventory:audit:view", "inventory:borrower_portal:access", "inventory:config:manage",
         ],
     },
@@ -263,7 +246,7 @@ RBAC_ROLES = [
         "display_name": "Borrower",
         "systems": ["inventory"],
         "permissions": [
-            "auth:session:manage", "inventory:borrower_portal:access", "inventory:requested_items:manage", "inventory:items:view",
+            "auth:session:manage", "inventory:borrower_portal:access", "inventory:items:view",
         ],
     },
     {
@@ -271,7 +254,7 @@ RBAC_ROLES = [
         "display_name": "Employee",
         "systems": ["inventory"],
         "permissions": [
-            "auth:session:manage", "inventory:items:view", "inventory:requested_items:manage", "inventory:borrower_portal:access",
+            "auth:session:manage", "inventory:items:view", "inventory:borrower_portal:access",
         ],
     },
     {
@@ -287,7 +270,7 @@ RBAC_ROLES = [
         "display_name": "Finance Manager",
         "systems": ["inventory"],
         "permissions": [
-            "auth:session:manage", "inventory:items:view", "inventory:movements:view", "inventory:requested_items:manage",
+            "auth:session:manage", "inventory:items:view", "inventory:movements:view",
             "inventory:dashboard:view", "inventory:audit:view",
         ],
     },

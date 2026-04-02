@@ -97,7 +97,7 @@ export default function BorrowsPage() {
 
   useEffect(() => {
     records.forEach(record => {
-      if (['approved', 'warehouse_approved'].includes(record.status) && !assignmentsMap[record.request_id]) {
+      if (record.status === 'approved' && !assignmentsMap[record.request_id]) {
         fetchAssignments(record.request_id);
       }
     });
