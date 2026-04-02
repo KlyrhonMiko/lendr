@@ -1,10 +1,12 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, field_serializer
+from pydantic import BaseModel, ConfigDict, field_serializer
 
 from utils.time_utils import format_datetime
 
 class AuditLogRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     audit_id: str
 
     entity_type: str
@@ -28,5 +30,3 @@ class AuditLogRead(BaseModel):
     def serialize_dates(self, dt: datetime | None) -> str | None:
         return format_datetime(dt) if dt else None
 
-    class Config:
-        from_attributes = True

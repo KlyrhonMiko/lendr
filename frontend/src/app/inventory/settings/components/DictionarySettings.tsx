@@ -4,21 +4,16 @@ import { useState } from 'react';
 import { 
   Plus, 
   Search, 
-  Filter, 
   Edit2, 
   Trash2, 
   Check, 
   X, 
-  ChevronRight, 
-  MoreVertical,
   BookOpen,
-  Calendar,
   Layers,
   Lock,
   Key as KeyIcon,
-  Type
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { toast } from 'sonner';
@@ -37,7 +32,6 @@ interface DictionarySettingsProps {
   onCategoryFilterChange: (val: string) => void;
   onPageChange: (page: number) => void;
   onPerPageChange: (perPage: number) => void;
-  onEdit: (setting: SystemSetting) => void;
   onDelete: (key: string, category: string) => void;
   onAdd: (data: SystemSettingCreate) => Promise<void>;
 }
@@ -53,7 +47,6 @@ export function DictionarySettings({
   onCategoryFilterChange,
   onPageChange,
   onPerPageChange,
-  onEdit,
   onDelete,
   onAdd
 }: DictionarySettingsProps) {

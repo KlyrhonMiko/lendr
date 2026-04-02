@@ -1,7 +1,5 @@
 'use client';
 
-import { Plus, RefreshCw } from 'lucide-react';
-
 export function SettingsHeader() {
   return (
     <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-border/50">

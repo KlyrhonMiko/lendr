@@ -3,6 +3,8 @@ import sys
 from pathlib import Path
 from logging.handlers import TimedRotatingFileHandler
 
+from core.request_context import get_correlation_id
+
 # ANSI colors for console output
 COLORS = {
     "DEBUG": "\033[94m",    # Blue
@@ -14,6 +16,12 @@ COLORS = {
     "BOLD": "\033[1m",
     "CYAN": "\033[96m",
 }
+
+
+class CorrelationIdFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.correlation_id = get_correlation_id()
+        return True
 
 class ColoredFormatter(logging.Formatter):
     """Custom formatter for terminal output with colors."""
@@ -28,12 +36,16 @@ class ColoredFormatter(logging.Formatter):
         
         # Source module (e.g. core.init)
         source = f"{bold}{COLORS['CYAN']}[{record.name}]{reset}"
+        correlation_id = getattr(record, "correlation_id", "-")
         
         # Format: [TIME] [LEVEL] [SOURCE] MESSAGE
         message = super().format(record)
         
         # Replace the levelname with a colored version
-        log_fmt = f"{COLORS['RESET']}{timestamp} {bold}{color}{levelname:<8}{reset} {source} {message}"
+        log_fmt = (
+            f"{COLORS['RESET']}{timestamp} {bold}{color}{levelname:<8}{reset} "
+            f"{source} [cid={correlation_id}] {message}"
+        )
         return log_fmt
 
 def setup_logging(log_level: str = "INFO", log_dir: str = ".logs"):
@@ -52,10 +64,14 @@ def setup_logging(log_level: str = "INFO", log_dir: str = ".logs"):
     # Remove existing handlers to avoid duplicates
     if logger.hasHandlers():
         logger.handlers.clear()
+
+    correlation_filter = CorrelationIdFilter()
+    logger.addFilter(correlation_filter)
         
     # 1. Console Handler (Colored)
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(ColoredFormatter("%(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
+    console_handler.addFilter(correlation_filter)
     logger.addHandler(console_handler)
     
     # 2. File Handler (Rotating)
@@ -64,10 +80,11 @@ def setup_logging(log_level: str = "INFO", log_dir: str = ".logs"):
         app_log_file, when="midnight", interval=1, backupCount=30, encoding="utf-8"
     )
     file_formatter = logging.Formatter(
-        "[%(asctime)s] [%(levelname)-8s] [%(name)s] %(message)s",
+        "[%(asctime)s] [%(levelname)-8s] [%(name)s] [cid=%(correlation_id)s] %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S"
     )
     file_handler.setFormatter(file_formatter)
+    file_handler.addFilter(correlation_filter)
     logger.addHandler(file_handler)
     
     # Suppress noisy third-party loggers if needed

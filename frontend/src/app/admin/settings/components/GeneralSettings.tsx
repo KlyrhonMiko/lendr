@@ -5,8 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select } from '@/components/ui/select';
 import { Globe, Mail, Save, Send, AlertCircle, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { toast } from 'sonner';
-import { api } from '@/lib/api';
 import { useGeneralSettings, useGeneralMutations } from '../lib/useSettingsQueries';
 import type { GeneralSettingsData } from '../api';
 

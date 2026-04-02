@@ -1,6 +1,6 @@
 from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 from utils.time_utils import format_datetime
 
@@ -20,7 +20,7 @@ class InventoryUnitCreate(InventoryUnitBase):
 
 class InventoryUnitBatchCreate(BaseModel):
     """Batch create multiple units for an inventory item."""
-    units: list[InventoryUnitBase] = Field(min_items=1, max_items=500)
+    units: list[InventoryUnitBase] = Field(min_length=1, max_length=500)
 
 
 class InventoryUnitUpdate(BaseModel):
@@ -32,6 +32,8 @@ class InventoryUnitUpdate(BaseModel):
 
 
 class InventoryUnitRead(InventoryUnitBase):
+    model_config = ConfigDict(from_attributes=True)
+
     """Unit read schema with server-assigned fields."""
     unit_id: str
     condition: str
@@ -45,5 +47,3 @@ class InventoryUnitRead(InventoryUnitBase):
             return None
         return format_datetime(dt)
 
-    class Config:
-        from_attributes = True

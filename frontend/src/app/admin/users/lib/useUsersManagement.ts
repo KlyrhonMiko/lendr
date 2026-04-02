@@ -1,9 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { toast } from 'sonner';
-import type { PaginationMeta } from '@/lib/api';
-import type { AuthConfig, User, UserListParams } from '../api';
+import { useEffect, useState } from 'react';
+import type { User, UserListParams } from '../api';
 import type { UserConfirmAction } from './types';
 import { useAdminUsers, useAdminUserConfigs, useAdminUserMutations } from './useUserQueries';
 

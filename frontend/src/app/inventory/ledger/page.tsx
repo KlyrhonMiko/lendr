@@ -1,10 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { ledgerApi, MovementLedgerParams, Anomaly, LedgerMovement } from './api';
+import { LedgerMovement } from './api';
 import { useLedgerMovements, useLedgerAnomalies, useReasonCodes, useLedgerMutations } from './lib/useLedgerQueries';
 import { Pagination } from '@/components/ui/Pagination';
-import type { PaginationMeta } from '@/lib/api';
 import { toast } from 'sonner';
 import type { MovementLedgerTab } from './components/MovementLedgerHeader';
 import { MovementLedgerHeader } from './components/MovementLedgerHeader';

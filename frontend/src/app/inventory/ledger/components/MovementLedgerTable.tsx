@@ -13,7 +13,6 @@ import {
   ShieldCheck,
   TrendingDown,
   TrendingUp,
-  X,
   Undo2,
 } from 'lucide-react';
 import type { Anomaly, LedgerMovement } from '../lib/types';

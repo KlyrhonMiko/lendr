@@ -1,6 +1,6 @@
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class UserBase(BaseModel):
@@ -34,8 +34,7 @@ class UserUpdate(UserBase):
 
 
 class UserRead(UserBase):
+    model_config = ConfigDict(from_attributes=True)
+
     user_id: str
     is_deleted: bool
-
-    class Config:
-        from_attributes = True

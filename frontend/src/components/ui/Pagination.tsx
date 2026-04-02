@@ -39,6 +39,20 @@ export function Pagination({
       </p>
 
       <div className="flex items-center gap-2">
+        {onPerPageChange && (
+          <select
+            value={perPage}
+            onChange={(event) => onPerPageChange(Number(event.target.value))}
+            className="h-8 rounded-lg border border-border bg-background px-2 text-xs text-muted-foreground focus:outline-none"
+          >
+            {perPageOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}/page
+              </option>
+            ))}
+          </select>
+        )}
+
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage <= 1}

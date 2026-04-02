@@ -1,9 +1,11 @@
 from datetime import datetime
 from typing import Any, Literal, Optional
-from pydantic import BaseModel, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from utils.time_utils import format_datetime
 
 class InventoryMovementRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     movement_id: str
 
     qty_change: int
@@ -30,10 +32,6 @@ class InventoryMovementRead(BaseModel):
     @field_serializer("occurred_at")
     def serialize_date(self, dt: datetime) -> str:
         return format_datetime(dt)
-
-    class Config:
-        from_attributes = True
-
 
 class InventoryMovementAdjust(BaseModel):
     qty_change: int = Field(..., allow_inf_nan=False)

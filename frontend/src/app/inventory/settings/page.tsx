@@ -1,11 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { AlertCircle } from 'lucide-react';
-import { inventorySettingsApi, SettingsListParams } from './api';
-import type { PaginationMeta } from '@/lib/api';
 import { toast } from 'sonner';
-import type { SystemSetting } from './lib/types';
 import type { InventorySettingsTab } from './components/InventorySettingsTabs';
 import { InventorySettingsHeader } from './components/InventorySettingsHeader';
 import { InventorySettingsTabs } from './components/InventorySettingsTabs';
@@ -46,10 +43,6 @@ export default function InventorySettingsPage() {
     }
   };
 
-  const handleEdit = (setting: SystemSetting) => {
-    toast.info(`Editing ${setting.key}`);
-  };
-
   return (
     <div className="w-full max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
       <InventorySettingsHeader />
@@ -80,7 +73,6 @@ export default function InventorySettingsPage() {
             onCategoryFilterChange={setCategoryFilter}
             onPageChange={setPage}
             onPerPageChange={setPerPage}
-            onEdit={handleEdit}
             onDelete={handleDelete}
             onAdd={async (data) => {
                try {

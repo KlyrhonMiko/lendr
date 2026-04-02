@@ -256,9 +256,9 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
         await inventoryApi.createUnitsBatch(itemId, batch);
         toast.success(`${batchCount} units created`);
       } else {
-        const { status, ...rest } = formData;
         await inventoryApi.createUnit(itemId, {
-          ...rest,
+          serial_number: formData.serial_number,
+          condition: formData.condition,
           expiration_date: formData.expiration_date || undefined,
           description: formData.description || undefined,
         });

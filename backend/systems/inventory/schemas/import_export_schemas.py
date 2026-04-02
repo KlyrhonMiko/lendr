@@ -1,10 +1,12 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional, Any
 from uuid import UUID
 from datetime import datetime
 from utils.time_utils import format_datetime
 
 class ImportHistoryRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     filename: str
     actor_id: UUID
@@ -21,9 +23,6 @@ class ImportHistoryRead(BaseModel):
         if isinstance(v, datetime):
             return format_datetime(v)
         return str(v)
-
-    class Config:
-        from_attributes = True
 
 class ImportResponse(BaseModel):
     history_id: UUID

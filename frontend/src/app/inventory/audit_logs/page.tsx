@@ -21,9 +21,7 @@ export default function InventoryAuditLogsPage() {
     setTimeframe,
     expandedAuditId,
     toggleExpand,
-    page,
     setPage,
-    perPage,
     setPerPage,
   } = useInventoryAuditLogsManagement();
 

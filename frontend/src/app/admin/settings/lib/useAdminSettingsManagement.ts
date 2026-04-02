@@ -1,9 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
-import type { PaginationMeta } from '@/lib/api';
-import { settingsApi, type SettingsListParams, type SystemSetting, type SystemSettingCreate } from '../api';
+import { type SettingsListParams, type SystemSetting, type SystemSettingCreate } from '../api';
 import { useDebounce } from './useDebounce';
 
 import { useAdminSettings, useAdminSettingLookups, useAdminSettingMutations, useAuthConfigurations } from './useSettingsQueries';
@@ -106,7 +105,7 @@ export function useAdminSettingsManagement() {
           toast.success('Settings saved');
         }
         resetForm();
-      } catch (err: unknown) {
+      } catch {
         // Error toast handled in mutation
       }
     },

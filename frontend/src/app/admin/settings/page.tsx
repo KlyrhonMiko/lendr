@@ -38,12 +38,9 @@ export default function SettingsPage() {
     setCategoryFilter,
     systemFilter,
     setSystemFilter,
-    page,
     setPage,
-    perPage,
     setPerPage,
     resetForm,
-    openEditModal,
     handleSave,
     handleDelete,
     handleRestore,
@@ -86,7 +83,6 @@ export default function SettingsPage() {
             onSystemFilterChange={setSystemFilter}
             onPageChange={setPage}
             onPerPageChange={setPerPage}
-            onEdit={openEditModal}
             onDelete={handleDelete}
             onOpenRestore={openRestoreModal}
             onOpenNew={openEditModalForNew}

@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Toggle } from '@/components/ui/toggle';
@@ -7,7 +8,6 @@ import { Input, Textarea } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Image as ImageIcon, Globe, Tablet, BellRing, Save, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { api } from '@/lib/api';
 import { useBrandingSettings, useBrandingMutations } from '../lib/useSettingsQueries';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -154,9 +154,12 @@ export function BrandingSettings() {
                 className="relative overflow-hidden border-2 border-dashed border-border rounded-xl p-8 flex flex-col items-center justify-center gap-3 bg-secondary/20 hover:bg-secondary/40 transition-colors cursor-pointer group h-[140px]"
               >
                 {settings.visual_identity.logo_url ? (
-                  <img 
+                  <Image
                     src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${settings.visual_identity.logo_url}`} 
                     alt="Logo Preview" 
+                    width={200}
+                    height={50}
+                    unoptimized
                     className="max-h-full max-w-full object-contain pointer-events-none"
                   />
                 ) : (
@@ -181,9 +184,12 @@ export function BrandingSettings() {
                   className="relative overflow-hidden border-2 border-dashed border-border rounded-xl p-4 flex flex-col items-center justify-center gap-2 bg-muted/10 hover:bg-muted/20 transition-colors cursor-pointer h-[70px]"
                 >
                   {settings.visual_identity.favicon_url ? (
-                    <img 
+                    <Image
                       src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${settings.visual_identity.favicon_url}`} 
                       alt="Favicon Preview" 
+                      width={32}
+                      height={32}
+                      unoptimized
                       className="w-8 h-8 object-contain pointer-events-none"
                     />
                   ) : (

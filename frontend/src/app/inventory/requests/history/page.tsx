@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { History, Search, Loader2, AlertCircle, User, Calendar, Tag, Info } from 'lucide-react';
 import { BorrowRequestEventGlobal } from '../api';
 import { useGlobalBorrowEvents } from '../lib/useRequestQueries';

@@ -3,15 +3,6 @@
 import { useEffect } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from './lib/useDashboardQueries';
-import type {
-  DashboardStats,
-  RecentTransaction,
-  LowStockItem,
-  PendingCounts,
-  CategoryBreakdown,
-  InventoryHealth,
-  BorrowingTrend,
-} from './lib/types';
 import { DashboardHeader } from './components/DashboardHeader';
 import { InventoryStatsGrid } from './components/InventoryStatsGrid';
 import { RecentTransactionsPanel } from './components/RecentTransactionsPanel';

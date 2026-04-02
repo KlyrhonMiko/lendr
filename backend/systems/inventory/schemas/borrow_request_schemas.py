@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field, field_serializer, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 
 from utils.time_utils import format_datetime
 
@@ -14,6 +14,8 @@ class BorrowRequestItemCreate(BaseModel):
 
 
 class BorrowRequestItemRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     """Schema for reading a single item in a borrow request."""
 
     item_id: str
@@ -35,10 +37,6 @@ class BorrowRequestItemRead(BaseModel):
                 data.__dict__.setdefault("is_trackable", data.inventory_item.is_trackable)
         return data
 
-    class Config:
-        from_attributes = True
-
-
 class BorrowRequestBase(BaseModel):
     notes: Optional[str] = Field(default=None, max_length=500)
 
@@ -58,6 +56,8 @@ class BorrowRequestUpdate(BaseModel):
 
 
 class BorrowRequestEventRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     event_id: str
     event_type: str
     actor_user_id: Optional[str] = None
@@ -69,15 +69,13 @@ class BorrowRequestEventRead(BaseModel):
     def serialize_date(self, dt: datetime) -> str:
         return format_datetime(dt)
 
-    class Config:
-        from_attributes = True
-
-
 class BorrowRequestEventGlobalRead(BorrowRequestEventRead):
     request_id: str
 
 
 class BorrowRequestUnitRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     borrow_unit_id: str
     unit_id: str
     serial_number: str | None = None
@@ -92,11 +90,9 @@ class BorrowRequestUnitRead(BaseModel):
     def serialize_dates(self, dt: datetime | None) -> str | None:
         return format_datetime(dt)
 
-    class Config:
-        from_attributes = True
-
-
 class BorrowRequestBatchRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     borrow_batch_id: str
     batch_id: str
     qty_assigned: int
@@ -107,10 +103,6 @@ class BorrowRequestBatchRead(BaseModel):
     @field_serializer("assigned_at", "released_at", "returned_at")
     def serialize_dates(self, dt: datetime | None) -> str | None:
         return format_datetime(dt)
-
-    class Config:
-        from_attributes = True
-
 
 class BorrowRequestRead(BaseModel):
     request_id: str

@@ -2,7 +2,7 @@
 
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 import { tokenStore } from '@/lib/tokenStore';
-import { logger } from '@/lib/logger';
+import { getCorrelationId, logger, setCorrelationId } from '@/lib/logger';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -20,12 +20,14 @@ export interface ApiResponse<T> {
   message?: string;
   meta?: PaginationMeta;
   error_type?: string;
+  correlation_id?: string;
 }
 
 interface ErrorPayload {
   message?: string;
   detail?: string;
   error_type?: string;
+  correlation_id?: string;
 }
 
 export class HttpRequestError extends Error {
@@ -92,6 +94,7 @@ export const http = {
   ): Promise<ApiResponse<T>> => {
     const token = http.getToken();
     const deviceId = await getDeviceId();
+    const correlationId = getCorrelationId();
 
     const headers = new Headers(options.headers);
     if (!(options.body instanceof FormData)) {
@@ -100,23 +103,35 @@ export const http = {
     if (token) {
       headers.set('Authorization', `Bearer ${token}`);
     }
-    
+
     headers.set('X-Device-ID', deviceId);
+    if (correlationId) {
+      headers.set('X-Correlation-ID', correlationId);
+    }
 
     const response = await fetch(`${API_BASE_URL}/api${url}`, {
       ...options,
       headers,
     });
 
+    const responseCorrelationId = response.headers.get('X-Correlation-ID');
+    if (responseCorrelationId) {
+      setCorrelationId(responseCorrelationId);
+    }
+
     if (!response.ok) {
       const errorData = (await response.json().catch(() => ({}))) as ErrorPayload;
+      const errorPayload: ErrorPayload = {
+        ...errorData,
+        correlation_id: errorData.correlation_id ?? responseCorrelationId ?? undefined,
+      };
       
       // Handle Maintenance Mode
-      if (response.status === 503 && errorData.error_type === 'MaintenanceMode') {
+      if (response.status === 503 && errorPayload.error_type === 'MaintenanceMode') {
         if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('lendr:maintenance-started', { detail: errorData.message }));
+          window.dispatchEvent(new CustomEvent('lendr:maintenance-started', { detail: errorPayload.message }));
         }
-        throw new MaintenanceError(errorData.message || 'System under maintenance');
+        throw new MaintenanceError(errorPayload.message || 'System under maintenance');
       }
 
       // Handle 401 (Unauthorized)
@@ -134,8 +149,8 @@ export const http = {
 
       throw new HttpRequestError(
         response.status,
-        errorData.message || errorData.detail || 'An error occurred during the request',
-        errorData,
+        errorPayload.message || errorPayload.detail || 'An error occurred during the request',
+        errorPayload,
       );
     }
 

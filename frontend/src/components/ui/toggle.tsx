@@ -9,7 +9,7 @@ interface ToggleProps extends React.InputHTMLAttributes<HTMLInputElement> {
 export const Toggle = React.forwardRef<HTMLInputElement, ToggleProps>(
   ({ className, label, ...props }, ref) => {
     return (
-      <label className="relative inline-flex items-center cursor-pointer group">
+      <label className={`relative inline-flex items-center cursor-pointer group ${className ?? ''}`}>
         <input
           type="checkbox"
           className="sr-only peer"

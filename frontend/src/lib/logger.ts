@@ -1,6 +1,39 @@
 type LogContext = Record<string, unknown>;
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
+const CORRELATION_ID_KEY = 'lendr_last_correlation_id';
+
+export function setCorrelationId(correlationId: string | null | undefined): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  if (!correlationId) {
+    window.sessionStorage.removeItem(CORRELATION_ID_KEY);
+    return;
+  }
+
+  window.sessionStorage.setItem(CORRELATION_ID_KEY, correlationId);
+}
+
+export function getCorrelationId(): string | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  return window.sessionStorage.getItem(CORRELATION_ID_KEY);
+}
+
+function withCorrelationContext(context?: LogContext): LogContext | undefined {
+  const correlationId = getCorrelationId();
+  if (!correlationId) {
+    return context;
+  }
+
+  return {
+    correlationId,
+    ...(context ?? {}),
+  };
+}
 
 function writeLog(level: 'debug' | 'info' | 'warn' | 'error', message: string, context?: LogContext): void {
   if (!isDevelopment && level !== 'warn' && level !== 'error') {
@@ -8,10 +41,11 @@ function writeLog(level: 'debug' | 'info' | 'warn' | 'error', message: string, c
   }
 
   const prefix = `[lendr] ${message}`;
+  const logContext = withCorrelationContext(context);
 
   if (level === 'debug') {
-    if (context) {
-      console.debug(prefix, context);
+    if (logContext) {
+      console.debug(prefix, logContext);
       return;
     }
     console.debug(prefix);
@@ -19,8 +53,8 @@ function writeLog(level: 'debug' | 'info' | 'warn' | 'error', message: string, c
   }
 
   if (level === 'info') {
-    if (context) {
-      console.info(prefix, context);
+    if (logContext) {
+      console.info(prefix, logContext);
       return;
     }
     console.info(prefix);
@@ -28,16 +62,16 @@ function writeLog(level: 'debug' | 'info' | 'warn' | 'error', message: string, c
   }
 
   if (level === 'warn') {
-    if (context) {
-      console.warn(prefix, context);
+    if (logContext) {
+      console.warn(prefix, logContext);
       return;
     }
     console.warn(prefix);
     return;
   }
 
-  if (context) {
-    console.error(prefix, context);
+  if (logContext) {
+    console.error(prefix, logContext);
     return;
   }
   console.error(prefix);

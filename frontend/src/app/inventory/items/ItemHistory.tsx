@@ -19,7 +19,7 @@ export function ItemHistory({ itemId, onClose }: ItemHistoryProps) {
     try {
       const historyRes = await inventoryApi.getHistory(itemId);
       setHistory(historyRes.data);
-    } catch (err: unknown) {
+    } catch {
       toast.error('Failed to load item activity');
     } finally {
       setLoading(false);

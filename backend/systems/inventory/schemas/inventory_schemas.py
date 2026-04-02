@@ -1,6 +1,6 @@
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class InventoryItemBase(BaseModel):
@@ -21,6 +21,8 @@ class InventoryItemUpdate(InventoryItemBase):
     condition: Optional[str] = Field(default=None, max_length=100)
 
 class InventoryItemRead(InventoryItemBase):
+    model_config = ConfigDict(from_attributes=True)
+
     item_id: str
     total_qty: int
     available_qty: int
@@ -30,11 +32,9 @@ class InventoryItemRead(InventoryItemBase):
     description: Optional[str] = None
     status_condition: Optional[str] = None
     
-    class Config:
-        from_attributes = True
-
-
 class InventoryCatalogItemRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     item_id: str
     name: str
     category: Optional[str] = None
@@ -46,7 +46,5 @@ class InventoryCatalogItemRead(BaseModel):
     description: Optional[str] = None
     status_condition: Optional[str] = None
 
-    class Config:
-        from_attributes = True
 
 

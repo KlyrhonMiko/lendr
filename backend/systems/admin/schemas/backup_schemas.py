@@ -1,11 +1,13 @@
 from datetime import datetime
 from typing import Literal, Optional
-from pydantic import BaseModel, field_serializer
+from pydantic import BaseModel, ConfigDict, field_serializer
 
 from utils.time_utils import format_datetime
 
 
 class BackupArtifactRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     artifact_id: str
 
     target_type: str
@@ -19,11 +21,9 @@ class BackupArtifactRead(BaseModel):
     def serialize_created_at(self, dt: datetime) -> str:
         return format_datetime(dt)
 
-    class Config:
-        from_attributes = True
-
-
 class BackupRunRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     backup_id: str
 
     started_at: datetime
@@ -36,10 +36,6 @@ class BackupRunRead(BaseModel):
     @field_serializer("started_at", "completed_at")
     def serialize_run_timestamps(self, dt: datetime | None) -> str:
         return format_datetime(dt)
-
-    class Config:
-        from_attributes = True
-
 
 class BackupTrigger(BaseModel):
     destination: Literal["local"] = "local"

@@ -3,7 +3,7 @@ from uuid import UUID
 
 from sqlalchemy import Index, text, Column, JSON
 from sqlmodel import Field, Relationship
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .borrow_request_event import BorrowRequestEvent

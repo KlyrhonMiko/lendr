@@ -24,7 +24,6 @@ interface CheckoutViewProps {
   employeeId: string;
   onEmployeeIdChange: (v: string) => void;
   employeePin: string;
-  onEmployeePinChange: (v: string) => void;
   customerName: string;
   onCustomerNameChange: (v: string) => void;
   locationName: string;
@@ -108,7 +107,6 @@ export function CheckoutView({
   employeeId,
   onEmployeeIdChange,
   employeePin,
-  onEmployeePinChange,
   customerName,
   onCustomerNameChange,
   locationName,

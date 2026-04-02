@@ -1,8 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { PaginationMeta } from '@/lib/api';
-import type { AuditLog, AuditLogParams } from '../api';
+import type { AuditLogParams } from '../api';
 import { useAdminAuditLogs } from './useAuditLogQueries';
 
 const DEFAULT_PER_PAGE = 10;

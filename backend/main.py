@@ -1,5 +1,7 @@
 from contextlib import asynccontextmanager
 import time
+from uuid import uuid4
+
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
@@ -10,6 +12,7 @@ from sqlmodel import Session
 from core.database import engine
 from core.config import settings
 from core.initialization_service import InitializationService
+from core.request_context import reset_correlation_id, set_correlation_id
 from core.schemas import create_error_response
 from utils.logging import setup_logging, get_logger, setup_health_logging, log_operation
 
@@ -97,6 +100,13 @@ def _docs_content_security_policy() -> str:
         "font-src 'self' https://cdn.jsdelivr.net"
     )
 
+
+def _resolve_request_correlation_id(request: Request) -> str:
+    incoming = request.headers.get("X-Correlation-ID", "").strip()
+    if incoming:
+        return incoming[:128]
+    return f"req-{uuid4().hex}"
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # System Initialization
@@ -151,12 +161,17 @@ app.mount("/api/assets", StaticFiles(directory="assets"), name="assets")
 @app.middleware("http")
 async def logging_middleware(request: Request, call_next):
     """Global middleware to log every request and its outcome."""
+    correlation_id = _resolve_request_correlation_id(request)
+    request.state.correlation_id = correlation_id
+    context_token = set_correlation_id(correlation_id)
     start_time = time.time()
-    
+
     try:
         response = await call_next(request)
         process_time = round((time.time() - start_time) * 1000, 2)
-        
+
+        response.headers.setdefault("X-Correlation-ID", correlation_id)
+
         # Log basic request info
         logger.info(
             f"{request.method} {request.url.path} - {response.status_code} ({process_time}ms)"
@@ -170,6 +185,8 @@ async def logging_middleware(request: Request, call_next):
             exc_info=True
         )
         raise e
+    finally:
+        reset_correlation_id(context_token)
 
 
 @app.middleware("http")

@@ -6,10 +6,7 @@ import { Toggle } from '@/components/ui/toggle';
 import { Input, Textarea } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Wrench, Database, Archive, Trash2, Clock, RefreshCw, FileText, Save, Plus } from 'lucide-react';
-import { toast } from 'sonner';
-import { api } from '@/lib/api';
 import { ArchivesModal } from './ArchivesModal';
-import { archivesApi } from '../api';
 import { useOperationsSettings, useBackupRuns, useOperationsMutations, useBackupMutations } from '../lib/useSettingsQueries';
 
 interface OperationsSettingsData {
@@ -37,18 +34,6 @@ interface OperationsSettingsData {
   };
 }
 
-interface BackupRun {
-  backup_id: string;
-  started_at: string;
-  completed_at: string | null;
-  status: string;
-  destination: string;
-  artifacts: Array<{
-    artifact_id: string;
-    size_bytes: number;
-  }>;
-}
-
 export function OperationsSettings() {
   const [newExclusion, setNewExclusion] = useState('');
   const [showArchives, setShowArchives] = useState(false);
@@ -60,7 +45,7 @@ export function OperationsSettings() {
 
   // Mutations
   const { updateOperations } = useOperationsMutations();
-  const { triggerBackup, deleteBackup } = useBackupMutations();
+  const { deleteBackup } = useBackupMutations();
 
   const data = localData || operationsRes?.data || null;
   const backups = backupRunsRes?.data || [];

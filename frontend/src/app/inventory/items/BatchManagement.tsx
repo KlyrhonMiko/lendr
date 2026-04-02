@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { inventoryApi, InventoryBatch, ConfigRead, StockAdjustmentPayload } from './api';
+import { inventoryApi, InventoryBatch, StockAdjustmentPayload } from './api';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { useInventoryBatches } from './lib/useItemQueries';
-import { X, Plus, Edit2, Loader2, AlertCircle, Layers, History, TrendingUp, TrendingDown } from 'lucide-react';
+import { X, Plus, Edit2, Loader2, Layers, History, TrendingUp, TrendingDown } from 'lucide-react';
 import { toast } from 'sonner';
-import { cn, parseSystemDate } from '@/lib/utils';
+import { parseSystemDate } from '@/lib/utils';
 
 interface BatchManagementProps {
   itemId: string;
@@ -33,9 +33,8 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
     note: '',
   });
 
-  const { data: batchesResponse, isLoading: batchesLoading, error: batchesError } = useInventoryBatches(itemId, {});
+  const { data: batchesResponse, isLoading: batchesLoading } = useInventoryBatches(itemId, {});
   const batches = batchesResponse?.data || [];
-  const error = batchesError ? (batchesError as Error).message : null;
 
   const { data: configs } = useQuery({
     queryKey: ['inventory', 'configs', 'movements'],
