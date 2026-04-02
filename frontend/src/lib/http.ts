@@ -22,6 +22,24 @@ export interface ApiResponse<T> {
   error_type?: string;
 }
 
+interface ErrorPayload {
+  message?: string;
+  detail?: string;
+  error_type?: string;
+}
+
+export class HttpRequestError extends Error {
+  status: number;
+  payload: ErrorPayload;
+
+  constructor(status: number, message: string, payload: ErrorPayload = {}) {
+    super(message);
+    this.name = 'HttpRequestError';
+    this.status = status;
+    this.payload = payload;
+  }
+}
+
 export class MaintenanceError extends Error {
   constructor(message: string) {
     super(message);
@@ -91,7 +109,7 @@ export const http = {
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
+      const errorData = (await response.json().catch(() => ({}))) as ErrorPayload;
       
       // Handle Maintenance Mode
       if (response.status === 503 && errorData.error_type === 'MaintenanceMode') {
@@ -114,7 +132,11 @@ export const http = {
         }
       }
 
-      throw new Error(errorData.message || errorData.detail || 'An error occurred during the request');
+      throw new HttpRequestError(
+        response.status,
+        errorData.message || errorData.detail || 'An error occurred during the request',
+        errorData,
+      );
     }
 
     return response.json();

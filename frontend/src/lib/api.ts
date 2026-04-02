@@ -1,8 +1,13 @@
 'use client';
 
-import { http, MaintenanceError, getDeviceId, ApiResponse, PaginationMeta } from './http';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import {
+  http,
+  HttpRequestError,
+  MaintenanceError,
+  getDeviceId,
+  ApiResponse,
+  PaginationMeta,
+} from './http';
 
 export { MaintenanceError };
 export type { ApiResponse, PaginationMeta };
@@ -32,6 +37,11 @@ interface ErrorPayload {
   detail?: string;
 }
 
+interface AuthTokenResponse {
+  access_token: string;
+  token_type: string;
+}
+
 export class AuthApiError extends Error {
   status: number;
 
@@ -46,6 +56,25 @@ function resolveAuthErrorMessage(payload: ErrorPayload, fallback: string): strin
   return payload.message || payload.detail || fallback;
 }
 
+function toAuthApiError(error: unknown, fallback: string): AuthApiError {
+  if (error instanceof AuthApiError) {
+    return error;
+  }
+
+  if (error instanceof HttpRequestError) {
+    return new AuthApiError(
+      error.status,
+      resolveAuthErrorMessage(error.payload, fallback),
+    );
+  }
+
+  if (error instanceof Error) {
+    return new AuthApiError(500, error.message || fallback);
+  }
+
+  return new AuthApiError(500, fallback);
+}
+
 export const api = {
   getDeviceId,
 
@@ -54,45 +83,25 @@ export const api = {
     body.append('username', formData.username);
     body.append('password', formData.password);
 
-    const deviceId = await getDeviceId();
-
-    const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-      method: 'POST',
-      body,
-      headers: {
-        'X-Device-ID': deviceId,
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = (await response.json().catch(() => ({}))) as ErrorPayload;
-      throw new AuthApiError(
-        response.status,
-        resolveAuthErrorMessage(errorData, 'Invalid username or password'),
-      );
+    try {
+      return await http.request<AuthTokenResponse>('/auth/login', {
+        method: 'POST',
+        body,
+      });
+    } catch (error: unknown) {
+      throw toAuthApiError(error, 'Invalid username or password');
     }
-
-    return response.json();
   },
 
   rotateBootstrapPassword: async (payload: BootstrapRotatePasswordPayload) => {
-    const response = await fetch(`${API_BASE_URL}/api/auth/bootstrap/rotate-password`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const errorData = (await response.json().catch(() => ({}))) as ErrorPayload;
-      throw new AuthApiError(
-        response.status,
-        resolveAuthErrorMessage(errorData, 'Failed to rotate bootstrap password'),
-      );
+    try {
+      return await http.request('/auth/bootstrap/rotate-password', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    } catch (error: unknown) {
+      throw toAuthApiError(error, 'Failed to rotate bootstrap password');
     }
-
-    return response.json();
   },
 
   borrowerLogin: async (formData: LoginCredentials) => {
@@ -100,25 +109,14 @@ export const api = {
     body.append('username', formData.username);
     body.append('password', formData.password);
 
-    const deviceId = await getDeviceId();
-
-    const response = await fetch(`${API_BASE_URL}/api/auth/borrower/login`, {
-      method: 'POST',
-      body,
-      headers: {
-        'X-Device-ID': deviceId,
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = (await response.json().catch(() => ({}))) as ErrorPayload;
-      throw new AuthApiError(
-        response.status,
-        resolveAuthErrorMessage(errorData, 'Invalid borrower pin'),
-      );
+    try {
+      return await http.request<AuthTokenResponse>('/auth/borrower/login', {
+        method: 'POST',
+        body,
+      });
+    } catch (error: unknown) {
+      throw toAuthApiError(error, 'Invalid borrower pin');
     }
-
-    return response.json();
   },
 
   get: <T>(url: string) => http.request<T>(url, { method: 'GET' }),

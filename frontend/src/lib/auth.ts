@@ -1,4 +1,4 @@
-import { http } from '@/lib/http';
+import { http, HttpRequestError } from '@/lib/http';
 import { tokenStore } from '@/lib/tokenStore';
 
 export interface User {
@@ -11,10 +11,6 @@ export interface User {
   role: string;
   is_active?: boolean;
 }
-
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
 let logoutTimer: NodeJS.Timeout | null = null;
 let lastActivityTime = Date.now();
 let listenersBound = false;
@@ -93,18 +89,24 @@ export const auth = {
           } else if (timeRemaining <= REFRESH_THRESHOLD) {
             if (now - lastActivityTime < IDLE_TIMEOUT) {
               try {
-                const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+                const refreshResponse = await http.request<{ access_token: string }>('/auth/refresh', {
                   method: 'POST',
-                  headers: { 'Authorization': `Bearer ${currentToken}` }
+                  headers: { Authorization: `Bearer ${currentToken}` },
                 });
-                if (response.ok) {
-                  const data = await response.json();
-                  // Update the token in storage, this restarts the cycle
-                  tokenStore.setToken(data.access_token);
-                } else if (response.status === 401) {
+
+                const refreshedToken =
+                  (refreshResponse as { access_token?: string }).access_token ||
+                  refreshResponse.data?.access_token;
+
+                if (refreshedToken) {
+                  // Update the token in storage, this restarts the cycle.
+                  tokenStore.setToken(refreshedToken);
+                }
+              } catch (error: unknown) {
+                if (error instanceof HttpRequestError && error.status === 401) {
                   auth.logout();
                 }
-              } catch {
+
                 // Keep existing token until expiry if refresh fails transiently.
               }
             } else {
@@ -149,7 +151,7 @@ export const auth = {
 
       if (token) {
         try {
-          await fetch(`${API_BASE_URL}/api/auth/logout`, {
+          await http.request('/auth/logout', {
             method: 'POST',
             headers: {
               Authorization: `Bearer ${token}`,
