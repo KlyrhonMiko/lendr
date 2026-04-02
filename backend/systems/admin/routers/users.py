@@ -39,7 +39,7 @@ async def register_user(
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_permission("admin:users:manage")),
 ):
-    user = user_service.create(session, user_data)
+    user = user_service.create(session, user_data, actor_id=current_user.id)
     _commit_and_refresh(session, user)
     return create_success_response(
         data=user, message="User registered successfully", request=request
@@ -118,7 +118,12 @@ async def update_user(
         raise HTTPException(status_code=404, detail="User not found")
 
     should_revoke_sessions = user_service.requires_session_revocation(user, user_data)
-    updated_user = user_service.update(session, user, user_data)
+    updated_user = user_service.update(
+        session,
+        user,
+        user_data,
+        actor_id=current_user.id,
+    )
 
     message = "User updated successfully"
     if should_revoke_sessions:
@@ -149,7 +154,7 @@ async def delete_user(
     user = user_service.get(session, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    deleted_user = user_service.delete(session, user)
+    deleted_user = user_service.delete(session, user, actor_id=current_user.id)
     session.commit()
     session.refresh(deleted_user)
 
@@ -173,7 +178,7 @@ async def restore_user(
     user = user_service.get(session, user_id, include_deleted=True)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    restored_user = user_service.restore(session, user)
+    restored_user = user_service.restore(session, user, actor_id=current_user.id)
     session.commit()
     session.refresh(restored_user)
 

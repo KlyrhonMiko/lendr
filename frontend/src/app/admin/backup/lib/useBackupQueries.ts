@@ -27,7 +27,7 @@ export function useBackupMutations() {
   const queryClient = useQueryClient();
 
   const triggerBackup = useMutation({
-    mutationFn: (data: { destination: string }) => backupApi.triggerBackup(data),
+    mutationFn: (data: { destination: 'local' }) => backupApi.triggerBackup(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'backups', 'runs'] });
       toast.success('Backup triggered successfully');

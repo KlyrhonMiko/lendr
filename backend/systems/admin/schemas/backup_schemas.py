@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 from pydantic import BaseModel, field_serializer
 
 from utils.time_utils import format_datetime
@@ -42,4 +42,4 @@ class BackupRunRead(BaseModel):
 
 
 class BackupTrigger(BaseModel):
-    destination: str = "local"  # local, s3, both
+    destination: Literal["local"] = "local"

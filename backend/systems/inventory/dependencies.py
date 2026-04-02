@@ -1,32 +1,45 @@
 from fastapi import Depends, HTTPException, status
 from sqlmodel import Session
 
-from core.database import get_session
+from core.database import engine
 from systems.admin.services.audit_service import audit_service
 from systems.admin.models.user import User
 from core.deps import get_current_user
 
+
+def _log_shift_guard_bypass(actor_id, shift_type: str | None, role: str | None) -> None:
+    """Persist shift-guard bypass telemetry without committing request session state."""
+    try:
+        with Session(engine) as audit_session:
+            audit_service.log_action(
+                db=audit_session,
+                entity_type="security",
+                entity_id="shift_guard",
+                action="admin_shift_guard_bypass",
+                actor_id=actor_id,
+                after={
+                    "shift_type": shift_type,
+                    "role": role,
+                },
+            )
+            audit_session.commit()
+    except Exception:
+        # Shift guard enforcement should not fail due to telemetry write issues.
+        pass
+
 def shift_guard(
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
 ):
     """Prevents inventory changes during unauthorized shifts."""
     shift_type = (current_user.shift_type or "").lower()
     role = (current_user.role or "").lower()
 
     if shift_type == "night" and role == "admin":
-        audit_service.log_action(
-            db=session,
-            entity_type="security",
-            entity_id="shift_guard",
-            action="admin_shift_guard_bypass",
-            actor_id=current_user.id,
-            after={
-                "shift_type": current_user.shift_type,
-                "role": current_user.role,
-            },
+        _log_shift_guard_bypass(
+            current_user.id,
+            current_user.shift_type,
+            current_user.role,
         )
-        session.commit()
         return current_user
 
     if shift_type == "night" and role != "admin":

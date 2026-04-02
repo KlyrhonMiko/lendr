@@ -1,4 +1,5 @@
 from typing import Optional
+from uuid import UUID
 from sqlmodel import Session, select, func, or_
 
 from core.base_service import BaseService
@@ -78,7 +79,12 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
 
         return list(results), total
 
-    def create(self, session: Session, schema: UserCreate) -> User:
+    def create(
+        self,
+        session: Session,
+        schema: UserCreate,
+        actor_id: UUID | None = None,
+    ) -> User:
         from systems.auth.services.configuration_service import AuthConfigService
         self.config_service = AuthConfigService()
         self.validate_uniqueness(
@@ -110,11 +116,27 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
 
         db_obj = self.model(**data)
         session.add(db_obj)
+
+        self._log_audit(
+            session=session,
+            action="created",
+            entity_id=db_obj.user_id,
+            after=db_obj.model_dump(mode="json"),
+            actor_id=actor_id,
+        )
+
         session.flush()
         session.refresh(db_obj)
         return db_obj
 
-    def update(self, session: Session, db_obj: User, schema: UserUpdate) -> User:
+    def update(
+        self,
+        session: Session,
+        db_obj: User,
+        schema: UserUpdate,
+        actor_id: UUID | None = None,
+    ) -> User:
+        before = db_obj.model_dump(mode="json")
         obj_data = schema.model_dump(exclude_unset=True)
         if "password" in obj_data:
             password = obj_data.pop("password")
@@ -125,6 +147,16 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
 
         db_obj.updated_at = get_now_manila()
         session.add(db_obj)
+
+        self._log_audit(
+            session=session,
+            action="updated",
+            entity_id=db_obj.user_id,
+            before=before,
+            after=db_obj.model_dump(mode="json"),
+            actor_id=actor_id,
+        )
+
         session.flush()
         session.refresh(db_obj)
         return db_obj
