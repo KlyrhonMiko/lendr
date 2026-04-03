@@ -17,7 +17,18 @@ from systems.admin.models.user import User
 from systems.admin.services.audit_service import audit_service
 from systems.admin.schemas.user_schemas import UserRead
 from systems.auth.dependencies import get_current_user, require_permission, reusable_oauth2
-from systems.auth.schemas.auth_schemas import BootstrapPasswordRotateRequest, RolePolicyRead, Token
+from systems.auth.schemas.auth_schemas import (
+    BootstrapPasswordRotateRequest,
+    RolePolicyRead,
+    SessionPolicyRead,
+    Token,
+    TwoFactorChallengeRead,
+    TwoFactorChallengeVerifyRequest,
+    TwoFactorCodeVerifyRequest,
+    TwoFactorDisableRequest,
+    TwoFactorEnrollmentInitiateRead,
+    TwoFactorStatusRead,
+)
 from systems.auth.services.auth_service import AuthService
 from systems.auth.services.rbac_service import rbac_service
 from utils.logging import get_logger
@@ -32,6 +43,11 @@ BOOTSTRAP_ROTATION_REQUIRED_DETAIL = (
     "Use /api/auth/bootstrap/rotate-password before signing in."
 )
 AUTH_RATE_LIMIT_EXCEEDED_DETAIL = "Too many authentication attempts. Please try again later."
+TWO_FACTOR_ENROLLMENT_REQUIRED_DETAIL = (
+    "Two-factor authentication enrollment is required before login. "
+    "Sign in to an existing session and complete authenticator setup first."
+)
+TWO_FACTOR_VERIFY_FAILED_DETAIL = "Invalid or expired two-factor challenge or authenticator code."
 
 
 @dataclass(frozen=True)
@@ -76,14 +92,25 @@ logger = get_logger("auth")
 
 
 def _get_client_ip(request: Request) -> str:
-    forwarded_for = request.headers.get("X-Forwarded-For")
-    if forwarded_for:
-        return forwarded_for.split(",", maxsplit=1)[0].strip()
+    direct_client_ip = request.client.host if request.client and request.client.host else "unknown"
 
-    if request.client and request.client.host:
-        return request.client.host
+    if not settings.AUTH_TRUST_PROXY_HEADERS:
+        return direct_client_ip
 
-    return "unknown"
+    forwarded_for = request.headers.get("X-Forwarded-For", "")
+    if not forwarded_for:
+        return direct_client_ip
+
+    forwarded_chain = [value.strip() for value in forwarded_for.split(",") if value.strip()]
+    if not forwarded_chain:
+        return direct_client_ip
+
+    trusted_proxy_hops = max(settings.AUTH_TRUSTED_PROXY_HOPS, 1)
+    originating_client_index = len(forwarded_chain) - trusted_proxy_hops - 1
+    if originating_client_index < 0:
+        return direct_client_ip
+
+    return forwarded_chain[originating_client_index]
 
 
 def _normalize_identity(value: str) -> str:
@@ -175,7 +202,7 @@ def _enforce_auth_rate_limit(
             bucket.append(now)
 
 
-@router.post("/login", response_model=Token)
+@router.post("/login", response_model=Token | TwoFactorChallengeRead)
 async def login_for_access_token(
     request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
@@ -233,6 +260,55 @@ async def login_for_access_token(
             detail=BOOTSTRAP_ROTATION_REQUIRED_DETAIL,
         )
 
+    if auth_service.is_two_factor_required_for_user(session, user):
+        if not auth_service.has_active_two_factor_enrollment(session, user.id):
+            audit_service.log_action(
+                db=session,
+                entity_type="auth_2fa",
+                entity_id=user.user_id,
+                action="two_factor_login_allowed_bootstrap_pending",
+                actor_id=user.id,
+            )
+
+            access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+
+            db_session = auth_service.create_user_session(
+                session=session,
+                user_uuid=user.id,
+                expires_delta=access_token_expires,
+                device_id=device_id,
+            )
+
+            access_token = auth_service.create_access_token(
+                data={"sub": user.user_id, "session_id": db_session.session_id},
+                expires_delta=access_token_expires,
+            )
+
+            audit_service.log_action(
+                db=session,
+                entity_type="session",
+                entity_id=db_session.session_id,
+                action="login",
+                actor_id=user.id,
+            )
+            session.commit()
+
+            return Token(access_token=access_token, token_type="bearer")
+
+        challenge = auth_service.create_two_factor_login_challenge(
+            session=session,
+            user=user,
+            device_id=device_id,
+        )
+        session.commit()
+
+        return TwoFactorChallengeRead(
+            two_factor_required=True,
+            challenge_token=challenge.challenge_id,
+            challenge_expires_at=challenge.expires_at,
+            method="authenticator_app",
+        )
+
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
     db_session = auth_service.create_user_session(
@@ -256,6 +332,122 @@ async def login_for_access_token(
     )
     session.commit()
 
+    return Token(access_token=access_token, token_type="bearer")
+
+
+@router.post(
+    "/2fa/enroll/initiate",
+    response_model=GenericResponse[TwoFactorEnrollmentInitiateRead],
+)
+async def initiate_two_factor_enrollment(
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        enrollment = auth_service.begin_two_factor_enrollment(session, current_user)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    session.commit()
+    return create_success_response(
+        data=TwoFactorEnrollmentInitiateRead(**enrollment),
+        message="Two-factor enrollment initiated",
+        request=request,
+    )
+
+
+@router.post(
+    "/2fa/enroll/verify",
+    response_model=GenericResponse[TwoFactorStatusRead],
+)
+async def verify_two_factor_enrollment(
+    payload: TwoFactorCodeVerifyRequest,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        verified, enrolled_at = auth_service.verify_two_factor_enrollment(
+            session,
+            current_user,
+            payload.code,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    if not verified:
+        session.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authenticator code",
+        )
+
+    session.commit()
+    return create_success_response(
+        data=TwoFactorStatusRead(enabled=True, method="authenticator_app", enrolled_at=enrolled_at),
+        message="Two-factor authentication enabled",
+        request=request,
+    )
+
+
+@router.post("/2fa/disable", response_model=GenericResponse[TwoFactorStatusRead])
+async def disable_two_factor_enrollment(
+    payload: TwoFactorDisableRequest,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        disabled, _ = auth_service.disable_two_factor_enrollment(session, current_user, payload.code)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    if not disabled:
+        session.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authenticator code",
+        )
+
+    session.commit()
+    return create_success_response(
+        data=TwoFactorStatusRead(enabled=False, method="authenticator_app", enrolled_at=None),
+        message="Two-factor authentication disabled",
+        request=request,
+    )
+
+
+@router.post("/2fa/verify", response_model=Token)
+async def verify_two_factor_login_challenge(
+    payload: TwoFactorChallengeVerifyRequest,
+    request: Request,
+    session: Session = Depends(get_session),
+):
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    verification_result = auth_service.verify_two_factor_login_challenge(
+        session,
+        payload.challenge_token,
+        payload.code,
+        access_token_expires,
+    )
+
+    if not verification_result:
+        session.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=TWO_FACTOR_VERIFY_FAILED_DETAIL,
+        )
+
+    access_token, session_id, actor_id = verification_result
+    audit_service.log_action(
+        db=session,
+        entity_type="session",
+        entity_id=session_id,
+        action="login",
+        actor_id=actor_id,
+    )
+    session.commit()
     return Token(access_token=access_token, token_type="bearer")
 
 
@@ -416,6 +608,24 @@ async def get_my_policy(
     )
 
     return create_success_response(data=data, request=request)
+
+
+@router.get(
+    "/session-policy",
+    response_model=GenericResponse[SessionPolicyRead],
+    responses={401: {"model": GenericResponse}},
+)
+async def get_session_policy(
+    request: Request,
+    session: Session = Depends(get_session),
+    _: User = Depends(get_current_user),
+):
+    policy = auth_service.get_session_timeout_policy(session)
+
+    return create_success_response(
+        data=SessionPolicyRead(**policy),
+        request=request,
+    )
 
 
 @router.post("/refresh", response_model=Token)

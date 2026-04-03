@@ -171,6 +171,12 @@ class RBACService:
             },
         )
 
+    def get_role_policies(
+        self,
+        session: Session,
+    ) -> dict[str, dict[str, list[str] | str]]:
+        return self._build_policies(session)
+
     def has_system_access(self, session: Session, user: User, system: str) -> bool:
         policy = self.get_role_policy(session, user.role)
         allowed_systems = [str(value).lower() for value in policy.get("systems", [])]

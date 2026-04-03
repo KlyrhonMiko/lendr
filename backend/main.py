@@ -27,6 +27,7 @@ from systems.admin.routers.audit_log import router as admin_audit_log
 from systems.admin.routers.dashboard import router as admin_dashboard
 from systems.admin.routers.health import router as health
 from systems.admin.routers.operations_settings import router as operations_settings
+from systems.admin.routers.security_settings import router as security_settings
 from systems.admin.routers.archives import router as archives
 
 from systems.auth.dependencies import require_system_access
@@ -287,6 +288,7 @@ app.include_router(config, prefix="/api/admin/config", tags=["Admin - Configurat
 app.include_router(general_settings, prefix="/api/admin/settings/general", tags=["Admin - General Settings"], dependencies=admin_access)
 app.include_router(branding_settings, prefix="/api/admin/settings/branding", tags=["Admin - Branding Settings"], dependencies=admin_access)
 app.include_router(operations_settings, prefix="/api/admin/settings/operations", tags=["Admin - Operations Settings"], dependencies=admin_access)
+app.include_router(security_settings, prefix="/api/admin/settings/security", tags=["Admin - Security Settings"], dependencies=admin_access)
 app.include_router(archives, prefix="/api/admin/settings/operations/archives", tags=["Admin - Operations Settings"], dependencies=admin_access)
 app.include_router(roles_config, prefix="/api/admin/roles", tags=["Admin - Roles"], dependencies=admin_access)
 app.include_router(admin_audit_log, prefix="/api/admin/audit-log", tags=["Admin - Audit Logs"], dependencies=admin_access)

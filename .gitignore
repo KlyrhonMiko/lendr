@@ -3,6 +3,9 @@
 #backups
 .backups/
 
+#vscode
+.vscode/
+
 #documentation
 .documentation/
 

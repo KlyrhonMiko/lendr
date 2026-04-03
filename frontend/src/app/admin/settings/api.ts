@@ -157,6 +157,73 @@ export interface OperationsSettingsData {
   };
 }
 
+export interface SecurityTwoFactorSettings {
+  enabled: boolean;
+  method: 'authenticator_app';
+  enforce_for_roles: string[];
+  enforce_on: 'next_login';
+}
+
+export interface SecurityPasswordRulesSettings {
+  min_length: number;
+  require_uppercase: boolean;
+  require_lowercase: boolean;
+  require_number: boolean;
+  require_special: boolean;
+  applies_when_role_not_in: string[];
+}
+
+export interface SecuritySessionTimeoutSettings {
+  inactive_minutes: number;
+  warning_minutes: number;
+}
+
+export interface SecurityRbacOverviewSettings {
+  policy_source: 'rbac_roles';
+  last_updated_at: string | null;
+  role_definitions: SecurityRbacRoleDefinition[];
+}
+
+export interface SecurityRbacRoleDefinition {
+  role: string;
+  display_name: string;
+  systems: string[];
+  permissions: string[];
+  user_count: number;
+}
+
+export interface SecurityShiftDefinition {
+  key: string;
+  label: string;
+  start: string;
+  end: string;
+  days: number[];
+}
+
+export interface SecurityShiftDefinitionsSettings {
+  source_category: 'users_shift_type';
+  values: string[];
+  definitions: SecurityShiftDefinition[];
+}
+
+export interface SecuritySettingsData {
+  two_factor: SecurityTwoFactorSettings;
+  password_rules: SecurityPasswordRulesSettings;
+  session_timeout: SecuritySessionTimeoutSettings;
+  rbac_overview: SecurityRbacOverviewSettings;
+  shift_definitions: SecurityShiftDefinitionsSettings;
+}
+
+export interface DashboardRoleDistribution {
+  role: string;
+  count: number;
+}
+
+export interface DashboardUserInsights {
+  distribution: DashboardRoleDistribution[];
+  trends: Array<{ date: string; count: number }>;
+}
+
 export const healthApi = {
   getStatus: () => api.get<HealthStatus>('/admin/health/status'),
   getStorage: () => api.get<HealthStorage>('/admin/health/storage'),
@@ -165,6 +232,13 @@ export const healthApi = {
   getLogs: (params: { page?: number; per_page?: number } = {}) => 
     api.get<HealthLog[]>(`/admin/health/logs${buildQueryString(params as Record<string, unknown>)}`),
 };
+
+export const securitySettingsApi = {
+  get: () => api.get<SecuritySettingsData>('/admin/settings/security'),
+  update: (payload: SecuritySettingsData) => api.put<SecuritySettingsData>('/admin/settings/security', payload),
+  getUserInsights: () => api.get<DashboardUserInsights>('/admin/dashboard/users'),
+};
+
 // --- Archives API ---
 import type { BorrowRequest } from '../../inventory/requests/api';
 

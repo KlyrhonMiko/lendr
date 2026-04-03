@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select } from '@/components/ui/select';
-import { Globe, Mail, Save, Send, AlertCircle, Loader2 } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { Globe, Save, Loader2 } from 'lucide-react';
 import { useGeneralSettings, useGeneralMutations } from '../lib/useSettingsQueries';
 import type { GeneralSettingsData } from '../api';
 
@@ -107,48 +106,6 @@ export function GeneralSettings() {
               { label: 'French (Coming Soon)', value: 'fr' }
             ]} 
           />
-        </CardContent>
-      </Card>
-
-      {/* Email / SMTP Configuration - Flagged as Future Feature */}
-      <Card className="border-border/50 shadow-sm opacity-80 overflow-hidden relative grayscale-[0.5]">
-        <div className="absolute inset-0 z-10 bg-background/5 cursor-not-allowed" />
-        <CardHeader className="flex flex-row items-center gap-4 bg-muted/10">
-          <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground shrink-0">
-            <Mail className="w-5 h-5" />
-          </div>
-          <div className="flex-1 space-y-1">
-            <div className="flex items-center gap-2">
-              <CardTitle className="text-xl">Email / SMTP Configuration</CardTitle>
-              <span className="px-2 py-0.5 bg-amber-500/10 text-amber-500 text-[10px] font-bold uppercase tracking-wider rounded border border-amber-500/20">
-                Future Feature
-              </span>
-            </div>
-            <CardDescription>Setup automated email notifications for borrow requests and returns.</CardDescription>
-          </div>
-          <button 
-            disabled
-            className="flex items-center gap-2 px-4 py-2 bg-muted text-muted-foreground rounded-lg text-xs font-bold border border-border opacity-50 cursor-not-allowed"
-          >
-            <Send className="w-3.5 h-3.5" />
-            Send Test Email
-          </button>
-        </CardHeader>
-        <CardContent className="space-y-6 pt-6">
-          <div className="p-3 bg-amber-500/5 border border-amber-500/10 rounded-lg flex items-center gap-3 text-amber-600/80 text-xs font-medium">
-            <AlertCircle className="w-4 h-4" />
-            <span>Email configuration is currently in development and will be available in a future update.</span>
-          </div>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 opacity-50">
-            <Input label="SMTP Host" placeholder="smtp.example.com" disabled />
-            <Input label="SMTP Port" type="number" placeholder="587" disabled />
-            <Select 
-              label="Encryption" 
-              defaultValue="tls"
-              disabled
-              options={[{ label: 'TLS', value: 'tls' }]} 
-            />
-          </div>
         </CardContent>
       </Card>
 

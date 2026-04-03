@@ -54,7 +54,7 @@ export function UsersTable({
   return (
     <div className="divide-y divide-border/60">
       {/* Column labels - visible on larger screens */}
-      <div className="hidden md:grid md:grid-cols-[1fr_140px_120px_120px_100px_200px] gap-4 px-6 py-3 text-xs font-medium text-muted-foreground bg-muted/20">
+      <div className="hidden md:grid md:grid-cols-[minmax(0,1fr)_140px_120px_120px_100px_240px] gap-4 px-6 py-3 text-xs font-medium text-muted-foreground bg-muted/20">
         <span>User</span>
         <span>Employee ID</span>
         <span>Role</span>
@@ -69,7 +69,7 @@ export function UsersTable({
           className="group px-6 py-4 hover:bg-muted/20 transition-colors"
         >
           {/* Desktop layout */}
-          <div className="hidden md:grid md:grid-cols-[1fr_140px_120px_120px_100px_200px] gap-4 items-center">
+          <div className="hidden md:grid md:grid-cols-[minmax(0,1fr)_140px_120px_120px_100px_240px] gap-4 items-center">
             {/* User info */}
             <div className="flex items-center gap-3 min-w-0">
               <div
@@ -120,30 +120,32 @@ export function UsersTable({
             )}
 
             {/* Actions */}
-            <div className="flex items-center justify-end gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2 min-w-0">
               <button
                 onClick={() => onEdit(user)}
                 aria-label={`Edit ${user.first_name} ${user.last_name}`}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-muted-foreground hover:text-indigo-600 hover:bg-indigo-500/10 rounded-lg transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-muted-foreground hover:text-indigo-600 hover:bg-indigo-500/10 rounded-lg transition-colors shrink-0"
               >
                 <Pencil className="w-4 h-4" />
                 <span className="hidden lg:inline">Edit</span>
               </button>
 
               {!user.is_deleted ? (
-                <button
-                  onClick={() => onRequestAction({ type: 'delete', user })}
-                  aria-label={`Deactivate ${user.first_name} ${user.last_name}`}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span className="hidden lg:inline">Deactivate</span>
-                </button>
+                <>
+                  <button
+                    onClick={() => onRequestAction({ type: 'delete', user })}
+                    aria-label={`Deactivate ${user.first_name} ${user.last_name}`}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors shrink-0"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span className="hidden lg:inline">Deactivate</span>
+                  </button>
+                </>
               ) : (
                 <button
                   onClick={() => onRequestAction({ type: 'restore', user })}
                   aria-label={`Restore ${user.first_name} ${user.last_name}`}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-muted-foreground hover:text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-muted-foreground hover:text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition-colors shrink-0"
                 >
                   <RotateCcw className="w-4 h-4" />
                   <span className="hidden lg:inline">Restore</span>
@@ -198,27 +200,29 @@ export function UsersTable({
               </span>
             </div>
 
-            <div className="flex items-center gap-2 pl-[52px]">
+            <div className="flex flex-wrap items-center gap-2 pl-[52px]">
               <button
                 onClick={() => onEdit(user)}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-500/10 rounded-lg transition-colors hover:bg-indigo-500/20"
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-500/10 rounded-lg transition-colors hover:bg-indigo-500/20 shrink-0"
               >
                 <Pencil className="w-4 h-4" />
                 Edit
               </button>
 
               {!user.is_deleted ? (
-                <button
-                  onClick={() => onRequestAction({ type: 'delete', user })}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-red-500 bg-red-500/10 rounded-lg transition-colors hover:bg-red-500/20"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Deactivate
-                </button>
+                <>
+                  <button
+                    onClick={() => onRequestAction({ type: 'delete', user })}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-red-500 bg-red-500/10 rounded-lg transition-colors hover:bg-red-500/20 shrink-0"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Deactivate
+                  </button>
+                </>
               ) : (
                 <button
                   onClick={() => onRequestAction({ type: 'restore', user })}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-emerald-500 bg-emerald-500/10 rounded-lg transition-colors hover:bg-emerald-500/20"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-emerald-500 bg-emerald-500/10 rounded-lg transition-colors hover:bg-emerald-500/20 shrink-0"
                 >
                   <RotateCcw className="w-4 h-4" />
                   Restore

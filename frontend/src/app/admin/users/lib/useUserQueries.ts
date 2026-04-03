@@ -61,10 +61,19 @@ export function useAdminUserMutations() {
     },
   });
 
+  const resetUserTwoFactor = useMutation({
+    mutationFn: (userId: string) => userApi.resetTwoFactor(userId),
+    onSuccess: async () => {
+      await invalidateUsers();
+      toast.success('2FA reset successfully');
+    },
+  });
+
   return {
     registerUser,
     updateUser,
     deleteUser,
     restoreUser,
+    resetUserTwoFactor,
   };
 }

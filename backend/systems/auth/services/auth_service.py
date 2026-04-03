@@ -1,4 +1,7 @@
+import json
+import secrets
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import UUID
 
 from sqlmodel import Session, select
@@ -6,20 +9,535 @@ from sqlmodel import Session, select
 from core.config import settings
 from systems.admin.models.user import User
 from systems.admin.services.audit_service import audit_service
+from systems.admin.services.configuration_service import ConfigurationService
+from systems.admin.services.password_policy_service import PasswordPolicyService
 from systems.admin.services.user_service import UserService
-from utils.id_generator import get_next_sequence
-from utils.security import get_password_hash, verify_and_update_password
-from systems.auth.models.user_session import UserSession
+from systems.auth.models.auth_two_factor_challenge import AuthTwoFactorChallenge
 from systems.auth.models.borrower_session import BorrowerSession
+from utils.id_generator import get_next_sequence
+from utils.security import (
+    build_totp_provisioning_uri,
+    decrypt_sensitive_value,
+    encrypt_sensitive_value,
+    generate_totp_secret,
+    get_password_hash,
+    verify_and_update_password,
+    verify_totp_code,
+)
+from systems.auth.models.user_session import UserSession
+from systems.auth.models.user_two_factor_credential import UserTwoFactorCredential
 from utils.time_utils import get_now_manila
+
+
+SECURITY_SETTINGS_CATEGORY = "security_settings"
+KEY_TWO_FACTOR_ENABLED = "two_factor_enabled"
+KEY_TWO_FACTOR_METHOD = "two_factor_method"
+KEY_TWO_FACTOR_ENFORCE_FOR_ROLES = "two_factor_enforce_for_roles"
+KEY_TWO_FACTOR_ENFORCE_ON = "two_factor_enforce_on"
+KEY_SESSION_INACTIVE_MINUTES = "session_inactive_minutes"
+KEY_SESSION_WARNING_MINUTES = "session_warning_minutes"
+
+TWO_FACTOR_METHOD_AUTHENTICATOR_APP = "authenticator_app"
+TWO_FACTOR_CHALLENGE_TTL_MINUTES = 5
+TWO_FACTOR_CHALLENGE_MAX_FAILURES = 5
+DEFAULT_SESSION_WARNING_MINUTES = 5
 
 
 class AuthService:
     def __init__(self):
         self.user_service = UserService()
+        self.configuration_service = ConfigurationService()
+        self.password_policy_service = PasswordPolicyService()
 
-    def _session_inactivity_timeout(self) -> timedelta | None:
-        timeout_minutes = max(settings.AUTH_SESSION_INACTIVITY_TIMEOUT_MINUTES, 0)
+    @staticmethod
+    def _parse_bool(value: str | None, default: bool) -> bool:
+        normalized = (value or "").strip().lower()
+        if normalized in {"true", "1", "yes", "on"}:
+            return True
+        if normalized in {"false", "0", "no", "off"}:
+            return False
+        return default
+
+    @staticmethod
+    def _parse_non_negative_int(value: str | None, default: int) -> int:
+        try:
+            parsed = int(str(value).strip())
+        except (TypeError, ValueError):
+            return default
+
+        if parsed < 0:
+            return default
+        return parsed
+
+    @staticmethod
+    def _normalize_role(role: str | None) -> str:
+        return (role or "").strip().lower()
+
+    @staticmethod
+    def _parse_json_role_list(value: str, default: list[str]) -> list[str]:
+        try:
+            parsed = json.loads(value)
+        except (TypeError, json.JSONDecodeError):
+            return default
+
+        if not isinstance(parsed, list):
+            return default
+
+        normalized = [str(role).strip().lower() for role in parsed if str(role).strip()]
+        return list(dict.fromkeys(normalized)) or default
+
+    def _load_two_factor_policy(self, session: Session) -> dict[str, Any]:
+        default_roles = ["admin", "manager", "staff"]
+        enabled = self._parse_bool(
+            self.configuration_service.get_value(
+                session,
+                KEY_TWO_FACTOR_ENABLED,
+                "true",
+                category=SECURITY_SETTINGS_CATEGORY,
+            ),
+            True,
+        )
+        method = self.configuration_service.get_value(
+            session,
+            KEY_TWO_FACTOR_METHOD,
+            TWO_FACTOR_METHOD_AUTHENTICATOR_APP,
+            category=SECURITY_SETTINGS_CATEGORY,
+        )
+        enforce_roles = self._parse_json_role_list(
+            self.configuration_service.get_value(
+                session,
+                KEY_TWO_FACTOR_ENFORCE_FOR_ROLES,
+                json.dumps(default_roles),
+                category=SECURITY_SETTINGS_CATEGORY,
+            ),
+            default_roles,
+        )
+        enforce_on = self.configuration_service.get_value(
+            session,
+            KEY_TWO_FACTOR_ENFORCE_ON,
+            "next_login",
+            category=SECURITY_SETTINGS_CATEGORY,
+        )
+
+        return {
+            "enabled": enabled,
+            "method": method,
+            "enforce_roles": enforce_roles,
+            "enforce_on": enforce_on,
+        }
+
+    def _log_two_factor_event(
+        self,
+        session: Session,
+        *,
+        action: str,
+        entity_id: str,
+        actor_id: UUID | None,
+        reason_code: str | None = None,
+        after: dict[str, Any] | None = None,
+    ) -> None:
+        audit_service.log_action(
+            db=session,
+            entity_type="auth_2fa",
+            entity_id=entity_id,
+            action=action,
+            reason_code=reason_code,
+            actor_id=actor_id,
+            after=after,
+        )
+
+    def is_two_factor_required_for_user(self, session: Session, user: User) -> bool:
+        policy = self._load_two_factor_policy(session)
+        if not policy["enabled"]:
+            return False
+
+        if str(policy["method"]).strip().lower() != TWO_FACTOR_METHOD_AUTHENTICATOR_APP:
+            return False
+
+        if str(policy["enforce_on"]).strip().lower() != "next_login":
+            return False
+
+        return self._normalize_role(user.role) in set(policy["enforce_roles"])
+
+    def get_two_factor_credential(
+        self,
+        session: Session,
+        user_uuid: UUID,
+    ) -> UserTwoFactorCredential | None:
+        return session.exec(
+            select(UserTwoFactorCredential).where(
+                UserTwoFactorCredential.user_uuid == user_uuid,
+                UserTwoFactorCredential.is_deleted.is_(False),
+            )
+        ).first()
+
+    def has_active_two_factor_enrollment(self, session: Session, user_uuid: UUID) -> bool:
+        credential = self.get_two_factor_credential(session, user_uuid)
+        if not credential:
+            return False
+
+        return bool(
+            credential.is_enabled
+            and credential.secret_encrypted
+            and credential.method == TWO_FACTOR_METHOD_AUTHENTICATOR_APP
+        )
+
+    def get_two_factor_status(self, session: Session, user_uuid: UUID) -> tuple[bool, datetime | None]:
+        credential = self.get_two_factor_credential(session, user_uuid)
+        if not credential:
+            return False, None
+        return credential.is_enabled, credential.enrolled_at
+
+    def begin_two_factor_enrollment(self, session: Session, user: User) -> dict[str, str]:
+        credential = self.get_two_factor_credential(session, user.id)
+        if credential and credential.is_enabled and credential.secret_encrypted:
+            raise ValueError("Two-factor authentication is already enabled for this account")
+
+        secret = generate_totp_secret()
+        encrypted_secret = encrypt_sensitive_value(secret)
+        now = get_now_manila()
+
+        if credential:
+            credential.method = TWO_FACTOR_METHOD_AUTHENTICATOR_APP
+            credential.pending_secret_encrypted = encrypted_secret
+            credential.updated_at = now
+            session.add(credential)
+        else:
+            credential = UserTwoFactorCredential(
+                user_uuid=user.id,
+                method=TWO_FACTOR_METHOD_AUTHENTICATOR_APP,
+                pending_secret_encrypted=encrypted_secret,
+            )
+            session.add(credential)
+
+        session.flush()
+
+        account_name = user.email or user.username or user.user_id
+        self._log_two_factor_event(
+            session,
+            action="two_factor_enroll_initiated",
+            entity_id=user.user_id,
+            actor_id=user.id,
+            after={"method": TWO_FACTOR_METHOD_AUTHENTICATOR_APP},
+        )
+
+        return {
+            "method": TWO_FACTOR_METHOD_AUTHENTICATOR_APP,
+            "secret": secret,
+            "provisioning_uri": build_totp_provisioning_uri(secret, account_name=account_name),
+        }
+
+    def verify_two_factor_enrollment(self, session: Session, user: User, code: str) -> tuple[bool, datetime | None]:
+        credential = self.get_two_factor_credential(session, user.id)
+        if not credential or not credential.pending_secret_encrypted:
+            raise ValueError("No pending two-factor enrollment found")
+
+        pending_secret = decrypt_sensitive_value(credential.pending_secret_encrypted)
+        if not verify_totp_code(pending_secret, code):
+            self._log_two_factor_event(
+                session,
+                action="two_factor_enroll_verify_failed",
+                entity_id=user.user_id,
+                actor_id=user.id,
+                reason_code="invalid_totp_code",
+            )
+            return False, credential.enrolled_at
+
+        now = get_now_manila()
+        credential.secret_encrypted = credential.pending_secret_encrypted
+        credential.pending_secret_encrypted = None
+        credential.is_enabled = True
+        credential.enrolled_at = now
+        credential.last_verified_at = now
+        credential.updated_at = now
+        session.add(credential)
+        session.flush()
+
+        self._log_two_factor_event(
+            session,
+            action="two_factor_enroll_verified",
+            entity_id=user.user_id,
+            actor_id=user.id,
+            after={"method": credential.method},
+        )
+        return True, credential.enrolled_at
+
+    def disable_two_factor_enrollment(self, session: Session, user: User, code: str) -> tuple[bool, datetime | None]:
+        credential = self.get_two_factor_credential(session, user.id)
+        if not credential or not credential.is_enabled or not credential.secret_encrypted:
+            raise ValueError("Two-factor authentication is not enabled")
+
+        secret = decrypt_sensitive_value(credential.secret_encrypted)
+        if not verify_totp_code(secret, code):
+            self._log_two_factor_event(
+                session,
+                action="two_factor_disable_failed",
+                entity_id=user.user_id,
+                actor_id=user.id,
+                reason_code="invalid_totp_code",
+            )
+            return False, credential.enrolled_at
+
+        now = get_now_manila()
+        credential.secret_encrypted = None
+        credential.pending_secret_encrypted = None
+        credential.is_enabled = False
+        credential.enrolled_at = None
+        credential.last_verified_at = now
+        credential.updated_at = now
+        session.add(credential)
+        session.flush()
+
+        self._log_two_factor_event(
+            session,
+            action="two_factor_disabled",
+            entity_id=user.user_id,
+            actor_id=user.id,
+        )
+        return True, credential.enrolled_at
+
+    def reset_two_factor_enrollment_for_user(
+        self,
+        session: Session,
+        target_user: User,
+        actor_id: UUID | None = None,
+    ) -> bool:
+        credential = self.get_two_factor_credential(session, target_user.id)
+        credential_existed = credential is not None
+
+        if credential:
+            now = get_now_manila()
+            credential.secret_encrypted = None
+            credential.pending_secret_encrypted = None
+            credential.is_enabled = False
+            credential.enrolled_at = None
+            credential.last_verified_at = now
+            credential.updated_at = now
+            session.add(credential)
+            session.flush()
+
+        self._log_two_factor_event(
+            session,
+            action="two_factor_admin_reset",
+            entity_id=target_user.user_id,
+            actor_id=actor_id,
+            after={
+                "target_user_id": target_user.user_id,
+                "target_user_uuid": str(target_user.id),
+                "target_username": target_user.username,
+                "target_email": target_user.email,
+                "method": TWO_FACTOR_METHOD_AUTHENTICATOR_APP,
+                "enabled": False,
+                "credential_existed": credential_existed,
+                "reset_applied": credential_existed,
+            },
+        )
+
+        return credential_existed
+
+    def create_two_factor_login_challenge(
+        self,
+        session: Session,
+        user: User,
+        device_id: str | None,
+    ) -> AuthTwoFactorChallenge:
+        expires_at = get_now_manila() + timedelta(minutes=TWO_FACTOR_CHALLENGE_TTL_MINUTES)
+        challenge = AuthTwoFactorChallenge(
+            challenge_id=secrets.token_urlsafe(32),
+            user_uuid=user.id,
+            device_id=device_id,
+            expires_at=expires_at,
+        )
+        session.add(challenge)
+        session.flush()
+
+        self._log_two_factor_event(
+            session,
+            action="two_factor_challenge_issued",
+            entity_id=challenge.challenge_id,
+            actor_id=user.id,
+            after={"user_id": user.user_id},
+        )
+
+        return challenge
+
+    def _get_active_two_factor_secret(self, session: Session, user_uuid: UUID) -> str | None:
+        credential = self.get_two_factor_credential(session, user_uuid)
+        if not credential or not credential.is_enabled or not credential.secret_encrypted:
+            return None
+        return decrypt_sensitive_value(credential.secret_encrypted)
+
+    def verify_two_factor_login_challenge(
+        self,
+        session: Session,
+        challenge_token: str,
+        code: str,
+        expires_delta: timedelta,
+    ) -> tuple[str, str, UUID] | None:
+        challenge = session.exec(
+            select(AuthTwoFactorChallenge).where(
+                AuthTwoFactorChallenge.challenge_id == challenge_token,
+                AuthTwoFactorChallenge.is_deleted.is_(False),
+            )
+        ).first()
+        if not challenge:
+            self._log_two_factor_event(
+                session,
+                action="two_factor_challenge_failed",
+                entity_id=challenge_token,
+                actor_id=None,
+                reason_code="challenge_not_found",
+            )
+            return None
+
+        now = get_now_manila()
+        challenge_expires_at = self._normalize_timestamp(challenge.expires_at, now)
+        if challenge.is_consumed:
+            self._log_two_factor_event(
+                session,
+                action="two_factor_challenge_failed",
+                entity_id=challenge.challenge_id,
+                actor_id=challenge.user_uuid,
+                reason_code="challenge_consumed",
+            )
+            return None
+
+        if challenge_expires_at <= now:
+            self._log_two_factor_event(
+                session,
+                action="two_factor_challenge_failed",
+                entity_id=challenge.challenge_id,
+                actor_id=challenge.user_uuid,
+                reason_code="challenge_expired",
+            )
+            return None
+
+        if challenge.failure_count >= TWO_FACTOR_CHALLENGE_MAX_FAILURES:
+            self._log_two_factor_event(
+                session,
+                action="two_factor_challenge_failed",
+                entity_id=challenge.challenge_id,
+                actor_id=challenge.user_uuid,
+                reason_code="challenge_failure_limit_exceeded",
+            )
+            return None
+
+        user = session.exec(
+            select(User).where(User.id == challenge.user_uuid, User.is_deleted.is_(False))
+        ).first()
+        if not user:
+            self._log_two_factor_event(
+                session,
+                action="two_factor_challenge_failed",
+                entity_id=challenge.challenge_id,
+                actor_id=None,
+                reason_code="user_not_found",
+            )
+            return None
+
+        active_secret = self._get_active_two_factor_secret(session, user.id)
+        if not active_secret:
+            self._log_two_factor_event(
+                session,
+                action="two_factor_challenge_failed",
+                entity_id=challenge.challenge_id,
+                actor_id=user.id,
+                reason_code="missing_enrollment",
+            )
+            return None
+
+        if not verify_totp_code(active_secret, code):
+            challenge.failure_count += 1
+            if challenge.failure_count >= TWO_FACTOR_CHALLENGE_MAX_FAILURES:
+                challenge.is_consumed = True
+                challenge.consumed_at = now
+            challenge.updated_at = now
+            session.add(challenge)
+            session.flush()
+
+            self._log_two_factor_event(
+                session,
+                action="two_factor_challenge_failed",
+                entity_id=challenge.challenge_id,
+                actor_id=user.id,
+                reason_code=(
+                    "challenge_failure_limit_reached"
+                    if challenge.failure_count >= TWO_FACTOR_CHALLENGE_MAX_FAILURES
+                    else "invalid_totp_code"
+                ),
+            )
+            return None
+
+        challenge.is_consumed = True
+        challenge.consumed_at = now
+        challenge.updated_at = now
+        session.add(challenge)
+
+        credential = self.get_two_factor_credential(session, user.id)
+        if credential:
+            credential.last_verified_at = now
+            credential.updated_at = now
+            session.add(credential)
+
+        db_session = self.create_user_session(
+            session=session,
+            user_uuid=user.id,
+            expires_delta=expires_delta,
+            device_id=challenge.device_id,
+        )
+        access_token = self.create_access_token(
+            data={"sub": user.user_id, "session_id": db_session.session_id},
+            expires_delta=expires_delta,
+        )
+
+        self._log_two_factor_event(
+            session,
+            action="two_factor_challenge_verified",
+            entity_id=challenge.challenge_id,
+            actor_id=user.id,
+            after={"session_id": db_session.session_id},
+        )
+
+        return access_token, db_session.session_id, user.id
+
+    def get_session_timeout_policy(self, session: Session) -> dict[str, int]:
+        inactive_minutes = self._parse_non_negative_int(
+            self.configuration_service.get_value(
+                session,
+                KEY_SESSION_INACTIVE_MINUTES,
+                str(settings.AUTH_SESSION_INACTIVITY_TIMEOUT_MINUTES),
+                category=SECURITY_SETTINGS_CATEGORY,
+            ),
+            max(settings.AUTH_SESSION_INACTIVITY_TIMEOUT_MINUTES, 0),
+        )
+
+        default_warning_minutes = (
+            min(DEFAULT_SESSION_WARNING_MINUTES, max(inactive_minutes - 1, 0))
+            if inactive_minutes > 0
+            else 0
+        )
+        warning_minutes = self._parse_non_negative_int(
+            self.configuration_service.get_value(
+                session,
+                KEY_SESSION_WARNING_MINUTES,
+                str(default_warning_minutes),
+                category=SECURITY_SETTINGS_CATEGORY,
+            ),
+            default_warning_minutes,
+        )
+
+        if inactive_minutes == 0:
+            warning_minutes = 0
+        elif warning_minutes >= inactive_minutes:
+            warning_minutes = max(inactive_minutes - 1, 0)
+
+        return {
+            "inactive_minutes": inactive_minutes,
+            "warning_minutes": warning_minutes,
+        }
+
+    def _session_inactivity_timeout(self, session: Session) -> timedelta | None:
+        timeout_minutes = self.get_session_timeout_policy(session)["inactive_minutes"]
         if timeout_minutes == 0:
             return None
         return timedelta(minutes=timeout_minutes)
@@ -27,8 +545,8 @@ class AuthService:
     def _activity_touch_interval_seconds(self) -> int:
         return max(settings.AUTH_ACTIVITY_TOUCH_INTERVAL_SECONDS, 0)
 
-    def _is_session_inactive(self, last_activity_at: datetime, now: datetime) -> bool:
-        timeout = self._session_inactivity_timeout()
+    def _is_session_inactive(self, session: Session, last_activity_at: datetime, now: datetime) -> bool:
+        timeout = self._session_inactivity_timeout(session)
         if timeout is None:
             return False
         return last_activity_at <= (now - timeout)
@@ -64,7 +582,7 @@ class AuthService:
         last_activity_at = db_session.last_activity_at or db_session.issued_at or db_session.created_at
         last_activity_at = self._normalize_timestamp(last_activity_at, now)
 
-        if self._is_session_inactive(last_activity_at, now):
+        if self._is_session_inactive(session, last_activity_at, now):
             db_session.is_revoked = True
             db_session.updated_at = now
             session.add(db_session)
@@ -170,6 +688,8 @@ class AuthService:
     ) -> User:
         if not self.is_bootstrap_admin(user):
             raise ValueError("Only ADMIN-001 can use bootstrap password rotation")
+
+        self.password_policy_service.validate_for_role(session, new_password, user.role)
 
         user.hashed_password = get_password_hash(new_password)
         user.must_change_password = False
