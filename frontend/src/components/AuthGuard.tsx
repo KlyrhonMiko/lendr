@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/auth';
+import { usePublicBranding } from '@/lib/publicBranding';
 
 export function AuthGuard({
   children,
@@ -15,6 +16,7 @@ export function AuthGuard({
 }) {
   const router = useRouter();
   const { loading } = useAuth();
+  const { brandName, logoUrl } = usePublicBranding();
 
   useEffect(() => {
     if (!loading && !auth.isAuthenticated()) {
@@ -30,21 +32,28 @@ export function AuthGuard({
           <div className="relative">
             <div className="absolute -inset-4 rounded-3xl bg-gradient-to-br from-yellow-400/20 to-amber-600/20 blur-xl animate-pulse" />
             <div className="relative w-20 h-20 rounded-2xl bg-white flex items-center justify-center shadow-lg shadow-yellow-500/20 p-2">
-              <Image
-                src="/Image/Powergold Enterprise Logo.png"
-                alt="Powergold"
-                width={64}
-                height={64}
-                className="object-contain"
-                priority
-              />
+              {logoUrl ? (
+                <Image
+                  src={logoUrl}
+                  alt={`${brandName} logo`}
+                  width={64}
+                  height={64}
+                  className="object-contain"
+                  priority
+                  unoptimized
+                />
+              ) : (
+                <span className="text-2xl font-black font-heading text-primary">
+                  {brandName.charAt(0).toUpperCase()}
+                </span>
+              )}
             </div>
           </div>
 
           {/* Brand + status */}
           <div className="flex flex-col items-center gap-3">
             <span className="text-xl font-bold font-heading tracking-tight text-foreground">
-              Powergold Engineering
+              {brandName}
             </span>
             <div className="flex flex-col items-center gap-4">
               {/* Progress bar */}
@@ -52,7 +61,7 @@ export function AuthGuard({
                 <div className="h-full w-2/3 rounded-full bg-gradient-to-r from-yellow-400 to-yellow-600 animate-[shimmer_1.5s_ease-in-out_infinite]" />
               </div>
               <span className="text-sm text-muted-foreground">
-                Verifying your session&hellip;
+                Verifying your session…
               </span>
             </div>
           </div>

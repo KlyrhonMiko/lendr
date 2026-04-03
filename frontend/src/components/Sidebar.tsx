@@ -7,6 +7,7 @@ import {
   LayoutDashboard, Package, Settings, Activity,
   Users, ScrollText, ClipboardList, Box, X
 } from 'lucide-react';
+import { usePublicBranding } from '@/lib/publicBranding';
 
 const systemMeta: Record<string, string> = {
   admin: 'Administration',
@@ -41,6 +42,7 @@ interface SidebarProps {
 
 export function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
+  const { brandName, logoUrl } = usePublicBranding();
 
   const getSystem = () => {
     if (pathname.startsWith('/inventory')) return 'inventory';
@@ -79,19 +81,23 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         {/* Brand */}
         <div className="flex items-center justify-between h-20 px-6 shrink-0 border-b border-sidebar-border/30 mb-2 pt-2">
           <div className="flex items-center gap-3">
-            <Image
-              src="/Image/Powergold Enterprise Logo.png"
-              alt="Powergold"
-              width={36}
-              height={36}
-              className="object-contain"
-            />
+            {logoUrl ? (
+              <Image
+                src={logoUrl}
+                alt={`${brandName} logo`}
+                width={36}
+                height={36}
+                className="object-contain"
+                unoptimized
+              />
+            ) : (
+              <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-sm font-bold font-heading">
+                {brandName.charAt(0).toUpperCase()}
+              </div>
+            )}
             <div className="flex flex-col">
               <span className="text-base font-bold font-heading tracking-tight text-sidebar-foreground uppercase leading-tight">
-                Powergold
-              </span>
-              <span className="text-[10px] font-bold text-muted-foreground/60 tracking-tighter uppercase">
-                Engineering
+                {brandName}
               </span>
             </div>
           </div>

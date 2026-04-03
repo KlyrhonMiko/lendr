@@ -123,13 +123,6 @@ export interface BrandingSettingsData {
     logo_url: string | null;
     favicon_url: string | null;
   };
-  banner: {
-    is_enabled: boolean;
-    message: string | null;
-    banner_type: string;
-    expiry_date: string | null;
-    expiry_time: string | null;
-  };
 }
 
 export interface OperationsSettingsData {

@@ -286,7 +286,7 @@ app.include_router(backup, prefix="/api/admin/backups", tags=["Admin - Backups"]
 app.include_router(users, prefix="/api/admin/users", tags=["Admin - Users"], dependencies=admin_access)
 app.include_router(config, prefix="/api/admin/config", tags=["Admin - Configuration"], dependencies=admin_access)
 app.include_router(general_settings, prefix="/api/admin/settings/general", tags=["Admin - General Settings"], dependencies=admin_access)
-app.include_router(branding_settings, prefix="/api/admin/settings/branding", tags=["Admin - Branding Settings"], dependencies=admin_access)
+app.include_router(branding_settings, prefix="/api/admin/settings/branding", tags=["Admin - Branding Settings"])
 app.include_router(operations_settings, prefix="/api/admin/settings/operations", tags=["Admin - Operations Settings"], dependencies=admin_access)
 app.include_router(security_settings, prefix="/api/admin/settings/security", tags=["Admin - Security Settings"], dependencies=admin_access)
 app.include_router(archives, prefix="/api/admin/settings/operations/archives", tags=["Admin - Operations Settings"], dependencies=admin_access)

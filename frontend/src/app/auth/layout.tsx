@@ -1,10 +1,15 @@
+'use client';
+
 import Image from "next/image";
+import { usePublicBranding } from '@/lib/publicBranding';
 
 export default function AuthLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { brandName, logoUrl } = usePublicBranding();
+
   return (
     <div className="min-h-screen w-full flex bg-amber-50 relative overflow-hidden">
       {/* Left side - Branding */}
@@ -19,17 +24,24 @@ export default function AuthLayout({
 
         <div className="relative z-10 flex flex-col items-center text-center max-w-lg pr-12">
           <div className="mb-10">
-            <Image
-              src="/Image/Powergold Enterprise Logo.png"
-              alt="Powergold Logo"
-              width={260}
-              height={260}
-              className="object-contain drop-shadow-sm"
-              priority
-            />
+            {logoUrl ? (
+              <Image
+                src={logoUrl}
+                alt={`${brandName} logo`}
+                width={260}
+                height={260}
+                className="object-contain drop-shadow-sm"
+                priority
+                unoptimized
+              />
+            ) : (
+              <div className="w-[180px] h-[180px] rounded-3xl bg-primary/10 text-primary flex items-center justify-center text-6xl font-black font-heading shadow-sm">
+                {brandName.charAt(0).toUpperCase()}
+              </div>
+            )}
           </div>
           <h1 className="text-3xl lg:text-4xl font-bold font-heading text-zinc-900 mb-5 tracking-tight">
-            Powergold Engineering Enterprises
+            {brandName}
           </h1>
           <div className="w-16 h-1.5 bg-yellow-400/90 rounded-full mb-6 relative overflow-hidden">
             <div className="absolute inset-0 bg-white/30 w-full h-full skew-x-[-20deg] animate-[pulse_4s_ease-in-out_infinite]"></div>

@@ -1,64 +1,101 @@
 import os
+import json
 import uuid
 import shutil
-from typing import Any
-from fastapi import APIRouter, Depends, Request, UploadFile, File, HTTPException
-from sqlmodel import Session, select
+import tempfile
+from pathlib import Path
 
-from core.database import get_session
+from fastapi import APIRouter, Depends, Request, UploadFile, File, HTTPException
+from pydantic import ValidationError
+
 from core.schemas import GenericResponse, create_success_response
-from systems.admin.models.settings import AdminConfig
 from systems.admin.schemas.branding_settings import (
     BrandingSettingsPayload,
     VisualIdentitySettings,
-    BannerSettings,
 )
 from systems.auth.dependencies import get_current_user, require_permission
 from systems.admin.models.user import User
-from utils.time_utils import get_now_manila
 
 router = APIRouter()
 
-ASSETS_DIR = "assets/branding"
+BASE_DIR = Path(__file__).resolve().parents[3]
+ASSETS_DIR = BASE_DIR / "assets" / "branding"
+BRANDING_JSON_PATH = ASSETS_DIR / "branding.json"
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+ALLOWED_IMAGE_CONTENT_TYPES = {
+    "image/png",
+    "image/jpeg",
+    "image/webp",
+    "image/x-icon",
+}
+
+
+def _default_branding_settings() -> BrandingSettingsPayload:
+    return BrandingSettingsPayload(
+        visual_identity=VisualIdentitySettings(
+            brand_name="Lendr",
+            system_theme="system",
+            logo_url=None,
+            favicon_url=None,
+        )
+    )
+
+
+def _load_branding_settings() -> BrandingSettingsPayload:
+    if not BRANDING_JSON_PATH.exists():
+        return _default_branding_settings()
+
+    try:
+        with BRANDING_JSON_PATH.open("r", encoding="utf-8") as file:
+            raw_payload = json.load(file)
+        return BrandingSettingsPayload.model_validate(raw_payload)
+    except (OSError, json.JSONDecodeError, ValidationError):
+        return _default_branding_settings()
+
+
+def _save_branding_settings(payload: BrandingSettingsPayload) -> None:
+    ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+
+    payload_dict = payload.model_dump(mode="json")
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        dir=ASSETS_DIR,
+        delete=False,
+        suffix=".json",
+    ) as temp_file:
+        json.dump(payload_dict, temp_file, indent=2)
+        temp_file.write("\n")
+        temp_path = Path(temp_file.name)
+
+    os.replace(temp_path, BRANDING_JSON_PATH)
+
+
+def _has_valid_file_signature(content_type: str | None, file_head: bytes) -> bool:
+    if content_type == "image/png":
+        return file_head.startswith(b"\x89PNG\r\n\x1a\n")
+
+    if content_type == "image/jpeg":
+        return file_head.startswith(b"\xff\xd8\xff")
+
+    if content_type == "image/webp":
+        return len(file_head) >= 12 and file_head[0:4] == b"RIFF" and file_head[8:12] == b"WEBP"
+
+    if content_type == "image/x-icon":
+        return file_head.startswith(b"\x00\x00\x01\x00")
+
+    return False
 
 @router.get(
     "",
     response_model=GenericResponse[BrandingSettingsPayload],
-    responses={401: {"model": GenericResponse}},
 )
 async def get_branding_settings(
     request: Request,
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-    _: None = Depends(require_permission("admin:config:manage")),
 ):
-    """Fetch branding settings from the database."""
-    statement = select(AdminConfig).where(
-        AdminConfig.category == "platform_branding",
-        AdminConfig.is_deleted.is_(False)
-    )
-    settings = session.exec(statement).all()
-    
-    def find_val(key: str, default: Any) -> Any:
-        return next((s.value for s in settings if s.key == key), default)
+    """Fetch branding settings from file-backed JSON config."""
+    payload = _load_branding_settings()
 
-    payload = BrandingSettingsPayload(
-        visual_identity=VisualIdentitySettings(
-            brand_name=find_val("brand_name", "Lendr"),
-            system_theme=find_val("system_theme", "system"),
-            logo_url=find_val("logo_url", None),
-            favicon_url=find_val("favicon_url", None),
-        ),
-        banner=BannerSettings(
-            is_enabled=str(find_val("banner_enabled", "false")).lower() == "true",
-            message=find_val("banner_message", None),
-            banner_type=find_val("banner_type", "info"),
-            expiry_date=find_val("banner_expiry_date", None),
-            expiry_time=find_val("banner_expiry_time", None),
-        )
-    )
-    
     return create_success_response(data=payload, request=request)
 
 @router.put(
@@ -69,53 +106,12 @@ async def get_branding_settings(
 async def update_branding_settings(
     payload: BrandingSettingsPayload,
     request: Request,
-    session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_permission("admin:config:manage")),
 ):
-    """Update branding configurations."""
-    
-    def upsert_setting(key: str, value: str, description: str = None):
-        statement = select(AdminConfig).where(
-            AdminConfig.key == key,
-            AdminConfig.category == "platform_branding",
-            AdminConfig.is_deleted.is_(False)
-        )
-        existing = session.exec(statement).first()
-        
-        if existing:
-            existing.value = str(value) if value is not None else ""
-            existing.updated_at = get_now_manila()
-            if description:
-                existing.description = description
-            session.add(existing)
-        else:
-            new_conf = AdminConfig(
-                key=key,
-                value=str(value) if value is not None else "",
-                category="platform_branding",
-                system="admin",
-                description=description
-            )
-            session.add(new_conf)
+    """Persist branding settings in file-backed JSON config."""
+    _save_branding_settings(payload)
 
-    # Visual Identity
-    vi = payload.visual_identity
-    upsert_setting("brand_name", vi.brand_name, "Organization display name")
-    upsert_setting("system_theme", vi.system_theme, "System-wide color theme")
-    upsert_setting("logo_url", vi.logo_url, "Path to organization logo")
-    upsert_setting("favicon_url", vi.favicon_url, "Path to system favicon")
-    
-    # Banner
-    bn = payload.banner
-    upsert_setting("banner_enabled", str(bn.is_enabled).lower(), "Enable/Disable announcement banner")
-    upsert_setting("banner_message", bn.message, "Content of the announcement banner")
-    upsert_setting("banner_type", bn.banner_type, "Severity type (info, warning, error)")
-    upsert_setting("banner_expiry_date", bn.expiry_date, "Expiration date for the banner")
-    upsert_setting("banner_expiry_time", bn.expiry_time, "Expiration time for the banner")
-    
-    session.commit()
-    
     return create_success_response(
         message="Branding configuration updated successfully",
         data=payload,
@@ -146,22 +142,34 @@ async def upload_branding_asset(
 
     # 2. Validate File Type
     content_type = file.content_type
-    if content_type not in ["image/png", "image/jpeg", "image/webp", "image/svg+xml", "image/x-icon"]:
-        raise HTTPException(status_code=400, detail="Invalid file type. Only PNG, JPG, WEBP, SVG, and ICO are allowed.")
+    if content_type not in ALLOWED_IMAGE_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file type. Only PNG, JPEG, WEBP, and ICO are allowed.",
+        )
 
-    # 3. Create structure if not exists
-    os.makedirs(ASSETS_DIR, exist_ok=True)
+    # 3. Validate File Content Signature to prevent MIME spoofing
+    file_head = file.file.read(4096)
+    file.file.seek(0)
+    if not _has_valid_file_signature(content_type, file_head):
+        raise HTTPException(
+            status_code=400,
+            detail="Uploaded file content does not match the declared file type.",
+        )
 
-    # 4. Generate unique filename to avoid collision and caching issues
+    # 4. Create structure if not exists
+    ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+
+    # 5. Generate unique filename to avoid collision and caching issues
     ext = os.path.splitext(file.filename)[1]
     filename = f"branding_{uuid.uuid4().hex}{ext}"
-    file_path = os.path.join(ASSETS_DIR, filename)
+    file_path = ASSETS_DIR / filename
 
-    # 5. Save file
-    with open(file_path, "wb") as buffer:
+    # 6. Save file
+    with file_path.open("wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    # 6. Return the public URL path
+    # 7. Return the public URL path
     public_url = f"/api/assets/branding/{filename}"
     
     return create_success_response(
