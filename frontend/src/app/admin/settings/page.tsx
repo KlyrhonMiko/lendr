@@ -44,6 +44,7 @@ export default function SettingsPage() {
     handleSave,
     handleDelete,
     handleRestore,
+    openEditModal,
     openRestoreModal,
     closeRestoreModal,
     openEditModalForNew,
@@ -84,6 +85,7 @@ export default function SettingsPage() {
             onPageChange={setPage}
             onPerPageChange={setPerPage}
             onDelete={handleDelete}
+            onEdit={openEditModal}
             onOpenRestore={openRestoreModal}
             onOpenNew={openEditModalForNew}
           />

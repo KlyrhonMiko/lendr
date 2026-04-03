@@ -66,6 +66,7 @@ export function useUsersManagement() {
     const { type, user } = isConfirmingAction;
 
     const action = type === 'delete' ? deleteUser : restoreUser;
+
     action.mutate(user.user_id, {
       onSettled: () => setIsConfirmingAction(null),
     });

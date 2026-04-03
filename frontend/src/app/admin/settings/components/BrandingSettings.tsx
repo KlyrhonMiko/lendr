@@ -2,11 +2,10 @@
 
 import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Toggle } from '@/components/ui/toggle';
-import { Input, Textarea } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
-import { Image as ImageIcon, Globe, Tablet, BellRing, Save, Loader2 } from 'lucide-react';
+import { Image as ImageIcon, Globe, Tablet, Save, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useBrandingSettings, useBrandingMutations } from '../lib/useSettingsQueries';
 
@@ -18,13 +17,6 @@ interface BrandingSettings {
     system_theme: string;
     logo_url: string | null;
     favicon_url: string | null;
-  };
-  banner: {
-    is_enabled: boolean;
-    message: string | null;
-    banner_type: string;
-    expiry_date: string | null;
-    expiry_time: string | null;
   };
 }
 
@@ -42,7 +34,6 @@ export function BrandingSettings() {
 
   const settings = localSettings || brandingRes?.data || {
     visual_identity: { brand_name: 'Lendr', system_theme: 'system', logo_url: null, favicon_url: null },
-    banner: { is_enabled: false, message: '', banner_type: 'info', expiry_date: '', expiry_time: '' },
   };
 
   const loading = updateBranding.isPending || uploadBrandingFile.isPending;
@@ -169,7 +160,7 @@ export function BrandingSettings() {
                     </div>
                     <div className="text-center">
                       <p className="text-sm font-medium">Click to upload or drag and drop</p>
-                      <p className="text-xs text-muted-foreground mt-1">PNG, JPG, WEBP, SVG (Recommended: 200x50px)</p>
+                      <p className="text-xs text-muted-foreground mt-1">PNG, JPG, WEBP (Recommended: 200x50px)</p>
                     </div>
                   </>
                 )}
@@ -208,91 +199,25 @@ export function BrandingSettings() {
         </CardContent>
       </Card>
 
-      {/* Announcement Banner */}
-      <Card>
-        <CardHeader className="flex flex-row items-center gap-4">
-          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-            <BellRing className="w-5 h-5" />
-          </div>
-          <div className="flex-1">
-            <CardTitle>System-wide Announcement Banner</CardTitle>
-            <CardDescription>Display a global notification banner to all active users.</CardDescription>
-          </div>
-          <Toggle 
-            label="Enable Banner" 
-            checked={!!settings.banner.is_enabled}
-            onChange={(e) => setLocalSettings({
-              ...settings,
-              banner: { ...settings.banner, is_enabled: e.target.checked }
-            })}
-          />
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <Textarea 
-            label="Banner Message" 
-            placeholder="Enter the announcement text here..." 
-            value={settings.banner.message ?? ''}
-            onChange={(e) => setLocalSettings({
-              ...settings,
-              banner: { ...settings.banner, message: e.target.value }
-            })}
-          />
-          
-          <div className="grid gap-6 md:grid-cols-3">
-            <Select 
-              label="Banner Type" 
-              value={settings.banner.banner_type ?? 'info'}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setLocalSettings({
-                ...settings,
-                banner: { ...settings.banner, banner_type: e.target.value }
-              })}
-              options={[
-                { label: 'Informational', value: 'info' },
-                { label: 'Warning', value: 'warning' },
-                { label: 'Critical', value: 'error' }
-              ]} 
-            />
-            
-            <Input 
-              label="Expiry Date" 
-              type="date" 
-              value={settings.banner.expiry_date ?? ''}
-              onChange={(e) => setLocalSettings({
-                ...settings,
-                banner: { ...settings.banner, expiry_date: e.target.value }
-              })}
-            />
-            <Input 
-              label="Expiry Time" 
-              type="time" 
-              value={settings.banner.expiry_time ?? ''}
-              onChange={(e) => setLocalSettings({
-                ...settings,
-                banner: { ...settings.banner, expiry_time: e.target.value }
-              })}
-            />
-          </div>
-        </CardContent>
-        <CardFooter className="flex justify-end">
-          <button 
-            onClick={handleSave}
-            disabled={loading}
-            className="flex items-center gap-2 px-6 py-2.5 bg-primary hover:bg-primary/95 disabled:opacity-50 text-primary-foreground rounded-lg text-sm font-bold shadow-sm transition-all active:scale-[0.98]"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4" />
-                Save Branding Configuration
-              </>
-            )}
-          </button>
-        </CardFooter>
-      </Card>
+      <div className="flex justify-end">
+        <button 
+          onClick={handleSave}
+          disabled={loading}
+          className="flex items-center gap-2 px-6 py-2.5 bg-primary hover:bg-primary/95 disabled:opacity-50 text-primary-foreground rounded-lg text-sm font-bold shadow-sm transition-all active:scale-[0.98]"
+        >
+          {loading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save className="w-4 h-4" />
+              Save Branding Configuration
+            </>
+          )}
+        </button>
+      </div>
     </div>
   );
 }

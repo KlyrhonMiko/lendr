@@ -21,7 +21,7 @@ export function buildQueryString(params: Record<string, unknown>): string {
   return '?' + entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join('&');
 }
 
-interface LoginCredentials {
+export interface LoginCredentials {
   username: string;
   password: string;
 }
@@ -37,9 +37,30 @@ interface ErrorPayload {
   detail?: string;
 }
 
-interface AuthTokenResponse {
+export interface AuthTokenResponse {
   access_token: string;
   token_type: string;
+}
+
+export interface TwoFactorChallengeResponse {
+  two_factor_required: true;
+  challenge_token: string;
+  challenge_expires_at: string;
+  method: string;
+}
+
+export type LoginResponse = AuthTokenResponse | TwoFactorChallengeResponse;
+
+export interface TwoFactorEnrollmentInitiateResponse {
+  method: string;
+  secret: string;
+  provisioning_uri: string;
+}
+
+export interface TwoFactorStatusResponse {
+  enabled: boolean;
+  method: string;
+  enrolled_at: string | null;
 }
 
 export class AuthApiError extends Error {
@@ -54,6 +75,22 @@ export class AuthApiError extends Error {
 
 function resolveAuthErrorMessage(payload: ErrorPayload, fallback: string): string {
   return payload.message || payload.detail || fallback;
+}
+
+function hasEnvelopeShape<T>(payload: ApiResponse<T> | T): payload is ApiResponse<T> {
+  return (
+    typeof payload === 'object' &&
+    payload !== null &&
+    'status' in payload &&
+    'data' in payload
+  );
+}
+
+function unwrapAuthPayload<T>(payload: ApiResponse<T> | T): T {
+  if (hasEnvelopeShape(payload)) {
+    return payload.data;
+  }
+  return payload;
 }
 
 function toAuthApiError(error: unknown, fallback: string): AuthApiError {
@@ -84,12 +121,52 @@ export const api = {
     body.append('password', formData.password);
 
     try {
-      return await http.request<AuthTokenResponse>('/auth/login', {
+      const response = await http.request<LoginResponse>('/auth/login', {
         method: 'POST',
         body,
       });
+      return unwrapAuthPayload(response as ApiResponse<LoginResponse> | LoginResponse);
     } catch (error: unknown) {
       throw toAuthApiError(error, 'Invalid username or password');
+    }
+  },
+
+  verifyLoginTwoFactor: async (challenge_token: string, code: string) => {
+    try {
+      const response = await http.request<AuthTokenResponse>('/auth/2fa/verify', {
+        method: 'POST',
+        body: JSON.stringify({ challenge_token, code }),
+      });
+      return unwrapAuthPayload(response as ApiResponse<AuthTokenResponse> | AuthTokenResponse);
+    } catch (error: unknown) {
+      throw toAuthApiError(error, 'Failed to verify two-factor authentication code');
+    }
+  },
+
+  initiateTwoFactorEnrollment: async () => {
+    try {
+      const response = await http.request<TwoFactorEnrollmentInitiateResponse>('/auth/2fa/enroll/initiate', {
+        method: 'POST',
+      });
+      return unwrapAuthPayload(
+        response as
+          | ApiResponse<TwoFactorEnrollmentInitiateResponse>
+          | TwoFactorEnrollmentInitiateResponse,
+      );
+    } catch (error: unknown) {
+      throw toAuthApiError(error, 'Unable to initiate two-factor enrollment');
+    }
+  },
+
+  verifyTwoFactorEnrollment: async (code: string) => {
+    try {
+      const response = await http.request<TwoFactorStatusResponse>('/auth/2fa/enroll/verify', {
+        method: 'POST',
+        body: JSON.stringify({ code }),
+      });
+      return unwrapAuthPayload(response as ApiResponse<TwoFactorStatusResponse> | TwoFactorStatusResponse);
+    } catch (error: unknown) {
+      throw toAuthApiError(error, 'Failed to enable two-factor authentication');
     }
   },
 

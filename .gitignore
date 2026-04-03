@@ -3,6 +3,9 @@
 #backups
 .backups/
 
+#vscode
+.vscode/
+
 #documentation
 .documentation/
 
@@ -52,6 +55,15 @@ backend/.tests
 backend/.todo
 backend/.scripts
 backend/data/logs
+
+# test directories and files
+backend/**/.tests/
+frontend/src/**/__tests__/
+frontend/src/**/tests/
+frontend/src/test/
+frontend/src/test/**
+frontend/**/.tests/
+frontend/**/__tests__/
 
 # vercel
 .vercel

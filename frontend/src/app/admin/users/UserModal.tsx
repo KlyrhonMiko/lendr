@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Loader2, Mail, Shield, Clock, Hash, Phone, UserCircle, Check, ChevronDown } from 'lucide-react';
+import { X, Loader2, Mail, Shield, Clock, Hash, Phone, UserCircle, Check, ChevronDown, KeyRound } from 'lucide-react';
 import { userApi, User, UserCreate, UserUpdate, AuthConfig } from './api';
 import { toast } from 'sonner';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
@@ -21,6 +21,7 @@ type EditableUserUpdate = UserUpdate & {
 export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
   const isEdit = !!user;
   const [loading, setLoading] = useState(false);
+  const [resettingTwoFactor, setResettingTwoFactor] = useState(false);
   const [configsLoading, setConfigsLoading] = useState(true);
   const [roles, setRoles] = useState<AuthConfig[]>([]);
   const [shifts, setShifts] = useState<AuthConfig[]>([]);
@@ -112,6 +113,27 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
       toast.error(message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResetTwoFactor = async () => {
+    if (!user) return;
+
+    const confirmed = window.confirm(
+      `Reset 2FA for ${user.first_name} ${user.last_name}? Their authenticator enrollment will be removed and active sessions will be revoked.`,
+    );
+    if (!confirmed) return;
+
+    setResettingTwoFactor(true);
+    try {
+      await userApi.resetTwoFactor(user.user_id);
+      toast.success('2FA reset successfully');
+      onSuccess();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to reset 2FA';
+      toast.error(message);
+    } finally {
+      setResettingTwoFactor(false);
     }
   };
 
@@ -291,6 +313,45 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
             </section>
 
             <hr className="border-border" />
+
+            {isEdit && (
+              <>
+                <section>
+                  <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+                    <KeyRound className="w-4 h-4 text-amber-500" />
+                    2FA Security
+                  </h3>
+                  <div className="rounded-lg border border-border bg-muted/20 p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-foreground">Authenticator reset</p>
+                      <p className="text-sm text-muted-foreground">
+                        Use this if the user lost their authenticator device. The current 2FA enrollment will be removed and they will sign in without 2FA until they enroll again.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleResetTwoFactor}
+                      disabled={resettingTwoFactor || loading}
+                      className="inline-flex items-center justify-center gap-2 h-11 px-4 rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-700 hover:bg-amber-500/15 disabled:opacity-50 transition-colors shrink-0"
+                    >
+                      {resettingTwoFactor ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Resetting...
+                        </>
+                      ) : (
+                        <>
+                          <KeyRound className="w-4 h-4" />
+                          Reset 2FA
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </section>
+
+                <hr className="border-border" />
+              </>
+            )}
 
             {/* System Configuration */}
             <section>

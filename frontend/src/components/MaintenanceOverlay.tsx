@@ -3,8 +3,11 @@
 import React from 'react';
 import { Wrench, RefreshCw, LogOut } from 'lucide-react';
 import { auth } from '@/lib/auth';
+import { usePublicBranding } from '@/lib/publicBranding';
 
 export function MaintenanceOverlay() {
+  const { brandName } = usePublicBranding();
+
   const handleRefresh = () => {
     window.location.reload();
   };
@@ -49,7 +52,7 @@ export function MaintenanceOverlay() {
         </div>
 
         <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
-          Powergold Engineering Enterprises Platform
+          {brandName} Platform
         </p>
       </div>
     </div>

@@ -196,6 +196,19 @@ def require_permission(permission: str | list[str]):
         perms = [permission] if isinstance(permission, str) else permission
         if not any(rbac_service.has_permission(session, current_user, p) for p in perms):
             required = ", ".join(perms) if isinstance(permission, list) else permission
+
+            _persist_audit_event(
+                entity_type="security",
+                entity_id=required,
+                action="unauthorized_access",
+                reason_code="403-FORBIDDEN",
+                actor_id=current_user.id,
+                after={
+                    "role": current_user.role,
+                    "required_permissions": perms,
+                },
+            )
+
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Role '{current_user.role}' lacks any of the required permissions: {required}",

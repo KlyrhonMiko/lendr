@@ -48,6 +48,12 @@ export interface AuthConfig {
   description?: string;
 }
 
+export interface UserTwoFactorStatus {
+  enabled: boolean;
+  method: string;
+  enrolled_at: string | null;
+}
+
 export const userApi = {
   list: (params: UserListParams = {}) =>
     api.get<User[]>(`/admin/users${buildQueryString(params as Record<string, unknown>)}`),
@@ -66,6 +72,9 @@ export const userApi = {
 
   restore: (userId: string) =>
     api.post<User>(`/admin/users/${userId}/restore`),
+
+  resetTwoFactor: (userId: string) =>
+    api.post<UserTwoFactorStatus>(`/admin/users/${userId}/2fa/reset`),
 
   getConfigs: (category: string) =>
     api.get<AuthConfig[]>(`/auth/config?category=${category}`),

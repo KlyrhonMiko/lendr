@@ -11,9 +11,30 @@ export interface User {
   role: string;
   is_active?: boolean;
 }
+
+interface SessionPolicyApiPayload {
+  inactive_minutes?: number;
+  warning_minutes?: number;
+}
+
+interface SessionTimerPolicy {
+  inactiveMinutes: number;
+  warningMinutes: number;
+}
+
+const DEFAULT_SESSION_TIMER_POLICY: SessionTimerPolicy = {
+  inactiveMinutes: 30,
+  warningMinutes: 5,
+};
+
+const POLICY_CACHE_TTL_MS = 5 * 60 * 1000;
+
 let logoutTimer: NodeJS.Timeout | null = null;
 let lastActivityTime = Date.now();
 let listenersBound = false;
+let sessionTimerPolicyCache: SessionTimerPolicy | null = null;
+let sessionTimerPolicyFetchedAt = 0;
+let sessionTimerPolicyPromise: Promise<SessionTimerPolicy> | null = null;
 
 const activityEvents: Array<keyof WindowEventMap> = ['mousemove', 'keydown', 'click', 'scroll'];
 
@@ -51,76 +72,178 @@ function parseJwtPayload(token: string): Record<string, unknown> | null {
   }
 }
 
-export const auth = {
-  setupTokenTimer: (token: string) => {
-    if (typeof window === 'undefined') return;
-    auth.clearTokenTimer();
-    bindActivityListeners();
-    
+function clampMinutes(value: unknown, fallback: number, min: number, max: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallback;
+  }
+
+  const rounded = Math.floor(value);
+  return Math.min(max, Math.max(min, rounded));
+}
+
+function normalizeSessionTimerPolicy(
+  payload: SessionPolicyApiPayload | undefined
+): SessionTimerPolicy {
+  const inactiveMinutes = clampMinutes(
+    payload?.inactive_minutes,
+    DEFAULT_SESSION_TIMER_POLICY.inactiveMinutes,
+    5,
+    1440,
+  );
+
+  const warningCandidate = clampMinutes(
+    payload?.warning_minutes,
+    DEFAULT_SESSION_TIMER_POLICY.warningMinutes,
+    1,
+    60,
+  );
+
+  const warningMinutes = Math.min(warningCandidate, Math.max(1, inactiveMinutes - 1));
+
+  return {
+    inactiveMinutes,
+    warningMinutes,
+  };
+}
+
+function isPolicyCacheFresh(): boolean {
+  if (!sessionTimerPolicyCache) return false;
+  return Date.now() - sessionTimerPolicyFetchedAt < POLICY_CACHE_TTL_MS;
+}
+
+async function getSessionTimerPolicy(): Promise<SessionTimerPolicy> {
+  if (isPolicyCacheFresh() && sessionTimerPolicyCache) {
+    return sessionTimerPolicyCache;
+  }
+
+  if (sessionTimerPolicyPromise) {
+    return sessionTimerPolicyPromise;
+  }
+
+  sessionTimerPolicyPromise = (async () => {
     try {
-      const payload = parseJwtPayload(token);
-      
-      if (!payload || typeof payload.exp !== 'number') return;
-      
-      const checkInterval = 60 * 1000; // Check every 1 minute
-      const REFRESH_THRESHOLD = 5 * 60 * 1000; // Refresh when <= 5 mins left
-      const IDLE_TIMEOUT = 10 * 60 * 1000; // Only refresh if active in last 10 mins
-      
-      logoutTimer = setInterval(async () => {
-        const currentToken = auth.getToken();
-        if (!currentToken) {
-          auth.clearTokenTimer();
+      const response = await http.request<SessionPolicyApiPayload>('/auth/session-policy', {
+        method: 'GET',
+      });
+
+      const resolvedPolicy = normalizeSessionTimerPolicy(response.data);
+      sessionTimerPolicyCache = resolvedPolicy;
+      sessionTimerPolicyFetchedAt = Date.now();
+      return resolvedPolicy;
+    } catch (error: unknown) {
+      if (error instanceof HttpRequestError && error.status === 401) {
+        throw error;
+      }
+
+      const fallbackPolicy = sessionTimerPolicyCache ?? DEFAULT_SESSION_TIMER_POLICY;
+      sessionTimerPolicyCache = fallbackPolicy;
+      sessionTimerPolicyFetchedAt = Date.now();
+      return fallbackPolicy;
+    } finally {
+      sessionTimerPolicyPromise = null;
+    }
+  })();
+
+  return sessionTimerPolicyPromise;
+}
+
+function startTokenTimer(token: string, policy: SessionTimerPolicy): void {
+  auth.clearTokenTimer();
+  bindActivityListeners();
+
+  try {
+    const payload = parseJwtPayload(token);
+
+    if (!payload || typeof payload.exp !== 'number') return;
+
+    const checkInterval = 60 * 1000; // Check every 1 minute
+    const refreshThreshold = policy.warningMinutes * 60 * 1000;
+    const idleTimeout = policy.inactiveMinutes * 60 * 1000;
+
+    logoutTimer = setInterval(async () => {
+      const currentToken = auth.getToken();
+      if (!currentToken) {
+        auth.clearTokenTimer();
+        return;
+      }
+
+      try {
+        const currentPayload = parseJwtPayload(currentToken);
+        if (!currentPayload || typeof currentPayload.exp !== 'number') {
+          auth.logout();
           return;
         }
 
-        try {
-          const currentPayload = parseJwtPayload(currentToken);
-          if (!currentPayload || typeof currentPayload.exp !== 'number') {
-            auth.logout();
-            return;
-          }
+        const currentExpTime = currentPayload.exp * 1000;
+        const now = Date.now();
+        const timeRemaining = currentExpTime - now;
 
-          const currentExpTime = currentPayload.exp * 1000;
-          const now = Date.now();
-          const timeRemaining = currentExpTime - now;
-          
-          if (timeRemaining <= 0) {
-            auth.logout();
-          } else if (timeRemaining <= REFRESH_THRESHOLD) {
-            if (now - lastActivityTime < IDLE_TIMEOUT) {
-              try {
-                const refreshResponse = await http.request<{ access_token: string }>('/auth/refresh', {
-                  method: 'POST',
-                  headers: { Authorization: `Bearer ${currentToken}` },
-                });
+        if (timeRemaining <= 0) {
+          auth.logout();
+        } else if (timeRemaining <= refreshThreshold) {
+          if (now - lastActivityTime < idleTimeout) {
+            try {
+              const refreshResponse = await http.request<{ access_token: string }>('/auth/refresh', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${currentToken}` },
+              });
 
-                const refreshedToken =
-                  (refreshResponse as { access_token?: string }).access_token ||
-                  refreshResponse.data?.access_token;
+              const refreshedToken =
+                (refreshResponse as { access_token?: string }).access_token ||
+                refreshResponse.data?.access_token;
 
-                if (refreshedToken) {
-                  // Update the token in storage, this restarts the cycle.
-                  tokenStore.setToken(refreshedToken);
-                }
-              } catch (error: unknown) {
-                if (error instanceof HttpRequestError && error.status === 401) {
-                  auth.logout();
-                }
-
-                // Keep existing token until expiry if refresh fails transiently.
+              if (refreshedToken) {
+                // Update the token in storage, this keeps the refresh cycle active.
+                tokenStore.setToken(refreshedToken);
               }
-            } else {
-              // User is idle but token not yet expired. Just wait for natural expiration.
+            } catch (error: unknown) {
+              if (error instanceof HttpRequestError && error.status === 401) {
+                auth.logout();
+              }
+
+              // Keep existing token until expiry if refresh fails transiently.
             }
+          } else {
+            // User is idle but token not yet expired. Just wait for natural expiration.
           }
-        } catch {
-          auth.clearTokenTimer();
         }
-      }, checkInterval);
-      
-    } catch {
-      auth.clearTokenTimer();
+      } catch {
+        auth.clearTokenTimer();
+      }
+    }, checkInterval);
+  } catch {
+    auth.clearTokenTimer();
+  }
+}
+
+export const auth = {
+  setupTokenTimer: (token: string, policyOverride?: SessionTimerPolicy) => {
+    if (typeof window === 'undefined') return;
+    const initialPolicy = policyOverride ?? sessionTimerPolicyCache ?? DEFAULT_SESSION_TIMER_POLICY;
+    startTokenTimer(token, initialPolicy);
+
+    if (policyOverride) {
+      return;
     }
+
+    void getSessionTimerPolicy()
+      .then((resolvedPolicy) => {
+        const currentToken = auth.getToken();
+        if (!currentToken || currentToken !== token) {
+          return;
+        }
+
+        const policyChanged =
+          resolvedPolicy.inactiveMinutes !== initialPolicy.inactiveMinutes ||
+          resolvedPolicy.warningMinutes !== initialPolicy.warningMinutes;
+
+        if (policyChanged) {
+          auth.setupTokenTimer(currentToken, resolvedPolicy);
+        }
+      })
+      .catch(() => {
+        // Keep timer running with fallback policy if policy fetch fails.
+      });
   },
 
   clearTokenTimer: () => {

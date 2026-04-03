@@ -8,6 +8,7 @@ from systems.auth.dependencies import require_permission
 from core.schemas import GenericResponse, create_success_response, make_pagination_meta
 from systems.admin.models.user import User
 from systems.admin.schemas.user_schemas import UserCreate, UserRead, UserUpdate
+from systems.auth.schemas.auth_schemas import TwoFactorStatusRead
 from systems.admin.services.user_service import UserService
 from systems.auth.services.auth_service import auth_service
 
@@ -98,6 +99,41 @@ async def get_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return create_success_response(data=user, request=request)
+
+
+@router.post(
+    "/{user_id}/2fa/reset",
+    response_model=GenericResponse[TwoFactorStatusRead],
+    responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}},
+)
+async def reset_user_two_factor_enrollment(
+    user_id: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("admin:users:manage")),
+):
+    target_user = user_service.get(session, user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    auth_service.reset_two_factor_enrollment_for_user(
+        session,
+        target_user,
+        actor_id=current_user.id,
+    )
+    auth_service.revoke_sessions_for_user(session, target_user.id)
+    session.commit()
+
+    return create_success_response(
+        data=TwoFactorStatusRead(
+            enabled=False,
+            method="authenticator_app",
+            enrolled_at=None,
+        ),
+        message="Two-factor authentication reset successfully",
+        request=request,
+    )
 
 
 @router.patch(

@@ -4,6 +4,7 @@ from sqlmodel import Session, select, func, or_
 
 from core.base_service import BaseService
 from systems.admin.models.user import User
+from systems.admin.services.password_policy_service import PasswordPolicyService
 from systems.admin.schemas.user_schemas import UserCreate, UserUpdate
 from utils.id_generator import get_next_sequence
 from utils.security import get_password_hash
@@ -12,6 +13,7 @@ from utils.time_utils import get_now_manila
 class UserService(BaseService[User, UserCreate, UserUpdate]):
     def __init__(self):
         super().__init__(User, lookup_field="user_id")
+        self.password_policy_service = PasswordPolicyService()
 
     def requires_session_revocation(self, user: User, schema: UserUpdate) -> bool:
         updates = schema.model_dump(exclude_unset=True)
@@ -109,6 +111,7 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
 
         data = schema.model_dump()
         password = data.pop("password")
+        self.password_policy_service.validate_for_role(session, password, schema.role)
         data["hashed_password"] = get_password_hash(password)
 
         if not data.get(self.lookup_field):
@@ -140,6 +143,8 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
         obj_data = schema.model_dump(exclude_unset=True)
         if "password" in obj_data:
             password = obj_data.pop("password")
+            target_role = obj_data.get("role") or db_obj.role
+            self.password_policy_service.validate_for_role(session, password, target_role)
             obj_data["hashed_password"] = get_password_hash(password)
 
         for key, value in obj_data.items():

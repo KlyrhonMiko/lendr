@@ -18,8 +18,8 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Powergold Engineering Enterprises - Enterprise POS",
-  description: "Enterprise POS and Inventory Management for Equipment",
+  title: "Inventory Management Platform",
+  description: "Web application for inventory and borrowing workflows",
 };
 
 export default function RootLayout({

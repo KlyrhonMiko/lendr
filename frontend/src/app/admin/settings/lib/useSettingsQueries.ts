@@ -3,11 +3,13 @@ import {
   settingsApi,
   healthApi,
   archivesApi,
+  securitySettingsApi,
   SettingsListParams,
   SystemSettingCreate,
   GeneralSettingsData,
   BrandingSettingsData,
   OperationsSettingsData,
+  SecuritySettingsData,
 } from '../api';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
@@ -16,6 +18,75 @@ import type { BackupRun } from '../../backup/api';
 const STALE_TIME_CONFIG = Infinity;
 const STALE_TIME_LIST = 1000 * 30; // 30 seconds
 const STALE_TIME_HEALTH = 1000 * 15; // 15 seconds
+
+export interface RbacOverviewRow {
+  role: string;
+  displayName: string;
+  permissions: string[];
+  userCount: number;
+}
+
+export interface SecurityShiftConfig {
+  key: string;
+  label: string;
+  start: string;
+  end: string;
+  days: number[];
+}
+
+export interface SecuritySettingsViewData {
+  security: SecuritySettingsData;
+  rbacRows: RbacOverviewRow[];
+  shiftConfigs: SecurityShiftConfig[];
+}
+
+function formatRoleLabel(role: string): string {
+  return role
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function normalizeShiftDays(days: number[]): number[] {
+  return [...new Set(days)].filter((day) => day >= 0 && day <= 6).sort((left, right) => left - right);
+}
+
+function buildRbacRows(securitySettings: SecuritySettingsData): RbacOverviewRow[] {
+  return securitySettings.rbac_overview.role_definitions
+    .map((definition) => ({
+      role: definition.role,
+      displayName: definition.display_name?.trim() || formatRoleLabel(definition.role),
+      permissions: definition.permissions,
+      userCount: definition.user_count,
+    }))
+    .sort((left, right) => left.displayName.localeCompare(right.displayName));
+}
+
+function buildShiftConfigs(securitySettings: SecuritySettingsData): SecurityShiftConfig[] {
+  const definitionsByKey = new Map(
+    securitySettings.shift_definitions.definitions.map((definition) => [definition.key, definition]),
+  );
+
+  const orderedKeys = securitySettings.shift_definitions.values.length
+    ? securitySettings.shift_definitions.values
+    : securitySettings.shift_definitions.definitions.map((definition) => definition.key);
+
+  const uniqueKeys = [...new Set(orderedKeys)];
+
+  return uniqueKeys
+    .map((key) => {
+      const definition = definitionsByKey.get(key);
+      return {
+        key,
+        label: definition?.label ?? formatRoleLabel(key),
+        start: definition?.start ?? '08:00',
+        end: definition?.end ?? '17:00',
+        days: normalizeShiftDays(definition?.days ?? [1, 2, 3, 4, 5]),
+      };
+    })
+    .sort((left, right) => left.label.localeCompare(right.label));
+}
 
 // --- Dictionary & Settings Queries ---
 
@@ -110,6 +181,25 @@ export function useOperationsSettings() {
     queryKey: ['admin', 'settings', 'operations'],
     queryFn: () => api.get<OperationsSettingsData>('/admin/settings/operations'),
     staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+}
+
+export function useSecuritySettingsViewData() {
+  return useQuery({
+    queryKey: ['admin', 'settings', 'security', 'view'],
+    queryFn: async () => {
+      const securityRes = await securitySettingsApi.get();
+      const security = securityRes.data;
+      const rbacRows = buildRbacRows(security);
+      const shiftConfigs = buildShiftConfigs(security);
+
+      return {
+        security,
+        rbacRows,
+        shiftConfigs,
+      } satisfies SecuritySettingsViewData;
+    },
+    staleTime: STALE_TIME_LIST,
   });
 }
 
@@ -310,4 +400,26 @@ export function useArchiveMutations() {
   });
 
   return { restoreArchive, updateArchiveTags };
+}
+
+export function useSecuritySettingsMutations() {
+  const queryClient = useQueryClient();
+
+  const saveSecuritySettings = useMutation({
+    mutationFn: (payload: SecuritySettingsData) => securitySettingsApi.update(payload),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['admin', 'settings', 'security'] }),
+        queryClient.invalidateQueries({ queryKey: ['admin', 'settings', 'security', 'view'] }),
+        queryClient.invalidateQueries({ queryKey: ['auth', 'settings', 'configurations'] }),
+        queryClient.invalidateQueries({ queryKey: ['admin', 'users', 'config', 'users_shift_type'] }),
+      ]);
+      toast.success('Security settings updated');
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : 'Failed to update security settings');
+    },
+  });
+
+  return { saveSecuritySettings };
 }

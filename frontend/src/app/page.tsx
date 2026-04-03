@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/auth';
 import { Loader2 } from 'lucide-react';
+import { usePublicBranding } from '@/lib/publicBranding';
 
 export default function HomePage() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const { brandName } = usePublicBranding();
 
   useEffect(() => {
     if (!loading) {
@@ -23,7 +25,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4">
       <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-xl shadow-indigo-500/20 animate-pulse">
-        <span className="text-white font-bold text-3xl font-heading">L</span>
+        <span className="text-white font-bold text-3xl font-heading">{brandName.charAt(0).toUpperCase()}</span>
       </div>
       <div className="flex items-center gap-2 text-muted-foreground animate-pulse">
         <Loader2 className="w-4 h-4 animate-spin" />
