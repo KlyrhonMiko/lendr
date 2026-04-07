@@ -9,6 +9,7 @@ import { api } from '@/lib/api';
 import { CartItem } from './lib/types';
 import { validateBorrowSubmission, validatePinVerificationInput } from './lib/validation';
 import { SelectionView } from './components/SelectionView';
+import { CheckoutView } from './components/CheckoutView';
 
 export default function BorrowPage() {
   const [items, setItems] = useState<BorrowCatalogItem[]>([]);
@@ -26,6 +27,9 @@ export default function BorrowPage() {
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [isPinVerifying, setIsPinVerifying] = useState(false);
   const [pinDraft, setPinDraft] = useState('');
+  const [step, setStep] = useState<'selection' | 'checkout'>('selection');
+  const [success, setSuccess] = useState(false);
+  const [submittedByEmployeeName, setSubmittedByEmployeeName] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -273,9 +277,18 @@ export default function BorrowPage() {
       }
       auth.clearToken();
 
+      setSubmittedByEmployeeName(displayName);
+      setSuccess(true);
       toast.success(`Borrow request submitted for ${cart.length} item(s) by ${displayName}`);
-      handleClear();
-      fetchData();
+
+      // Delay clearing and fetching to allow success animation
+      setTimeout(() => {
+        handleClear();
+        fetchData();
+        setStep('selection');
+        setSuccess(false);
+        setSubmittedByEmployeeName(null);
+      }, 3000);
     } catch (error: unknown) {
       if (hasBorrowerSession) {
         try {
@@ -296,37 +309,48 @@ export default function BorrowPage() {
   };
 
   return (
-    <div className="h-screen p-4 animate-in fade-in duration-300 relative">
-      <SelectionView
-        items={filteredItems}
-        loading={loading}
-        search={search}
-        onSearchChange={setSearch}
-        categories={categories}
-        selectedCategory={selectedCategory}
-        onCategoryChange={setSelectedCategory}
-        totalItems={items.length}
-        cart={cart}
-        totalCartItems={totalCartItems}
-        onAddToCart={addToCart}
-        onUpdateCartQty={updateCartQty}
-        onRemoveFromCart={removeFromCart}
-        onClear={handleClear}
-        employeeId={employeeId}
-        onEmployeeIdChange={setEmployeeId}
-        employeePin={employeePin}
-        customerName={customerName}
-        onCustomerNameChange={setCustomerName}
-        locationName={locationName}
-        onLocationNameChange={setLocationName}
-        collaborators={collaborators}
-        onCollaboratorsChange={setCollaborators}
-        notes={notes}
-        onNotesChange={setNotes}
-        onOpenPinModal={handleOpenPinModal}
-        onSubmit={handleSubmit}
-        isSubmitting={isSubmitting}
-      />
+    <div className="h-screen p-4 animate-in fade-in duration-300 relative bg-[#fcfcfc] dark:bg-[#0a0a0b]">
+      {step === 'selection' ? (
+        <SelectionView
+          items={filteredItems}
+          loading={loading}
+          search={search}
+          onSearchChange={setSearch}
+          categories={categories}
+          selectedCategory={selectedCategory}
+          onCategoryChange={setSelectedCategory}
+          totalItems={items.length}
+          cart={cart}
+          totalCartItems={totalCartItems}
+          onAddToCart={addToCart}
+          onUpdateCartQty={updateCartQty}
+          onRemoveFromCart={removeFromCart}
+          onClear={handleClear}
+          onProceed={() => setStep('checkout')}
+        />
+      ) : (
+        <CheckoutView
+          cart={cart}
+          totalCartItems={totalCartItems}
+          employeeId={employeeId}
+          onEmployeeIdChange={setEmployeeId}
+          employeePin={employeePin}
+          customerName={customerName}
+          onCustomerNameChange={setCustomerName}
+          locationName={locationName}
+          onLocationNameChange={setLocationName}
+          collaborators={collaborators}
+          onCollaboratorsChange={setCollaborators}
+          notes={notes}
+          onNotesChange={setNotes}
+          onBack={() => setStep('selection')}
+          onSubmit={handleSubmit}
+          isSubmitting={isSubmitting}
+          success={success}
+          submittedByEmployeeName={submittedByEmployeeName}
+          onOpenPinModal={handleOpenPinModal}
+        />
+      )}
 
       {isPinModalOpen && (
         <div
@@ -369,11 +393,10 @@ export default function BorrowPage() {
                       onChange={(e) => handlePinDigitChange(i, e.target.value)}
                       onKeyDown={(e) => handlePinKeyDown(i, e)}
                       onFocus={(e) => e.target.select()}
-                      className={`w-14 h-16 text-center text-2xl font-bold rounded-xl border-2 bg-background transition-all focus:outline-none tabular-nums ${
-                        pinDigits[i]
-                          ? 'border-indigo-500/50 text-foreground'
-                          : 'border-border/80 text-muted-foreground'
-                      } focus:border-indigo-500 focus:shadow-[0_0_0_4px_rgba(99,102,241,0.1)]`}
+                      className={`w-14 h-16 text-center text-2xl font-bold rounded-xl border-2 bg-background transition-all focus:outline-none tabular-nums ${pinDigits[i]
+                        ? 'border-indigo-500/50 text-foreground'
+                        : 'border-border/80 text-muted-foreground'
+                        } focus:border-indigo-500 focus:shadow-[0_0_0_4px_rgba(99,102,241,0.1)]`}
                     />
                     {!pinDigits[i] && (
                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -389,11 +412,10 @@ export default function BorrowPage() {
                 {Array.from({ length: 6 }).map((_, i) => (
                   <div
                     key={i}
-                    className={`h-1 rounded-full transition-all duration-200 ${
-                      pinDigits[i]
-                        ? 'w-5 bg-indigo-500'
-                        : 'w-3 bg-border'
-                    }`}
+                    className={`h-1 rounded-full transition-all duration-200 ${pinDigits[i]
+                      ? 'w-5 bg-indigo-500'
+                      : 'w-3 bg-border'
+                      }`}
                   />
                 ))}
               </div>

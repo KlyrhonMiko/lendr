@@ -165,13 +165,13 @@ export function SecuritySettings() {
 
   const roleOptions = securityViewData?.rbacRows.length
     ? securityViewData.rbacRows.map((row) => ({
-        role: row.role,
-        label: row.displayName,
-      }))
+      role: row.role,
+      label: row.displayName,
+    }))
     : (draft?.two_factor.enforce_for_roles ?? []).map((role) => ({
-        role,
-        label: formatRoleLabel(role),
-      }));
+      role,
+      label: formatRoleLabel(role),
+    }));
 
   const rbacRows = securityViewData?.rbacRows ?? [];
   const excludedRoles = draft?.password_rules.applies_when_role_not_in ?? [];
@@ -306,7 +306,7 @@ export function SecuritySettings() {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {error && (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700">
+        <div className="rounded-lg border border-orange-500/30 bg-orange-500/10 px-4 py-3 text-sm text-orange-700">
           Showing cached security data while refreshing failed.
         </div>
       )}
@@ -669,11 +669,10 @@ export function SecuritySettings() {
                                     key={day.value}
                                     type="button"
                                     onClick={() => toggleShiftDay(shift.key, day.value)}
-                                    className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors ${
-                                      isActive
-                                        ? 'bg-primary text-primary-foreground border-primary/20'
-                                        : 'bg-secondary/50 text-muted-foreground border-border/50'
-                                    }`}
+                                    className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors ${isActive
+                                      ? 'bg-primary text-primary-foreground border-primary/20'
+                                      : 'bg-secondary/50 text-muted-foreground border-border/50'
+                                      }`}
                                     disabled={isSaving}
                                   >
                                     {day.label}
@@ -699,11 +698,10 @@ export function SecuritySettings() {
                               {SHIFT_DAYS.map((day) => (
                                 <span
                                   key={day.value}
-                                  className={`px-2 py-0.5 rounded text-[9px] font-bold border ${
-                                    shift.days.includes(day.value)
-                                      ? 'bg-primary text-primary-foreground border-primary/20'
-                                      : 'bg-secondary/50 text-muted-foreground border-border/50'
-                                  }`}
+                                  className={`px-2 py-0.5 rounded text-[9px] font-bold border ${shift.days.includes(day.value)
+                                    ? 'bg-primary text-primary-foreground border-primary/20'
+                                    : 'bg-secondary/50 text-muted-foreground border-border/50'
+                                    }`}
                                 >
                                   {day.label}
                                 </span>

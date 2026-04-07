@@ -45,7 +45,7 @@ export function SettingsTable({
                     <span className="font-semibold text-foreground font-mono text-sm">{setting.key}</span>
                     <span className="text-xs text-muted-foreground line-clamp-1">{setting.description || 'No description provided.'}</span>
                     {setting.crucial && (
-                      <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-600">
+                      <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
                         <Lock className="h-3 w-3" />
                         Required
                       </span>

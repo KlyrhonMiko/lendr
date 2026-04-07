@@ -56,7 +56,7 @@ export function GeneralSettings() {
       {/* Localization and Regional Settings */}
       <Card className="border-border/50 shadow-sm overflow-hidden">
         <CardHeader className="flex flex-row items-start gap-4 bg-muted/30 pb-6">
-          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0 transition-colors">
+          <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500 shrink-0 transition-colors">
             <Globe className="w-5 h-5" />
           </div>
           <div className="space-y-1">
@@ -65,8 +65,8 @@ export function GeneralSettings() {
           </div>
         </CardHeader>
         <CardContent className="grid gap-6 md:grid-cols-2 pt-6">
-          <Select 
-            label="Timezone" 
+          <Select
+            label="Timezone"
             value={settings.localization.timezone}
             onChange={(e: React.ChangeEvent<HTMLSelectElement>) => updateLocalization('timezone', e.target.value)}
             options={[
@@ -75,42 +75,42 @@ export function GeneralSettings() {
               { label: '(UTC+09:00) Tokyo, Seoul', value: 'Asia/Tokyo' },
               { label: '(UTC-05:00) Eastern Time (US & Canada)', value: 'America/New_York' },
               { label: '(UTC+01:00) Central European Time', value: 'Europe/Berlin' }
-            ]} 
+            ]}
           />
-          <Select 
-            label="Date Format" 
+          <Select
+            label="Date Format"
             value={settings.localization.date_format}
             onChange={(e: React.ChangeEvent<HTMLSelectElement>) => updateLocalization('date_format', e.target.value)}
             options={[
               { label: 'MM/DD/YYYY (USA Style)', value: 'MM/DD/YYYY' },
               { label: 'DD/MM/YYYY (PH Style)', value: 'DD/MM/YYYY' },
               { label: 'YYYY-MM-DD (ISO standard)', value: 'YYYY-MM-DD' }
-            ]} 
+            ]}
           />
-          <Select 
-            label="Time Format" 
+          <Select
+            label="Time Format"
             value={settings.localization.time_format}
             onChange={(e: React.ChangeEvent<HTMLSelectElement>) => updateLocalization('time_format', e.target.value)}
             options={[
               { label: '12-hour (AM/PM)', value: '12h' },
               { label: '24-hour (Military)', value: '24h' }
-            ]} 
+            ]}
           />
-          <Select 
-            label="Language" 
+          <Select
+            label="Language"
             value={settings.localization.language}
             onChange={(e: React.ChangeEvent<HTMLSelectElement>) => updateLocalization('language', e.target.value)}
             options={[
               { label: 'English (US)', value: 'en' },
               { label: 'Spanish (Coming Soon)', value: 'es' },
               { label: 'French (Coming Soon)', value: 'fr' }
-            ]} 
+            ]}
           />
         </CardContent>
       </Card>
 
       <div className="flex justify-end pt-4 sticky bottom-0 bg-background/80 backdrop-blur-sm pb-4 border-t border-border/40 z-20">
-        <button 
+        <button
           onClick={handleSave}
           disabled={saving}
           className="flex items-center gap-2 px-10 py-3 bg-primary hover:bg-primary/90 disabled:opacity-50 text-white rounded-xl text-sm font-bold shadow-lg shadow-primary/20 transition-all active:scale-[0.98]"

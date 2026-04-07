@@ -28,7 +28,7 @@ export default function AdminDashboard() {
           <ActivityHeatmap activity={activity} loading={loading} />
         </div>
         <div className="lg:col-span-2">
-           <UserDistributionPanel insights={userInsights} loading={loading} />
+          <UserDistributionPanel insights={userInsights} loading={loading} />
         </div>
       </div>
 

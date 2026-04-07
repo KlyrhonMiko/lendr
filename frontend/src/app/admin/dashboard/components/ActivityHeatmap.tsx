@@ -3,7 +3,7 @@ import { Activity } from 'lucide-react';
 
 export function ActivityHeatmap({ activity, loading }: { activity: ActivityPoint[]; loading: boolean }) {
   const maxCount = Math.max(...activity.map(a => a.count), 1);
-  
+
   // Create a 24-hour array to ensure all hours are shown even if count is 0
   const fullActivity = Array.from({ length: 24 }, (_, i) => {
     const found = activity.find(a => a.hour === i);
@@ -27,10 +27,10 @@ export function ActivityHeatmap({ activity, loading }: { activity: ActivityPoint
           <div className="w-full h-full bg-muted animate-pulse rounded" />
         ) : (
           fullActivity.map((point) => (
-            <div 
-              key={point.hour} 
+            <div
+              key={point.hour}
               className="flex-1 rounded-t-sm transition-all group relative cursor-help"
-              style={{ 
+              style={{
                 height: `${Math.max(4, (point.count / maxCount) * 100)}%`,
                 backgroundColor: point.count === 0 ? 'rgba(var(--muted), 0.2)' : `rgba(59, 130, 246, ${Math.max(0.2, point.count / maxCount)})`
               }}

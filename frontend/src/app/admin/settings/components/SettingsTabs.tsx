@@ -22,11 +22,10 @@ export function SettingsTabs({ activeTab, onTabChange }: { activeTab: ActiveTab;
           <button
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
-            className={`flex items-center gap-2 px-5 py-2 rounded-md text-sm font-semibold transition-all ${
-              activeTab === tab.id
+            className={`flex items-center gap-2 px-5 py-2 rounded-md text-sm font-semibold transition-all ${activeTab === tab.id
                 ? 'bg-background text-primary shadow-sm border border-border/50'
                 : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
-            }`}
+              }`}
           >
             <Icon className="w-4 h-4" />
             {tab.label}

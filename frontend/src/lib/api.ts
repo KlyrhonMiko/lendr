@@ -150,8 +150,8 @@ export const api = {
       });
       return unwrapAuthPayload(
         response as
-          | ApiResponse<TwoFactorEnrollmentInitiateResponse>
-          | TwoFactorEnrollmentInitiateResponse,
+        | ApiResponse<TwoFactorEnrollmentInitiateResponse>
+        | TwoFactorEnrollmentInitiateResponse,
       );
     } catch (error: unknown) {
       throw toAuthApiError(error, 'Unable to initiate two-factor enrollment');
@@ -187,10 +187,11 @@ export const api = {
     body.append('password', formData.password);
 
     try {
-      return await http.request<AuthTokenResponse>('/auth/borrower/login', {
+      const response = await http.request<AuthTokenResponse>('/auth/borrower/login', {
         method: 'POST',
         body,
       });
+      return unwrapAuthPayload(response as ApiResponse<AuthTokenResponse> | AuthTokenResponse);
     } catch (error: unknown) {
       throw toAuthApiError(error, 'Invalid borrower pin');
     }
