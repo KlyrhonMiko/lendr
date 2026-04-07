@@ -86,34 +86,34 @@ export function OperationsSettings() {
       {/* Maintenance Mode */}
       <Card>
         <CardHeader className="flex flex-row items-center gap-4">
-          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+          <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center text-orange-500">
             <Wrench className="w-5 h-5" />
           </div>
           <div className="flex-1">
             <CardTitle>Enable Maintenance Mode</CardTitle>
             <CardDescription>Block user access to the platform for scheduled repairs or updates.</CardDescription>
           </div>
-          <Toggle 
-            label={data.maintenance.enabled ? "Active" : "Inactive"} 
-            checked={data.maintenance.enabled} 
+          <Toggle
+            label={data.maintenance.enabled ? "Active" : "Inactive"}
+            checked={data.maintenance.enabled}
             onChange={(e: ChangeEvent<HTMLInputElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
-              ...prev, 
+              ...prev,
               maintenance: { ...prev.maintenance, enabled: e.target.checked }
-            } : null)} 
+            } : null)}
           />
         </CardHeader>
         <CardContent className={data.maintenance.enabled ? "space-y-6 opacity-100 transition-opacity" : "space-y-6 opacity-50 grayscale pointer-events-none transition-opacity"}>
           <div className="space-y-2">
             <label className="text-sm font-semibold text-foreground px-1">Custom Maintenance Message</label>
-            <Textarea 
-              value={data.maintenance.message} 
+            <Textarea
+              value={data.maintenance.message}
               onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
                 ...prev,
                 maintenance: { ...prev.maintenance, message: e.target.value }
               } : null)}
             />
           </div>
-          
+
           {/* Time scheduling removed per user request for simplicity */}
         </CardContent>
       </Card>
@@ -121,7 +121,7 @@ export function OperationsSettings() {
       {/* Automated Backup Schedule */}
       <Card>
         <CardHeader className="flex flex-row items-center gap-4">
-          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+          <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500">
             <Database className="w-5 h-5" />
           </div>
           <div className="flex-1">
@@ -130,8 +130,8 @@ export function OperationsSettings() {
           </div>
         </CardHeader>
         <CardContent className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          <Select 
-            label="Frequency" 
+          <Select
+            label="Frequency"
             value={data.backup_schedule.frequency}
             onChange={(e: ChangeEvent<HTMLSelectElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
               ...prev,
@@ -141,19 +141,19 @@ export function OperationsSettings() {
               { label: 'Daily', value: 'daily' },
               { label: 'Weekly', value: 'weekly' },
               { label: 'Monthly', value: 'monthly' }
-            ]} 
+            ]}
           />
-          <Input 
-            label="Backup Time" 
-            type="time" 
+          <Input
+            label="Backup Time"
+            type="time"
             value={data.backup_schedule.time}
             onChange={(e: ChangeEvent<HTMLInputElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
               ...prev,
               backup_schedule: { ...prev.backup_schedule, time: e.target.value }
             } : null)}
           />
-          <Select 
-            label="Storage Location" 
+          <Select
+            label="Storage Location"
             value={data.backup_schedule.storage_location}
             onChange={(e: ChangeEvent<HTMLSelectElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
               ...prev,
@@ -163,7 +163,7 @@ export function OperationsSettings() {
               { label: 'Local Server', value: 'local' },
               { label: 'Amazon S3 (Cloud)', value: 's3' },
               { label: 'Local + S3 (Mirror)', value: 'both' }
-            ]} 
+            ]}
           />
         </CardContent>
       </Card>
@@ -179,48 +179,48 @@ export function OperationsSettings() {
         <CardContent className="p-0 border-t border-border">
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
-               <thead className="bg-muted/30 text-muted-foreground font-semibold">
-                 <tr>
-                    <th className="px-6 py-4">Date & Time</th>
-                    <th className="px-6 py-4">Size</th>
-                    <th className="px-6 py-4">Target</th>
-                    <th className="px-6 py-4">Status</th>
-                    <th className="px-6 py-4 text-right">Actions</th>
-                 </tr>
-               </thead>
-               <tbody className="divide-y divide-border/50">
-                 {backups.length === 0 ? (
-                   <tr>
-                     <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground italic">No backup history available</td>
-                   </tr>
-                 ) : backups.map((backup) => (
-                   <tr key={backup.backup_id} className="hover:bg-muted/10 transition-colors">
-                     <td className="px-6 py-4 font-medium">{backup.started_at}</td>
-                     <td className="px-6 py-4">{formatSize(backup.artifacts[0]?.size_bytes || 0)}</td>
-                     <td className="px-6 py-4 capitalize">{backup.destination}</td>
-                     <td className="px-6 py-4">
-                        <span className={`flex items-center gap-1.5 ${backup.status === 'completed' ? 'text-emerald-500' : backup.status === 'running' ? 'text-blue-500' : 'text-rose-500'}`}>
-                          <div className={`w-1.5 h-1.5 rounded-full ${backup.status === 'completed' ? 'bg-emerald-500' : backup.status === 'running' ? 'bg-blue-500' : 'bg-rose-500'}`} />
-                          {backup.status}
-                        </span>
-                     </td>
-                     <td className="px-6 py-4 text-right space-x-2">
-                        <button aria-label="Download backup" className="p-2 hover:bg-indigo-500/10 hover:text-indigo-500 rounded-lg transition-colors" title="Download">
-                          <FileText className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => deleteBackup.mutate(backup.backup_id)}
-                          aria-label={`Delete backup ${backup.backup_id}`}
-                          className="p-2 hover:bg-rose-500/10 hover:text-rose-500 rounded-lg transition-colors" 
-                          title="Delete"
-                          disabled={deleteBackup.isPending}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                     </td>
-                   </tr>
-                 ))}
-               </tbody>
+              <thead className="bg-muted/30 text-muted-foreground font-semibold">
+                <tr>
+                  <th className="px-6 py-4">Date & Time</th>
+                  <th className="px-6 py-4">Size</th>
+                  <th className="px-6 py-4">Target</th>
+                  <th className="px-6 py-4">Status</th>
+                  <th className="px-6 py-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/50">
+                {backups.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground italic">No backup history available</td>
+                  </tr>
+                ) : backups.map((backup) => (
+                  <tr key={backup.backup_id} className="hover:bg-muted/10 transition-colors">
+                    <td className="px-6 py-4 font-medium">{backup.started_at}</td>
+                    <td className="px-6 py-4">{formatSize(backup.artifacts[0]?.size_bytes || 0)}</td>
+                    <td className="px-6 py-4 capitalize">{backup.destination}</td>
+                    <td className="px-6 py-4">
+                      <span className={`flex items-center gap-1.5 ${backup.status === 'completed' ? 'text-emerald-500' : backup.status === 'running' ? 'text-blue-500' : 'text-rose-500'}`}>
+                        <div className={`w-1.5 h-1.5 rounded-full ${backup.status === 'completed' ? 'bg-emerald-500' : backup.status === 'running' ? 'bg-blue-500' : 'bg-rose-500'}`} />
+                        {backup.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right space-x-2">
+                      <button aria-label="Download backup" className="p-2 hover:bg-indigo-500/10 hover:text-indigo-500 rounded-lg transition-colors" title="Download">
+                        <FileText className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => deleteBackup.mutate(backup.backup_id)}
+                        aria-label={`Delete backup ${backup.backup_id}`}
+                        className="p-2 hover:bg-rose-500/10 hover:text-rose-500 rounded-lg transition-colors"
+                        title="Delete"
+                        disabled={deleteBackup.isPending}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           </div>
         </CardContent>
@@ -229,8 +229,8 @@ export function OperationsSettings() {
       {/* Archives & Retention */}
       <div className="grid gap-8 md:grid-cols-2">
         <Card>
-        <CardHeader className="flex flex-row items-center gap-4">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+          <CardHeader className="flex flex-row items-center gap-4">
+            <div className="w-10 h-10 rounded-lg bg-slate-500/10 flex items-center justify-center text-slate-500">
               <Archive className="w-5 h-5" />
             </div>
             <div className="flex-1">
@@ -239,69 +239,69 @@ export function OperationsSettings() {
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
-             <div className="flex items-end gap-3">
-                <Input 
-                  label="Archive audit logs older than:" 
-                  type="number" 
-                  className="flex-1" 
-                  value={data.archive_policy.audit_logs_value}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
-                    ...prev,
-                    archive_policy: { ...prev.archive_policy, audit_logs_value: parseInt(e.target.value) || 0 }
-                  } : null)}
-                />
-                <Select 
-                  options={[{label: 'Days', value:'d'}, {label: 'Months', value:'m'}]} 
-                  value={data.archive_policy.audit_logs_unit}
-                  onChange={(e: ChangeEvent<HTMLSelectElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
-                    ...prev,
-                    archive_policy: { ...prev.archive_policy, audit_logs_unit: e.target.value }
-                  } : null)}
-                  className="w-[110px]" 
-                />
-             </div>
-             <div className="flex items-end gap-3">
-                <Input 
-                  label="Archive borrow records older than:" 
-                  type="number" 
-                  className="flex-1" 
-                  value={data.archive_policy.borrow_records_value}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
-                    ...prev,
-                    archive_policy: { ...prev.archive_policy, borrow_records_value: parseInt(e.target.value) || 0 }
-                  } : null)}
-                />
-                <Select 
-                  options={[{label: 'Days', value:'d'}, {label: 'Months', value:'m'}, {label: 'Years', value:'y'}]} 
-                  value={data.archive_policy.borrow_records_unit}
-                  onChange={(e: ChangeEvent<HTMLSelectElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
-                    ...prev,
-                    archive_policy: { ...prev.archive_policy, borrow_records_unit: e.target.value }
-                  } : null)}
-                  className="w-[110px]" 
-                />
-             </div>
-             <button 
-               onClick={() => setShowArchives(true)}
-               className="w-full py-2.5 bg-secondary text-secondary-foreground rounded-xl text-sm font-bold border border-border mt-2 flex items-center justify-center gap-2 hover:bg-secondary/80 transition-colors"
-             >
-               <FileText className="w-4 h-4" />
-               View Archived Records
-             </button>
+            <div className="flex items-end gap-3">
+              <Input
+                label="Archive audit logs older than:"
+                type="number"
+                className="flex-1"
+                value={data.archive_policy.audit_logs_value}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
+                  ...prev,
+                  archive_policy: { ...prev.archive_policy, audit_logs_value: parseInt(e.target.value) || 0 }
+                } : null)}
+              />
+              <Select
+                options={[{ label: 'Days', value: 'd' }, { label: 'Months', value: 'm' }]}
+                value={data.archive_policy.audit_logs_unit}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
+                  ...prev,
+                  archive_policy: { ...prev.archive_policy, audit_logs_unit: e.target.value }
+                } : null)}
+                className="w-[110px]"
+              />
+            </div>
+            <div className="flex items-end gap-3">
+              <Input
+                label="Archive borrow records older than:"
+                type="number"
+                className="flex-1"
+                value={data.archive_policy.borrow_records_value}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
+                  ...prev,
+                  archive_policy: { ...prev.archive_policy, borrow_records_value: parseInt(e.target.value) || 0 }
+                } : null)}
+              />
+              <Select
+                options={[{ label: 'Days', value: 'd' }, { label: 'Months', value: 'm' }, { label: 'Years', value: 'y' }]}
+                value={data.archive_policy.borrow_records_unit}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
+                  ...prev,
+                  archive_policy: { ...prev.archive_policy, borrow_records_unit: e.target.value }
+                } : null)}
+                className="w-[110px]"
+              />
+            </div>
+            <button
+              onClick={() => setShowArchives(true)}
+              className="w-full py-2.5 bg-secondary text-secondary-foreground rounded-xl text-sm font-bold border border-border mt-2 flex items-center justify-center gap-2 hover:bg-secondary/80 transition-colors"
+            >
+              <FileText className="w-4 h-4" />
+              View Archived Records
+            </button>
           </CardContent>
         </Card>
 
         <Card>
-        <CardHeader className="flex flex-row items-center gap-4">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+          <CardHeader className="flex flex-row items-center gap-4">
+            <div className="w-10 h-10 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-500">
               <Trash2 className="w-5 h-5" />
             </div>
             <div className="flex-1">
               <CardTitle>Data Retention Policy</CardTitle>
               <CardDescription>Automatically purge archived data to comply with regulations.</CardDescription>
             </div>
-            <Toggle 
-              checked={data.retention_policy.auto_delete} 
+            <Toggle
+              checked={data.retention_policy.auto_delete}
               onChange={(e: ChangeEvent<HTMLInputElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
                 ...prev,
                 retention_policy: { ...prev.retention_policy, auto_delete: e.target.checked }
@@ -309,97 +309,97 @@ export function OperationsSettings() {
             />
           </CardHeader>
           <CardContent className="space-y-6">
-             <div className="flex items-end gap-3">
-                <Input 
-                  label="Auto-delete records older than:" 
-                  type="number" 
-                  className="flex-1" 
-                  value={data.retention_policy.delete_older_than_value}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
-                    ...prev,
-                    retention_policy: { ...prev.retention_policy, delete_older_than_value: parseInt(e.target.value) || 0 }
-                  } : null)}
-                />
-                <Select 
-                  options={[{label: 'Years', value:'y'}, {label: 'Months', value:'m'}]} 
-                  value={data.retention_policy.delete_older_than_unit}
-                  onChange={(e: ChangeEvent<HTMLSelectElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
-                    ...prev,
-                    retention_policy: { ...prev.retention_policy, delete_older_than_unit: e.target.value }
-                  } : null)}
-                  className="w-[110px]" 
-                />
-             </div>
-             <div className="space-y-2">
-                <Input 
-                  label="Daily Maintenance Window" 
-                  type="time" 
-                  value={data.retention_policy.maintenance_time}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
-                    ...prev,
-                    retention_policy: { ...prev.retention_policy, maintenance_time: e.target.value }
-                  } : null)}
-                />
-                <p className="text-[10px] text-muted-foreground italic px-1 mt-1">
-                    System-wide archival and purging tasks will run daily at this time.
-                </p>
-             </div>
-             <div className="space-y-2">
-               <label className="text-sm font-semibold text-foreground px-1">Exclusion List (Mark as Never Purge)</label>
-               <div className="flex flex-wrap gap-2">
-                 {data.retention_policy.exclusion_list.map((tag: string, idx: number) => (
-                   <span key={tag} className="px-3 py-1 bg-muted rounded-lg text-xs font-medium border border-border flex items-center gap-1.5">
-                     {tag}
-                     <Trash2 
-                       className="w-3 h-3 text-muted-foreground hover:text-rose-500 cursor-pointer transition-colors" 
-                       onClick={() => {
-                         setLocalData((prev: OperationsSettingsData | null) => {
-                           if (!prev) return null;
-                           const newList = [...prev.retention_policy.exclusion_list];
-                           newList.splice(idx, 1);
-                           return {
-                             ...prev,
-                             retention_policy: { ...prev.retention_policy, exclusion_list: newList }
-                           };
-                         });
-                       }}
-                     />
-                   </span>
-                 ))}
-                 <div className="flex gap-2 w-full mt-2">
-                    <Input 
-                      placeholder="Add tag..." 
-                      className="h-8 text-xs flex-1" 
-                      value={newExclusion}
-                      onChange={(e: ChangeEvent<HTMLInputElement>) => setNewExclusion(e.target.value)}
-                    />
-                    <button 
+            <div className="flex items-end gap-3">
+              <Input
+                label="Auto-delete records older than:"
+                type="number"
+                className="flex-1"
+                value={data.retention_policy.delete_older_than_value}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
+                  ...prev,
+                  retention_policy: { ...prev.retention_policy, delete_older_than_value: parseInt(e.target.value) || 0 }
+                } : null)}
+              />
+              <Select
+                options={[{ label: 'Years', value: 'y' }, { label: 'Months', value: 'm' }]}
+                value={data.retention_policy.delete_older_than_unit}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
+                  ...prev,
+                  retention_policy: { ...prev.retention_policy, delete_older_than_unit: e.target.value }
+                } : null)}
+                className="w-[110px]"
+              />
+            </div>
+            <div className="space-y-2">
+              <Input
+                label="Daily Maintenance Window"
+                type="time"
+                value={data.retention_policy.maintenance_time}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
+                  ...prev,
+                  retention_policy: { ...prev.retention_policy, maintenance_time: e.target.value }
+                } : null)}
+              />
+              <p className="text-[10px] text-muted-foreground italic px-1 mt-1">
+                System-wide archival and purging tasks will run daily at this time.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-foreground px-1">Exclusion List (Mark as Never Purge)</label>
+              <div className="flex flex-wrap gap-2">
+                {data.retention_policy.exclusion_list.map((tag: string, idx: number) => (
+                  <span key={tag} className="px-3 py-1 bg-muted rounded-lg text-xs font-medium border border-border flex items-center gap-1.5">
+                    {tag}
+                    <Trash2
+                      className="w-3 h-3 text-muted-foreground hover:text-rose-500 cursor-pointer transition-colors"
                       onClick={() => {
-                        if (newExclusion.trim()) {
-                          setLocalData((prev: OperationsSettingsData | null) => prev ? {
+                        setLocalData((prev: OperationsSettingsData | null) => {
+                          if (!prev) return null;
+                          const newList = [...prev.retention_policy.exclusion_list];
+                          newList.splice(idx, 1);
+                          return {
                             ...prev,
-                            retention_policy: { 
-                              ...prev.retention_policy, 
-                              exclusion_list: [...prev.retention_policy.exclusion_list, newExclusion.trim()] 
-                            }
-                          } : null);
-                          setNewExclusion('');
-                        }
+                            retention_policy: { ...prev.retention_policy, exclusion_list: newList }
+                          };
+                        });
                       }}
-                      className="px-3 py-1 bg-indigo-500 text-white rounded-lg text-xs font-bold hover:bg-indigo-600 transition-colors flex items-center gap-1"
-                    >
-                      <Plus className="w-3 h-3" />
-                      Add
-                    </button>
-                 </div>
-               </div>
-             </div>
+                    />
+                  </span>
+                ))}
+                <div className="flex gap-2 w-full mt-2">
+                  <Input
+                    placeholder="Add tag..."
+                    className="h-8 text-xs flex-1"
+                    value={newExclusion}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => setNewExclusion(e.target.value)}
+                  />
+                  <button
+                    onClick={() => {
+                      if (newExclusion.trim()) {
+                        setLocalData((prev: OperationsSettingsData | null) => prev ? {
+                          ...prev,
+                          retention_policy: {
+                            ...prev.retention_policy,
+                            exclusion_list: [...prev.retention_policy.exclusion_list, newExclusion.trim()]
+                          }
+                        } : null);
+                        setNewExclusion('');
+                      }
+                    }}
+                    className="px-3 py-1 bg-indigo-500 text-white rounded-lg text-xs font-bold hover:bg-indigo-600 transition-colors flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Add
+                  </button>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
 
       <div className="flex justify-end pt-4">
-        <button 
+        <button
           onClick={handleSave}
           disabled={saving}
           className="flex items-center gap-2 px-8 py-3 bg-primary hover:bg-primary/95 disabled:opacity-50 text-primary-foreground rounded-lg text-sm font-bold shadow-lg shadow-primary/20 transition-all active:scale-[0.98]"
@@ -408,9 +408,9 @@ export function OperationsSettings() {
           {saving ? 'Processing changes...' : 'Save Operations Configuration'}
         </button>
       </div>
-      <ArchivesModal 
-        isOpen={showArchives} 
-        onClose={() => setShowArchives(false)} 
+      <ArchivesModal
+        isOpen={showArchives}
+        onClose={() => setShowArchives(false)}
       />
     </div>
   );

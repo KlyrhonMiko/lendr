@@ -12,10 +12,10 @@ export function UserDistributionPanel({ insights, loading }: { insights: UserIns
       </div>
       <div className="p-4 flex-1 space-y-6">
         {loading ? (
-             <div className="space-y-4">
-                <div className="h-20 bg-muted animate-pulse rounded" />
-                <div className="h-24 bg-muted animate-pulse rounded" />
-             </div>
+          <div className="space-y-4">
+            <div className="h-20 bg-muted animate-pulse rounded" />
+            <div className="h-24 bg-muted animate-pulse rounded" />
+          </div>
         ) : !insights ? (
           <div className="h-full flex items-center justify-center text-muted-foreground text-xs italic">
             No user data available
@@ -41,8 +41,8 @@ export function UserDistributionPanel({ insights, loading }: { insights: UserIns
               </div>
               <div className="h-20 flex items-end gap-1">
                 {insights.trends.map((day) => (
-                  <div 
-                    key={day.date} 
+                  <div
+                    key={day.date}
                     className="flex-1 bg-emerald-500/20 group relative cursor-help rounded-t-[1px]"
                     style={{ height: `${Math.max(4, (day.count / maxTrend) * 100)}%` }}
                   >

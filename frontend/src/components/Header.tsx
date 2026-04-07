@@ -38,11 +38,10 @@ export function Header({ onMenuToggle }: HeaderProps) {
                 <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30 shrink-0" />
               )}
               <span
-                className={`truncate tracking-wide ${
-                  i === breadcrumbs.length - 1
+                className={`truncate tracking-wide ${i === breadcrumbs.length - 1
                     ? 'text-primary px-2 py-0.5 bg-primary/10 rounded-md shadow-sm'
                     : 'text-muted-foreground/60 hover:text-foreground transition-colors'
-                }`}
+                  }`}
               >
                 {crumb}
               </span>

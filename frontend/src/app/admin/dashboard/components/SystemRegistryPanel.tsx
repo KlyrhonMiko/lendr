@@ -16,8 +16,8 @@ export function SystemRegistryPanel({ registry, loading }: { registry: SystemReg
         ) : (
           <div className="grid gap-3">
             {registry.map((item) => (
-              <div 
-                key={item.entity} 
+              <div
+                key={item.entity}
                 className="flex items-center justify-between p-3.5 rounded-lg bg-muted/40 border border-border/50 group hover:border-indigo-500/30 transition-colors"
               >
                 <div className="flex items-center gap-3">

@@ -64,11 +64,10 @@ export function LookupExplorer({
                 key={table}
                 type="button"
                 onClick={() => onSelectTable(table)}
-                className={`w-full text-left px-3 py-2 rounded-xl text-sm font-medium transition-all ${
-                  selectedTable === table
+                className={`w-full text-left px-3 py-2 rounded-xl text-sm font-medium transition-all ${selectedTable === table
                     ? 'bg-background text-indigo-400 shadow-sm border border-border'
                     : 'hover:bg-muted/50 text-muted-foreground'
-                }`}
+                  }`}
               >
                 {table}
               </button>
