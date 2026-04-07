@@ -388,11 +388,11 @@ export function SecuritySettings() {
               <Input
                 label="Minimum Length"
                 type="number"
-                min={8}
+                min={6}
                 max={128}
                 value={draft.password_rules.min_length}
                 onChange={(event) => {
-                  const value = Math.min(128, Math.max(8, parsePositiveInt(event.target.value, 12)));
+                  const value = Math.min(128, Math.max(6, parsePositiveInt(event.target.value, 6)));
                   updateDraft((current) => ({
                     ...current,
                     password_rules: {

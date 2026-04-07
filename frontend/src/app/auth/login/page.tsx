@@ -412,7 +412,7 @@ export default function LoginPage() {
                   id="new-password"
                   type="password"
                   required
-                  minLength={8}
+                  minLength={6}
                   value={rotationForm.newPassword}
                   onChange={(e) =>
                     setRotationForm({ ...rotationForm, newPassword: e.target.value })
@@ -429,7 +429,7 @@ export default function LoginPage() {
                   id="confirm-password"
                   type="password"
                   required
-                  minLength={8}
+                  minLength={6}
                   value={rotationForm.confirmPassword}
                   onChange={(e) =>
                     setRotationForm({ ...rotationForm, confirmPassword: e.target.value })

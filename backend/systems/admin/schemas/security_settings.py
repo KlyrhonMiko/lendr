@@ -24,11 +24,11 @@ class TwoFactorSettings(BaseModel):
 class PasswordRulesSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    min_length: int = Field(default=12, ge=8, le=128)
-    require_uppercase: bool = Field(default=True)
-    require_lowercase: bool = Field(default=True)
-    require_number: bool = Field(default=True)
-    require_special: bool = Field(default=True)
+    min_length: int = Field(default=6, ge=6, le=128)
+    require_uppercase: bool = Field(default=False)
+    require_lowercase: bool = Field(default=False)
+    require_number: bool = Field(default=False)
+    require_special: bool = Field(default=False)
     applies_when_role_not_in: list[str] = Field(default_factory=lambda: ["borrower", "dispatch"])
 
     @field_validator("applies_when_role_not_in")

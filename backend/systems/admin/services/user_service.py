@@ -15,6 +15,10 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
         super().__init__(User, lookup_field="user_id")
         self.password_policy_service = PasswordPolicyService()
 
+    @staticmethod
+    def _normalize_role(role: str | None) -> str:
+        return (role or "").strip().lower()
+
     def requires_session_revocation(self, user: User, schema: UserUpdate) -> bool:
         updates = schema.model_dump(exclude_unset=True)
         if not updates:
@@ -95,9 +99,11 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
             unique_fields=[["email"], ["username"]],
         )
 
+        normalized_role = self._normalize_role(schema.role)
+
         setting = self.config_service.get_by_key(
             session,
-            key=schema.role.lower(),
+            key=normalized_role,
             category="users_role"
         )
 
@@ -110,8 +116,9 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
         prefix = setting.value
 
         data = schema.model_dump()
+        data["role"] = normalized_role
         password = data.pop("password")
-        self.password_policy_service.validate_for_role(session, password, schema.role)
+        self.password_policy_service.validate_for_role(session, password, normalized_role)
         data["hashed_password"] = get_password_hash(password)
 
         if not data.get(self.lookup_field):
@@ -141,6 +148,10 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
     ) -> User:
         before = db_obj.model_dump(mode="json")
         obj_data = schema.model_dump(exclude_unset=True)
+
+        if "role" in obj_data:
+            obj_data["role"] = self._normalize_role(obj_data.get("role"))
+
         if "password" in obj_data:
             password = obj_data.pop("password")
             target_role = obj_data.get("role") or db_obj.role

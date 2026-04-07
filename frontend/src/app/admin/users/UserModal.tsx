@@ -20,13 +20,24 @@ type EditableUserUpdate = UserUpdate & {
 
 export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
   const isEdit = !!user;
+  const DEFAULT_PIN_LENGTH = 6;
+  const SCHEMA_PASSWORD_MIN_LENGTH = 6;
   const [loading, setLoading] = useState(false);
   const [resettingTwoFactor, setResettingTwoFactor] = useState(false);
   const [configsLoading, setConfigsLoading] = useState(true);
   const [roles, setRoles] = useState<AuthConfig[]>([]);
   const [shifts, setShifts] = useState<AuthConfig[]>([]);
+  const [pinLength, setPinLength] = useState(DEFAULT_PIN_LENGTH);
   const [roleOpen, setRoleOpen] = useState(false);
   const [shiftOpen, setShiftOpen] = useState(false);
+
+  const pinValidationMessage = `PIN must be at least ${pinLength} characters`;
+  const PASSWORD_POLICY_EXEMPT_ROLES = new Set(['borrower', 'dispatch']);
+
+  const normalizeRole = (role: string | undefined): string => (role || '').trim().toLowerCase();
+
+  const isRolePasswordPolicyExempt = (role: string | undefined): boolean =>
+    PASSWORD_POLICY_EXEMPT_ROLES.has(normalizeRole(role));
 
   const [formData, setFormData] = useState({
     username: user?.username || '',
@@ -42,22 +53,41 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
   });
 
   useEffect(() => {
+    const normalizePinLength = (value: unknown): number => {
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed) || parsed < 1) {
+        return DEFAULT_PIN_LENGTH;
+      }
+      return Math.trunc(parsed);
+    };
+
     const fetchConfigs = async () => {
       try {
-        const [rolesRes, shiftsRes] = await Promise.all([
+        const [rolesRes, shiftsRes, securityRes] = await Promise.allSettled([
           userApi.getConfigs('users_role'),
           userApi.getConfigs('users_shift_type'),
+          userApi.getSecuritySettings(),
         ]);
-        setRoles(rolesRes.data);
-        setShifts(shiftsRes.data);
 
-        if (!isEdit && rolesRes.data.length > 0) {
+        if (rolesRes.status !== 'fulfilled' || shiftsRes.status !== 'fulfilled') {
+          toast.error('Failed to load roles and shift types');
+          return;
+        }
+
+        setRoles(rolesRes.value.data);
+        setShifts(shiftsRes.value.data);
+
+        if (securityRes.status === 'fulfilled') {
+          setPinLength(normalizePinLength(securityRes.value.data?.password_rules?.min_length));
+        }
+
+        if (!isEdit && rolesRes.value.data.length > 0) {
           setFormData((prev) =>
-            prev.role ? prev : { ...prev, role: rolesRes.data[0].key }
+            prev.role ? prev : { ...prev, role: rolesRes.value.data[0].key }
           );
         }
       } catch {
-        toast.error('Failed to load roles and shift types');
+        toast.error('Failed to load user form settings');
       } finally {
         setConfigsLoading(false);
       }
@@ -71,13 +101,19 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
     try {
       const employeeId = (formData.employee_id || '').trim();
       const pin = (formData.password || '').trim();
-      const pinRegex = /^\d{6}$/;
+      const effectiveRole = formData.role || user?.role;
+      const enforcePasswordRules = !isRolePasswordPolicyExempt(effectiveRole);
 
       const effectiveUsername = employeeId || (formData.username || '').trim();
 
       if (isEdit) {
-        if (pin && !pinRegex.test(pin)) {
-          toast.error('PIN must be exactly 6 digits');
+        if (pin && pin.length < SCHEMA_PASSWORD_MIN_LENGTH) {
+          toast.error(`PIN must be at least ${SCHEMA_PASSWORD_MIN_LENGTH} characters`);
+          return;
+        }
+
+        if (enforcePasswordRules && pin && pin.length < pinLength) {
+          toast.error(pinValidationMessage);
           return;
         }
           const updateData: EditableUserUpdate = {
@@ -93,8 +129,18 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
           toast.error('Employee ID is required');
           return;
         }
-        if (!pinRegex.test(pin)) {
-          toast.error('PIN must be exactly 6 digits');
+        if (!pin) {
+          toast.error('PIN is required');
+          return;
+        }
+
+        if (pin.length < SCHEMA_PASSWORD_MIN_LENGTH) {
+          toast.error(`PIN must be at least ${SCHEMA_PASSWORD_MIN_LENGTH} characters`);
+          return;
+        }
+
+        if (enforcePasswordRules && pin.length < pinLength) {
+          toast.error(pinValidationMessage);
           return;
         }
 
@@ -264,17 +310,12 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
                     )}
                   </label>
                   <input
-                    required={!isEdit}
                     type="password"
                     name="password"
                     value={formData.password}
                     onChange={handleChange}
-                    inputMode="numeric"
-                    pattern="^\d{6}$"
-                    minLength={6}
-                    maxLength={6}
                     className={inputClassName}
-                    placeholder="Enter 6-digit PIN"
+                    placeholder="Enter PIN"
                   />
                 </div>
                 <div>
