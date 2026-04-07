@@ -54,6 +54,14 @@ export interface UserTwoFactorStatus {
   enrolled_at: string | null;
 }
 
+export interface SecurityPasswordRules {
+  min_length: number;
+}
+
+export interface SecuritySettingsSummary {
+  password_rules: SecurityPasswordRules;
+}
+
 export const userApi = {
   list: (params: UserListParams = {}) =>
     api.get<User[]>(`/admin/users${buildQueryString(params as Record<string, unknown>)}`),
@@ -78,4 +86,7 @@ export const userApi = {
 
   getConfigs: (category: string) =>
     api.get<AuthConfig[]>(`/auth/config?category=${category}`),
+
+  getSecuritySettings: () =>
+    api.get<SecuritySettingsSummary>('/admin/settings/security'),
 };

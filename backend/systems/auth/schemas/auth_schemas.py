@@ -27,7 +27,7 @@ class SessionPolicyRead(BaseModel):
 class BootstrapPasswordRotateRequest(BaseModel):
     username: str = Field(..., min_length=1, max_length=255)
     current_password: str = Field(..., min_length=6, max_length=255)
-    new_password: str = Field(..., min_length=8, max_length=255)
+    new_password: str = Field(..., min_length=6, max_length=255)
 
 
 class TwoFactorEnrollmentInitiateRead(BaseModel):

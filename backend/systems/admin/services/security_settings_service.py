@@ -109,7 +109,7 @@ class SecuritySettingsService:
         return max((setting.updated_at for setting in rbac_settings), default=None) if rbac_settings else None
 
     def _resolve_user_count_by_role(self, session: Session) -> dict[str, int]:
-        roles = session.exec(select(User.role).where(User.is_deleted == False)).all()
+        roles = session.exec(select(User.role).where(User.is_deleted.is_(False))).all()
         counts: dict[str, int] = {}
         for role in roles:
             normalized = str(role).strip().lower()
@@ -204,46 +204,46 @@ class SecuritySettingsService:
                         self.admin_config_service.get_value(
                             session,
                             KEY_PASSWORD_MIN_LENGTH,
-                            "12",
+                            "6",
                             category=SECURITY_SETTINGS_CATEGORY,
                         ),
-                        12,
+                        6,
                     ),
                     "require_uppercase": _parse_bool(
                         self.admin_config_service.get_value(
                             session,
                             KEY_PASSWORD_REQUIRE_UPPERCASE,
-                            "true",
+                            "false",
                             category=SECURITY_SETTINGS_CATEGORY,
                         ),
-                        True,
+                        False,
                     ),
                     "require_lowercase": _parse_bool(
                         self.admin_config_service.get_value(
                             session,
                             KEY_PASSWORD_REQUIRE_LOWERCASE,
-                            "true",
+                            "false",
                             category=SECURITY_SETTINGS_CATEGORY,
                         ),
-                        True,
+                        False,
                     ),
                     "require_number": _parse_bool(
                         self.admin_config_service.get_value(
                             session,
                             KEY_PASSWORD_REQUIRE_NUMBER,
-                            "true",
+                            "false",
                             category=SECURITY_SETTINGS_CATEGORY,
                         ),
-                        True,
+                        False,
                     ),
                     "require_special": _parse_bool(
                         self.admin_config_service.get_value(
                             session,
                             KEY_PASSWORD_REQUIRE_SPECIAL,
-                            "true",
+                            "false",
                             category=SECURITY_SETTINGS_CATEGORY,
                         ),
-                        True,
+                        False,
                     ),
                     "applies_when_role_not_in": _parse_json_str_list(
                         self.admin_config_service.get_value(

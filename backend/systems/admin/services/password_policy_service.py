@@ -20,11 +20,11 @@ PASSWORD_POLICY_EXEMPT_ROLES = frozenset({"borrower", "dispatch"})
 
 @dataclass(frozen=True)
 class PasswordPolicy:
-    min_length: int = 12
-    require_uppercase: bool = True
-    require_lowercase: bool = True
-    require_number: bool = True
-    require_special: bool = True
+    min_length: int = 6
+    require_uppercase: bool = False
+    require_lowercase: bool = False
+    require_number: bool = False
+    require_special: bool = False
 
 
 class PasswordPolicyService:
@@ -60,10 +60,10 @@ class PasswordPolicyService:
             self.configuration_service.get_value(
                 session,
                 KEY_PASSWORD_MIN_LENGTH,
-                "12",
+                "6",
                 category=SECURITY_SETTINGS_CATEGORY,
             ),
-            12,
+            6,
         )
 
         return PasswordPolicy(
@@ -72,37 +72,37 @@ class PasswordPolicyService:
                 self.configuration_service.get_value(
                     session,
                     KEY_PASSWORD_REQUIRE_UPPERCASE,
-                    "true",
+                    "false",
                     category=SECURITY_SETTINGS_CATEGORY,
                 ),
-                True,
+                False,
             ),
             require_lowercase=self._parse_bool(
                 self.configuration_service.get_value(
                     session,
                     KEY_PASSWORD_REQUIRE_LOWERCASE,
-                    "true",
+                    "false",
                     category=SECURITY_SETTINGS_CATEGORY,
                 ),
-                True,
+                False,
             ),
             require_number=self._parse_bool(
                 self.configuration_service.get_value(
                     session,
                     KEY_PASSWORD_REQUIRE_NUMBER,
-                    "true",
+                    "false",
                     category=SECURITY_SETTINGS_CATEGORY,
                 ),
-                True,
+                False,
             ),
             require_special=self._parse_bool(
                 self.configuration_service.get_value(
                     session,
                     KEY_PASSWORD_REQUIRE_SPECIAL,
-                    "true",
+                    "false",
                     category=SECURITY_SETTINGS_CATEGORY,
                 ),
-                True,
+                False,
             ),
         )
 

@@ -171,7 +171,7 @@ class ShiftDefinitionsService:
         removed = set(current.values) - {definition.key for definition in requested}
         if removed:
             assigned_shift_types = session.exec(
-                select(User.shift_type).where(User.is_deleted == False)
+                select(User.shift_type).where(User.is_deleted.is_(False))
             ).all()
             if any(shift_type in removed for shift_type in assigned_shift_types):
                 raise HTTPException(
