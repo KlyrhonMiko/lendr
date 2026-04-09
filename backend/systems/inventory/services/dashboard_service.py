@@ -5,6 +5,7 @@ from systems.inventory.models.borrow_request import BorrowRequest
 from systems.inventory.models.borrow_request_item import BorrowRequestItem
 from pydantic import BaseModel
 from typing import Any
+from systems.inventory.services.inventory_service import InventoryService
 
 
 class DashboardStats(BaseModel):
@@ -54,6 +55,7 @@ class DashboardService:
     def get_stats(self, session: Session) -> DashboardStats:
         from utils.time_utils import get_now_manila
         from systems.inventory.models.inventory_unit import InventoryUnit
+        from systems.inventory.models.inventory_batch import InventoryBatch
         from datetime import timedelta
 
         now = get_now_manila()
@@ -78,11 +80,15 @@ class DashboardService:
             .where(BorrowRequest.is_deleted.is_(False))
         ).one()
 
-        low_stock_items = session.exec(
-            select(func.count(InventoryItem.id))
-            .where(InventoryItem.available_qty <= 5)
-            .where(InventoryItem.is_deleted.is_(False))
-        ).one()
+        inventory_service = InventoryService()
+        active_items = session.exec(
+            select(InventoryItem).where(InventoryItem.is_deleted.is_(False))
+        ).all()
+        low_stock_items = 0
+        for item in active_items:
+            balances = inventory_service.get_item_balances(session, item)
+            if balances["available_qty"] <= 5:
+                low_stock_items += 1
 
         # New metrics
         active_requests = session.exec(
@@ -106,7 +112,6 @@ class DashboardService:
             .where(InventoryUnit.is_deleted.is_(False))
         ).one()
 
-        from systems.inventory.models.inventory_batch import InventoryBatch
         expiring_batches_count = session.exec(
             select(func.count(func.distinct(InventoryBatch.inventory_uuid)))
             .where(InventoryBatch.expiration_date < thirty_days_later)
@@ -114,15 +119,15 @@ class DashboardService:
         ).one()
 
         items_in_maintenance = session.exec(
-            select(func.count(InventoryItem.id))
-            .where(InventoryItem.status == "maintenance")
-            .where(InventoryItem.is_deleted.is_(False))
+            select(func.count(func.distinct(InventoryUnit.inventory_uuid)))
+            .where(InventoryUnit.status == "maintenance")
+            .where(InventoryUnit.is_deleted.is_(False))
         ).one()
 
         items_with_poor_condition = session.exec(
-            select(func.count(InventoryItem.id))
-            .where(InventoryItem.condition.in_(["poor", "damaged", "needs_repair"]))
-            .where(InventoryItem.is_deleted.is_(False))
+            select(func.count(func.distinct(InventoryUnit.inventory_uuid)))
+            .where(InventoryUnit.condition.in_(["poor", "damaged", "needs_repair", "unusable"]))
+            .where(InventoryUnit.is_deleted.is_(False))
         ).one()
 
         emergency_requests = session.exec(
@@ -156,6 +161,7 @@ class DashboardService:
     def get_inventory_health_distribution(self, session: Session) -> InventoryHealthBreakdown:
         from systems.inventory.models.inventory_unit import InventoryUnit
         from systems.inventory.models.inventory_batch import InventoryBatch
+        inventory_service = InventoryService()
 
         def get_dist(model, field):
             rows = session.exec(
@@ -165,9 +171,18 @@ class DashboardService:
             ).all()
             return [{"label": str(row[0]), "count": int(row[1])} for row in rows]
 
+        item_status_counter: dict[str, int] = {}
+        item_condition_counter: dict[str, int] = {}
+        active_items = session.exec(select(InventoryItem).where(InventoryItem.is_deleted.is_(False))).all()
+        for item in active_items:
+            status_label = inventory_service.get_item_status(session, item)
+            condition_label = inventory_service.get_item_condition(session, item)
+            item_status_counter[status_label] = item_status_counter.get(status_label, 0) + 1
+            item_condition_counter[condition_label] = item_condition_counter.get(condition_label, 0) + 1
+
         return InventoryHealthBreakdown(
-            item_statuses=get_dist(InventoryItem, InventoryItem.status),
-            item_conditions=get_dist(InventoryItem, InventoryItem.condition),
+            item_statuses=[{"label": k, "count": v} for k, v in item_status_counter.items()],
+            item_conditions=[{"label": k, "count": v} for k, v in item_condition_counter.items()],
             unit_statuses=get_dist(InventoryUnit, InventoryUnit.status),
             unit_conditions=get_dist(InventoryUnit, InventoryUnit.condition),
             batch_statuses=get_dist(InventoryBatch, InventoryBatch.status),
@@ -212,22 +227,31 @@ class DashboardService:
         ).all()
 
     def get_low_stock_items(self, session: Session, threshold: int = 5) -> list[LowStockItemRead]:
+        inventory_service = InventoryService()
         items = session.exec(
             select(InventoryItem)
-            .where(InventoryItem.available_qty <= threshold)
             .where(InventoryItem.is_deleted.is_(False))
-            .order_by(InventoryItem.available_qty.asc())
-            .limit(10)
+            .order_by(InventoryItem.name.asc())
         ).all()
+
+        low_items: list[tuple[InventoryItem, dict[str, int]]] = []
+        for item in items:
+            balances = inventory_service.get_item_balances(session, item)
+            if balances["available_qty"] <= threshold:
+                low_items.append((item, balances))
+
+        low_items.sort(key=lambda row: row[1]["available_qty"])
+        low_items = low_items[:10]
+
         return [
             LowStockItemRead(
                 item_id=i.item_id,
                 name=i.name,
                 category=i.category,
-                available_qty=i.available_qty,
-                total_qty=i.total_qty,
+                available_qty=balances["available_qty"],
+                total_qty=balances["total_qty"],
             )
-            for i in items
+            for i, balances in low_items
         ]
 
     def get_pending_counts(self, session: Session) -> dict[str, int]:

@@ -21,16 +21,14 @@ export function useInventoryConfigs() {
   return useQuery({
     queryKey: ['inventory', 'configs', 'item_categories'],
     queryFn: async () => {
-      const [classRes, typeRes, condRes, catRes] = await Promise.all([
+      const [classRes, typeRes, catRes] = await Promise.all([
         inventoryApi.getConfigs('inventory_classification'),
         inventoryApi.getConfigs('inventory_item_type'),
-        inventoryApi.getConfigs('inventory_condition'),
         inventoryApi.getConfigs('inventory_category'),
       ]);
       return {
         classifications: classRes.data,
         itemTypes: typeRes.data,
-        conditions: condRes.data,
         categories: catRes.data,
       };
     },

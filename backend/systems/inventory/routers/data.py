@@ -132,9 +132,9 @@ async def get_import_template():
     writer = csv.writer(output)
     headers = ["name", "category", "classification", "item_type", "is_trackable", "description", "condition", "quantity", "serial_number", "expiration_date"]
     writer.writerow(headers)
-    writer.writerow(["MacBook Pro M2", "it_communications", "equipment", "electronics", "true", "High-end laptop", "good", "1", "SN12345M2", "2026-12-31"])
-    writer.writerow(["KN95 Masks", "medical_clinical", "consumable", "disposables", "false", "Box of 50", "good", "50", "", "2025-06-01"])
-    writer.writerow(["Fire Extinguisher", "safety_security", "equipment", "tools", "true", "ABC Dry Powder 5kg", "excellent", "1", "FE-998877", "2028-01-01"])
+    writer.writerow(["Thermal Scanner (Fluke)", "items_tools", "equipment", "electronics", "true", "Warehouse scanner", "good", "1", "TS-102938", ""])
+    writer.writerow(["Powder Soap", "cmp_pm_acu_pm", "consumable", "cleaning_supplies", "false", "Cleaning consumable", "good", "50", "", "2026-12-01"])
+    writer.writerow(["Emergency Light", "declogging", "equipment", "tools", "true", "Portable emergency light", "excellent", "1", "EL-998877", ""])
     output.seek(0)
     
     return StreamingResponse(

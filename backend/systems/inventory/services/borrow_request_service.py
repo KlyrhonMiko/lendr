@@ -1205,10 +1205,12 @@ class BorrowService(
                     f"Inventory item record for {borrow_item.item_uuid} not found"
                 )
 
-            if is_direct_release and item.available_qty < borrow_item.qty_requested:
-                raise ValueError(
-                    f"Insufficient stock for item {item.item_id}. Direct release requires all items to be in stock."
-                )
+            if is_direct_release:
+                balances = self.inventory_service.get_item_balances(session, item)
+                if balances["available_qty"] < borrow_item.qty_requested:
+                    raise ValueError(
+                        f"Insufficient stock for item {item.item_id}. Direct release requires all items to be in stock."
+                    )
 
             if item.is_trackable:
                 assignments = self._validate_trackable_assignment_prerequisites(

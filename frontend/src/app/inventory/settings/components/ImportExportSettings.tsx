@@ -632,7 +632,7 @@ export function ImportExportSettings() {
                       <tr>
                         <td className="p-3 pl-6 font-mono font-bold text-primary">category</td>
                         <td className="p-3 text-muted-foreground leading-relaxed text-[11px]">High-level organizational grouping for different departments or functional areas.</td>
-                        <td className="p-3 pr-6 italic font-semibold text-primary/80">it_communications, medical_clinical, safety_security...</td>
+                        <td className="p-3 pr-6 italic font-semibold text-primary/80">items_tools, declogging, cmp_pm_acu_pm, pm_set_electrical...</td>
                       </tr>
                       <tr>
                         <td className="p-3 pl-6 font-mono font-bold text-primary">item_type</td>
@@ -642,7 +642,7 @@ export function ImportExportSettings() {
                       <tr>
                         <td className="p-3 pl-6 font-mono font-bold text-primary">classification</td>
                         <td className="p-3 text-muted-foreground leading-relaxed">System-wide categorization. Controls whether tracking rules are enforced.</td>
-                        <td className="p-3 pr-6 italic font-semibold">equipment, consumable</td>
+                        <td className="p-3 pr-6 italic font-semibold">equipment, consumable, perishable</td>
                       </tr>
                       <tr>
                         <td className="p-3 pl-6 font-mono font-bold text-primary">is_trackable</td>
@@ -652,7 +652,7 @@ export function ImportExportSettings() {
                       <tr>
                         <td className="p-3 pl-6 font-mono font-bold text-primary">condition</td>
                         <td className="p-3 text-muted-foreground leading-relaxed">The physical state of the item at the time of import.</td>
-                        <td className="p-3 pr-6 italic">good, fair, poor</td>
+                        <td className="p-3 pr-6 italic">excellent, good, fair, poor, unusable</td>
                       </tr>
                       <tr>
                         <td className="p-3 pl-6 font-mono font-bold text-primary">serial_number</td>
@@ -680,9 +680,9 @@ export function ImportExportSettings() {
                     <div className="text-muted-foreground"># Trackable Asset Row</div>
                     name,category,classification,item_type,is_trackable,serial_number
                     <br />
-                    "Dell Monitor","it_communications","equipment","electronics","true","SN-102938"
+                    "Thermal Scanner (Fluke)","items_tools","equipment","electronics","true","TS-102938"
                     <br />
-                    "Fire Extinguisher","safety_security","equipment","tools","true","FE-998877"
+                    "Emergency Light","declogging","equipment","tools","true","EL-998877"
                   </div>
                 </div>
                 <div className="space-y-3">
@@ -694,7 +694,7 @@ export function ImportExportSettings() {
                     <div className="text-muted-foreground"># Non-Trackable Batch Row</div>
                     name,category,classification,item_type,is_trackable,quantity,expiration_date
                     <br />
-                    "Surgical Gloves","medical_clinical","consumable","disposables","false","500","2026-12-01"
+                    "Powder Soap","cmp_pm_acu_pm","consumable","cleaning_supplies","false","500","2026-12-01"
                   </div>
                 </div>
               </div>

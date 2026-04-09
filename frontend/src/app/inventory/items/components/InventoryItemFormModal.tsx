@@ -69,7 +69,6 @@ export function InventoryItemFormModal({
   formData,
   classifications,
   itemTypes,
-  conditions,
   categories,
   onClose,
   onSubmit,
@@ -80,7 +79,6 @@ export function InventoryItemFormModal({
   formData: InventoryItemFormData;
   classifications: ConfigRead[];
   itemTypes: ConfigRead[];
-  conditions: ConfigRead[];
   categories: ConfigRead[];
   onClose: () => void;
   onSubmit: (e: React.FormEvent) => void | Promise<void>;
@@ -154,7 +152,7 @@ export function InventoryItemFormModal({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3">
             <FormPopoverSelect
               label="Item Type"
               value={formData.item_type}
@@ -164,16 +162,6 @@ export function InventoryItemFormModal({
                 ...itemTypes.map((t) => ({ key: t.key, label: t.key.charAt(0).toUpperCase() + t.key.slice(1) })),
               ]}
               placeholder="Select type"
-            />
-            <FormPopoverSelect
-              label="Condition"
-              value={formData.condition}
-              onChange={(v) => setFormData({ ...formData, condition: v })}
-              options={[
-                { key: '', label: 'Select condition' },
-                ...conditions.map((c) => ({ key: c.key, label: c.key.charAt(0).toUpperCase() + c.key.slice(1) })),
-              ]}
-              placeholder="Select condition"
             />
           </div>
 

@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { ShieldCheck, CheckCircle2, X, Delete, Loader2 } from 'lucide-react';
 import { posApi, BorrowCatalogItem } from './api';
+import type { ConfigRead } from '../inventory/items/api';
 import { toast } from 'sonner';
 import { auth } from '@/lib/auth';
 import { api } from '@/lib/api';
@@ -10,9 +11,17 @@ import { CartItem } from './lib/types';
 import { validateBorrowSubmission, validatePinVerificationInput } from './lib/validation';
 import { SelectionView } from './components/SelectionView';
 import { CheckoutView } from './components/CheckoutView';
+import { formatCategoryLabel } from './lib/utils';
+
+interface BorrowerTaxonomyData {
+  categories: ConfigRead[];
+  classifications: ConfigRead[];
+}
 
 export default function BorrowPage() {
   const [items, setItems] = useState<BorrowCatalogItem[]>([]);
+  const [categoryConfigs, setCategoryConfigs] = useState<ConfigRead[]>([]);
+  const [classificationConfigs, setClassificationConfigs] = useState<ConfigRead[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -38,14 +47,29 @@ export default function BorrowPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const invRes = await posApi.listCatalog({ per_page: 200 });
+      const [invRes, categoryRes] = await Promise.all([
+        posApi.listCatalog({ per_page: 200 }),
+        api.get<BorrowerTaxonomyData>('/inventory/borrower/taxonomy'),
+      ]);
       setItems(invRes.data);
+      setCategoryConfigs(categoryRes.data?.categories || []);
+      setClassificationConfigs(categoryRes.data?.classifications || []);
     } catch {
       toast.error('Failed to load inventory data');
     } finally {
       setLoading(false);
     }
   };
+
+  const categoryLabels = useMemo(() => {
+    return Object.fromEntries(categoryConfigs.map((category) => [category.key, category.value]));
+  }, [categoryConfigs]);
+
+  const classificationLabels = useMemo(() => {
+    return Object.fromEntries(
+      classificationConfigs.map((classification) => [classification.key, classification.value]),
+    );
+  }, [classificationConfigs]);
 
   const categories = useMemo(() => {
     const cats = new Set(items.map((i) => i.category).filter(Boolean));
@@ -317,6 +341,8 @@ export default function BorrowPage() {
           search={search}
           onSearchChange={setSearch}
           categories={categories}
+          categoryLabels={categoryLabels}
+          classificationLabels={classificationLabels}
           selectedCategory={selectedCategory}
           onCategoryChange={setSelectedCategory}
           totalItems={items.length}
@@ -332,6 +358,8 @@ export default function BorrowPage() {
         <CheckoutView
           cart={cart}
           totalCartItems={totalCartItems}
+          categoryLabels={categoryLabels}
+          classificationLabels={classificationLabels}
           employeeId={employeeId}
           onEmployeeIdChange={setEmployeeId}
           employeePin={employeePin}

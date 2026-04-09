@@ -37,13 +37,10 @@ export interface InventoryItemCreate {
   item_type?: string;
   classification?: string;
   is_trackable?: boolean;
-  condition?: string;
   description?: string;
 }
 
-export interface InventoryItemUpdate extends Partial<InventoryItemCreate> {
-  condition?: string;
-}
+export interface InventoryItemUpdate extends Partial<InventoryItemCreate> {}
 
 export interface InventoryListParams {
   page?: number;
@@ -53,7 +50,6 @@ export interface InventoryListParams {
   item_type?: string;
   classification?: string;
   is_trackable?: boolean;
-  condition?: string;
   include_deleted?: boolean;
 }
 

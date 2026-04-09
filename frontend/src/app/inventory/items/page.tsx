@@ -26,7 +26,6 @@ export default function InventoryPage() {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [classificationFilter, setClassificationFilter] = useState('');
   const [itemTypeFilter, setItemTypeFilter] = useState('');
-  const [conditionFilter, setConditionFilter] = useState('');
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(DEFAULT_PER_PAGE);
 
@@ -42,7 +41,6 @@ export default function InventoryPage() {
     classification: '',
     item_type: '',
     is_trackable: false,
-    condition: '',
     description: '',
   });
 
@@ -53,7 +51,7 @@ export default function InventoryPage() {
 
   // Queries
   const { data: configsData } = useInventoryConfigs();
-  const { classifications = [], itemTypes = [], conditions = [], categories = [] } = configsData || {};
+  const { classifications = [], itemTypes = [], categories = [] } = configsData || {};
 
   const { data: itemsResponse, isLoading: itemsLoading, error: itemsError } = useInventoryItems({
     page,
@@ -62,7 +60,6 @@ export default function InventoryPage() {
     category: debouncedCategory || undefined,
     classification: classificationFilter || undefined,
     item_type: itemTypeFilter || undefined,
-    condition: conditionFilter || undefined,
   });
 
   const { createItem, updateItem, deleteItem } = useInventoryItemMutations();
@@ -73,10 +70,10 @@ export default function InventoryPage() {
   // Reset page to 1 whenever any filter changes (but not when page itself changes)
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, debouncedCategory, classificationFilter, itemTypeFilter, conditionFilter, perPage]);
+  }, [debouncedSearch, debouncedCategory, classificationFilter, itemTypeFilter, perPage]);
 
   const resetForm = () => {
-    setFormData({ name: '', category: '', classification: '', item_type: '', is_trackable: false, condition: '', description: '' });
+    setFormData({ name: '', category: '', classification: '', item_type: '', is_trackable: false, description: '' });
     setEditingItem(null);
     setIsModalOpen(false);
   };
@@ -89,7 +86,6 @@ export default function InventoryPage() {
       classification: item.classification || '',
       item_type: item.item_type || '',
       is_trackable: item.is_trackable ?? false,
-      condition: item.condition || '',
       description: item.description || '',
     });
     setIsModalOpen(true);
@@ -101,7 +97,6 @@ export default function InventoryPage() {
     const validationError = validateInventoryItemForm(formData, {
       categories: categories.map((entry) => entry.key),
       itemTypes: itemTypes.map((entry) => entry.key),
-      conditions: conditions.map((entry) => entry.key),
     });
     if (validationError) {
       toast.error(validationError);
@@ -116,9 +111,8 @@ export default function InventoryPage() {
             name: formData.name,
             category: formData.category,
             classification: formData.classification || undefined,
-            item_type: formData.item_type,
+            item_type: formData.item_type || undefined,
             is_trackable: formData.is_trackable,
-            condition: formData.condition,
             description: formData.description || undefined,
           }
         });
@@ -128,9 +122,8 @@ export default function InventoryPage() {
           name: formData.name,
           category: formData.category,
           classification: formData.classification || undefined,
-          item_type: formData.item_type,
+          item_type: formData.item_type || undefined,
           is_trackable: formData.is_trackable,
-          condition: formData.condition || undefined,
           description: formData.description || undefined,
         });
         toast.success('New equipment added to catalog');
@@ -176,21 +169,18 @@ export default function InventoryPage() {
           onClassificationFilterChange={setClassificationFilter}
           itemTypeFilter={itemTypeFilter}
           onItemTypeFilterChange={setItemTypeFilter}
-          conditionFilter={conditionFilter}
-          onConditionFilterChange={setConditionFilter}
           classifications={classifications}
           itemTypes={itemTypes}
-          conditions={conditions}
           onClearExpandedFilters={() => {
             setClassificationFilter('');
             setItemTypeFilter('');
-            setConditionFilter('');
           }}
         />
 
         <InventoryItemsTable
           items={items}
           loading={itemsLoading}
+          categories={categories}
           onOpenHistory={(itemId) => setItemHistoryItemId(itemId)}
           onOpenUnitManagement={(itemId) => setUnitManagementItemId(itemId)}
           onOpenBatchManagement={(itemId) => setBatchManagementItemId(itemId)}
@@ -214,7 +204,6 @@ export default function InventoryPage() {
           formData={formData}
           classifications={classifications}
           itemTypes={itemTypes}
-          conditions={conditions}
           categories={categories}
           setFormData={setFormData}
           onClose={() => { }}

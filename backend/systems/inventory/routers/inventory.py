@@ -41,6 +41,16 @@ router = APIRouter()
 inventory_service = InventoryService()
 
 
+def _to_inventory_item_read(session: Session, item) -> InventoryItemRead:
+    item_read = InventoryItemRead.model_validate(item)
+    balances = inventory_service.get_item_balances(session, item)
+    item_read.total_qty = balances["total_qty"]
+    item_read.available_qty = balances["available_qty"]
+    item_read.condition = inventory_service.get_item_condition(session, item)
+    item_read.status_condition = inventory_service.get_item_status(session, item)
+    return item_read
+
+
 @router.post(
     "",
     response_model=GenericResponse[InventoryItemRead],
@@ -64,8 +74,7 @@ async def create_item(
     session.commit()
     session.refresh(item)
 
-    item_read = InventoryItemRead.model_validate(item)
-    item_read.status_condition = inventory_service.get_item_status(session, item)
+    item_read = _to_inventory_item_read(session, item)
 
     return create_success_response(
         data=item_read, message="Item created successfully", request=request
@@ -86,7 +95,6 @@ async def list_items(
     item_type: Optional[str] = Query(default=None, description="Filter by item type (e.g. equipment, consumable)"),
     classification: Optional[str] = Query(default=None, description="Filter by classification (exact match)"),
     is_trackable: Optional[bool] = Query(default=None, description="Filter trackable/non-trackable items"),
-    condition: Optional[str] = Query(default=None, description="Filter by condition (e.g. good, damaged)"),
     include_deleted: bool = Query(default=False, description="Include soft-deleted items"),
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
@@ -103,14 +111,11 @@ async def list_items(
         item_type=item_type,
         classification=classification,
         is_trackable=is_trackable,
-        condition=condition,
         include_deleted=include_deleted,
     )
     items_read = []
     for item in items:
-        item_read = InventoryItemRead.model_validate(item)
-        item_read.status_condition = inventory_service.get_item_status(session, item)
-        items_read.append(item_read)
+        items_read.append(_to_inventory_item_read(session, item))
 
     return create_success_response(
         data=items_read,
@@ -135,8 +140,7 @@ async def get_item(
     item = inventory_service.get(session, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
-    item_read = InventoryItemRead.model_validate(item)
-    item_read.status_condition = inventory_service.get_item_status(session, item)
+    item_read = _to_inventory_item_read(session, item)
 
     return create_success_response(data=item_read, request=request)
 
@@ -168,10 +172,7 @@ async def update_item(
     session.commit()
     session.refresh(updated_item)
 
-    item_read = InventoryItemRead.model_validate(updated_item)
-    item_read.status_condition = inventory_service.get_item_status(
-        session, updated_item
-    )
+    item_read = _to_inventory_item_read(session, updated_item)
 
     return create_success_response(
         data=item_read, message="Item updated successfully", request=request
@@ -211,8 +212,7 @@ async def adjust_stock(
         session.commit()
         session.refresh(item)
 
-        item_read = InventoryItemRead.model_validate(item)
-        item_read.status_condition = inventory_service.get_item_status(session, item)
+        item_read = _to_inventory_item_read(session, item)
 
         return create_success_response(
             data=item_read,
@@ -249,10 +249,7 @@ async def delete_item(
     session.commit()
     session.refresh(deleted_item)
 
-    item_read = InventoryItemRead.model_validate(deleted_item)
-    item_read.status_condition = inventory_service.get_item_status(
-        session, deleted_item
-    )
+    item_read = _to_inventory_item_read(session, deleted_item)
 
     return create_success_response(
         data=item_read, message="Item deleted successfully", request=request
@@ -292,10 +289,7 @@ async def restore_item(
     session.commit()
     session.refresh(restored_item)
 
-    item_read = InventoryItemRead.model_validate(restored_item)
-    item_read.status_condition = inventory_service.get_item_status(
-        session, restored_item
-    )
+    item_read = _to_inventory_item_read(session, restored_item)
     return create_success_response(
         data=item_read, message="Item restored successfully", request=request
     )
