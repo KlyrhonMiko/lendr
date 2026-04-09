@@ -20,7 +20,8 @@ export function MaintenanceOverlay() {
         <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-yellow-400/15 blur-3xl rounded-full" />
 
         <div className="relative">
-          <div className="w-20 h-20 bg-amber-500/10 rounded-2xl flex items-center justify-center text-amber-600 mx-auto mb-6 transform hover:rotate-12 transition-transform duration-500">
+          <div className="w-20 h-20 bg-primary/10 rounded-2xl flex items-center justify-center text-primary mx-auto mb-6 transform hover:rotate-12 transition-transform duration-500">
+
             <Wrench className="w-10 h-10" />
           </div>
 
@@ -41,7 +42,7 @@ export function MaintenanceOverlay() {
             <RefreshCw className="w-5 h-5" />
             Check Again
           </button>
-          
+
           <button
             onClick={() => auth.logout()}
             className="w-full py-4 bg-secondary text-secondary-foreground rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-secondary/80 active:scale-[0.98] transition-all border border-border"

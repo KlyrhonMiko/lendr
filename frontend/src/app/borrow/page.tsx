@@ -309,7 +309,7 @@ export default function BorrowPage() {
   };
 
   return (
-    <div className="h-screen p-4 animate-in fade-in duration-300 relative bg-[#fcfcfc] dark:bg-[#0a0a0b]">
+    <div className="min-h-screen p-4 md:p-6 animate-in fade-in duration-300 bg-background text-foreground">
       {step === 'selection' ? (
         <SelectionView
           items={filteredItems}
@@ -354,67 +354,48 @@ export default function BorrowPage() {
 
       {isPinModalOpen && (
         <div
-          className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-background/80 backdrop-blur-md"
           onClick={handleClosePinModal}
         >
           <div
-            className="w-full max-w-md rounded-3xl bg-card border border-border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+            className="w-full sm:max-w-md mx-0 sm:mx-4 rounded-t-2xl sm:rounded-2xl bg-card border shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="px-7 pt-7 pb-5 text-center relative">
+            <div className="p-5 sm:p-7 text-center relative border-b bg-muted/20">
               <button
                 onClick={handleClosePinModal}
                 aria-label="Close PIN modal"
-                className="absolute right-4 top-4 w-10 h-10 flex items-center justify-center rounded-xl text-muted-foreground hover:bg-muted transition-colors active:scale-95"
+                className="absolute right-3 sm:right-4 top-3 sm:top-4 p-2 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-all"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/25 mx-auto mb-4">
-                <ShieldCheck className="w-7 h-7" />
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                <ShieldCheck className="w-6 h-6 sm:w-7 sm:h-7" />
               </div>
-              <h2 className="text-xl font-bold font-heading">Enter Your PIN</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                Type your 6-digit employee security PIN
+              <h2 className="text-lg sm:text-xl font-bold">Security PIN</h2>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1 sm:mt-1.5">
+                Enter your 6-digit employee PIN
               </p>
             </div>
 
             {/* PIN Boxes */}
-            <div className="px-7 pb-2">
-              <div className="flex justify-center gap-3" onPaste={handlePinPaste}>
+            <div className="p-5 sm:p-7 pb-4 sm:pb-5">
+              <div className="flex justify-center gap-2 sm:gap-2.5" onPaste={handlePinPaste}>
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="relative">
-                    <input
-                      ref={(el) => { pinInputRefs.current[i] = el; }}
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={1}
-                      value={pinDigits[i] ? '•' : ''}
-                      onChange={(e) => handlePinDigitChange(i, e.target.value)}
-                      onKeyDown={(e) => handlePinKeyDown(i, e)}
-                      onFocus={(e) => e.target.select()}
-                      className={`w-14 h-16 text-center text-2xl font-bold rounded-xl border-2 bg-background transition-all focus:outline-none tabular-nums ${pinDigits[i]
-                        ? 'border-indigo-500/50 text-foreground'
-                        : 'border-border/80 text-muted-foreground'
-                        } focus:border-indigo-500 focus:shadow-[0_0_0_4px_rgba(99,102,241,0.1)]`}
-                    />
-                    {!pinDigits[i] && (
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="w-2 h-2 rounded-full bg-border" />
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Progress indicator */}
-              <div className="flex justify-center mt-4 gap-1">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div
+                  <input
                     key={i}
-                    className={`h-1 rounded-full transition-all duration-200 ${pinDigits[i]
-                      ? 'w-5 bg-indigo-500'
-                      : 'w-3 bg-border'
+                    ref={(el) => { pinInputRefs.current[i] = el; }}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={pinDigits[i] ? '•' : ''}
+                    onChange={(e) => handlePinDigitChange(i, e.target.value)}
+                    onKeyDown={(e) => handlePinKeyDown(i, e)}
+                    onFocus={(e) => e.target.select()}
+                    className={`w-11 h-13 sm:w-14 sm:h-16 text-center text-xl sm:text-2xl font-bold rounded-xl border-2 bg-background transition-all duration-200 focus:outline-none tabular-nums ${pinDigits[i]
+                      ? 'border-primary ring-2 ring-primary/20 bg-primary/5'
+                      : 'border-muted focus:border-primary focus:ring-2 focus:ring-primary/20'
                       }`}
                   />
                 ))}
@@ -422,10 +403,10 @@ export default function BorrowPage() {
             </div>
 
             {/* Actions */}
-            <div className="px-7 pt-5 pb-7 flex gap-3">
+            <div className="p-5 sm:p-7 pt-2 flex gap-3 safe-bottom">
               <button
                 onClick={handleClearPin}
-                className="h-12 px-5 rounded-xl border-2 border-border/60 bg-muted/40 text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors flex items-center gap-2 active:scale-[0.98]"
+                className="px-4 sm:px-5 h-11 sm:h-12 rounded-xl border bg-background text-sm font-medium text-foreground hover:bg-muted transition-all active:scale-[0.97] flex items-center gap-2"
               >
                 <Delete className="w-4 h-4" />
                 Clear
@@ -433,14 +414,14 @@ export default function BorrowPage() {
               <button
                 onClick={handleConfirmPin}
                 disabled={pinDraft.replace(/\D/g, '').length !== 6 || isPinVerifying}
-                className="flex-1 h-12 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-sm font-bold text-white disabled:opacity-30 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-indigo-500/25 transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
+                className="flex-1 h-11 sm:h-12 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/90 active:scale-[0.97] flex items-center justify-center gap-2.5 transition-all shadow-md shadow-primary/20 disabled:shadow-none"
               >
                 {isPinVerifying ? (
-                  <Loader2 className="w-4.5 h-4.5 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  <CheckCircle2 className="w-4.5 h-4.5" />
+                  <CheckCircle2 className="w-4 h-4" />
                 )}
-                {isPinVerifying ? 'Verifying...' : 'Confirm PIN'}
+                {isPinVerifying ? 'Verifying...' : 'Confirm'}
               </button>
             </div>
           </div>

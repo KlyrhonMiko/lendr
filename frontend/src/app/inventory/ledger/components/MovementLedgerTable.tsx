@@ -91,7 +91,7 @@ export function MovementLedgerTable({
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
-        <Loader2 className="w-7 h-7 animate-spin text-indigo-500" />
+        <Loader2 className="w-7 h-7 animate-spin text-primary" />
         <p className="text-sm text-muted-foreground font-medium">Loading movements...</p>
       </div>
     );
@@ -159,13 +159,12 @@ export function MovementLedgerTable({
                   onClick={() =>
                     activeTab === 'anomalies' && anomalyKey && onToggleAnomalyExpand(anomalyKey)
                   }
-                  className={`border-b border-border/50 hover:bg-muted/30 transition-colors ${
-                    activeTab === 'anomalies' ? 'cursor-pointer' : ''
-                  } ${idx % 2 === 0 ? '' : 'bg-muted/10'} ${isExpanded ? 'bg-muted/30' : ''}`}
+                  className={`border-b border-border/50 hover:bg-muted/30 transition-colors ${activeTab === 'anomalies' ? 'cursor-pointer' : ''
+                    } ${idx % 2 === 0 ? '' : 'bg-muted/10'} ${isExpanded ? 'bg-muted/30' : ''}`}
                 >
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-indigo-500/8 flex items-center justify-center text-indigo-500 shrink-0">
+                      <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
                         <Package className="w-4.5 h-4.5" />
                       </div>
                       <div className="min-w-0">
@@ -182,13 +181,12 @@ export function MovementLedgerTable({
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-2">
                       <div
-                        className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                          isReversed
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isReversed
                             ? 'bg-muted text-muted-foreground'
                             : isIn
                               ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                               : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
-                        }`}
+                          }`}
                       >
                         {isIn ? (
                           <TrendingUp className="w-4 h-4" />
@@ -204,13 +202,12 @@ export function MovementLedgerTable({
 
                   <td className="px-4 py-3.5">
                     <span
-                      className={`text-sm font-semibold tabular-nums ${
-                        isReversed
+                      className={`text-sm font-semibold tabular-nums ${isReversed
                           ? 'text-muted-foreground line-through'
                           : isIn
                             ? 'text-emerald-600 dark:text-emerald-400'
                             : 'text-rose-600 dark:text-rose-400'
-                      }`}
+                        }`}
                     >
                       {qty > 0 ? '+' : ''}
                       {qty}
@@ -227,7 +224,7 @@ export function MovementLedgerTable({
                       {getRowTimestamp(move)}
                     </p>
                     {!isAnomalyRow(move) && move.reference_id && (
-                      <span className="inline-block mt-1 text-[11px] font-mono bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded">
+                      <span className="inline-block mt-1 text-[11px] font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded">
                         Ref ({move.reference_type || 'external_reference'}): {move.reference_id}
                       </span>
                     )}
@@ -248,7 +245,7 @@ export function MovementLedgerTable({
                           </span>
                         )}
                         {!isAnomalyRow(move) && move.movement_type === 'reversal' && !isReversed && (
-                          <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-500">
+                          <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-primary/10 text-primary">
                             Correction
                           </span>
                         )}
@@ -269,11 +266,10 @@ export function MovementLedgerTable({
                     ) : (
                       <div className="flex items-center justify-end gap-2">
                         <span
-                          className={`text-xs font-semibold px-2 py-0.5 rounded-md ${
-                            (move as Anomaly).severity === 'high'
+                          className={`text-xs font-semibold px-2 py-0.5 rounded-md ${(move as Anomaly).severity === 'high'
                               ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
                               : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                          }`}
+                            }`}
                         >
                           {(move as Anomaly).severity}
                         </span>
@@ -291,7 +287,7 @@ export function MovementLedgerTable({
                       <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div className="p-4 rounded-xl bg-background border border-border">
                           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 mb-1">
-                            <BarChart3 className="w-4 h-4 text-indigo-500" />
+                            <BarChart3 className="w-4 h-4 text-primary" />
                             Ledger balance
                           </p>
                           <p className="text-xl font-semibold text-foreground">
@@ -313,9 +309,8 @@ export function MovementLedgerTable({
                             Difference
                           </p>
                           <p
-                            className={`text-xl font-semibold ${
-                              (move as Anomaly).details?.delta < 0 ? 'text-rose-600' : 'text-amber-600'
-                            }`}
+                            className={`text-xl font-semibold ${(move as Anomaly).details?.delta < 0 ? 'text-rose-600' : 'text-amber-600'
+                              }`}
                           >
                             {(move as Anomaly).details?.delta > 0 ? '+' : ''}
                             {(move as Anomaly).details?.delta}
@@ -323,7 +318,7 @@ export function MovementLedgerTable({
                         </div>
                         <div className="p-4 rounded-xl bg-background border border-border">
                           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 mb-1">
-                            <RefreshCw className="w-4 h-4 text-blue-500" />
+                            <RefreshCw className="w-4 h-4 text-primary" />
                             Transactions
                           </p>
                           <p className="text-xl font-semibold text-foreground">

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import type { BorrowCatalogItem } from '../api';
 import { CartItem } from '../lib/types';
 import { formatCategoryLabel } from '../lib/utils';
@@ -12,15 +13,8 @@ import {
   Loader2,
   Package2,
   X,
-  PackageOpen,
-  Sparkles,
-  Hash,
-  Building2,
-  MapPin,
-  Users,
-  StickyNote,
-  ShieldCheck,
-  CheckCircle2,
+  ArrowRight,
+  ChevronUp,
 } from 'lucide-react';
 
 interface SelectionViewProps {
@@ -58,263 +52,370 @@ export function SelectionView({
   onClear,
   onProceed,
 }: SelectionViewProps) {
+  const [mobileCartOpen, setMobileCartOpen] = useState(false);
+
   return (
-    <div className="flex gap-6 h-full p-2 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      {/* Main Content: Item Selection */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Header/Search Area */}
-        <div className="flex items-center gap-4 mb-6">
-          <div className="relative flex-1 group">
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground/40 group-focus-within:text-primary transition-colors pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search equipment, tools, or categories..."
-              value={search}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full h-14 pl-14 pr-12 rounded-2xl bg-card/50 backdrop-blur-md border border-border/50 text-[15px] font-medium placeholder:text-muted-foreground/30 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all shadow-sm"
-            />
-            {search && (
-              <button
-                onClick={() => onSearchChange('')}
-                className="absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-xl text-muted-foreground hover:bg-muted transition-colors"
-                aria-label="Clear search"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-          <div className="hidden md:flex items-center gap-2 px-6 h-14 rounded-2xl bg-card/50 backdrop-blur-md border border-border/50 text-[13px] font-bold text-muted-foreground shadow-sm">
-            <PackageOpen className="w-4 h-4 opacity-50" />
-            <span className="tabular-nums">{totalItems}</span>
-            <span className="opacity-60 ml-1">Items Available</span>
-          </div>
-        </div>
-
-        {/* Categories Scroller */}
-        <div className="flex gap-2.5 mb-6 overflow-x-auto scrollbar-hide pb-2 -mx-2 px-2">
-          {categories.map((cat) => {
-            const isActive = selectedCategory === cat;
-            return (
-              <button
-                key={cat}
-                onClick={() => onCategoryChange(cat)}
-                className={`px-6 h-11 rounded-xl text-[13px] font-bold whitespace-nowrap transition-all shrink-0 active:scale-[0.96] shadow-sm ${isActive
-                    ? 'bg-primary text-primary-foreground shadow-primary/20'
-                    : 'bg-card/50 backdrop-blur-md border border-border/50 text-muted-foreground hover:text-foreground hover:border-border'
-                  }`}
-              >
-                {cat === 'All' ? 'Explore All' : formatCategoryLabel(cat)}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Item Grid */}
-        <div className="flex-1 overflow-y-auto scrollbar-hide pr-1 -mr-1">
-          {loading ? (
-            <div className="h-full flex flex-col items-center justify-center gap-4 animate-in fade-in duration-500">
-              <div className="relative">
-                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                </div>
-                <div className="absolute -inset-4 bg-primary/20 rounded-full blur-2xl -z-10 animate-pulse" />
+    <>
+      <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 lg:h-[calc(100vh-2rem)] animate-in fade-in duration-500">
+        {/* Main Content: Item Selection */}
+        <div className="flex-1 flex flex-col min-w-0 bg-background rounded-2xl border shadow-sm overflow-hidden">
+          {/* Header/Search Area */}
+          <div className="p-4 lg:p-6 border-b bg-card">
+            <div className="flex flex-col gap-3 sm:flex-row sm:gap-4 justify-between items-start sm:items-center">
+              <div>
+                <h1 className="text-xl lg:text-2xl font-semibold tracking-tight">Select Items</h1>
+                <p className="text-xs lg:text-sm text-muted-foreground mt-0.5 lg:mt-1">
+                  Browse and add items to your request
+                  <span className="ml-1.5 text-[11px] font-medium text-muted-foreground/70">
+                    ({totalItems} total)
+                  </span>
+                </p>
               </div>
-              <div className="text-center">
-                <p className="text-[15px] font-bold text-foreground">Loading Registry</p>
-                <p className="text-xs text-muted-foreground/60 mt-1">Synchronizing inventory cache...</p>
+
+              <div className="relative w-full sm:w-72 lg:w-80">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Search inventory..."
+                  value={search}
+                  onChange={(e) => onSearchChange(e.target.value)}
+                  className="w-full h-10 lg:h-11 pl-9 pr-9 rounded-xl border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                />
+                {search && (
+                  <button
+                    onClick={() => onSearchChange('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md text-muted-foreground hover:bg-muted transition-colors"
+                    aria-label="Clear search"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             </div>
-          ) : items.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center gap-4 text-muted-foreground/20 animate-in zoom-in-95 duration-500">
-              <div className="w-24 h-24 rounded-3xl bg-muted/50 flex items-center justify-center border-2 border-dashed border-muted">
-                <PackageOpen className="w-12 h-12" />
-              </div>
-              <div className="text-center">
-                <p className="text-[15px] font-bold text-muted-foreground/40">No items detected</p>
-                <p className="text-xs text-muted-foreground/30 mt-1">Adjust your filters or try a different search</p>
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-              {items.map((item) => {
-                const inCart = cart.find((c) => c.item_id === item.item_id);
-                const outOfStock = item.available_qty <= 0;
+
+            {/* Categories */}
+            <div className="flex gap-1.5 lg:gap-2 mt-3 lg:mt-5 overflow-x-auto scrollbar-hide pb-1 -mx-1 px-1">
+              {categories.map((cat) => {
+                const isActive = selectedCategory === cat;
                 return (
                   <button
-                    key={item.item_id}
-                    onClick={() => onAddToCart(item)}
-                    className={`group relative flex flex-col text-left p-5 rounded-3xl border transition-all duration-300 min-h-[12rem] ${inCart
-                        ? 'bg-primary/[0.03] border-primary shadow-lg shadow-primary/5'
-                        : 'bg-card/40 backdrop-blur-sm border-border/50 hover:border-primary/40 hover:bg-card hover:shadow-xl hover:-translate-y-1'
-                      } ${outOfStock ? 'opacity-60 ring-2 ring-orange-500/10' : ''}`}
+                    key={cat}
+                    onClick={() => onCategoryChange(cat)}
+                    className={`px-3.5 lg:px-5 py-1.5 lg:py-2 rounded-full text-xs lg:text-sm font-medium whitespace-nowrap transition-all duration-200 ${isActive
+                      ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/25'
+                      : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground active:scale-95'
+                      }`}
                   >
-                    {inCart && (
-                      <div className="absolute top-4 right-4 h-7 min-w-[1.75rem] px-2 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center shadow-lg shadow-primary/25 animate-in zoom-in-50 duration-300 tabular-nums">
-                        {inCart.cartQty}
-                      </div>
-                    )}
-
-                    <div className="flex-1">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted text-[10px] font-bold text-muted-foreground/80 tracking-wider uppercase mb-3 text-ellipsis truncate max-w-full">
-                        {formatCategoryLabel(item.category)}
-                      </span>
-                      <h3 className="font-bold text-[15px] text-foreground leading-tight line-clamp-2 group-hover:text-primary transition-colors">
-                        {item.name}
-                      </h3>
-                    </div>
-
-                    <div className="mt-4 flex items-end justify-between">
-                      <div className="flex flex-col">
-                        <span className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest mb-0.5">Availability</span>
-                        <div className="flex items-baseline gap-1.5">
-                          <span className={`text-2xl font-black tabular-nums tracking-tight ${outOfStock ? 'text-orange-500' : 'text-foreground'}`}>
-                            {item.available_qty}
-                          </span>
-                          <span className="text-[11px] font-bold text-muted-foreground/40 uppercase">Units</span>
-                        </div>
-                      </div>
-
-                      <div className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all duration-300 ${inCart
-                          ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-105'
-                          : outOfStock
-                            ? 'bg-orange-500/10 text-orange-600 group-hover:bg-orange-500 group-hover:text-white'
-                            : 'bg-muted text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground group-hover:shadow-lg group-hover:shadow-primary/20'
-                        }`}>
-                        <Plus className="w-5 h-5" />
-                      </div>
-                    </div>
-
-                    {outOfStock && (
-                      <div className="absolute inset-0 rounded-3xl bg-orange-500/[0.02] pointer-events-none border-2 border-orange-500/10" />
-                    )}
+                    {cat === 'All' ? 'All Items' : formatCategoryLabel(cat)}
                   </button>
                 );
               })}
             </div>
-          )}
-        </div>
-      </div>
+          </div>
 
-      {/* Sidebar: Cart Controls */}
-      <div className="w-[340px] xl:w-[380px] shrink-0 flex flex-col bg-card/50 backdrop-blur-xl border border-border/50 rounded-[2.5rem] overflow-hidden shadow-2xl relative group/sidebar">
-        {/* Sidebar Header */}
-        <div className="px-7 py-7 border-b border-border/50 bg-gradient-to-br from-primary/5 via-transparent to-transparent">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center shadow-lg shadow-primary/25">
-                <ShoppingCart className="w-6 h-6" />
+          {/* Item Grid */}
+          <div className="flex-1 overflow-y-auto p-3 lg:p-6 bg-muted/5">
+            {loading ? (
+              <div className="h-64 lg:h-full flex flex-col items-center justify-center text-muted-foreground">
+                <div className="relative">
+                  <div className="w-14 h-14 lg:w-16 lg:h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 lg:w-7 lg:h-7 animate-spin text-primary" />
+                  </div>
+                </div>
+                <p className="text-sm mt-3 lg:mt-4 font-medium">Loading inventory...</p>
+              </div>
+            ) : items.length === 0 ? (
+              <div className="h-64 lg:h-full flex flex-col items-center justify-center text-muted-foreground">
+                <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-2xl bg-muted/50 flex items-center justify-center mb-3 lg:mb-4">
+                  <Package2 className="w-8 h-8 lg:w-10 lg:h-10 opacity-30" />
+                </div>
+                <p className="font-medium text-foreground text-base lg:text-lg">No items found</p>
+                <p className="text-xs lg:text-sm mt-1">Try adjusting your search or filters</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5 lg:gap-4 pb-20 lg:pb-0">
+                {items.map((item) => {
+                  const inCart = cart.find((c) => c.item_id === item.item_id);
+                  const outOfStock = item.available_qty <= 0;
+                  return (
+                    <button
+                      key={item.item_id}
+                      onClick={() => onAddToCart(item)}
+                      disabled={outOfStock}
+                      className={`group relative flex flex-col text-left p-3 lg:p-4 rounded-xl border bg-card transition-all duration-200
+                        ${outOfStock
+                          ? 'opacity-40 cursor-not-allowed grayscale'
+                          : 'hover:shadow-lg hover:-translate-y-0.5 hover:border-primary/30 active:translate-y-0 active:shadow-md active:scale-[0.98]'
+                        }
+                        ${inCart ? 'ring-2 ring-primary border-transparent shadow-md shadow-primary/10' : ''}`}
+                    >
+                      {inCart && (
+                        <div className="absolute -top-2 -right-2 lg:-top-2.5 lg:-right-2.5 w-6 h-6 lg:w-7 lg:h-7 rounded-full bg-primary text-primary-foreground text-[10px] lg:text-xs font-bold flex items-center justify-center shadow-md shadow-primary/30 animate-in zoom-in-50 duration-200">
+                          {inCart.cartQty}
+                        </div>
+                      )}
+
+                      <div className="flex-1">
+                        <div className="inline-flex items-center px-2 py-0.5 lg:px-2.5 lg:py-1 rounded-md text-[10px] lg:text-[11px] font-medium bg-muted/70 text-muted-foreground mb-2 lg:mb-3">
+                          {formatCategoryLabel(item.category)}
+                        </div>
+                        <h3 className="font-medium text-xs lg:text-sm text-foreground leading-snug line-clamp-2">
+                          {item.name}
+                        </h3>
+                      </div>
+
+                      <div className="mt-3 lg:mt-4 flex items-end justify-between">
+                        <div>
+                          <p className="text-[10px] lg:text-[11px] text-muted-foreground mb-0.5 font-medium uppercase tracking-wider">
+                            Available
+                          </p>
+                          <p
+                            className={`font-bold text-lg lg:text-xl leading-none ${outOfStock ? 'text-destructive' : 'text-foreground'
+                              }`}
+                          >
+                            {item.available_qty}
+                          </p>
+                        </div>
+
+                        {!outOfStock && (
+                          <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-lg lg:rounded-xl flex items-center justify-center bg-muted/60 text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground group-hover:shadow-md transition-all duration-200">
+                            <Plus className="w-4 h-4 lg:w-5 lg:h-5" />
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Desktop Sidebar: Cart Controls — hidden on mobile */}
+        <div className="hidden lg:flex w-96 shrink-0 flex-col bg-card rounded-2xl border shadow-sm overflow-hidden">
+          {/* Sidebar Header */}
+          <div className="p-6 border-b flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                <ShoppingCart className="w-4.5 h-4.5 text-primary" />
               </div>
               <div>
-                <h2 className="font-bold text-[17px]">Request Tray</h2>
-                <p className="text-xs text-muted-foreground/60 font-medium">
-                  {totalCartItems === 0
-                    ? 'Queue is currently empty'
-                    : `${totalCartItems} Item${totalCartItems !== 1 ? 's' : ''} Staged`}
-                </p>
+                <h2 className="font-semibold text-base">Borrow Request</h2>
+                {cart.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {cart.length} item{cart.length !== 1 ? 's' : ''} selected
+                  </p>
+                )}
               </div>
             </div>
             {cart.length > 0 && (
               <button
                 onClick={onClear}
-                className="w-10 h-10 flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl transition-all active:scale-90"
-                title="Clear staging area"
+                className="text-sm text-muted-foreground hover:text-destructive flex items-center gap-1.5 transition-colors px-2 py-1 rounded-lg hover:bg-destructive/10"
               >
-                <Trash2 className="w-5 h-5" />
+                <Trash2 className="w-3.5 h-3.5" />
+                Clear
               </button>
             )}
           </div>
-        </div>
 
-        {/* Cart Items List */}
-        <div className="flex-1 overflow-y-auto px-4 py-6 space-y-3 scrollbar-hide">
-          {cart.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center gap-4 animate-in fade-in duration-700">
-              <div className="w-20 h-20 rounded-3xl bg-muted/30 flex items-center justify-center border-2 border-dashed border-muted group-hover/sidebar:scale-110 transition-transform duration-500">
-                <ShoppingCart className="w-8 h-8 text-muted-foreground/20" />
+          {/* Cart Items List */}
+          <div className="flex-1 overflow-y-auto p-6">
+            {cart.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+                <div className="w-20 h-20 rounded-2xl bg-muted/30 flex items-center justify-center mb-4">
+                  <ShoppingCart className="w-9 h-9 opacity-20" />
+                </div>
+                <p className="text-sm text-center text-muted-foreground/80 max-w-[220px] leading-relaxed">
+                  Your request is empty. Tap items from the catalog to add them.
+                </p>
               </div>
-              <div className="text-center max-w-[200px]">
-                <p className="text-[15px] font-bold text-muted-foreground/40 leading-tight">Your tray is empty</p>
-                <p className="text-[11px] text-muted-foreground/30 mt-2">Tap items on the left to begin staging your request</p>
+            ) : (
+              <div className="space-y-3">
+                {cart.map((item) => (
+                  <div
+                    key={item.item_id}
+                    className="flex flex-col gap-3 p-4 rounded-xl border bg-muted/20 hover:bg-muted/30 transition-colors animate-in slide-in-from-right-2 duration-200"
+                  >
+                    <div className="flex justify-between items-start gap-2">
+                      <p className="text-sm font-medium line-clamp-2 leading-snug">{item.name}</p>
+                      <button
+                        onClick={() => onRemoveFromCart(item.item_id)}
+                        className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all shrink-0 p-1.5 rounded-lg"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] text-muted-foreground font-medium">
+                        {item.available_qty} available
+                      </p>
+                      <div className="flex items-center bg-background rounded-xl border shadow-sm">
+                        <button
+                          onClick={() => onUpdateCartQty(item.item_id, -1)}
+                          className="w-10 h-10 flex items-center justify-center text-muted-foreground hover:text-foreground rounded-l-xl hover:bg-muted transition-colors"
+                        >
+                          <Minus className="w-4 h-4" />
+                        </button>
+                        <span className="w-10 text-center text-sm font-semibold tabular-nums">
+                          {item.cartQty}
+                        </span>
+                        <button
+                          onClick={() => onUpdateCartQty(item.item_id, 1)}
+                          className="w-10 h-10 flex items-center justify-center text-muted-foreground hover:text-foreground rounded-r-xl hover:bg-muted transition-colors"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Footer: Summary & Action */}
+          <div className="p-6 border-t bg-muted/5">
+            <div className="flex justify-between items-end mb-5">
+              <div>
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Items</span>
+              </div>
+              <span className="text-3xl font-bold leading-none tabular-nums">{totalCartItems}</span>
+            </div>
+
+            <button
+              onClick={onProceed}
+              disabled={cart.length === 0}
+              className="w-full h-13 rounded-xl bg-primary text-primary-foreground font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/90 active:scale-[0.98] flex items-center justify-center gap-2.5 transition-all duration-200 shadow-md shadow-primary/20 disabled:shadow-none text-[15px]"
+            >
+              Review Request
+              <ArrowRight className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ===== Mobile Floating Cart Bar ===== */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40">
+        {/* Expandable cart drawer */}
+        {mobileCartOpen && cart.length > 0 && (
+          <div
+            className="fixed inset-0 bg-background/60 backdrop-blur-sm z-40 animate-in fade-in duration-200"
+            onClick={() => setMobileCartOpen(false)}
+          />
+        )}
+
+        {mobileCartOpen && cart.length > 0 && (
+          <div className="relative z-50 bg-card border-t border-x rounded-t-2xl shadow-2xl mx-1 max-h-[60vh] flex flex-col animate-in slide-in-from-bottom-4 duration-300">
+            {/* Drawer header */}
+            <div className="flex items-center justify-between p-4 border-b">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <ShoppingCart className="w-4 h-4 text-primary" />
+                </div>
+                <h3 className="font-semibold text-sm">
+                  {cart.length} item{cart.length !== 1 ? 's' : ''} selected
+                </h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={onClear}
+                  className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-destructive/10 transition-colors"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Clear
+                </button>
+                <button
+                  onClick={() => setMobileCartOpen(false)}
+                  className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {cart.map((item, idx) => (
+
+            {/* Cart items */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {cart.map((item) => (
                 <div
                   key={item.item_id}
-                  className="flex items-center gap-4 p-4 rounded-2xl bg-card border border-border/50 shadow-sm animate-in slide-in-from-right-4 duration-300 fill-mode-both hover:border-primary/30 hover:shadow-md transition-all"
-                  style={{ animationDelay: `${idx * 50}ms` }}
+                  className="flex items-center gap-3 p-3 rounded-xl border bg-muted/20"
                 >
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0 border border-primary/10">
-                    <Package2 className="w-5 h-5" />
-                  </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-bold text-foreground truncate">{item.name}</p>
-                    <p className="text-[10px] font-bold text-muted-foreground/50 mt-1 tracking-wider uppercase">
-                      {item.available_qty} Units In Field
-                    </p>
+                    <p className="text-sm font-medium truncate">{item.name}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{item.available_qty} available</p>
                   </div>
-                  <div className="flex items-center bg-muted/50 rounded-xl p-1 gap-1 border border-border/30">
+                  <div className="flex items-center bg-background rounded-lg border shadow-sm shrink-0">
                     <button
                       onClick={() => onUpdateCartQty(item.item_id, -1)}
-                      className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-card hover:text-primary transition-all active:scale-90"
+                      className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground rounded-l-lg hover:bg-muted transition-colors"
                     >
                       <Minus className="w-3.5 h-3.5" />
                     </button>
-                    <span className="w-6 text-center text-[13px] font-black tabular-nums text-foreground">
-                      {item.cartQty}
-                    </span>
+                    <span className="w-7 text-center text-xs font-semibold tabular-nums">{item.cartQty}</span>
                     <button
                       onClick={() => onUpdateCartQty(item.item_id, 1)}
-                      className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-card hover:text-primary transition-all active:scale-90"
+                      className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground rounded-r-lg hover:bg-muted transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5" />
                     </button>
                   </div>
                   <button
                     onClick={() => onRemoveFromCart(item.item_id)}
-                    className="w-9 h-9 flex items-center justify-center text-muted-foreground/30 hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all"
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all shrink-0"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Sticky bottom bar */}
+        <div className="relative z-50 bg-card/95 backdrop-blur-lg border-t px-4 py-3 flex items-center gap-3 safe-bottom">
+          {cart.length > 0 ? (
+            <>
+              <button
+                onClick={() => setMobileCartOpen(!mobileCartOpen)}
+                className="flex items-center gap-2 flex-1 min-w-0"
+              >
+                <div className="relative">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <ShoppingCart className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center shadow-sm">
+                    {totalCartItems}
+                  </div>
+                </div>
+                <div className="text-left min-w-0">
+                  <p className="text-sm font-semibold">
+                    {cart.length} item{cart.length !== 1 ? 's' : ''}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">Tap to review</p>
+                </div>
+                <ChevronUp className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${mobileCartOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              <button
+                onClick={onProceed}
+                className="h-11 px-6 rounded-xl bg-primary text-primary-foreground font-semibold text-sm flex items-center gap-2 active:scale-[0.97] transition-all shadow-md shadow-primary/20"
+              >
+                Continue
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </>
+          ) : (
+            <div className="flex items-center gap-3 w-full opacity-60">
+              <div className="w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center">
+                <ShoppingCart className="w-5 h-5 text-muted-foreground" />
+              </div>
+              <p className="text-sm text-muted-foreground">Tap items above to get started</p>
+            </div>
           )}
         </div>
-
-        {/* Footer: Summary & Action */}
-        <div className="p-7 border-t border-border/50 bg-gradient-to-tr from-primary/[0.02] to-transparent">
-          <div className="flex items-center justify-between px-2 mb-6">
-            <span className="text-[13px] font-bold text-muted-foreground/60 uppercase tracking-widest">Total Quantity</span>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-black text-foreground tabular-nums tracking-tighter">
-                {totalCartItems}
-              </span>
-              <span className="text-[11px] font-bold text-muted-foreground/40 uppercase">Units</span>
-            </div>
-          </div>
-
-          <button
-            onClick={onProceed}
-            disabled={cart.length === 0}
-            className="group relative w-full h-16 rounded-[1.25rem] bg-primary text-primary-foreground text-[15px] font-black disabled:opacity-20 disabled:cursor-not-allowed hover:shadow-2xl hover:shadow-primary/30 active:scale-[0.98] transition-all overflow-hidden"
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-            <div className="flex items-center justify-center gap-3 relative z-10">
-              <Sparkles className="w-5 h-5 animate-pulse" />
-              <span>Review & Finalize</span>
-            </div>
-          </button>
-
-          <p className="text-[10px] text-center text-muted-foreground/40 mt-4 font-bold tracking-widest uppercase">
-            Step 1 of 2: Deployment Selection
-          </p>
-        </div>
-
-        {/* Decorative background element */}
-        <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10 group-hover/sidebar:bg-primary/10 transition-colors duration-1000" />
       </div>
-    </div>
+    </>
   );
 }

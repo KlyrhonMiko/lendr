@@ -197,4 +197,7 @@ export const borrowApi = {
 
   getReleaseReceipt: (id: string) =>
     api.get<ReleaseReceipt>(`/inventory/borrowing/requests/${id}/release-receipt`),
+
+  saveSignature: (id: string, signatureData: string) =>
+    api.post<BorrowRequest>(`/inventory/borrowing/requests/${id}/signature`, { signature_data: signatureData }),
 };

@@ -350,7 +350,7 @@ export function SecuritySettings() {
                       type="checkbox"
                       checked={draft.two_factor.enforce_for_roles.includes(role.role)}
                       onChange={() => toggleTwoFactorRole(role.role)}
-                      className="w-4 h-4 rounded border-border text-indigo-500 focus:ring-indigo-500"
+                      className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
                       disabled={isSaving}
                     />
                     <span className="text-sm font-medium">{role.label}</span>

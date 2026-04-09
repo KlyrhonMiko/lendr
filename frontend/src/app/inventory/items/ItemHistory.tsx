@@ -48,14 +48,13 @@ export function ItemHistory({ itemId, onClose }: ItemHistoryProps) {
             <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border/50" />
             <div className="space-y-6">
               {loading ? (
-                <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>
+                <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
               ) : history.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">No movement records found for this item.</div>
               ) : history.map((move) => (
                 <div key={move.movement_id} className="relative pl-10">
-                  <div className={`absolute left-2.5 top-1.5 w-3.5 h-3.5 rounded-full border-2 border-background z-10 ${
-                    move.qty_change > 0 ? 'bg-emerald-500' : 'bg-rose-500'
-                  }`} />
+                  <div className={`absolute left-2.5 top-1.5 w-3.5 h-3.5 rounded-full border-2 border-background z-10 ${move.qty_change > 0 ? 'bg-emerald-500' : 'bg-rose-500'
+                    }`} />
                   <div className="p-4 rounded-2xl bg-background border border-border/50 hover:border-border transition-colors">
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex items-center gap-2">

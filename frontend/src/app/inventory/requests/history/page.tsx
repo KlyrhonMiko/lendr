@@ -49,11 +49,12 @@ export default function RequestHistoryPage() {
 
   const getEventBadgeClass = (type: string) => {
     switch (type.toLowerCase()) {
-      case 'created': return 'bg-sky-500/10 text-sky-500 border-sky-500/20';
+      case 'created': return 'bg-primary/10 text-primary border-primary/20';
       case 'approved': return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
       case 'rejected': return 'bg-rose-500/10 text-rose-500 border-rose-500/20';
-      case 'released': return 'bg-amber-500/10 text-amber-500 border-amber-500/20';
-      case 'returned': return 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20';
+      case 'released': return 'bg-primary/10 text-primary border-primary/20 font-bold';
+
+      case 'returned': return 'bg-primary/10 text-primary border-primary/20';
       case 'closed': return 'bg-slate-500/10 text-slate-500 border-slate-500/20';
       default: return 'bg-muted/30 text-muted-foreground border-border/50';
     }
@@ -66,7 +67,7 @@ export default function RequestHistoryPage() {
           <h1 className="text-4xl font-bold font-heading mb-2">Request Activity Log</h1>
           <p className="text-muted-foreground text-lg">Detailed history of all borrow request state transitions and actions.</p>
         </div>
-        <div className="flex items-center gap-2 px-4 py-2 bg-indigo-500/10 text-indigo-500 rounded-2xl border border-indigo-500/20 text-sm font-bold">
+        <div className="flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-2xl border border-primary/20 text-sm font-bold">
           <Info className="w-4 h-4" />
           <span>Tracking all borrow request life cycles</span>
         </div>
@@ -82,7 +83,7 @@ export default function RequestHistoryPage() {
                 value={requestIdFilter}
                 onChange={(e) => setRequestIdFilter(e.target.value)}
                 placeholder="Search by Request ID..."
-                className="w-full h-11 pl-11 pr-4 rounded-xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all text-sm font-medium"
+                className="w-full h-11 pl-11 pr-4 rounded-xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all text-sm font-medium"
               />
             </div>
 
@@ -93,7 +94,7 @@ export default function RequestHistoryPage() {
                 value={actorNameFilter}
                 onChange={(e) => setActorNameFilter(e.target.value)}
                 placeholder="Actor Name..."
-                className="w-full sm:w-48 h-11 pl-11 pr-4 rounded-xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all text-sm font-medium"
+                className="w-full sm:w-48 h-11 pl-11 pr-4 rounded-xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all text-sm font-medium"
               />
             </div>
 
@@ -102,7 +103,7 @@ export default function RequestHistoryPage() {
               <select
                 value={eventTypeFilter}
                 onChange={(e) => setEventTypeFilter(e.target.value)}
-                className="h-11 px-4 rounded-xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all text-sm font-medium pr-8"
+                className="h-11 px-4 rounded-xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all text-sm font-medium pr-8"
               >
                 <option value="">All Types</option>
                 <option value="created">Created</option>
@@ -125,18 +126,18 @@ export default function RequestHistoryPage() {
                     type="date"
                     value={dateFrom}
                     onChange={(e) => setDateFrom(e.target.value)}
-                    className="h-10 px-3 rounded-lg bg-input/30 border border-border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                    className="h-10 px-3 rounded-lg bg-input/30 border border-border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30"
                   />
                   <span className="text-muted-foreground text-xs font-bold uppercase tracking-wider">to</span>
                   <input
                     type="date"
                     value={dateTo}
                     onChange={(e) => setDateTo(e.target.value)}
-                    className="h-10 px-3 rounded-lg bg-input/30 border border-border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                    className="h-10 px-3 rounded-lg bg-input/30 border border-border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30"
                   />
                 </div>
               </div>
-              
+
               {(requestIdFilter || actorNameFilter || eventTypeFilter || dateFrom || dateTo) && (
                 <button
                   onClick={() => {
@@ -174,7 +175,7 @@ export default function RequestHistoryPage() {
               {loading ? (
                 <tr>
                   <td colSpan={5} className="p-12 text-center">
-                    <Loader2 className="w-10 h-10 animate-spin text-indigo-500 mx-auto mb-4" />
+                    <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto mb-4" />
                     <p className="text-muted-foreground font-medium animate-pulse text-lg">Fetching activity history...</p>
                   </td>
                 </tr>
@@ -209,9 +210,9 @@ export default function RequestHistoryPage() {
                     </td>
                     <td className="p-4">
                       <div className="flex flex-col">
-                        <Link 
+                        <Link
                           href={`/inventory/requests?search=${event.request_id}`}
-                          className="text-sm font-bold text-indigo-400 font-mono tracking-tighter hover:text-indigo-300 transition-colors"
+                          className="text-sm font-bold text-primary font-mono tracking-tighter hover:text-primary/80 transition-colors"
                         >
                           {event.request_id}
                         </Link>
@@ -225,7 +226,7 @@ export default function RequestHistoryPage() {
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-indigo-500/10 flex items-center justify-center text-[10px] text-indigo-500 border border-indigo-500/20 font-bold">
+                        <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[10px] text-primary border border-primary/20 font-bold">
                           {event.actor_name?.split(', ')[0]?.substring(0, 1) || 'S'}
                           {event.actor_name?.split(', ')[1]?.substring(0, 1) || ''}
                         </div>

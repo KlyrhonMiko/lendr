@@ -40,8 +40,8 @@ export function AdminStatsGrid({ stats, loading }: { stats: AdminStats | null; l
       label: 'Active Users',
       value: stats?.total_users ?? 0,
       icon: Users,
-      accent: 'text-blue-600 dark:text-blue-400',
-      iconBg: 'bg-blue-50 dark:bg-blue-500/10',
+      accent: 'text-yellow-600 dark:text-yellow-400',
+      iconBg: 'bg-yellow-100/50 dark:bg-yellow-500/10',
     },
     {
       label: 'Current Sessions',
@@ -54,8 +54,8 @@ export function AdminStatsGrid({ stats, loading }: { stats: AdminStats | null; l
       label: 'Audit Log (24h)',
       value: stats?.audit_log_count_24h ?? 0,
       icon: ShieldCheck,
-      accent: 'text-violet-600 dark:text-violet-400',
-      iconBg: 'bg-violet-50 dark:bg-violet-500/10',
+      accent: 'text-yellow-600 dark:text-yellow-400',
+      iconBg: 'bg-yellow-100/50 dark:bg-yellow-500/10',
     },
     {
       label: 'System Backup',

@@ -39,8 +39,8 @@ export function Header({ onMenuToggle }: HeaderProps) {
               )}
               <span
                 className={`truncate tracking-wide ${i === breadcrumbs.length - 1
-                    ? 'text-primary px-2 py-0.5 bg-primary/10 rounded-md shadow-sm'
-                    : 'text-muted-foreground/60 hover:text-foreground transition-colors'
+                  ? 'text-primary px-2 py-0.5 bg-primary/10 rounded-md shadow-sm'
+                  : 'text-muted-foreground/60 hover:text-foreground transition-colors'
                   }`}
               >
                 {crumb}
@@ -60,9 +60,10 @@ export function Header({ onMenuToggle }: HeaderProps) {
                 ? `${user.first_name} ${user.last_name}`
                 : 'Guest'}
           </span>
-          <span className="text-[10px] font-bold text-primary/70 uppercase tracking-widest leading-tight mt-0.5">
+          <span className="text-[10px] font-bold text-primary uppercase tracking-[0.1em] leading-tight mt-0.5">
             {loading ? 'Loading...' : user?.role.replace('_', ' ') || 'User'}
           </span>
+
         </div>
 
         <div className="w-px h-6 bg-border mx-1 hidden sm:block" />

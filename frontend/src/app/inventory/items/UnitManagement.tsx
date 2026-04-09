@@ -16,11 +16,20 @@ import {
   Check,
   Cpu,
   Hash,
+  QrCode,
+  Printer,
+  Square,
+  CheckSquare,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { cn, parseSystemDate } from '@/lib/utils';
 import { logger } from '@/lib/logger';
+import { QrCodeModal } from '@/components/ui/QrCodeModal';
+import { QRCodeSVG } from 'qrcode.react';
+import { renderToString } from 'react-dom/server';
+import { DatePicker } from '@/components/ui/date-picker';
+import { parseISO, format as formatDateFns } from 'date-fns';
 
 interface UnitManagementProps {
   itemId: string;
@@ -56,7 +65,7 @@ function FilterSelect({
           onClick={() => { onChange(''); setOpen(false); }}
           className={cn(
             'w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors text-left',
-            !value ? 'bg-indigo-500/10 text-indigo-600 font-medium' : 'hover:bg-muted'
+            !value ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted'
           )}
         >
           <Check className={cn('w-3.5 h-3.5 shrink-0', !value ? 'opacity-100' : 'opacity-0')} />
@@ -69,7 +78,7 @@ function FilterSelect({
             onClick={() => { onChange(opt.key); setOpen(false); }}
             className={cn(
               'w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors text-left',
-              value === opt.key ? 'bg-indigo-500/10 text-indigo-600 font-medium' : 'hover:bg-muted'
+              value === opt.key ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted'
             )}
           >
             <Check className={cn('w-3.5 h-3.5 shrink-0', value === opt.key ? 'opacity-100' : 'opacity-0')} />
@@ -103,7 +112,7 @@ function FormSelect({
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger
           type="button"
-          className="w-full h-11 px-3.5 rounded-xl bg-muted/50 border border-border text-sm font-medium cursor-pointer flex items-center justify-between gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 transition-all"
+          className="w-full h-11 px-3.5 rounded-xl bg-muted/50 border border-border text-sm font-medium cursor-pointer flex items-center justify-between gap-2 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition-all"
         >
           <span className={cn('truncate text-left', !value && 'text-muted-foreground')}>{display}</span>
           <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -116,7 +125,7 @@ function FormSelect({
               onClick={() => { onChange(opt.key); setOpen(false); }}
               className={cn(
                 'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left',
-                value === opt.key ? 'bg-indigo-500/10 text-indigo-600 font-medium' : 'hover:bg-muted'
+                value === opt.key ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted'
               )}
             >
               <Check className={cn('w-4 h-4 shrink-0', value === opt.key ? 'opacity-100' : 'opacity-0')} />
@@ -131,15 +140,18 @@ function FormSelect({
 
 const STATUS_COLORS: Record<string, string> = {
   available: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-  borrowed: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
-  maintenance: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+  borrowed: 'bg-primary/10 text-primary',
+  maintenance: 'bg-primary/10 text-primary font-bold',
+
   retired: 'bg-rose-500/10 text-rose-600 dark:text-rose-400',
 };
 
 export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [isBatch, setIsBatch] = useState(false);
-  const [editingUnitId, setEditingUnitId] = useState<string | null>(null);
+  const [editingUnit, setEditingUnit] = useState<InventoryUnit | null>(null);
+  const [qrCodeUnit, setQrCodeUnit] = useState<InventoryUnit | null>(null);
+  const [selectedUnitIds, setSelectedUnitIds] = useState<Set<string>>(new Set());
 
   const queryClient = useQueryClient();
 
@@ -157,16 +169,6 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
   });
 
   const units = unitsResponse?.data || [];
-
-  const [formData, setFormData] = useState({
-    serial_number: '',
-    expiration_date: '',
-    condition: 'good',
-    description: '',
-    status: 'available',
-  });
-
-  const [batchCount, setBatchCount] = useState(1);
 
   const fetchConfigs = useCallback(async () => {
     try {
@@ -190,87 +192,26 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
     queryClient.invalidateQueries({ queryKey: ['inventory', 'items'] }); // Main list
   };
 
-  const resetForm = () => {
-    setFormData({
-      serial_number: '',
-      expiration_date: '',
-      condition: conditionConfigs[0]?.key || 'good',
-      description: '',
-      status: statusConfigs[0]?.key || 'available',
-    });
-    setBatchCount(1);
-  };
+
 
   const openAddForm = (batch: boolean) => {
     setIsAdding(true);
     setIsBatch(batch);
-    setEditingUnitId(null);
-    resetForm();
+    setEditingUnit(null);
   };
 
   const startEdit = (unit: InventoryUnit) => {
-    setEditingUnitId(unit.unit_id);
-    
-    let dateVal = '';
-    if (unit.expiration_date) {
-      const d = parseSystemDate(unit.expiration_date);
-      if (!isNaN(d.getTime())) {
-        dateVal = d.toISOString().split('T')[0];
-      }
-    }
-
-    setFormData({
-      serial_number: unit.serial_number || '',
-      expiration_date: dateVal,
-      condition: unit.condition || 'good',
-      description: unit.description || '',
-      status: unit.status || 'available',
-    });
+    setEditingUnit(unit);
     setIsAdding(true);
     setIsBatch(false);
   };
 
   const closeForm = () => {
     setIsAdding(false);
-    setEditingUnitId(null);
+    setEditingUnit(null);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      if (editingUnitId) {
-        await inventoryApi.updateUnit(itemId, editingUnitId, {
-          status: formData.status,
-          condition: formData.condition,
-          expiration_date: formData.expiration_date || undefined,
-          description: formData.description || undefined,
-        });
-        toast.success('Unit updated');
-      } else if (isBatch) {
-        const batch = Array.from({ length: batchCount }).map((_, i) => ({
-          serial_number: `${formData.serial_number}-${i + 1}`,
-          expiration_date: formData.expiration_date || undefined,
-          description: formData.description || undefined,
-          condition: formData.condition,
-        }));
-        await inventoryApi.createUnitsBatch(itemId, batch);
-        toast.success(`${batchCount} units created`);
-      } else {
-        await inventoryApi.createUnit(itemId, {
-          serial_number: formData.serial_number,
-          condition: formData.condition,
-          expiration_date: formData.expiration_date || undefined,
-          description: formData.description || undefined,
-        });
-        toast.success('Unit created');
-      }
-      closeForm();
-      invalidateQueries();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to save unit';
-      toast.error(message);
-    }
-  };
+
 
   const handleRetire = async (unitId: string) => {
     if (!confirm('Are you sure you want to retire this unit?')) return;
@@ -284,24 +225,95 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
     }
   };
 
-  const formTitle = editingUnitId
-    ? 'Edit Unit'
-    : isBatch
-      ? 'Batch Add Units'
-      : 'Add Unit';
+  const handleBatchPrint = () => {
+    const unitsToPrint = selectedUnitIds.size > 0
+      ? units.filter(u => selectedUnitIds.has(u.unit_id))
+      : units;
+
+    if (unitsToPrint.length === 0) {
+      toast.error('No units to print');
+      return;
+    }
+
+    const printWindow = window.open('', '', 'width=800,height=800');
+    if (!printWindow) {
+      toast.error('Pop-up blocked. Please allow pop-ups for this site.');
+      return;
+    }
+
+    const htmlContent = renderToString(
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '30px', padding: '20px', fontFamily: 'system-ui, sans-serif' }}>
+        {unitsToPrint.map((unit) => {
+          const val = JSON.stringify({ type: 'unit', id: unit.unit_id, itemId: itemId });
+          return (
+            <div key={unit.unit_id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px', breakInside: 'avoid' }}>
+              <h3 style={{ margin: '0 0 5px 0', fontSize: '16px', fontWeight: 'bold' }}>Unit: {unit.serial_number}</h3>
+              <p style={{ margin: '0 0 15px 0', fontSize: '12px', color: '#64748b' }}>Condition: {unit.condition}</p>
+              <QRCodeSVG value={val} size={150} level="M" />
+            </div>
+          );
+        })}
+      </div>
+    );
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Batch Print QR Codes</title>
+          <style>
+            @page { margin: 1cm; }
+            body { margin: 0; background: white; }
+          </style>
+        </head>
+        <body>
+          <h2 style="font-family: system-ui, sans-serif; padding-left: 20px;">Equipment QR Labels</h2>
+          ${htmlContent}
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.onload = () => {
+      printWindow.focus();
+      printWindow.print();
+      // Keep it open if user cancels, or close? For batch, maybe close after print returns
+    };
+  };
+
+
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      className={cn(
+        "fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[10vh] bg-black/40 backdrop-blur-sm transition-all duration-300 overflow-y-auto",
+        isAdding ? "gap-6 lg:flex-row flex-col" : "gap-0"
+      )}
       onClick={onClose}
     >
+      {isAdding && (
+        <UnitFormModal
+          itemId={itemId}
+          isBatch={isBatch}
+          unit={editingUnit}
+          statusConfigs={statusConfigs}
+          conditionConfigs={conditionConfigs}
+          onClose={closeForm}
+          onSuccess={() => {
+            closeForm();
+            invalidateQueries();
+          }}
+        />
+      )}
       <div
-        className="w-full max-w-2xl bg-card border border-border rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]"
+        className={cn(
+          "w-full max-w-2xl bg-card border border-border rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh] transition-all duration-300",
+          isAdding && "scale-[0.98] opacity-90 lg:scale-100 lg:opacity-100"
+        )}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-border shrink-0">
-          <div className="w-9 h-9 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-500">
+          <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
             <Cpu className="w-4.5 h-4.5" />
           </div>
           <div className="flex-1 min-w-0">
@@ -329,7 +341,7 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
                 placeholder="Search by serial number..."
                 value={searchSerial}
                 onChange={(e) => setSearchSerial(e.target.value)}
-                className="w-full h-9 pl-9 pr-3 rounded-xl bg-muted/50 border border-border text-sm focus:bg-background focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 transition-all"
+                className="w-full h-9 pl-9 pr-3 rounded-xl bg-muted/50 border border-border text-sm focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition-all"
               />
             </div>
             <FilterSelect
@@ -349,156 +361,44 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
 
         {/* Add / Batch buttons */}
         {!isAdding && (
-          <div className="px-5 pt-4 pb-1 flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => openAddForm(false)}
-              className="h-9 px-3.5 bg-indigo-500 text-white text-sm font-semibold rounded-xl flex items-center gap-1.5 hover:bg-indigo-600 active:scale-[0.98] transition-all shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              Add Unit
-            </button>
-            <button
-              onClick={() => openAddForm(true)}
-              className="h-9 px-3.5 bg-muted text-foreground text-sm font-medium rounded-xl flex items-center gap-1.5 hover:bg-muted/80 transition-colors"
-            >
-              <Package className="w-4 h-4" />
-              Batch Add
-            </button>
+          <div className="px-5 pt-4 pb-1 flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => openAddForm(false)}
+                className="h-9 px-3.5 bg-primary text-primary-foreground text-sm font-semibold rounded-xl flex items-center gap-1.5 hover:bg-primary/90 active:scale-[0.98] transition-all shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+                Add Unit
+              </button>
+              <button
+                onClick={() => openAddForm(true)}
+                className="h-9 px-3.5 bg-muted text-foreground text-sm font-medium rounded-xl flex items-center gap-1.5 hover:bg-muted/80 transition-colors"
+              >
+                <Package className="w-4 h-4" />
+                Batch Add
+              </button>
+            </div>
+            {units.length > 0 && (
+              <button
+                onClick={handleBatchPrint}
+                className="h-9 px-3.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-sm font-semibold rounded-xl flex items-center gap-1.5 hover:bg-indigo-500/20 transition-colors"
+                title={selectedUnitIds.size > 0 ? `Print ${selectedUnitIds.size} selected labels` : "Print labels for all visible units"}
+              >
+                <Printer className="w-4 h-4" />
+                {selectedUnitIds.size > 0 ? `Print (${selectedUnitIds.size})` : 'Print QRs'}
+              </button>
+            )}
           </div>
         )}
 
-        {/* Inline Form */}
-        {isAdding && (
-          <div className="px-5 pt-4 pb-2 shrink-0">
-            <form onSubmit={handleSubmit} className="p-4 bg-muted/30 rounded-xl border border-border/50 space-y-3">
-              <div className="flex items-center justify-between mb-1">
-                <h3 className="text-sm font-semibold text-foreground">{formTitle}</h3>
-                <button
-                  type="button"
-                  onClick={closeForm}
-                  aria-label="Close unit form"
-                  className="p-1 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className={cn('space-y-1.5', !isBatch && !editingUnitId && 'col-span-2')}>
-                  <label className="block text-sm font-medium text-foreground">
-                    {isBatch ? 'Serial Prefix' : 'Serial Number'} <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    required
-                    disabled={!!editingUnitId}
-                    type="text"
-                    value={formData.serial_number}
-                    onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
-                    className="w-full h-11 px-3.5 rounded-xl bg-muted/50 border border-border text-sm font-medium focus:bg-background focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 transition-all disabled:opacity-50"
-                    placeholder={isBatch ? 'e.g. SN-2024' : 'e.g. SN-001'}
-                  />
-                </div>
-                {isBatch && (
-                  <div className="space-y-1.5">
-                    <label className="block text-sm font-medium text-foreground">
-                      Quantity <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      required
-                      type="number"
-                      min="1"
-                      max="100"
-                      value={batchCount}
-                      onChange={(e) => setBatchCount(parseInt(e.target.value) || 1)}
-                      className="w-full h-11 px-3.5 rounded-xl bg-muted/50 border border-border text-sm font-medium focus:bg-background focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 transition-all"
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <FormSelect
-                  label="Condition"
-                  value={formData.condition}
-                  onChange={(v) => setFormData({ ...formData, condition: v })}
-                  options={conditionConfigs.map((c) => ({
-                    key: c.key,
-                    label: c.value,
-                  }))}
-                  placeholder="Select condition"
-                />
-                {editingUnitId ? (
-                  <FormSelect
-                    label="Status"
-                    value={formData.status}
-                    onChange={(v) => setFormData({ ...formData, status: v })}
-                    options={statusConfigs.map((c) => ({
-                      key: c.key,
-                      label: c.value,
-                    }))}
-                    placeholder="Select status"
-                  />
-                ) : (
-                  <div className="space-y-1.5">
-                    <label className="block text-sm font-medium text-foreground">Expiration Date</label>
-                    <input
-                      type="date"
-                      value={formData.expiration_date}
-                      onChange={(e) => setFormData({ ...formData, expiration_date: e.target.value })}
-                      className="w-full h-11 px-3.5 rounded-xl bg-muted/50 border border-border text-sm font-medium focus:bg-background focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 transition-all"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {editingUnitId && (
-                <div className="space-y-1.5">
-                  <label className="block text-sm font-medium text-foreground">Expiration Date</label>
-                  <input
-                    type="date"
-                    value={formData.expiration_date}
-                    onChange={(e) => setFormData({ ...formData, expiration_date: e.target.value })}
-                    className="w-full h-11 px-3.5 rounded-xl bg-muted/50 border border-border text-sm font-medium focus:bg-background focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 transition-all"
-                  />
-                </div>
-              )}
-
-              <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-foreground">Note</label>
-                <input
-                  type="text"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full h-11 px-3.5 rounded-xl bg-muted/50 border border-border text-sm font-medium focus:bg-background focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 transition-all"
-                  placeholder="Optional note about this unit..."
-                />
-              </div>
-
-              <div className="flex gap-3 pt-1">
-                <button
-                  type="button"
-                  onClick={closeForm}
-                  className="flex-1 h-10 rounded-xl text-sm font-semibold bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 h-10 rounded-xl text-sm font-semibold bg-indigo-500 text-white hover:bg-indigo-600 active:scale-[0.98] transition-all shadow-sm"
-                >
-                  {editingUnitId ? 'Save Changes' : isBatch ? `Create ${batchCount} Units` : 'Create Unit'}
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
 
         {/* Unit List */}
         <div className="flex-1 overflow-y-auto min-h-0 bg-muted/10 relative p-5">
           {unitsLoading ? (
             <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-10">
               <div className="flex flex-col items-center gap-3">
-                <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+                <Loader2 className="w-8 h-8 text-primary animate-spin" />
                 <p className="text-sm font-medium text-muted-foreground">Loading units...</p>
               </div>
             </div>
@@ -516,7 +416,7 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
               {!isAdding && !searchSerial && !filterStatus && !filterCondition && (
                 <button
                   onClick={() => openAddForm(false)}
-                  className="mt-4 h-9 px-4 bg-indigo-500 text-white text-sm font-semibold rounded-xl flex items-center gap-1.5 hover:bg-indigo-600 active:scale-[0.98] transition-all shadow-sm"
+                  className="mt-4 h-9 px-4 bg-primary text-primary-foreground text-sm font-semibold rounded-xl flex items-center gap-1.5 hover:bg-primary/90 active:scale-[0.98] transition-all shadow-sm"
                 >
                   <Plus className="w-4 h-4" />
                   Add First Unit
@@ -528,6 +428,24 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
               <table className="w-full text-left">
                 <thead className="bg-muted/40">
                   <tr className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    <th className="px-4 py-2.5 w-10">
+                      <button
+                        onClick={() => {
+                          if (selectedUnitIds.size === units.length && units.length > 0) {
+                            setSelectedUnitIds(new Set());
+                          } else {
+                            setSelectedUnitIds(new Set(units.map(u => u.unit_id)));
+                          }
+                        }}
+                        className="p-1 hover:text-primary transition-colors"
+                      >
+                        {selectedUnitIds.size === units.length && units.length > 0 ? (
+                          <CheckSquare className="w-4 h-4" />
+                        ) : (
+                          <Square className="w-4 h-4" />
+                        )}
+                      </button>
+                    </th>
                     <th className="px-4 py-2.5">Serial No.</th>
                     <th className="px-4 py-2.5">Condition</th>
                     <th className="px-4 py-2.5">Status</th>
@@ -540,9 +458,32 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
                       key={unit.unit_id}
                       className={cn(
                         'group hover:bg-muted/30 transition-colors',
-                        editingUnitId === unit.unit_id && 'bg-indigo-500/5'
+                        (editingUnit?.unit_id === unit.unit_id || selectedUnitIds.has(unit.unit_id)) && 'bg-primary/5'
                       )}
                     >
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => {
+                            const newSelected = new Set(selectedUnitIds);
+                            if (newSelected.has(unit.unit_id)) {
+                              newSelected.delete(unit.unit_id);
+                            } else {
+                              newSelected.add(unit.unit_id);
+                            }
+                            setSelectedUnitIds(newSelected);
+                          }}
+                          className={cn(
+                            'p-1 transition-colors',
+                            selectedUnitIds.has(unit.unit_id) ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                          )}
+                        >
+                          {selectedUnitIds.has(unit.unit_id) ? (
+                            <CheckSquare className="w-4 h-4" />
+                          ) : (
+                            <Square className="w-4 h-4" />
+                          )}
+                        </button>
+                      </td>
                       <td className="px-4 py-3">
                         <span className="text-sm font-mono font-semibold">{unit.serial_number}</span>
                       </td>
@@ -571,8 +512,15 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-0.5 sm:opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
+                            onClick={() => setQrCodeUnit(unit)}
+                            className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                            title="View QR"
+                          >
+                            <QrCode className="w-3.5 h-3.5" />
+                          </button>
+                          <button
                             onClick={() => startEdit(unit)}
-                            className="p-1.5 text-muted-foreground hover:text-indigo-500 hover:bg-indigo-500/10 rounded-lg transition-colors"
+                            className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
                             title="Edit"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
@@ -594,6 +542,235 @@ export function UnitManagement({ itemId, onClose }: UnitManagementProps) {
           )}
         </div>
       </div>
+
+
+
+      {qrCodeUnit && (
+        <QrCodeModal
+          value={JSON.stringify({ type: 'unit', id: qrCodeUnit.unit_id, itemId: itemId })}
+          title={`Unit: ${qrCodeUnit.serial_number}`}
+          subtitle={`Condition: ${qrCodeUnit.condition}`}
+          onClose={() => setQrCodeUnit(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+interface UnitFormModalProps {
+  itemId: string;
+  isBatch: boolean;
+  unit: InventoryUnit | null;
+  statusConfigs: ConfigRead[];
+  conditionConfigs: ConfigRead[];
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+function UnitFormModal({
+  itemId,
+  isBatch,
+  unit,
+  statusConfigs,
+  conditionConfigs,
+  onClose,
+  onSuccess,
+}: UnitFormModalProps) {
+  const [formData, setFormData] = useState({
+    serial_number: '',
+    expiration_date: undefined as Date | undefined,
+    condition: 'good',
+    description: '',
+    status: 'available',
+  });
+  const [batchCount, setBatchCount] = useState(1);
+
+  useEffect(() => {
+    if (unit) {
+      setFormData({
+        serial_number: unit.serial_number || '',
+        expiration_date: unit.expiration_date ? parseISO(unit.expiration_date) : undefined,
+        condition: unit.condition || 'good',
+        description: unit.description || '',
+        status: unit.status || 'available',
+      });
+    } else {
+      setFormData({
+        serial_number: '',
+        expiration_date: undefined,
+        condition: conditionConfigs[0]?.key || 'good',
+        description: '',
+        status: statusConfigs[0]?.key || 'available',
+      });
+    }
+  }, [unit, statusConfigs, conditionConfigs]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const expirationDateStr = formData.expiration_date ? formatDateFns(formData.expiration_date, 'yyyy-MM-dd') : undefined;
+
+      if (unit) {
+        await inventoryApi.updateUnit(itemId, unit.unit_id, {
+          status: formData.status,
+          condition: formData.condition,
+          expiration_date: expirationDateStr,
+          description: formData.description || undefined,
+        });
+        toast.success('Unit updated');
+      } else if (isBatch) {
+        const batch = Array.from({ length: batchCount }).map((_, i) => ({
+          serial_number: `${formData.serial_number}-${i + 1}`,
+          expiration_date: expirationDateStr,
+          description: formData.description || undefined,
+          condition: formData.condition,
+        }));
+        await inventoryApi.createUnitsBatch(itemId, batch);
+        toast.success(`${batchCount} units created`);
+      } else {
+        await inventoryApi.createUnit(itemId, {
+          serial_number: formData.serial_number,
+          condition: formData.condition,
+          expiration_date: expirationDateStr,
+          description: formData.description || undefined,
+        });
+        toast.success('Unit created');
+      }
+      onSuccess();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to save unit';
+      toast.error(message);
+    }
+  };
+
+  const formTitle = unit
+    ? 'Edit Unit'
+    : isBatch
+      ? 'Batch Add Units'
+      : 'Add Unit';
+
+  return (
+    <div
+      className="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-left-4 zoom-in-95 duration-300 flex flex-col max-h-[85vh]"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+        <h3 className="text-lg font-bold font-heading">{formTitle}</h3>
+        <button
+          type="button"
+          onClick={onClose}
+          className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto min-h-0">
+        <div className="grid grid-cols-2 gap-4">
+          <div className={cn('space-y-1.5', !isBatch && !unit && 'col-span-2')}>
+            <label className="block text-sm font-medium text-foreground">
+              {isBatch ? 'Serial Prefix' : 'Serial Number'} <span className="text-rose-500">*</span>
+            </label>
+            <input
+              required
+              disabled={!!unit}
+              type="text"
+              value={formData.serial_number}
+              onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
+              className="w-full h-11 px-3.5 rounded-xl bg-muted/50 border border-border text-sm font-medium focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition-all disabled:opacity-50"
+              placeholder={isBatch ? 'e.g. SN-2024' : 'e.g. SN-001'}
+            />
+          </div>
+          {isBatch && (
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-foreground">
+                Quantity <span className="text-rose-500">*</span>
+              </label>
+              <input
+                required
+                type="number"
+                min="1"
+                max="100"
+                value={batchCount}
+                onChange={(e) => setBatchCount(parseInt(e.target.value) || 1)}
+                className="w-full h-11 px-3.5 rounded-xl bg-muted/50 border border-border text-sm font-medium focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition-all"
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormSelect
+            label="Condition"
+            value={formData.condition}
+            onChange={(v) => setFormData({ ...formData, condition: v })}
+            options={conditionConfigs.map((c) => ({
+              key: c.key,
+              label: c.value,
+            }))}
+            placeholder="Select condition"
+          />
+          {unit ? (
+            <FormSelect
+              label="Status"
+              value={formData.status}
+              onChange={(v) => setFormData({ ...formData, status: v })}
+              options={statusConfigs.map((c) => ({
+                key: c.key,
+                label: c.value,
+              }))}
+              placeholder="Select status"
+            />
+          ) : (
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-foreground">Expiration Date</label>
+              <DatePicker
+                date={formData.expiration_date}
+                onChange={(date) => setFormData({ ...formData, expiration_date: date })}
+                placeholder="Select date"
+              />
+            </div>
+          )}
+        </div>
+
+        {unit && (
+          <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-foreground">Expiration Date</label>
+            <DatePicker
+              date={formData.expiration_date}
+              onChange={(date) => setFormData({ ...formData, expiration_date: date })}
+              placeholder="Select date"
+            />
+          </div>
+        )}
+
+        <div className="space-y-1.5">
+          <label className="block text-sm font-medium text-foreground">Note</label>
+          <input
+            type="text"
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            className="w-full h-11 px-3.5 rounded-xl bg-muted/50 border border-border text-sm font-medium focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition-all"
+            placeholder="Optional note about this unit..."
+          />
+        </div>
+
+        <div className="flex gap-3 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 h-11 rounded-xl text-sm font-semibold bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="flex-1 h-11 rounded-xl text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.98] transition-all shadow-sm"
+          >
+            {unit ? 'Save Changes' : isBatch ? `Create ${batchCount} Units` : 'Create Unit'}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

@@ -19,7 +19,7 @@ export function AuditLogsTable({
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-3 text-muted-foreground">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-500/60" />
+        <Loader2 className="w-8 h-8 animate-spin text-primary/60" />
         <p className="text-sm font-medium">Loading audit logs...</p>
       </div>
     );
@@ -49,9 +49,8 @@ export function AuditLogsTable({
         <Fragment key={log.audit_id}>
           <div
             onClick={() => toggleExpand(log.audit_id)}
-            className={`group px-6 py-4 hover:bg-muted/20 transition-colors cursor-pointer ${
-              expandedAuditId === log.audit_id ? 'bg-muted/30' : ''
-            }`}
+            className={`group px-6 py-4 hover:bg-muted/20 transition-colors cursor-pointer ${expandedAuditId === log.audit_id ? 'bg-muted/30' : ''
+              }`}
           >
             <div className="hidden md:grid md:grid-cols-[1fr_1.5fr_1fr_1.5fr_44px] gap-4 items-center">
               <div className="flex flex-col min-w-0">
@@ -68,7 +67,7 @@ export function AuditLogsTable({
                 <span className="text-xs text-muted-foreground truncate">ID: {log.employee_id || '—'}</span>
               </div>
               <div className="flex justify-end">
-                <div className="text-muted-foreground/50 group-hover:text-indigo-500 transition-colors">
+                <div className="text-muted-foreground/50 group-hover:text-primary transition-colors">
                   {expandedAuditId === log.audit_id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                 </div>
               </div>
@@ -91,7 +90,7 @@ export function AuditLogsTable({
                     e.stopPropagation();
                     toggleExpand(log.audit_id);
                   }}
-                  className="text-muted-foreground hover:text-indigo-500 transition-colors"
+                  className="text-muted-foreground hover:text-primary transition-colors"
                 >
                   {expandedAuditId === log.audit_id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                 </button>

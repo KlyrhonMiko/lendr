@@ -19,7 +19,7 @@ export function ActivityHeatmap({ activity, loading }: { activity: ActivityPoint
   return (
     <div className="flex flex-col h-full bg-card border border-border rounded-xl overflow-hidden">
       <div className="p-4 border-b border-border flex items-center gap-2">
-        <Activity className="w-5 h-5 text-blue-500" />
+        <Activity className="w-5 h-5 text-yellow-600" />
         <h3 className="font-semibold text-sm">System Activity (24h Heatmap)</h3>
       </div>
       <div className="p-6 flex-1 flex items-end gap-1.5 min-h-[200px]">
@@ -32,7 +32,7 @@ export function ActivityHeatmap({ activity, loading }: { activity: ActivityPoint
               className="flex-1 rounded-t-sm transition-all group relative cursor-help"
               style={{
                 height: `${Math.max(4, (point.count / maxCount) * 100)}%`,
-                backgroundColor: point.count === 0 ? 'rgba(var(--muted), 0.2)' : `rgba(59, 130, 246, ${Math.max(0.2, point.count / maxCount)})`
+                backgroundColor: point.count === 0 ? 'rgba(var(--muted), 0.2)' : `rgba(234, 179, 8, ${Math.max(0.2, point.count / maxCount)})`
               }}
             >
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-popover border border-border rounded text-[10px] opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none shadow-sm">

@@ -38,7 +38,7 @@ export function LookupExplorer({
                 <button
                   key={cat}
                   onClick={() => onCategoryClick(cat)}
-                  className="px-3 py-1.5 rounded-xl bg-secondary hover:bg-indigo-500/10 hover:text-indigo-400 border border-border transition-all text-xs font-bold"
+                  className="px-3 py-1.5 rounded-xl bg-secondary hover:bg-primary/10 hover:text-primary/80 border border-border transition-all text-xs font-bold"
                   type="button"
                 >
                   {cat}
@@ -65,8 +65,8 @@ export function LookupExplorer({
                 type="button"
                 onClick={() => onSelectTable(table)}
                 className={`w-full text-left px-3 py-2 rounded-xl text-sm font-medium transition-all ${selectedTable === table
-                    ? 'bg-background text-indigo-400 shadow-sm border border-border'
-                    : 'hover:bg-muted/50 text-muted-foreground'
+                  ? 'bg-background text-indigo-400 shadow-sm border border-border'
+                  : 'hover:bg-muted/50 text-muted-foreground'
                   }`}
               >
                 {table}

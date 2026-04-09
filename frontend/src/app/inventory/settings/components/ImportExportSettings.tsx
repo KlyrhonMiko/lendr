@@ -113,7 +113,7 @@ export function ImportExportSettings() {
       <div className="grid gap-8 lg:grid-cols-2">
         <Card className="flex flex-col">
           <CardHeader className="flex flex-row items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-500">
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
               <Upload className="w-6 h-6" />
             </div>
             <div>
@@ -141,16 +141,16 @@ export function ImportExportSettings() {
                 <p className="text-xs text-muted-foreground mt-1">Accepted format: CSV only (max 10MB)</p>
               </div>
               <button
-                className="px-4 py-2 bg-indigo-500 text-white rounded-lg text-xs font-bold hover:bg-indigo-600 transition-colors"
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-bold hover:bg-primary/90 transition-colors"
                 disabled={mutation.isPending}
               >
                 {mutation.isPending ? 'Processing...' : 'Select File'}
               </button>
             </div>
 
-            <div className="flex items-center justify-between p-4 rounded-xl bg-indigo-500/5 border border-indigo-500/10">
+            <div className="flex items-center justify-between p-4 rounded-xl bg-primary/5 border border-primary/10">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-500">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
                   <Download className="w-4 h-4" />
                 </div>
                 <div>
@@ -160,7 +160,7 @@ export function ImportExportSettings() {
               </div>
               <button
                 onClick={downloadTemplate}
-                className="px-3 py-1.5 bg-indigo-500 text-white rounded-lg text-xs font-bold hover:bg-indigo-600"
+                className="px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-bold hover:bg-primary/90"
               >
                 Download
               </button>
@@ -174,7 +174,7 @@ export function ImportExportSettings() {
                     key={mode}
                     onClick={() => setDuplicateMode(mode.toLowerCase())}
                     className={`px-3 py-2 rounded-xl text-xs font-bold transition-all border ${duplicateMode === mode.toLowerCase()
-                      ? 'bg-indigo-500 text-white border-indigo-500'
+                      ? 'bg-primary text-primary-foreground border-primary'
                       : 'bg-card text-muted-foreground border-border hover:bg-muted'
                       }`}
                   >
@@ -187,16 +187,16 @@ export function ImportExportSettings() {
           <CardFooter className="p-6 border-t border-border/50">
             <button
               onClick={() => setIsIntegrityModalOpen(true)}
-              className="w-full h-12 flex items-center justify-center gap-2 bg-muted hover:bg-muted/80 text-muted-foreground rounded-xl text-sm font-bold transition-all border border-border/50 hover:border-indigo-500/30 group"
+              className="w-full h-12 flex items-center justify-center gap-2 bg-muted hover:bg-muted/80 text-muted-foreground rounded-xl text-sm font-bold transition-all border border-border/50 hover:border-primary/30 group"
             >
-              View Import Rules & Validation <FileText className="w-4 h-4 group-hover:text-indigo-500 transition-colors" />
+              View Import Rules & Validation <FileText className="w-4 h-4 group-hover:text-primary transition-colors" />
             </button>
           </CardFooter>
         </Card>
 
         <Card className="flex flex-col">
           <CardHeader className="flex flex-row items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
               <History className="w-6 h-6" />
             </div>
             <div>
@@ -284,7 +284,7 @@ export function ImportExportSettings() {
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
-            <button className="text-xs text-indigo-500 font-bold hover:underline">View Full History</button>
+            <button className="text-xs text-primary font-bold hover:underline">View Full History</button>
           </CardFooter>
         </Card>
       </div>
@@ -303,7 +303,7 @@ export function ImportExportSettings() {
         <CardContent className="grid gap-10 md:grid-cols-2">
           {/* Inventory Catalog */}
           <div className="space-y-6">
-            <div className="flex items-center gap-2 text-sm font-semibold text-blue-500 px-1">
+            <div className="flex items-center gap-2 text-sm font-semibold text-primary px-1">
               <Barcode className="w-4 h-4" />
               Inventory Catalog (Full State)
             </div>
@@ -322,7 +322,7 @@ export function ImportExportSettings() {
               />
               <button
                 onClick={() => exportData('catalog', catalogParams)}
-                className="w-full h-11 bg-blue-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2"
+                className="w-full h-11 bg-primary text-primary-foreground rounded-xl text-sm font-bold shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
               >
                 <Download className="w-4 h-4" /> Export Complete State
               </button>
@@ -361,7 +361,7 @@ export function ImportExportSettings() {
               />
               <button
                 onClick={() => exportData('audit', auditParams)}
-                className="w-full h-11 bg-indigo-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2"
+                className="w-full h-11 bg-primary text-primary-foreground rounded-xl text-sm font-bold shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
               >
                 <Download className="w-4 h-4" /> Export Audit Logs
               </button>
@@ -370,7 +370,7 @@ export function ImportExportSettings() {
 
           {/* Ledger Data */}
           <div className="space-y-6">
-            <div className="flex items-center gap-2 text-sm font-semibold text-blue-500 px-1">
+            <div className="flex items-center gap-2 text-sm font-semibold text-primary px-1">
               <Database className="w-4 h-4" />
               Ledger Data
             </div>
@@ -474,7 +474,7 @@ export function ImportExportSettings() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
               <Clock className="w-6 h-6" />
             </div>
             <div>
@@ -482,14 +482,14 @@ export function ImportExportSettings() {
               <CardDescription>Automate your reports and deliver them periodically.</CardDescription>
             </div>
           </div>
-          <button className="bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg shadow-indigo-500/20">
+          <button className="bg-primary text-primary-foreground px-4 py-2 rounded-xl text-xs font-bold shadow-lg shadow-primary/20">
             Create Schedule +
           </button>
         </CardHeader>
         <CardContent className="relative">
           {/* Overlay for Coming Soon */}
           <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-b-3xl">
-            <div className="px-6 py-3 bg-indigo-500 text-white rounded-2xl font-bold shadow-2xl flex items-center gap-2 animate-pulse">
+            <div className="px-6 py-3 bg-primary text-primary-foreground rounded-2xl font-bold shadow-2xl flex items-center gap-2 animate-pulse">
               <Clock className="w-5 h-5" /> Feature Coming Soon
             </div>
           </div>
@@ -505,29 +505,29 @@ export function ImportExportSettings() {
               </div>
             </div>
 
-            <div className="space-y-4 p-6 rounded-3xl bg-indigo-500/5 border border-indigo-500/20 flex flex-col">
+            <div className="space-y-4 p-6 rounded-3xl bg-primary/5 border border-primary/20 flex flex-col">
               <div className="flex items-center justify-between mb-4">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-500 bg-indigo-500/10 px-2 py-1 rounded-full">Weekly</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-2 py-1 rounded-full">Weekly</span>
                 <button aria-label="Remove weekly report schedule" className="text-rose-500"><XCircle className="w-4 h-4" /></button>
               </div>
               <p className="text-sm font-bold truncate">Audit Logs Weekly Report</p>
               <p className="text-xs text-muted-foreground">Every Monday at 8:00 AM</p>
-              <div className="mt-auto pt-4 border-t border-indigo-500/10 flex items-center justify-between">
-                <span className="text-xs text-indigo-500">Scheduled</span>
-                <RefreshCcw className="w-3 h-3 text-indigo-500 animate-spin-slow" />
+              <div className="mt-auto pt-4 border-t border-primary/10 flex items-center justify-between">
+                <span className="text-xs text-primary">Scheduled</span>
+                <RefreshCcw className="w-3 h-3 text-primary animate-spin-slow" />
               </div>
             </div>
 
-            <div className="space-y-4 p-6 rounded-3xl bg-blue-500/5 border border-blue-500/20 flex flex-col">
+            <div className="space-y-4 p-6 rounded-3xl bg-primary/5 border border-primary/20 flex flex-col">
               <div className="flex items-center justify-between mb-4">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-blue-500 bg-blue-500/10 px-2 py-1 rounded-full">Daily</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-2 py-1 rounded-full">Daily</span>
                 <button aria-label="Remove daily report schedule" className="text-rose-500"><XCircle className="w-4 h-4" /></button>
               </div>
               <p className="text-sm font-bold truncate">Daily Movements Summary</p>
               <p className="text-xs text-muted-foreground">Daily at 11:59 PM</p>
-              <div className="mt-auto pt-4 border-t border-blue-500/10 flex items-center justify-between">
-                <span className="text-xs text-blue-500">Scheduled</span>
-                <RefreshCcw className="w-3 h-3 text-blue-500 animate-spin-slow" />
+              <div className="mt-auto pt-4 border-t border-primary/10 flex items-center justify-between">
+                <span className="text-xs text-primary">Scheduled</span>
+                <RefreshCcw className="w-3 h-3 text-primary animate-spin-slow" />
               </div>
             </div>
           </div>
@@ -540,7 +540,7 @@ export function ImportExportSettings() {
           <div className="w-full max-w-4xl bg-card border border-border rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-border flex items-center justify-between bg-muted/5">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
                   <ShieldCheck className="w-6 h-6" />
                 </div>
                 <div>
@@ -561,26 +561,26 @@ export function ImportExportSettings() {
               {/* High-Level Overview Cards */}
               <div className="grid gap-6 md:grid-cols-2">
                 {/* Trackable Items Logic Card */}
-                <div className="relative group p-6 rounded-3xl bg-blue-500/5 border border-blue-500/10 flex flex-col gap-4">
+                <div className="relative group p-6 rounded-3xl bg-primary/5 border border-primary/10 flex flex-col gap-4">
                   <div className="flex items-center justify-between">
-                    <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-500">
+                    <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
                       <Barcode className="w-6 h-6" />
                     </div>
-                    <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-blue-500/10 text-blue-500 border border-blue-500/20 uppercase tracking-widest">Trackable (Equipment)</span>
+                    <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 uppercase tracking-widest">Trackable (Equipment)</span>
                   </div>
                   <div>
                     <h4 className="text-sm font-bold mb-2">Trackable Item Strategy</h4>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Used for unique assets like Laptops, Drones, or Tools. Each row is treated as a <span className="text-blue-500 font-bold">unique physical unit</span>.
+                      Used for unique assets like Laptops, Drones, or Tools. Each row is treated as a <span className="text-primary font-bold">unique physical unit</span>.
                     </p>
                   </div>
                   <ul className="text-xs space-y-2 mt-2">
                     <li className="flex items-start gap-2">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-blue-500 mt-0.5" />
+                      <CheckCircle2 className="w-3.5 h-3.5 text-primary mt-0.5" />
                       <div><span className="font-bold text-foreground">serial_number:</span> Mandatory and must be unique.</div>
                     </li>
                     <li className="flex items-start gap-2">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-blue-500 mt-0.5" />
+                      <CheckCircle2 className="w-3.5 h-3.5 text-primary mt-0.5" />
                       <div><span className="font-bold text-foreground">quantity:</span> Ignored (defaults to 1 unit per serial).</div>
                     </li>
                   </ul>
@@ -597,7 +597,7 @@ export function ImportExportSettings() {
                   <div>
                     <h4 className="text-sm font-bold mb-2">Bulk Consumable Strategy</h4>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Used for items tracked in <span className="text-amber-500 font-bold">batches</span> such as Masks, Batteries, or Perishables.
+                      Used for items tracked in <span className="text-primary font-bold">batches</span> such as Masks, Batteries, or Perishables.
                     </p>
                   </div>
                   <ul className="text-xs space-y-2 mt-2">
@@ -616,7 +616,7 @@ export function ImportExportSettings() {
               {/* Advanced Field Reference */}
               <div className="space-y-4">
                 <h4 className="text-sm font-bold px-1 flex items-center gap-2">
-                  <TableIcon className="w-4 h-4 text-indigo-500" />
+                  <TableIcon className="w-4 h-4 text-primary" />
                   Validation Matrix
                 </h4>
                 <div className="rounded-2xl border border-border overflow-hidden bg-muted/5">
@@ -630,37 +630,37 @@ export function ImportExportSettings() {
                     </thead>
                     <tbody className="divide-y divide-border/50">
                       <tr>
-                        <td className="p-3 pl-6 font-mono font-bold text-indigo-500">category</td>
+                        <td className="p-3 pl-6 font-mono font-bold text-primary">category</td>
                         <td className="p-3 text-muted-foreground leading-relaxed text-[11px]">High-level organizational grouping for different departments or functional areas.</td>
-                        <td className="p-3 pr-6 italic font-semibold text-indigo-500/80">it_communications, medical_clinical, safety_security...</td>
+                        <td className="p-3 pr-6 italic font-semibold text-primary/80">it_communications, medical_clinical, safety_security...</td>
                       </tr>
                       <tr>
-                        <td className="p-3 pl-6 font-mono font-bold text-indigo-500">item_type</td>
+                        <td className="p-3 pl-6 font-mono font-bold text-primary">item_type</td>
                         <td className="p-3 text-muted-foreground leading-relaxed text-[11px]">Sub-category for grouping similar equipment or supplies under a classification.</td>
-                        <td className="p-3 pr-6 italic font-semibold text-indigo-500/80">electronics, tools, pharmaceuticals...</td>
+                        <td className="p-3 pr-6 italic font-semibold text-primary/80">electronics, tools, pharmaceuticals...</td>
                       </tr>
                       <tr>
-                        <td className="p-3 pl-6 font-mono font-bold text-indigo-500">classification</td>
+                        <td className="p-3 pl-6 font-mono font-bold text-primary">classification</td>
                         <td className="p-3 text-muted-foreground leading-relaxed">System-wide categorization. Controls whether tracking rules are enforced.</td>
                         <td className="p-3 pr-6 italic font-semibold">equipment, consumable</td>
                       </tr>
                       <tr>
-                        <td className="p-3 pl-6 font-mono font-bold text-indigo-500">is_trackable</td>
+                        <td className="p-3 pl-6 font-mono font-bold text-primary">is_trackable</td>
                         <td className="p-3 text-muted-foreground leading-relaxed">True = Asset tracking (Requires Serial). False = Batch tracking.</td>
                         <td className="p-3 pr-6 italic font-semibold text-rose-500">true, false</td>
                       </tr>
                       <tr>
-                        <td className="p-3 pl-6 font-mono font-bold text-indigo-500">condition</td>
+                        <td className="p-3 pl-6 font-mono font-bold text-primary">condition</td>
                         <td className="p-3 text-muted-foreground leading-relaxed">The physical state of the item at the time of import.</td>
                         <td className="p-3 pr-6 italic">good, fair, poor</td>
                       </tr>
                       <tr>
-                        <td className="p-3 pl-6 font-mono font-bold text-indigo-500">serial_number</td>
+                        <td className="p-3 pl-6 font-mono font-bold text-primary">serial_number</td>
                         <td className="p-3 text-muted-foreground leading-relaxed font-semibold">Only required if is_trackable is "true".</td>
-                        <td className="p-3 pr-6 italic text-blue-500">Unique Identifier</td>
+                        <td className="p-3 pr-6 italic text-primary">Unique Identifier</td>
                       </tr>
                       <tr>
-                        <td className="p-3 pl-6 font-mono font-bold text-indigo-500">expiration_date</td>
+                        <td className="p-3 pl-6 font-mono font-bold text-primary">expiration_date</td>
                         <td className="p-3 text-muted-foreground leading-relaxed font-semibold">Required for any consumable item.</td>
                         <td className="p-3 pr-6 italic text-orange-500 uppercase">YYYY-MM-DD</td>
                       </tr>
@@ -673,7 +673,7 @@ export function ImportExportSettings() {
               <div className="grid gap-6 md:grid-cols-2">
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                    <span className="w-2 h-2 rounded-full bg-primary" />
                     <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Equipment Sample</h4>
                   </div>
                   <div className="bg-muted/30 p-4 rounded-2xl border border-border font-mono text-[9px] overflow-x-auto whitespace-nowrap leading-relaxed opacity-80 hover:opacity-100 transition-opacity">
@@ -700,12 +700,12 @@ export function ImportExportSettings() {
               </div>
 
               {/* Pro Tip Box */}
-              <div className="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 flex items-start gap-4">
-                <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 shrink-0">
+              <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
                   <Sparkles className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="text-xs font-bold text-indigo-500 mb-1 tracking-tight">System Refinement: Logic Heuristics</h4>
+                  <h4 className="text-xs font-bold text-primary mb-1 tracking-tight">System Refinement: Logic Heuristics</h4>
                   <p className="text-[11px] text-muted-foreground leading-relaxed">
                     Our import engine includes "Rescue Mapping". If you accidentally put "Equipment" in the <span className="font-mono">item_type</span> column instead of <span className="font-mono">classification</span>, the system will attempt to intelligently re-map it for you!
                   </p>
@@ -717,7 +717,7 @@ export function ImportExportSettings() {
               <p className="text-[10px] text-muted-foreground italic">Need help? Reference the official documentation for full API specs.</p>
               <button
                 onClick={() => setIsIntegrityModalOpen(false)}
-                className="px-8 py-2.5 bg-indigo-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/20 hover:scale-105 active:scale-95 transition-all"
+                className="px-8 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
               >
                 Close & Return
               </button>

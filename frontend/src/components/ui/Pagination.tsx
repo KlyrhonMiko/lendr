@@ -80,11 +80,11 @@ export function Pagination({
               <button
                 key={p}
                 onClick={() => onPageChange(p as number)}
-                className={`min-w-[2rem] h-8 px-2 rounded-lg text-sm font-medium transition-all ${
-                  p === currentPage
-                    ? 'bg-indigo-500 text-white shadow-sm'
-                    : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-                }`}
+                className={`min-w-[2rem] h-8 px-2 rounded-lg text-sm font-bold transition-all ${p === currentPage
+                  ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/10'
+                  : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+
               >
                 {p}
               </button>

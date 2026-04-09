@@ -106,13 +106,13 @@ export function DictionarySettings({
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
         <div className="flex items-center gap-4 flex-1 w-full max-w-2xl">
           <div className="relative flex-1 group">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-colors group-focus-within:text-indigo-500" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
             <input
               type="text"
               placeholder="Search dictionary keys or values..."
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full h-12 pl-12 pr-4 rounded-2xl bg-muted/20 border border-border focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all text-sm outline-none"
+              className="w-full h-12 pl-12 pr-4 rounded-2xl bg-muted/20 border border-border focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all text-sm outline-none"
             />
           </div>
           <div className="w-48">
@@ -128,7 +128,7 @@ export function DictionarySettings({
         </div>
         <button
           onClick={() => setIsAdding(true)}
-          className="flex items-center gap-2 px-6 py-3 bg-indigo-500 hover:bg-indigo-600 text-white rounded-2xl text-sm font-bold shadow-lg shadow-indigo-500/20 transition-all active:scale-95 whitespace-nowrap"
+          className="flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-2xl text-sm font-bold shadow-lg shadow-primary/20 transition-all active:scale-95 whitespace-nowrap"
         >
           <Plus className="w-4 h-4" /> Add New Entry
         </button>
@@ -136,10 +136,10 @@ export function DictionarySettings({
 
       {/* Adding New Entry Card (Form) */}
       {isAdding && (
-        <Card className="border-indigo-500/30 bg-indigo-500/5 shadow-xl shadow-indigo-500/5 animate-in slide-in-from-top-4">
+        <Card className="border-primary/30 bg-primary/5 shadow-xl shadow-primary/5 animate-in slide-in-from-top-4">
           <CardHeader className="flex flex-row items-center justify-between pb-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
                 <Plus className="w-5 h-5" />
               </div>
               <CardTitle className="text-lg">New Dictionary Entry</CardTitle>
@@ -178,7 +178,7 @@ export function DictionarySettings({
               />
             </div>
           </CardContent>
-          <div className="px-6 py-4 border-t border-indigo-500/10 flex justify-end gap-3">
+          <div className="px-6 py-4 border-t border-primary/10 flex justify-end gap-3">
             <button
               onClick={() => setIsAdding(false)}
               className="px-4 py-2 text-sm font-bold text-muted-foreground hover:text-foreground"
@@ -201,7 +201,7 @@ export function DictionarySettings({
                 }
               }}
               disabled={isSubmitting}
-              className="px-6 py-2 bg-indigo-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/20 disabled:opacity-50"
+              className="px-6 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-bold shadow-lg shadow-primary/20 disabled:opacity-50"
             >
               {isSubmitting ? 'Saving...' : 'Save Entry'}
             </button>
@@ -227,7 +227,7 @@ export function DictionarySettings({
                 <tr>
                   <td colSpan={5} className="p-12 text-center text-muted-foreground font-medium">
                     <div className="flex flex-col items-center gap-2">
-                      <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                      <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                       Loading dictionary...
                     </div>
                   </td>
@@ -239,7 +239,7 @@ export function DictionarySettings({
                   <tr key={`${setting.category}-${setting.key}`} className="hover:bg-muted/30 transition-colors group">
                     <td className="p-4 pl-8">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-500 border border-indigo-500/10">
+                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary border border-primary/10">
                           <KeyIcon className="w-4 h-4" />
                         </div>
                         {isEditing ? (
@@ -277,7 +277,7 @@ export function DictionarySettings({
                           onChange={(e) => setEditData({ ...editData, value: e.target.value })}
                         />
                       ) : (
-                        <code className="text-sm px-2.5 py-1.5 rounded-xl bg-muted/50 font-mono border border-border/50 text-indigo-500">
+                        <code className="text-sm px-2.5 py-1.5 rounded-xl bg-muted/50 font-mono border border-border/50 text-primary">
                           {setting.value}
                         </code>
                       )}
@@ -312,7 +312,7 @@ export function DictionarySettings({
                             <button
                               onClick={() => handleStartEdit(setting)}
                               aria-label={`Edit ${setting.key}`}
-                              className="w-8 h-8 rounded-lg text-muted-foreground flex items-center justify-center hover:bg-indigo-500/10 hover:text-indigo-500 transition-all disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+                              className="w-8 h-8 rounded-lg text-muted-foreground flex items-center justify-center hover:bg-primary/10 hover:text-primary transition-all disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
                               title={setting.crucial ? 'Required setting cannot be edited from UI' : `Edit ${setting.key}`}
                               disabled={setting.crucial}
                             >

@@ -16,6 +16,7 @@ import { InventoryItemsHeader } from './components/InventoryItemsHeader';
 import { InventoryItemsToolbar } from './components/InventoryItemsToolbar';
 import { InventoryItemsTable } from './components/InventoryItemsTable';
 import { InventoryItemFormModal } from './components/InventoryItemFormModal';
+import { QrCodeModal } from '@/components/ui/QrCodeModal';
 
 const DEFAULT_PER_PAGE = 10;
 
@@ -48,6 +49,7 @@ export default function InventoryPage() {
   const [unitManagementItemId, setUnitManagementItemId] = useState<string | null>(null);
   const [batchManagementItemId, setBatchManagementItemId] = useState<string | null>(null);
   const [itemHistoryItemId, setItemHistoryItemId] = useState<string | null>(null);
+  const [qrCodeItem, setQrCodeItem] = useState<InventoryItem | null>(null);
 
   // Queries
   const { data: configsData } = useInventoryConfigs();
@@ -193,6 +195,7 @@ export default function InventoryPage() {
           onOpenUnitManagement={(itemId) => setUnitManagementItemId(itemId)}
           onOpenBatchManagement={(itemId) => setBatchManagementItemId(itemId)}
           onOpenEdit={openEditModal}
+          onOpenQrCode={(item) => setQrCodeItem(item)}
           onDelete={handleDelete}
         />
 
@@ -214,30 +217,39 @@ export default function InventoryPage() {
           conditions={conditions}
           categories={categories}
           setFormData={setFormData}
-          onClose={() => {}}
+          onClose={() => { }}
           onSubmit={handleSave}
           resetForm={resetForm}
         />
       )}
 
       {unitManagementItemId && (
-        <UnitManagement 
-          itemId={unitManagementItemId} 
-          onClose={() => setUnitManagementItemId(null)} 
+        <UnitManagement
+          itemId={unitManagementItemId}
+          onClose={() => setUnitManagementItemId(null)}
         />
       )}
 
       {batchManagementItemId && (
-        <BatchManagement 
-          itemId={batchManagementItemId} 
-          onClose={() => setBatchManagementItemId(null)} 
+        <BatchManagement
+          itemId={batchManagementItemId}
+          onClose={() => setBatchManagementItemId(null)}
         />
       )}
 
       {itemHistoryItemId && (
-        <ItemHistory 
-          itemId={itemHistoryItemId} 
-          onClose={() => setItemHistoryItemId(null)} 
+        <ItemHistory
+          itemId={itemHistoryItemId}
+          onClose={() => setItemHistoryItemId(null)}
+        />
+      )}
+
+      {qrCodeItem && (
+        <QrCodeModal
+          value={JSON.stringify({ type: 'item', id: qrCodeItem.item_id })}
+          title={qrCodeItem.name}
+          subtitle={qrCodeItem.description || qrCodeItem.category}
+          onClose={() => setQrCodeItem(null)}
         />
       )}
     </div>

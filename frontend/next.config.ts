@@ -14,15 +14,16 @@ function toOrigin(value: string | undefined, fallback?: string): string {
 
 const apiOrigin = toOrigin(process.env.NEXT_PUBLIC_API_URL, defaultApiOrigin);
 
-const connectSrc = ["'self'", apiOrigin];
+const connectSrc = ["'self'", apiOrigin, "https://fastly.jsdelivr.net"];
 const imgSrc = ["'self'", "data:", "blob:", apiOrigin];
 
 if (isDevelopment) {
-  connectSrc.push("ws://localhost:3000", "ws://127.0.0.1:3000");
+  connectSrc.push("ws://localhost:3000", "ws://127.0.0.1:3000", "ws://192.168.100.104:3000", "ws:");
 }
 
 const contentSecurityPolicy = [
   "default-src 'self'",
+  "media-src 'self' data: blob:",
   `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
   `img-src ${imgSrc.join(" ")}`,
@@ -44,8 +45,16 @@ const nextConfig: NextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+          { key: "Permissions-Policy", value: "camera=*, microphone=(), geolocation=()" },
         ],
+      },
+    ];
+  },
+  async rewrites() {
+    return [
+      {
+        source: "/api/:path*",
+        destination: `${apiOrigin}/api/:path*`,
       },
     ];
   },

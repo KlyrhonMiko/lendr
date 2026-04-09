@@ -114,7 +114,7 @@ export function ArchivesModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border/50 bg-muted/20">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-slate-500/10 flex items-center justify-center text-slate-500">
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
               <Archive className="w-6 h-6" />
             </div>
             <div>
@@ -212,7 +212,7 @@ export function ArchivesModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
                               </span>
                             </div>
                             <p className="text-xs font-semibold leading-relaxed text-foreground/90">
-                              Modified: <span className="font-mono text-indigo-500">{log.entity_id}</span>
+                              Modified: <span className="font-mono text-primary">{log.entity_id}</span>
                             </p>
                             <p className="text-[10px] text-muted-foreground mt-1 font-medium italic">Original: {log.created_at}</p>
                           </td>
@@ -331,7 +331,7 @@ function RetentionTags({ tags, onClick }: { tags: string[] | null, onClick: () =
   return (
     <div className="flex flex-wrap gap-1.5 max-w-[200px]">
       {tags.map((tag, index) => (
-        <span key={`${tag}-${index}`} className="px-2 py-0.5 bg-indigo-500/5 text-indigo-600 border border-indigo-500/20 rounded text-[9px] font-bold uppercase tracking-tight">
+        <span key={`${tag}-${index}`} className="px-2 py-0.5 bg-primary/5 text-primary border border-primary/20 rounded text-[9px] font-bold uppercase tracking-tight">
           {tag}
         </span>
       ))}

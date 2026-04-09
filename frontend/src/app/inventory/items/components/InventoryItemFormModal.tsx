@@ -35,7 +35,7 @@ function FormPopoverSelect({
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger
           type="button"
-          className="w-full h-11 px-3.5 rounded-xl bg-muted/50 border border-border text-sm font-medium cursor-pointer flex items-center justify-between gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 transition-all"
+          className="w-full h-11 px-3.5 rounded-xl bg-muted/50 border border-border text-sm font-medium cursor-pointer flex items-center justify-between gap-2 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition-all"
         >
           <span className={cn('truncate text-left', !value && 'text-muted-foreground')}>{displayValue}</span>
           <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -51,7 +51,7 @@ function FormPopoverSelect({
               }}
               className={cn(
                 'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left',
-                value === opt.key ? 'bg-indigo-500/10 text-indigo-600 font-medium' : 'hover:bg-muted'
+                value === opt.key ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted'
               )}
             >
               <Check className={cn('w-4 h-4 shrink-0', value === opt.key ? 'opacity-100' : 'opacity-0')} />
@@ -97,7 +97,7 @@ export function InventoryItemFormModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-3 p-5 border-b border-border">
-          <div className="w-9 h-9 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-500">
+          <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
             <Package className="w-4.5 h-4.5" />
           </div>
           <div className="flex-1">
@@ -129,7 +129,7 @@ export function InventoryItemFormModal({
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full h-11 px-3.5 rounded-xl bg-muted/50 border border-border text-sm font-medium focus:bg-background focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 transition-all"
+              className="w-full h-11 px-3.5 rounded-xl bg-muted/50 border border-border text-sm font-medium focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition-all"
               placeholder="e.g. Dell Latitude Laptop"
             />
           </div>
@@ -182,7 +182,7 @@ export function InventoryItemFormModal({
             <textarea
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full h-20 p-3.5 rounded-xl bg-muted/50 border border-border text-sm font-medium focus:bg-background focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/40 transition-all resize-none"
+              className="w-full h-20 p-3.5 rounded-xl bg-muted/50 border border-border text-sm font-medium focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition-all resize-none"
               placeholder="Optional notes about this equipment..."
             />
           </div>
@@ -193,7 +193,7 @@ export function InventoryItemFormModal({
                 type="checkbox"
                 checked={formData.is_trackable}
                 onChange={(e) => setFormData({ ...formData, is_trackable: e.target.checked })}
-                className="h-4.5 w-4.5 rounded border-border accent-indigo-500"
+                className="h-4.5 w-4.5 rounded border-border accent-primary"
               />
               <div>
                 <p className="text-sm font-medium text-foreground">Track individual units</p>
@@ -215,7 +215,7 @@ export function InventoryItemFormModal({
             </button>
             <button
               type="submit"
-              className="flex-1 h-11 rounded-xl text-sm font-semibold bg-indigo-500 text-white hover:bg-indigo-600 active:scale-[0.98] transition-all shadow-md shadow-indigo-500/20"
+              className="flex-1 h-11 rounded-xl text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.98] transition-all shadow-md shadow-primary/20"
             >
               {editingItem ? 'Save Changes' : 'Add Equipment'}
             </button>

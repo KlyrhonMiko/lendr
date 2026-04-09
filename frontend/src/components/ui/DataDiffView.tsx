@@ -24,7 +24,7 @@ export function DataDiffView({ before, after }: DataDiffViewProps) {
   const renderValue = (val: JsonValue | undefined) => {
     if (val === null) return <span className="text-muted-foreground font-mono italic">null</span>;
     if (val === undefined) return <span className="text-muted-foreground font-mono italic">undefined</span>;
-    if (typeof val === 'object') return <span className="text-indigo-400 font-mono text-[10px]">{JSON.stringify(val)}</span>;
+    if (typeof val === 'object') return <span className="text-primary font-mono text-[10px]">{JSON.stringify(val)}</span>;
     return <span className="text-foreground font-mono">{String(val)}</span>;
   };
 
@@ -42,7 +42,7 @@ export function DataDiffView({ before, after }: DataDiffViewProps) {
                 const bVal = before?.[key];
                 const aVal = after?.[key];
                 const hasChanged = JSON.stringify(bVal) !== JSON.stringify(aVal);
-                
+
                 if (bVal === undefined && !hasChanged) return null;
 
                 return (

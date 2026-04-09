@@ -24,8 +24,8 @@ const ACTION_CONFIG: Record<string, { icon: ReactNode; color: string; btnClass: 
   },
   release: {
     icon: <PackageOpen className="w-5 h-5" />,
-    color: 'text-sky-600 bg-sky-50',
-    btnClass: 'bg-sky-600 hover:bg-sky-700 text-white shadow-sm',
+    color: 'text-primary bg-primary/10',
+    btnClass: 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm',
   },
   return: {
     icon: <Undo2 className="w-5 h-5" />,

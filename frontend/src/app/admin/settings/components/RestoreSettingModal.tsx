@@ -32,7 +32,7 @@ export function RestoreSettingModal({
               type="text"
               value={restoreData.key}
               onChange={(e) => setRestoreData({ ...restoreData, key: e.target.value })}
-              className="w-full h-11 px-4 rounded-xl bg-input/30 border border-border focus:ring-2 focus:ring-indigo-500/30 transition-all font-mono text-sm"
+              className="w-full h-11 px-4 rounded-xl bg-input/30 border border-border focus:ring-2 focus:ring-primary/30 transition-all font-mono text-sm"
               placeholder="e.g. system_name"
             />
           </div>
@@ -44,7 +44,7 @@ export function RestoreSettingModal({
               type="text"
               value={restoreData.category}
               onChange={(e) => setRestoreData({ ...restoreData, category: e.target.value })}
-              className="w-full h-11 px-4 rounded-xl bg-input/30 border border-border focus:ring-2 focus:ring-indigo-500/30 transition-all font-medium"
+              className="w-full h-11 px-4 rounded-xl bg-input/30 border border-border focus:ring-2 focus:ring-primary/30 transition-all font-medium"
             />
           </div>
 

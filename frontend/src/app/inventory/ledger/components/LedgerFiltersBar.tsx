@@ -56,7 +56,7 @@ export function LedgerFiltersBar({
             placeholder="Search equipment..."
             value={itemId}
             onChange={(e) => onItemIdChange(e.target.value)}
-            className="w-full h-11 pl-12 pr-4 rounded-lg bg-muted/50 border border-border text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/40 transition-all"
+            className="w-full h-11 pl-12 pr-4 rounded-lg bg-muted/50 border border-border text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
           />
           {itemId && (
             <button
@@ -99,7 +99,7 @@ export function LedgerFiltersBar({
                 }}
                 className={cn(
                   'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left',
-                  movementType === opt.key ? 'bg-indigo-500/10 text-indigo-600 font-medium' : 'hover:bg-muted'
+                  movementType === opt.key ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted'
                 )}
               >
                 <Check className={cn('w-4 h-4 shrink-0', movementType === opt.key ? 'opacity-100' : 'opacity-0')} />
@@ -115,7 +115,7 @@ export function LedgerFiltersBar({
             placeholder="Reference ID"
             value={referenceId}
             onChange={(e) => onReferenceIdChange(e.target.value)}
-            className="w-full h-10 pl-3 pr-9 rounded-lg bg-muted/50 border border-border text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/40 transition-all"
+            className="w-full h-10 pl-3 pr-9 rounded-lg bg-muted/50 border border-border text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
           />
           {referenceId && (
             <button
@@ -150,7 +150,7 @@ export function LedgerFiltersBar({
                 }}
                 className={cn(
                   'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left',
-                  referenceType === opt.key ? 'bg-indigo-500/10 text-indigo-600 font-medium' : 'hover:bg-muted'
+                  referenceType === opt.key ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted'
                 )}
               >
                 <Check className={cn('w-4 h-4 shrink-0', referenceType === opt.key ? 'opacity-100' : 'opacity-0')} />

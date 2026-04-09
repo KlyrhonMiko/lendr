@@ -17,7 +17,7 @@ export const ProgressBar = ({
   label,
   showValue = true,
   className = "",
-  color = "bg-indigo-500",
+  color = "bg-primary",
 }: ProgressBarProps) => {
   const percentage = Math.min(Math.max((value / max) * 100, 0), 100);
 
@@ -31,7 +31,7 @@ export const ProgressBar = ({
       )}
       <div className="h-2.5 w-full bg-muted/30 rounded-full overflow-hidden border border-border/50">
         <div
-          className={`h-full ${color} transition-all duration-500 ease-out rounded-full shadow-[0_0_10px_rgba(99,102,241,0.2)]`}
+          className={`h-full ${color} transition-all duration-500 ease-out rounded-full shadow-lg shadow-primary/20`}
           style={{ width: `${percentage}%` }}
         ></div>
       </div>
