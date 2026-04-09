@@ -23,7 +23,14 @@ help:
 
 .PHONY: lan-up
 lan-up:
+	$(LAN_COMPOSE) up -d postgres
+	$(LAN_COMPOSE) run --rm --build backend python data/bootstrap_system.py
 	$(LAN_COMPOSE) up --build -d --remove-orphans
+
+.PHONY: lan-init
+lan-init:
+	$(LAN_COMPOSE) up -d postgres
+	$(LAN_COMPOSE) run --rm --build backend python data/bootstrap_system.py
 
 .PHONY: lan-go
 lan-go: lan-up lan-url
@@ -51,7 +58,7 @@ lan-bootstrap:
 
 .PHONY: lan-url
 lan-url:
-	@$$ip = Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $$_.IPAddress -notmatch '^169\\.254\\.' -and $$_.IPAddress -ne '127.0.0.1' -and $$_.InterfaceAlias -notmatch 'vEthernet|WSL|Loopback|Docker|VirtualBox|VMware' } | Select-Object -First 1 -ExpandProperty IPAddress; if (-not $$ip) { Write-Host 'Could not determine LAN IP automatically.'; Write-Host 'Run: ipconfig'; exit 1 }; Write-Host 'Open from other devices on the same network:'; Write-Host ('  http://{0}' -f $$ip)
+	@$$ip = Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $$_.IPAddress -match '^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)' -and $$_.IPAddress -ne '127.0.0.1' -and $$_.InterfaceAlias -notmatch 'vEthernet|WSL|Loopback|Docker|VirtualBox|VMware' } | Sort-Object InterfaceMetric | Select-Object -First 1 -ExpandProperty IPAddress; if (-not $$ip) { Write-Host 'Could not determine a usable LAN IPv4 address automatically.'; Write-Host 'Run: ipconfig'; exit 1 }; Write-Host 'Open from other devices on the same network:'; Write-Host ('  http://{0}' -f $$ip)
 
 .PHONY: lan-adminer-up
 lan-adminer-up:

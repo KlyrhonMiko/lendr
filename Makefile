@@ -22,7 +22,14 @@ help:
 
 .PHONY: lan-up
 lan-up:
+	$(LAN_COMPOSE) up -d postgres
+	$(LAN_COMPOSE) run --rm --build backend python data/bootstrap_system.py
 	$(LAN_COMPOSE) up --build -d --remove-orphans
+
+.PHONY: lan-init
+lan-init:
+	$(LAN_COMPOSE) up -d postgres
+	$(LAN_COMPOSE) run --rm --build backend python data/bootstrap_system.py
 
 .PHONY: lan-go
 lan-go: lan-up lan-url
@@ -51,14 +58,11 @@ lan-bootstrap:
 .PHONY: lan-url
 lan-url:
 	@LAN_IP=$$(ip -4 route get 1.1.1.1 2>/dev/null | awk '/src/ {for (i=1; i<=NF; i++) if ($$i=="src") {print $$(i+1); exit}}'); \
-	if [[ -z "$$LAN_IP" ]]; then \
-		LAN_IP=$$(hostname -I 2>/dev/null | awk '{print $$1}'); \
+	if [[ -z "$$LAN_IP" || "$$LAN_IP" =~ ^169\.254\. || "$$LAN_IP" == 127.0.0.1 ]]; then \
+		LAN_IP=$$(ip -4 addr show scope global 2>/dev/null | awk '/inet / {sub("/.*", "", $$2); if ($$2 !~ /^169\.254\./ && $$2 != "127.0.0.1") {print $$2; exit}}'); \
 	fi; \
 	if [[ -z "$$LAN_IP" ]]; then \
-		LAN_IP=$$(ip -4 addr show scope global 2>/dev/null | awk '/inet / {sub("/.*", "", $$2); print $$2; exit}'); \
-	fi; \
-	if [[ -z "$$LAN_IP" ]]; then \
-		echo "Could not determine LAN IP automatically."; \
+		echo "Could not determine a usable LAN IPv4 address automatically."; \
 		echo "Run: ip -4 addr show"; \
 		exit 1; \
 	fi; \
