@@ -15,6 +15,7 @@ An inventory and borrowing management system built with **FastAPI** (backend) an
 - [Prerequisites](#prerequisites)
 - [Setup](#setup)
   - [Option A — Docker (Recommended)](#option-a--docker-recommended)
+  - [Option A.1 — Docker LAN Host (Caddy)](#option-a1--docker-lan-host-caddy)
   - [Option B — Local Development](#option-b--local-development)
 - [Environment Variables](#environment-variables)
 - [Database Migrations](#database-migrations)
@@ -213,6 +214,17 @@ The system uses **JWT + Session-based hybrid authentication**:
 - [Docker](https://docs.docker.com/get-docker/) 24+
 - [Docker Compose](https://docs.docker.com/compose/install/) v2+
 
+### For LAN Host Profile (before starting any containers)
+
+1. Docker Engine/Desktop is running.
+2. `.env.local` exists in project root and has valid values for `POSTGRES_*`, `DATABASE_URL`, `SECRET_KEY`, and admin bootstrap credentials.
+3. Host ports are available:
+  1. `80` for app access via Caddy
+  2. `8080` only if using optional Adminer
+4. Host firewall allows inbound TCP `80` from your local network.
+5. Server machine has a stable LAN IP (recommended via router DHCP reservation).
+6. GNU Make is installed if you want to use Makefile helpers on Windows.
+
 ### For local setup
 
 - [Python](https://www.python.org/downloads/) 3.11+
@@ -278,6 +290,124 @@ docker compose exec backend python data/seed_configuration.py
 | Backend API    | http://localhost:8000        | —                  |
 | API Docs       | http://localhost:8000/docs   | —                  |
 | Adminer (DB)   | http://localhost:8080        | —                  |
+
+---
+
+### Option A.1 — Docker LAN Host (Caddy)
+
+Use this profile when one machine hosts the app for other devices on the same network.
+This adds Caddy as a reverse proxy and exposes only port 80.
+
+This mode is intentionally bare-bones:
+
+1. No router DNS changes
+2. No custom domain setup
+3. One command to start, then use server IP from any LAN device
+
+**1. Ensure `.env.local` is set**
+
+Use the same variables from Option A. Keep `DATABASE_URL` pointed to the internal postgres service host `postgres`.
+
+**2. Run one-shot bootstrap (first boot, schema-changing updates, and seed/config baseline updates)**
+
+Linux/macOS:
+
+```bash
+make lan-bootstrap
+```
+
+Windows (PowerShell + GNU Make):
+
+```powershell
+make -f Makefile.windows lan-bootstrap
+```
+
+What this does:
+
+1. Starts `postgres` if needed
+2. Runs Alembic migrations
+3. Runs initialization/seed reconciliation
+
+Equivalent manual command:
+
+```bash
+docker compose -f docker-compose.lan.yml up -d postgres
+docker compose -f docker-compose.lan.yml run --rm backend python data/bootstrap_system.py
+```
+
+**3. Start the LAN stack**
+
+Linux/macOS:
+
+```bash
+make lan-go
+```
+
+Windows (PowerShell + GNU Make):
+
+```powershell
+make -f Makefile.windows lan-go
+```
+
+This one command starts the stack and prints the exact LAN URL to open from other devices.
+
+Additional helpers:
+
+```bash
+make lan-ps
+make lan-logs
+```
+
+Windows helper equivalents:
+
+```powershell
+make -f Makefile.windows lan-ps
+make -f Makefile.windows lan-logs
+```
+
+Optional DB UI (host machine only):
+
+```bash
+make lan-adminer-up
+make lan-adminer-url
+```
+
+Windows equivalent:
+
+```powershell
+make -f Makefile.windows lan-adminer-up
+make -f Makefile.windows lan-adminer-url
+```
+
+Important startup behavior in LAN mode:
+
+1. Backend startup does not automatically run Alembic migrations.
+2. Backend startup does not automatically run initialization/seed reconciliation.
+3. Scheduler startup is fail-fast by default if required DB/config state is missing.
+4. Run bootstrap commands explicitly when needed.
+
+**4. Open from other devices on the same network**
+
+Use the URL printed by `make lan-url`, for example:
+
+```text
+http://192.168.1.50
+```
+
+If this machine gets a different IP after reboot, run `make lan-url` again.
+
+**5. Access the app**
+
+| Service | URL |
+|---|---|
+| Lendr | http://SERVER_LAN_IP |
+| Swagger UI | http://SERVER_LAN_IP/docs |
+
+Notes:
+
+1. Backend and database are internal in this profile.
+2. Adminer is disabled by default in this profile.
+3. Optional Adminer binds to `localhost:8080` on the host machine only (not exposed to LAN clients).
 
 ---
 

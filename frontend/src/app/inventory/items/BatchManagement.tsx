@@ -98,12 +98,28 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
     if (!isAdjusting) return;
 
     try {
+      const trimmedNote = adjustData.note.trim();
+      if (trimmedNote.length < 5) {
+        toast.error('Adjustment note must be at least 5 characters.');
+        return;
+      }
+
+      const absoluteQty = Math.abs(adjustData.qty_change);
+      if (!Number.isFinite(absoluteQty) || absoluteQty < 1) {
+        toast.error('Quantity must be at least 1.');
+        return;
+      }
+
       const finalQty = isReduction ? -Math.abs(adjustData.qty_change) : Math.abs(adjustData.qty_change);
 
       await inventoryApi.adjustStock(itemId, {
         ...adjustData,
         qty_change: finalQty,
         batch_id: isAdjusting.batch_id,
+        note: trimmedNote,
+        reason_code: adjustData.reason_code?.trim() || undefined,
+        reference_id: adjustData.reference_id?.trim() || undefined,
+        reference_type: adjustData.reference_type?.trim() || undefined,
       });
       toast.success('Stock adjusted successfully');
       resetForms();
@@ -262,6 +278,7 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
                 <label className="text-xs font-bold uppercase text-muted-foreground">Adjustment Note</label>
                 <textarea
                   required
+                  minLength={5}
                   value={adjustData.note}
                   onChange={(e) => setAdjustData({ ...adjustData, note: e.target.value })}
                   className="w-full h-20 p-3 rounded-lg bg-background border border-border text-sm resize-none"

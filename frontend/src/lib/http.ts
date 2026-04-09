@@ -3,8 +3,7 @@
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 import { tokenStore } from '@/lib/tokenStore';
 import { getCorrelationId, logger, setCorrelationId } from '@/lib/logger';
-
-const API_BASE_URL = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000');
+import { buildApiRequestUrl } from '@/lib/apiPath';
 
 export interface PaginationMeta {
   total: number;
@@ -49,6 +48,26 @@ export class MaintenanceError extends Error {
   }
 }
 
+const MAINTENANCE_ACTIVE_KEY = 'lendr:maintenance:active';
+const MAINTENANCE_MESSAGE_KEY = 'lendr:maintenance:message';
+
+function setMaintenanceState(message: string): void {
+  if (typeof window === 'undefined') return;
+  window.sessionStorage.setItem(MAINTENANCE_ACTIVE_KEY, 'true');
+  window.sessionStorage.setItem(MAINTENANCE_MESSAGE_KEY, message);
+}
+
+function clearMaintenanceState(): void {
+  if (typeof window === 'undefined') return;
+  window.sessionStorage.removeItem(MAINTENANCE_ACTIVE_KEY);
+  window.sessionStorage.removeItem(MAINTENANCE_MESSAGE_KEY);
+}
+
+function isMaintenanceStateActive(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.sessionStorage.getItem(MAINTENANCE_ACTIVE_KEY) === 'true';
+}
+
 /** 
  * Unique browser/hardware fingerprint.
  */
@@ -88,10 +107,10 @@ export const http = {
     return tokenStore.getToken();
   },
 
-  request: async <T>(
+  requestRaw: async (
     url: string,
     options: RequestInit = {}
-  ): Promise<ApiResponse<T>> => {
+  ): Promise<Response> => {
     const token = http.getToken();
     const deviceId = await getDeviceId();
     const correlationId = getCorrelationId();
@@ -109,7 +128,7 @@ export const http = {
       headers.set('X-Correlation-ID', correlationId);
     }
 
-    const response = await fetch(`${API_BASE_URL}/api${url}`, {
+    const response = await fetch(buildApiRequestUrl(url), {
       ...options,
       headers,
     });
@@ -117,6 +136,13 @@ export const http = {
     const responseCorrelationId = response.headers.get('X-Correlation-ID');
     if (responseCorrelationId) {
       setCorrelationId(responseCorrelationId);
+    }
+
+    if (response.ok && isMaintenanceStateActive()) {
+      clearMaintenanceState();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('lendr:maintenance-ended'));
+      }
     }
 
     if (!response.ok) {
@@ -129,7 +155,9 @@ export const http = {
       // Handle Maintenance Mode
       if (response.status === 503 && errorPayload.error_type === 'MaintenanceMode') {
         if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('lendr:maintenance-started', { detail: errorPayload.message }));
+          const message = errorPayload.message || 'System under maintenance';
+          setMaintenanceState(message);
+          window.dispatchEvent(new CustomEvent('lendr:maintenance-started', { detail: message }));
         }
         throw new MaintenanceError(errorPayload.message || 'System under maintenance');
       }
@@ -154,6 +182,14 @@ export const http = {
       );
     }
 
+    return response;
+  },
+
+  request: async <T>(
+    url: string,
+    options: RequestInit = {}
+  ): Promise<ApiResponse<T>> => {
+    const response = await http.requestRaw(url, options);
     return response.json();
   },
 };

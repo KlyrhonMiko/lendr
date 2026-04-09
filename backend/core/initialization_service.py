@@ -12,7 +12,6 @@ from core.config import settings
 from utils.security import get_password_hash
 from data.system_init_data import SYSTEM_CONFIGS, RBAC_ROLES
 from utils.logging import get_logger
-from utils.migrations import run_migrations
 from systems.auth.services.rbac_service import normalize_role, validate_role_policy_payload
 
 logger = get_logger("core.init")
@@ -358,10 +357,7 @@ class InitializationService:
 
     def run(self, session: Session):
         """Run all initialization steps in sequence."""
-        # 1. Automate Database Migrations
-        run_migrations()
-
-        # 2. Seed Data
+        # Seed Data
         logger.info("Starting System Initialization Registry check...")
         self.ensure_admin_user(session)
         self.rebalance_misplaced_configurations(session)

@@ -20,6 +20,12 @@ interface BrandingSettings {
   };
 }
 
+function resolvePreviewAssetUrl(path: string | null): string {
+  if (!path) return '';
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  return path.startsWith('/') ? path : `/${path}`;
+}
+
 export function BrandingSettings() {
   const [localSettings, setLocalSettings] = useState<BrandingSettings | null>(null);
 
@@ -146,7 +152,7 @@ export function BrandingSettings() {
               >
                 {settings.visual_identity.logo_url ? (
                   <Image
-                    src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${settings.visual_identity.logo_url}`} 
+                    src={resolvePreviewAssetUrl(settings.visual_identity.logo_url)}
                     alt="Logo Preview" 
                     width={200}
                     height={50}
@@ -176,7 +182,7 @@ export function BrandingSettings() {
                 >
                   {settings.visual_identity.favicon_url ? (
                     <Image
-                      src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${settings.visual_identity.favicon_url}`} 
+                      src={resolvePreviewAssetUrl(settings.visual_identity.favicon_url)}
                       alt="Favicon Preview" 
                       width={32}
                       height={32}

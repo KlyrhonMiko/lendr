@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     LOG_DIR: str = ".logs"
     SKIP_INIT: bool = False
+    STARTUP_RUN_INITIALIZATION: bool = True
+    STARTUP_ENABLE_SCHEDULER: bool = False
+    STARTUP_FAIL_FAST_ON_SCHEDULER_ERROR: bool = True
 
     SECURITY_HEADERS_ENABLED: bool = True
     SECURITY_HSTS_MAX_AGE_SECONDS: int = 31536000

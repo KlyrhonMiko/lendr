@@ -1,0 +1,71 @@
+SHELL := powershell.exe
+.SHELLFLAGS := -NoProfile -ExecutionPolicy Bypass -Command
+
+LAN_COMPOSE := docker compose -f docker-compose.lan.yml
+
+.PHONY: help
+help:
+	@Write-Host "Lendr LAN helpers (Windows)"
+	@Write-Host ""
+	@Write-Host "Targets:"
+	@Write-Host "  make -f Makefile.windows lan-up           # Build/start LAN stack"
+	@Write-Host "  make -f Makefile.windows lan-go           # Start stack and print access URL"
+	@Write-Host "  make -f Makefile.windows lan-ps           # Show LAN stack services"
+	@Write-Host "  make -f Makefile.windows lan-logs         # Tail LAN stack logs"
+	@Write-Host "  make -f Makefile.windows lan-migrate      # Run alembic upgrade head"
+	@Write-Host "  make -f Makefile.windows lan-seed         # Seed configuration"
+	@Write-Host "  make -f Makefile.windows lan-bootstrap    # One-shot bootstrap"
+	@Write-Host "  make -f Makefile.windows lan-url          # Print access URL for other devices"
+	@Write-Host "  make -f Makefile.windows lan-adminer-up   # Start Adminer on localhost:8080 (optional)"
+	@Write-Host "  make -f Makefile.windows lan-adminer-down # Stop optional Adminer"
+	@Write-Host "  make -f Makefile.windows lan-adminer-url  # Print Adminer access URL"
+	@Write-Host "  make -f Makefile.windows lan-down         # Stop LAN stack"
+
+.PHONY: lan-up
+lan-up:
+	$(LAN_COMPOSE) up --build -d --remove-orphans
+
+.PHONY: lan-go
+lan-go: lan-up lan-url
+
+.PHONY: lan-ps
+lan-ps:
+	$(LAN_COMPOSE) ps
+
+.PHONY: lan-logs
+lan-logs:
+	$(LAN_COMPOSE) logs -f --tail=200
+
+.PHONY: lan-migrate
+lan-migrate:
+	$(LAN_COMPOSE) exec backend alembic upgrade head
+
+.PHONY: lan-seed
+lan-seed:
+	$(LAN_COMPOSE) exec backend python data/seed_configuration.py
+
+.PHONY: lan-bootstrap
+lan-bootstrap:
+	$(LAN_COMPOSE) up -d postgres
+	$(LAN_COMPOSE) run --rm --build backend python data/bootstrap_system.py
+
+.PHONY: lan-url
+lan-url:
+	@$$ip = Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $$_.IPAddress -notmatch '^169\\.254\\.' -and $$_.IPAddress -ne '127.0.0.1' -and $$_.InterfaceAlias -notmatch 'vEthernet|WSL|Loopback|Docker|VirtualBox|VMware' } | Select-Object -First 1 -ExpandProperty IPAddress; if (-not $$ip) { Write-Host 'Could not determine LAN IP automatically.'; Write-Host 'Run: ipconfig'; exit 1 }; Write-Host 'Open from other devices on the same network:'; Write-Host ('  http://{0}' -f $$ip)
+
+.PHONY: lan-adminer-up
+lan-adminer-up:
+	$(LAN_COMPOSE) --profile adminer up -d adminer
+
+.PHONY: lan-adminer-down
+lan-adminer-down:
+	$(LAN_COMPOSE) --profile adminer stop adminer
+
+.PHONY: lan-adminer-url
+lan-adminer-url:
+	@Write-Host "Adminer (host machine only):"
+	@Write-Host "  http://localhost:8080"
+
+.PHONY: lan-down
+lan-down:
+	$(LAN_COMPOSE) --profile adminer down --remove-orphans
