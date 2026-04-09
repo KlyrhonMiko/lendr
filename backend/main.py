@@ -42,6 +42,7 @@ from systems.inventory.routers.borrower import router as borrower
 from systems.inventory.routers.configuration import router as inv_config
 from systems.inventory.routers.settings import router as inv_settings
 from systems.inventory.routers.data import router as data
+from systems.inventory.routers.public import router as public_router
 
 # Initialize System-wide Logging
 setup_logging(log_level=settings.LOG_LEVEL, log_dir=settings.LOG_DIR)
@@ -348,7 +349,11 @@ app.include_router(
     tags=["Inventory - Data Management"],
     dependencies=inventory_access,
 )
-
+app.include_router(
+    public_router,
+    prefix="/api/inventory/public/items",
+    tags=["Inventory - Public Items"],
+)
 
 @app.get("/")
 async def root():

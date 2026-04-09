@@ -490,8 +490,20 @@ class BorrowService(
             approval_channel=db_request.approval_channel or "standard",
             notes=db_request.notes,
             items=receipt_items,
+            borrower_signature=db_request.borrower_signature,
         )
         return receipt
+
+    def save_signature(
+        self, session: Session, request_id: str, signature_data: str
+    ) -> BorrowRequest:
+        db_request = self.get(session, request_id)
+        if not db_request:
+            raise ValueError("Request not found")
+
+        db_request.borrower_signature = signature_data
+        session.add(db_request)
+        return db_request
 
     def serialize_borrow_requests(
         self,

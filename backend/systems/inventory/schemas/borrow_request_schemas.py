@@ -139,6 +139,7 @@ class BorrowRequestRead(BaseModel):
     is_archived: bool = False
     archived_at: Optional[datetime] = None
     retention_tags: Optional[list[str]] = None
+    borrower_signature: Optional[str] = None
 
     @field_serializer("request_date", "return_at", "closed_at", "archived_at")
     def serialize_dates(self, dt: datetime | None) -> str | None:
