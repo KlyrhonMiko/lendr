@@ -1,4 +1,4 @@
-import { http, HttpRequestError } from '@/lib/http';
+import { http, HttpRequestError, MaintenanceError } from '@/lib/http';
 import { tokenStore } from '@/lib/tokenStore';
 
 export interface User {
@@ -273,20 +273,18 @@ export const auth = {
       auth.clearToken();
 
       if (token) {
-        try {
-          await http.request('/auth/logout', {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-            keepalive: true,
-          });
-        } catch {
+        void http.request('/auth/logout', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          keepalive: true,
+        }).catch(() => {
           // Ignore network errors during logout and proceed with client redirect.
-        }
+        });
       }
 
-      window.location.href = redirectTo;
+      window.location.replace(redirectTo);
     }
   },
 
@@ -302,7 +300,20 @@ export const auth = {
       const result = await http.request<User>('/auth/me', { method: 'GET' });
       return result.data;
     } catch (error) {
-      // Re-throw MaintenanceError so it's caught by the Context/Wrapper
+      // Preserve maintenance flow for overlay handling.
+      if (error instanceof MaintenanceError) {
+        throw error;
+      }
+
+      // Treat invalid session/auth states as logged out.
+      if (
+        error instanceof HttpRequestError
+        && [401, 403, 404].includes(error.status)
+      ) {
+        auth.clearToken();
+        return null;
+      }
+
       throw error;
     }
   },

@@ -3,7 +3,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { auth, User } from '@/lib/auth';
 import { tokenStore } from '@/lib/tokenStore';
-import { MaintenanceError } from '@/lib/api';
+import { HttpRequestError, MaintenanceError } from '@/lib/http';
 import { logger } from '@/lib/logger';
 
 interface AuthContextType {
@@ -15,6 +15,10 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+function isSessionInvalidationError(error: unknown): boolean {
+  return error instanceof HttpRequestError && [401, 403, 404].includes(error.status);
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -32,6 +36,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(userData);
     } catch (error) {
       if (error instanceof MaintenanceError) {
+        auth.clearToken();
+        setUser(null);
+      } else if (isSessionInvalidationError(error)) {
+        auth.clearToken();
         setUser(null);
       } else {
         logger.error('Failed to refresh user', { error });
@@ -66,9 +74,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (error) {
         if (mounted) {
-          setUser(null);
+          if (error instanceof MaintenanceError || isSessionInvalidationError(error)) {
+            auth.clearToken();
+            setUser(null);
+          } else {
+            setUser(null);
+          }
           setLoading(false);
-          if (!(error instanceof MaintenanceError)) {
+          if (!(error instanceof MaintenanceError) && !isSessionInvalidationError(error)) {
             logger.error('Initial user fetch failed', { error });
           }
         }
