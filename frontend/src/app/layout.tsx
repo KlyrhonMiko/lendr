@@ -32,14 +32,14 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${jakarta.variable} antialiased selection:bg-yellow-500/30 font-sans`}
       >
-        <MaintenanceWrapper>
-          <AuthProvider>
-            <QueryProvider>
+        <QueryProvider>
+          <MaintenanceWrapper>
+            <AuthProvider>
               {children}
               <Toaster richColors position="top-right" />
-            </QueryProvider>
-          </AuthProvider>
-        </MaintenanceWrapper>
+            </AuthProvider>
+          </MaintenanceWrapper>
+        </QueryProvider>
       </body>
     </html>
   );

@@ -18,6 +18,7 @@ router = APIRouter()
 config_service = ConfigurationService()
 logger = get_logger("admin.general_settings")
 
+@router.get("", include_in_schema=False)
 @router.get("/", response_model=GenericResponse[GeneralSettingsPayload])
 async def get_general_settings(
     request: Request,
@@ -51,6 +52,7 @@ async def get_general_settings(
         request=request
     )
 
+@router.put("", include_in_schema=False)
 @router.put("/", response_model=GenericResponse[GeneralSettingsPayload])
 async def update_general_settings(
     payload: GeneralSettingsPayload,

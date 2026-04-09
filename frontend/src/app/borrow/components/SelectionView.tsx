@@ -23,6 +23,8 @@ interface SelectionViewProps {
   search: string;
   onSearchChange: (v: string) => void;
   categories: string[];
+  categoryLabels: Record<string, string>;
+  classificationLabels: Record<string, string>;
   selectedCategory: string;
   onCategoryChange: (v: string) => void;
   totalItems: number;
@@ -41,6 +43,8 @@ export function SelectionView({
   search,
   onSearchChange,
   categories,
+  categoryLabels,
+  classificationLabels,
   selectedCategory,
   onCategoryChange,
   totalItems,
@@ -106,7 +110,7 @@ export function SelectionView({
                       : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground active:scale-95'
                       }`}
                   >
-                    {cat === 'All' ? 'All Items' : formatCategoryLabel(cat)}
+                    {cat === 'All' ? 'All Items' : categoryLabels[cat] || cat}
                   </button>
                 );
               })}
@@ -157,8 +161,13 @@ export function SelectionView({
 
                       <div className="flex-1">
                         <div className="inline-flex items-center px-2 py-0.5 lg:px-2.5 lg:py-1 rounded-md text-[10px] lg:text-[11px] font-medium bg-muted/70 text-muted-foreground mb-2 lg:mb-3">
-                          {formatCategoryLabel(item.category)}
+                          {categoryLabels[item.category] || item.category}
                         </div>
+                        {item.classification && (
+                          <div className="inline-flex items-center px-2 py-0.5 lg:px-2.5 lg:py-1 rounded-md text-[10px] lg:text-[11px] font-medium bg-primary/5 text-primary mb-2 lg:mb-3 ml-2 lg:ml-2.5">
+                            {classificationLabels[item.classification] || formatCategoryLabel(item.classification)}
+                          </div>
+                        )}
                         <h3 className="font-medium text-xs lg:text-sm text-foreground leading-snug line-clamp-2">
                           {item.name}
                         </h3>

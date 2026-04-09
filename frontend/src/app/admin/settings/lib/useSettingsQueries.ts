@@ -161,7 +161,7 @@ export function useHealthLogs(params: { page?: number; per_page?: number }) {
 export function useGeneralSettings() {
   return useQuery({
     queryKey: ['admin', 'settings', 'general'],
-    queryFn: () => api.get<GeneralSettingsData>('/admin/settings/general'),
+    queryFn: () => api.get<GeneralSettingsData>('/admin/settings/general/'),
     staleTime: Infinity,
   });
 }
@@ -179,7 +179,8 @@ export function useBrandingSettings() {
 export function useOperationsSettings() {
   return useQuery({
     queryKey: ['admin', 'settings', 'operations'],
-    queryFn: () => api.get<OperationsSettingsData>('/admin/settings/operations'),
+    // Backend router is mounted at a slash-only path; use canonical URL to avoid redirect/CORS issues.
+    queryFn: () => api.get<OperationsSettingsData>('/admin/settings/operations/'),
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
@@ -295,7 +296,7 @@ export function useOperationsMutations() {
   const queryClient = useQueryClient();
 
   const updateOperations = useMutation({
-    mutationFn: (data: OperationsSettingsData) => api.put('/admin/settings/operations', data),
+    mutationFn: (data: OperationsSettingsData) => api.put('/admin/settings/operations/', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'settings', 'operations'] });
       toast.success('System operations updated successfully');
@@ -309,7 +310,7 @@ export function useGeneralMutations() {
   const queryClient = useQueryClient();
 
   const updateGeneral = useMutation({
-    mutationFn: (data: GeneralSettingsData) => api.put('/admin/settings/general', data),
+    mutationFn: (data: GeneralSettingsData) => api.put('/admin/settings/general/', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'settings', 'general'] });
       toast.success('General settings updated successfully');

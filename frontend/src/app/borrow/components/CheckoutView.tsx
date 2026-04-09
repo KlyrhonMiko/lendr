@@ -22,6 +22,8 @@ import {
 interface CheckoutViewProps {
   cart: CartItem[];
   totalCartItems: number;
+  categoryLabels: Record<string, string>;
+  classificationLabels: Record<string, string>;
   employeeId: string;
   onEmployeeIdChange: (v: string) => void;
   employeePin: string;
@@ -44,6 +46,8 @@ interface CheckoutViewProps {
 export function CheckoutView({
   cart,
   totalCartItems,
+  categoryLabels,
+  classificationLabels,
   employeeId,
   onEmployeeIdChange,
   employeePin,
@@ -146,7 +150,13 @@ export function CheckoutView({
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm text-foreground truncate">{item.name}</p>
                   <p className="text-[11px] lg:text-sm text-muted-foreground mt-0.5">
-                    {formatCategoryLabel(item.category)} &middot; {item.available_qty} Remaining
+                    {categoryLabels[item.category] || item.category}
+                    {item.classification && (
+                      <>
+                        {' '}&middot; {classificationLabels[item.classification] || formatCategoryLabel(item.classification)}
+                      </>
+                    )}
+                    {' '}&middot; {item.available_qty} Remaining
                   </p>
                 </div>
                 <div className="flex flex-col items-end shrink-0">

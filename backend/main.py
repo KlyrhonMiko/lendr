@@ -13,7 +13,7 @@ from core.database import engine
 from core.config import settings
 from core.initialization_service import InitializationService
 from core.request_context import reset_correlation_id, set_correlation_id
-from core.schemas import create_error_response
+from core.schemas import GenericResponse, create_error_response, create_success_response
 from utils.logging import setup_logging, get_logger, setup_health_logging, log_operation
 
 # Routers
@@ -109,37 +109,101 @@ def _resolve_request_correlation_id(request: Request) -> str:
         return incoming[:128]
     return f"req-{uuid4().hex}"
 
+
+def _initialize_locale_settings() -> None:
+    from utils.time_utils import update_system_timezone, update_system_format
+
+    tz = "Asia/Manila"
+    df = "MM/DD/YYYY"
+    tf = "12h"
+
+    try:
+        from systems.admin.services.configuration_service import ConfigurationService
+
+        with Session(engine) as session:
+            config_service = ConfigurationService()
+            tz = config_service.get_value(session, "timezone", tz, category="general_settings")
+            df = config_service.get_value(session, "date_format", df, category="general_settings")
+            tf = config_service.get_value(session, "time_format", tf, category="general_settings")
+    except Exception as exc:
+        logger.warning(
+            "Locale settings unavailable during startup; using defaults. Error: %s",
+            str(exc),
+        )
+
+    update_system_timezone(tz)
+    update_system_format(df, tf)
+    log_operation("LOCALE-INIT", f"System Timezone set to {tz}, Format: {df} {tf}")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # System Initialization
-    if not settings.SKIP_INIT:
+    run_startup_initialization = settings.STARTUP_RUN_INITIALIZATION and not settings.SKIP_INIT
+
+    if run_startup_initialization:
         with Session(engine) as session:
             init_service = InitializationService()
             init_service.run(session)
-            
-            # Initialize System Localization
-            from systems.admin.services.configuration_service import ConfigurationService
-            from utils.time_utils import update_system_timezone, update_system_format
-            
-            config_service = ConfigurationService()
-            tz = config_service.get_value(session, "timezone", "Asia/Manila", category="general_settings")
-            df = config_service.get_value(session, "date_format", "MM/DD/YYYY", category="general_settings")
-            tf = config_service.get_value(session, "time_format", "12h", category="general_settings")
-            
-            update_system_timezone(tz)
-            update_system_format(df, tf)
-            
-            # Start Background Scheduler
-            from systems.admin.services.scheduler_service import scheduler_service
-            scheduler_service.start()
-            
+
         log_operation("INIT-DONE", "System Initialization COMPLETED")
         log_operation("DB-CONNECT", "PostgreSQL connectivity established")
-        log_operation("LOCALE-INIT", f"System Timezone set to {tz}, Format: {df} {tf}")
     else:
-        logger.warning("System Initialization SKIPPED (SKIP_INIT=True)")
+        logger.warning(
+            "System Initialization SKIPPED "
+            "(STARTUP_RUN_INITIALIZATION=%s, SKIP_INIT=%s)",
+            settings.STARTUP_RUN_INITIALIZATION,
+            settings.SKIP_INIT,
+        )
         log_operation("INIT-SKIP", "System Initialization SKIPPED", level="WARNING")
-    yield
+
+    _initialize_locale_settings()
+
+    scheduler_instance = None
+    scheduler_started = False
+    if settings.STARTUP_ENABLE_SCHEDULER:
+        try:
+            from systems.admin.services.scheduler_service import scheduler_service
+
+            scheduler_instance = scheduler_service
+            scheduler_instance.start()
+            scheduler_started = True
+            log_operation("SCHEDULER-ENABLED", "Background scheduler startup is ENABLED")
+        except Exception as exc:
+            logger.error("Scheduler startup failed: %s", str(exc), exc_info=True)
+            log_operation(
+                "SCHEDULER-START-FAIL",
+                f"Background scheduler failed to start: {str(exc)}",
+                level="ERROR",
+            )
+            if scheduler_instance is not None:
+                try:
+                    scheduler_instance.shutdown()
+                except Exception as shutdown_exc:
+                    logger.error(
+                        "Scheduler shutdown after startup failure also failed: %s",
+                        str(shutdown_exc),
+                        exc_info=True,
+                    )
+
+            if settings.STARTUP_FAIL_FAST_ON_SCHEDULER_ERROR:
+                raise RuntimeError(
+                    "Scheduler startup failed while STARTUP_FAIL_FAST_ON_SCHEDULER_ERROR=True"
+                ) from exc
+            logger.warning(
+                "Continuing startup without scheduler because "
+                "STARTUP_FAIL_FAST_ON_SCHEDULER_ERROR=False"
+            )
+    else:
+        logger.info("Background scheduler is disabled (STARTUP_ENABLE_SCHEDULER=False)")
+        log_operation("SCHEDULER-SKIP", "Background scheduler startup is DISABLED")
+
+    try:
+        yield
+    finally:
+        if scheduler_started and scheduler_instance is not None:
+            try:
+                scheduler_instance.shutdown()
+            except Exception as exc:
+                logger.error("Scheduler shutdown failed: %s", str(exc), exc_info=True)
 
 
 docs_url = "/docs" if settings.SWAGGER_UI_ENABLED else None
@@ -354,6 +418,15 @@ app.include_router(
     prefix="/api/inventory/public/items",
     tags=["Inventory - Public Items"],
 )
+
+
+@app.get("/api/health/live", response_model=GenericResponse[dict[str, str]])
+async def public_liveness(request: Request):
+    return create_success_response(
+        data={"status": "alive"},
+        message="Liveness check OK",
+        request=request,
+    )
 
 @app.get("/")
 async def root():

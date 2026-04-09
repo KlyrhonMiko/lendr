@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { auth } from '@/lib/auth';
 import { toast } from 'sonner';
 
 export interface ImportHistoryErrorLogEntry {
@@ -34,6 +33,34 @@ function resolveErrorMessage(error: unknown, fallback: string): string {
     return error.message;
   }
   return fallback;
+}
+
+export const EXPORT_ENDPOINT_MAP: Record<string, string> = {
+  catalog: '/inventory/data/export/catalog',
+  audit: '/inventory/data/export/audit-logs',
+  requests: '/inventory/data/export/ledger/requests',
+  movements: '/inventory/data/export/ledger/movements',
+};
+
+export function buildExportDownloadPath(type: string, params: Record<string, unknown>): string {
+  const queryParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, val]) => {
+    if (val !== null && val !== undefined && val !== '') {
+      queryParams.append(key, String(val));
+    }
+  });
+
+  const endpoint = EXPORT_ENDPOINT_MAP[type];
+  if (!endpoint) {
+    throw new Error('Unsupported export type');
+  }
+
+  const query = queryParams.toString();
+  return `${endpoint}${query ? `?${query}` : ''}`;
+}
+
+export function buildImportTemplateDownloadPath(): string {
+  return '/inventory/data/import/template';
 }
 
 export function useImportHistory(page: number, perPage: number) {
@@ -83,31 +110,10 @@ export function useImportInventory() {
 export function useExportData() {
   return {
     exportData: async (type: string, params: Record<string, unknown>) => {
-      const queryParams = new URLSearchParams();
-      Object.entries(params).forEach(([key, val]) => {
-        if (val !== null && val !== undefined && val !== '') {
-          queryParams.append(key, String(val));
-        }
-      });
+      const url = buildExportDownloadPath(type, params);
       
-      const endpointMap: Record<string, string> = {
-        'catalog': '/inventory/data/export/catalog',
-        'audit': '/inventory/data/export/audit-logs',
-        'requests': '/inventory/data/export/ledger/requests',
-        'movements': '/inventory/data/export/ledger/movements'
-      };
-
-      const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api${endpointMap[type]}?${queryParams.toString()}`;
-      
-      // We need to fetch with auth headers, then create a blob
       try {
-        const response = await fetch(url, {
-          headers: {
-            'Authorization': `Bearer ${auth.getToken()}`
-          }
-        });
-
-        if (!response.ok) throw new Error('Export failed');
+        const response = await api.getRaw(url);
 
         const blob = await response.blob();
         const downloadUrl = window.URL.createObjectURL(blob);
@@ -135,28 +141,23 @@ export function useExportData() {
 }
 
 export function useDownloadTemplate() {
-    return {
-        downloadTemplate: async () => {
-            const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/inventory/data/import/template`;
-            try {
-                const response = await fetch(url, {
-                    headers: {
-                        'Authorization': `Bearer ${auth.getToken()}`
-                    }
-                });
-                if (!response.ok) throw new Error('Template download failed');
-                const blob = await response.blob();
-                const downloadUrl = window.URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = downloadUrl;
-                link.setAttribute('download', 'inventory_import_template.csv');
-                document.body.appendChild(link);
-                link.click();
-                link.remove();
-                window.URL.revokeObjectURL(downloadUrl);
-              } catch (err: unknown) {
-                toast.error(resolveErrorMessage(err, 'Download failed'));
-            }
-        }
+  return {
+    downloadTemplate: async () => {
+      const url = buildImportTemplateDownloadPath();
+      try {
+        const response = await api.getRaw(url);
+        const blob = await response.blob();
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.setAttribute('download', 'inventory_import_template.csv');
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(downloadUrl);
+      } catch (err: unknown) {
+        toast.error(resolveErrorMessage(err, 'Download failed'));
+      }
     }
+  }
 }

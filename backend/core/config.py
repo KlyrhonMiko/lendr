@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     LOG_DIR: str = ".logs"
     SKIP_INIT: bool = False
+    STARTUP_RUN_INITIALIZATION: bool = True
+    STARTUP_ENABLE_SCHEDULER: bool = False
+    STARTUP_FAIL_FAST_ON_SCHEDULER_ERROR: bool = True
 
     SECURITY_HEADERS_ENABLED: bool = True
     SECURITY_HSTS_MAX_AGE_SECONDS: int = 31536000
@@ -35,7 +38,10 @@ class Settings(BaseSettings):
 
     SWAGGER_UI_ENABLED: bool = True
 
-    CORS_ALLOW_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
+    CORS_ALLOW_ORIGINS: str = (
+        "http://localhost:3000,http://127.0.0.1:3000,"
+        "https://localhost:3000,https://127.0.0.1:3000"
+    )
     CORS_ALLOW_METHODS: str = "GET,POST,PUT,PATCH,DELETE,OPTIONS"
     CORS_ALLOW_HEADERS: str = "Authorization,Content-Type,X-Device-ID"
     CORS_ALLOW_CREDENTIALS: bool = True

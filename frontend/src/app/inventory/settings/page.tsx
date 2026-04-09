@@ -66,7 +66,14 @@ export default function InventorySettingsPage() {
             settings={settings}
             loading={loading}
             meta={meta}
-            categories={['inventory_category', 'inventory_condition', 'inventory_item_type', 'inventory_classification', 'inventory_movements_reason_code']}
+            categories={[
+              'inventory_category',
+              'inventory_item_type',
+              'inventory_classification',
+              'inventory_status',
+              'inventory_condition',
+              'inventory_movements_reason_code',
+            ]}
             search={search}
             onSearchChange={setSearch}
             categoryFilter={categoryFilter}

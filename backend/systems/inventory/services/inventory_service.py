@@ -101,14 +101,6 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                 field_name="item_type",
                 field_label="inventory item type",
             )
-        if data.get("condition"):
-            self._require_config_key(
-                session,
-                key=str(data["condition"]),
-                table_name="inventory",
-                field_name="condition",
-                field_label="inventory item condition",
-            )
         if data.get("classification"):
             self._require_config_key(
                 session,
@@ -136,7 +128,6 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         item_type: Optional[str] = None,
         classification: Optional[str] = None,
         is_trackable: Optional[bool] = None,
-        condition: Optional[str] = None,
         include_deleted: bool = False,
         include_archived: bool = False,
         is_archived: Optional[bool] = None,
@@ -163,8 +154,6 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             statement = statement.where(InventoryItem.classification == classification)
         if is_trackable is not None:
             statement = statement.where(InventoryItem.is_trackable == is_trackable)
-        if condition:
-            statement = statement.where(InventoryItem.condition == condition)
 
         count_statement = select(func.count()).select_from(statement.subquery())
         total_count = session.exec(count_statement).one()
@@ -200,8 +189,16 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             statement = statement.where(InventoryItem.item_type == item_type)
         if classification is not None:
             statement = statement.where(InventoryItem.classification == classification)
+
         if in_stock_only:
-            statement = statement.where(InventoryItem.available_qty > 0)
+            all_items = session.exec(statement.order_by(InventoryItem.name.asc())).all()
+            filtered_items = [
+                item
+                for item in all_items
+                if self.get_item_balances(session, item)["available_qty"] > 0
+            ]
+            total_count = len(filtered_items)
+            return list(filtered_items[skip : skip + limit]), total_count
 
         count_statement = select(func.count()).select_from(statement.subquery())
         total_count = session.exec(count_statement).one()
@@ -219,6 +216,15 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         prefix: str | None = "ITEM",
         actor_id: UUID | None = None,
     ) -> InventoryItem:
+        if schema.item_type == "":
+            schema.item_type = None
+        if schema.classification == "":
+            schema.classification = None
+        if schema.category == "":
+            schema.category = None
+        if schema.description == "":
+            schema.description = None
+
         self.validate_uniqueness(
             session, 
             schema, 
@@ -241,6 +247,15 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         schema: InventoryItemUpdate,
         actor_id: UUID | None = None,
     ) -> InventoryItem:
+        if schema.item_type == "":
+            schema.item_type = None
+        if schema.classification == "":
+            schema.classification = None
+        if schema.category == "":
+            schema.category = None
+        if schema.description == "":
+            schema.description = None
+
         obj_data = schema.model_dump(exclude_unset=True)
         self._validate_item_config(session, obj_data)
         return super().update(
@@ -324,148 +339,73 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             
         return "healthy"
 
-    def _sync_item_condition(self, session: Session, item: InventoryItem) -> None:
-        """
-        Derive the parent item's physical condition from its units/batches.
-        Hierarchy (Weight) is fetched dynamically from the configuration system.
-        Only uses 'condition' weights.
-        """
-        # 1. Fetch dynamic condition weights
+    def get_item_balances(self, session: Session, item: InventoryItem) -> dict[str, int]:
+        if item.is_trackable:
+            total_stmt = select(func.count(InventoryUnit.id)).where(
+                InventoryUnit.inventory_uuid == item.id,
+                InventoryUnit.is_deleted.is_(False),
+                InventoryUnit.status != "retired",
+            )
+            available_stmt = select(func.count(InventoryUnit.id)).where(
+                InventoryUnit.inventory_uuid == item.id,
+                InventoryUnit.is_deleted.is_(False),
+                InventoryUnit.status == "available",
+            )
+            total_qty = int(session.exec(total_stmt).one() or 0)
+            available_qty = int(session.exec(available_stmt).one() or 0)
+            return {"total_qty": total_qty, "available_qty": available_qty}
+
+        total_stmt = select(func.sum(InventoryBatch.total_qty)).where(
+            InventoryBatch.inventory_uuid == item.id,
+            InventoryBatch.is_deleted.is_(False),
+        )
+        available_stmt = select(func.sum(InventoryBatch.available_qty)).where(
+            InventoryBatch.inventory_uuid == item.id,
+            InventoryBatch.is_deleted.is_(False),
+        )
+        total_sum = session.exec(total_stmt).one()
+        available_sum = session.exec(available_stmt).one()
+        return {
+            "total_qty": int(total_sum or 0),
+            "available_qty": int(available_sum or 0),
+        }
+
+    def get_item_condition(self, session: Session, item: InventoryItem) -> str:
         config_service = InventoryConfigService()
         unit_cond_weights = config_service.get_weights(session, "inventory_units_condition_weights")
-        batch_cond_weights = config_service.get_weights(session, "inventory_batches_condition_weights")
 
         max_weight = 0
         winning_condition = "good"
 
         if item.is_trackable:
-            # Aggregate from InventoryUnit
             units = session.exec(
                 select(InventoryUnit).where(
                     InventoryUnit.inventory_uuid == item.id,
                     InventoryUnit.is_deleted.is_(False),
-                    InventoryUnit.status != "retired"
+                    InventoryUnit.status != "retired",
                 )
             ).all()
             for unit in units:
-                # Check individual unit condition
                 condition_weight = unit_cond_weights.get((unit.condition or "").lower(), 0)
                 if condition_weight > max_weight:
                     max_weight = condition_weight
                     winning_condition = unit.condition or winning_condition
-        else:
-            # Aggregate from InventoryBatch
-            batches = session.exec(
-                select(InventoryBatch).where(
-                    InventoryBatch.inventory_uuid == item.id,
-                    InventoryBatch.is_deleted.is_(False)
-                )
-            ).all()
-            for batch in batches:
-                # Batch condition is usually not tracked individually but can be added here
-                condition_weight = batch_cond_weights.get((batch.condition or "").lower() if hasattr(batch, 'condition') else "", 0)
-                if condition_weight > max_weight:
-                    max_weight = condition_weight
-                    winning_condition = batch.condition if hasattr(batch, 'condition') else winning_condition
 
-        item.condition = winning_condition
-
-    def _sync_item_status(self, session: Session, item: InventoryItem) -> None:
-        """
-        Derive the parent item's operational status from its units/batches.
-        Only uses 'status' weights.
-        """
-        # 1. Fetch dynamic status weights
-        config_service = InventoryConfigService()
-        unit_status_weights = config_service.get_weights(session, "inventory_units_status_weights")
-        batch_status_weights = config_service.get_weights(session, "inventory_batches_status_weights")
-
-        max_weight = 0
-        winning_status = "healthy"
-
-        if item.is_trackable:
-            # Aggregate from InventoryUnit
-            units = session.exec(
-                select(InventoryUnit).where(
-                    InventoryUnit.inventory_uuid == item.id,
-                    InventoryUnit.is_deleted.is_(False),
-                    InventoryUnit.status != "retired"
-                )
-            ).all()
-            for unit in units:
-                # Check status
-                status_weight = unit_status_weights.get(unit.status.lower() if unit.status else "", 0)
-                if status_weight > max_weight:
-                    max_weight = status_weight
-                    winning_status = unit.status
-        else:
-            # Aggregate from InventoryBatch
-            batches = session.exec(
-                select(InventoryBatch).where(
-                    InventoryBatch.inventory_uuid == item.id,
-                    InventoryBatch.is_deleted.is_(False)
-                )
-            ).all()
-            for batch in batches:
-                # Aggregate batch status weights
-                status_weight = batch_status_weights.get(batch.status.lower() if batch.status else "", 0)
-                if status_weight > max_weight:
-                    max_weight = status_weight
-                    winning_status = batch.status
-
-        item.status = winning_status
+        return winning_condition
 
     def _sync_item_quantities(self, session: Session, item_id: str) -> InventoryItem:
-        """
-        Aggregate quantities and condition from children (Units/Batches) and update parent InventoryItem.
-        """
         item = self.get(session, item_id)
         if not item:
             raise ValueError(f"Item {item_id} not found for sync")
 
-        if item.is_trackable:
-            # Aggregate from InventoryUnit
-            # Total: not retired, not deleted
-            total_stmt = select(func.count(InventoryUnit.id)).where(
-                InventoryUnit.inventory_uuid == item.id,
-                InventoryUnit.is_deleted.is_(False),
-                InventoryUnit.status != "retired"
-            )
-            # Available: status is 'available', not deleted
-            avail_stmt = select(func.count(InventoryUnit.id)).where(
-                InventoryUnit.inventory_uuid == item.id,
-                InventoryUnit.is_deleted.is_(False),
-                InventoryUnit.status == "available"
-            )
-            
-            item.total_qty = session.exec(total_stmt).one()
-            item.available_qty = session.exec(avail_stmt).one()
-        else:
-            # Aggregate from InventoryBatch
-            total_stmt = select(func.sum(InventoryBatch.total_qty)).where(
-                InventoryBatch.inventory_uuid == item.id,
-                InventoryBatch.is_deleted.is_(False)
-            )
-            avail_stmt = select(func.sum(InventoryBatch.available_qty)).where(
-                InventoryBatch.inventory_uuid == item.id,
-                InventoryBatch.is_deleted.is_(False)
-            )
-            
-            total_sum = session.exec(total_stmt).one()
-            avail_sum = session.exec(avail_stmt).one()
-            
-            item.total_qty = total_sum if total_sum is not None else 0
-            item.available_qty = avail_sum if avail_sum is not None else 0
-
-        # Sync condition and status as well
-        self._sync_item_condition(session, item)
-        self._sync_item_status(session, item)
-
+        balances = self.get_item_balances(session, item)
+        item.total_qty = balances["total_qty"]
+        item.available_qty = balances["available_qty"]
+        item.status = self.get_item_status(session, item).lower()
         session.add(item)
         return item
 
     def sync_all_quantities(self, session: Session) -> int:
-        """Syncs quantities for all non-deleted inventory items."""
         items = session.exec(select(InventoryItem).where(InventoryItem.is_deleted.is_(False))).all()
         for item in items:
             self._sync_item_quantities(session, item.item_id)
@@ -703,7 +643,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
 
             session.add(batch)
 
-        old_qty = db_obj.available_qty
+        old_qty = self.get_item_balances(session, db_obj)["available_qty"]
 
         resolved_reference_type = self._resolve_reference_context(
             movement_type=movement_type,
@@ -711,12 +651,13 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             reference_type=reference_type,
         )
 
-        # Sync Item quantities (Purely Aggregate)
-        self._sync_item_quantities(session, item_id)
+        current_balances = self.get_item_balances(session, db_obj)
 
         # Validation: prevent negative stock
-        if db_obj.available_qty < 0:
-            raise ValueError(f"Insufficient total stock for {item_id}. Available: {db_obj.available_qty - qty_change}")
+        if current_balances["available_qty"] < 0:
+            raise ValueError(
+                f"Insufficient total stock for {item_id}. Available: {current_balances['available_qty'] - qty_change}"
+            )
 
         # LOG THE MOVEMENT (The Ledger)
         movement = InventoryMovement(
@@ -733,7 +674,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         )
 
         audit_data_after = {
-            "qty": db_obj.available_qty,
+            "qty": current_balances["available_qty"],
             "qty_change": qty_change,
             "movement_type": movement_type,
             "reason_code": reason_code,
@@ -755,7 +696,6 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             actor_id=actor_id,
         )
         session.add(movement)
-        session.add(db_obj)
         
         # Trigger alert evaluation
         from systems.inventory.services.alert_service import alert_service
@@ -774,12 +714,37 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         config_service = InventoryConfigService()
         unit_weights = config_service.get_weights(session, "inventory_units_status_weights")
         batch_weights = config_service.get_weights(session, "inventory_batches_status_weights")
-        all_weights = {**unit_weights, **batch_weights}
-        
-        if item.status and item.status.lower() in all_weights:
-            weight = all_weights.get(item.status.lower(), 0)
-            if weight > 30: 
-                return item.status.upper()
+        worst_status = ""
+        worst_weight = 0
+
+        if item.is_trackable:
+            units = session.exec(
+                select(InventoryUnit).where(
+                    InventoryUnit.inventory_uuid == item.id,
+                    InventoryUnit.is_deleted.is_(False),
+                    InventoryUnit.status != "retired",
+                )
+            ).all()
+            for unit in units:
+                weight = unit_weights.get((unit.status or "").lower(), 0)
+                if weight > worst_weight:
+                    worst_weight = weight
+                    worst_status = (unit.status or "").upper()
+        else:
+            batches = session.exec(
+                select(InventoryBatch).where(
+                    InventoryBatch.inventory_uuid == item.id,
+                    InventoryBatch.is_deleted.is_(False),
+                )
+            ).all()
+            for batch in batches:
+                weight = batch_weights.get((batch.status or "").lower(), 0)
+                if weight > worst_weight:
+                    worst_weight = weight
+                    worst_status = (batch.status or "").upper()
+
+        if worst_weight > 30 and worst_status:
+            return worst_status
 
         # 2. Dynamic Policy-based thresholds
         configs = config_service.get_by_category(session, "inventory_threshold_alerts")
@@ -788,11 +753,13 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         low_stock_pct = int(thresholds.get("low_stock_threshold", "20"))
         overstock_pct = int(thresholds.get("overstock_threshold", "150"))
 
-        if item.available_qty <= 0:
+        balances = self.get_item_balances(session, item)
+
+        if balances["available_qty"] <= 0:
             return "OUT_OF_STOCK"
         
-        if item.total_qty > 0:
-            pct = (item.available_qty / item.total_qty) * 100
+        if balances["total_qty"] > 0:
+            pct = (balances["available_qty"] / balances["total_qty"]) * 100
             if pct <= low_stock_pct:
                 return "LOW_STOCK"
             if pct >= overstock_pct:
@@ -917,12 +884,14 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         movements, _ = self.get_history(session, item_id)
         ledger_balance = sum(movement["qty_change"] for movement in movements)
         latest_movement_at = movements[0]["occurred_at"] if movements else None
-        delta = ledger_balance - item.available_qty
+        balances = self.get_item_balances(session, item)
+        actual_balance = balances["available_qty"]
+        delta = ledger_balance - actual_balance
 
         return InventoryMovementReconciliationRead(
             movement_count=len(movements),
             ledger_balance=ledger_balance,
-            actual_balance=item.available_qty,
+            actual_balance=actual_balance,
             delta=delta,
             is_reconciled=delta == 0,
             latest_movement_at=latest_movement_at,
@@ -1010,19 +979,34 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             raise ValueError(f"Item for movement {movement_id} not found")
 
         reversal_qty_change = -original.qty_change
-        new_available = item.available_qty + reversal_qty_change
-        new_total = item.total_qty
 
-        # Mirror adjust_stock side effects for positive original movements.
-        if original.qty_change > 0:
-            new_total -= original.qty_change
+        # Non-unit reversals adjust batch quantities when the original movement targeted a batch.
+        if original.batch_uuid is not None:
+            batch = session.exec(
+                select(InventoryBatch).where(
+                    InventoryBatch.id == original.batch_uuid,
+                    InventoryBatch.is_deleted.is_(False),
+                )
+            ).first()
+            if not batch:
+                raise ValueError("Reversal target batch was not found")
 
-        if new_available < 0:
-            raise ValueError("Reversal would make available quantity negative")
-        if new_total < 0:
-            raise ValueError("Reversal would make total quantity negative")
-        if new_available > new_total:
-            raise ValueError("Reversal would make available quantity exceed total quantity")
+            next_available = batch.available_qty + reversal_qty_change
+            next_total = batch.total_qty
+            if original.qty_change > 0:
+                next_total -= original.qty_change
+
+            if next_available < 0:
+                raise ValueError("Reversal would make batch available quantity negative")
+            if next_total < 0:
+                raise ValueError("Reversal would make batch total quantity negative")
+            if next_available > next_total:
+                raise ValueError("Reversal would make batch available exceed batch total")
+
+            batch.available_qty = next_available
+            batch.total_qty = next_total
+            batch.status = self.recalculate_batch_status(session, batch)
+            session.add(batch)
 
         reversal = InventoryMovement(
             movement_id=get_next_sequence(session, InventoryMovement, "movement_id", "MOV"),
@@ -1035,9 +1019,6 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             reference_type="inventory_movement",
             note=reason,
         )
-
-        item.available_qty = new_available
-        item.total_qty = new_total
 
         audit_service.log_action(
             db=session,
@@ -1068,7 +1049,6 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         )
 
         session.add(reversal)
-        session.add(item)
         return reversal
 
     def _extract_unit_transition_from_movement(
@@ -1145,7 +1125,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                 f"Cannot reverse movement {movement.movement_id}: item for unit {unit_id} was not found"
             )
 
-        old_available_qty = item.available_qty
+        old_available_qty = self.get_item_balances(session, item)["available_qty"]
         before_state = {
             "status": unit.status,
             "condition": unit.condition,
@@ -1157,7 +1137,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         session.add(unit)
 
         synced_item = self._sync_item_quantities(session, item.item_id)
-        new_available_qty = synced_item.available_qty
+        new_available_qty = self.get_item_balances(session, synced_item)["available_qty"]
         qty_change = new_available_qty - old_available_qty
 
         audit_service.log_action(
@@ -1267,7 +1247,9 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                     )
                 )
 
-            if item.available_qty < 0:
+            balances = self.get_item_balances(session, item)
+
+            if balances["available_qty"] < 0:
                 anomalies.append(
                     InventoryMovementAnomalyRead(
                         item_id=item.item_id,
@@ -1275,11 +1257,11 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                         anomaly_type="negative_available_qty",
                         severity="critical",
                         message="Item has negative available quantity",
-                        details={"available_qty": item.available_qty},
+                        details={"available_qty": balances["available_qty"]},
                     )
                 )
 
-            if item.available_qty > item.total_qty:
+            if balances["available_qty"] > balances["total_qty"]:
                 anomalies.append(
                     InventoryMovementAnomalyRead(
                         item_id=item.item_id,
@@ -1288,8 +1270,8 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                         severity="high",
                         message="Item has available quantity greater than total quantity",
                         details={
-                            "available_qty": item.available_qty,
-                            "total_qty": item.total_qty,
+                            "available_qty": balances["available_qty"],
+                            "total_qty": balances["total_qty"],
                         },
                     )
                 )

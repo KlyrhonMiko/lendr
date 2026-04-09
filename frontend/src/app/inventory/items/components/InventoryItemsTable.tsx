@@ -126,6 +126,7 @@ function ActionMenu({
 export function InventoryItemsTable({
   items,
   loading,
+  categories,
   onOpenHistory,
   onOpenUnitManagement,
   onOpenBatchManagement,
@@ -135,6 +136,7 @@ export function InventoryItemsTable({
 }: {
   items: InventoryItem[];
   loading: boolean;
+  categories: { key: string; value: string }[];
   onOpenHistory: (itemId: string) => void;
   onOpenUnitManagement: (itemId: string) => void;
   onOpenBatchManagement: (itemId: string) => void;
@@ -142,6 +144,8 @@ export function InventoryItemsTable({
   onOpenQrCode: (item: InventoryItem) => void;
   onDelete: (itemId: string) => void;
 }) {
+  const categoryLabels = Object.fromEntries(categories.map((category) => [category.key, category.value]));
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
@@ -170,9 +174,9 @@ export function InventoryItemsTable({
       <table className="w-full text-left">
         <thead>
           <tr className="border-b border-border">
-            <th className="px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Equipment</th>
-            <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Classification</th>
-            <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden md:table-cell">Type</th>
+            <th className="px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Equipment Name</th>
+            <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Category</th>
+            <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Classification</th>
             <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Condition</th>
             <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Status</th>
             <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Availability</th>
@@ -195,19 +199,14 @@ export function InventoryItemsTable({
                     {item.description && (
                       <p className="text-xs text-muted-foreground truncate max-w-[220px] mt-0.5">{item.description}</p>
                     )}
-                    <p className="text-[11px] text-muted-foreground/60 font-mono mt-0.5 lg:hidden">
-                      {item.classification && <span className="uppercase">{item.classification}</span>}
-                      {item.classification && item.item_type && <span className="mx-1">·</span>}
-                      {item.item_type && <span className="uppercase">{item.item_type}</span>}
-                    </p>
                   </div>
                 </div>
               </td>
-              <td className="px-4 py-3.5 hidden lg:table-cell">
-                <span className="text-sm text-muted-foreground capitalize">{item.classification}</span>
+              <td className="px-4 py-3.5">
+                <span className="text-sm text-muted-foreground capitalize">{categoryLabels[item.category] || item.category}</span>
               </td>
-              <td className="px-4 py-3.5 hidden md:table-cell">
-                <span className="text-sm text-muted-foreground capitalize">{item.item_type}</span>
+              <td className="px-4 py-3.5">
+                <span className="text-sm text-muted-foreground capitalize">{item.classification}</span>
               </td>
               <td className="px-4 py-3.5">
                 <span className={`inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-md border capitalize ${conditionStyle(item.condition)}`}>

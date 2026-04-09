@@ -199,6 +199,9 @@ export const api = {
 
   get: <T>(url: string) => http.request<T>(url, { method: 'GET' }),
 
+  getRaw: (url: string, options: Omit<RequestInit, 'method'> = {}) =>
+    http.requestRaw(url, { ...options, method: 'GET' }),
+
   post: <T>(url: string, data?: unknown) => {
     const options: RequestInit = { method: 'POST' };
     if (data !== undefined) {

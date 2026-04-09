@@ -10,28 +10,32 @@ SYSTEM_CONFIGS = [
     {"system": "inventory", "key": "chemicals", "value": "Chemicals", "category": "inventory_item_type", "description": "Chemical products and solutions"},
     {"system": "inventory", "key": "pharmaceuticals", "value": "Pharmaceuticals", "category": "inventory_item_type", "description": "Pharmaceutical products and medications"},
 
-    # Inventory Condition
-    {"system": "inventory", "key": "excellent", "value": "Excellent", "category": "inventory_condition", "description": "Item is in excellent working condition"},
-    {"system": "inventory", "key": "good", "value": "Good", "category": "inventory_condition", "description": "Item is in good working condition"},
-    {"system": "inventory", "key": "fair", "value": "Fair", "category": "inventory_condition", "description": "Item has minor wear but still functional"},
-    {"system": "inventory", "key": "poor", "value": "Poor", "category": "inventory_condition", "description": "Item has significant damage but may still function"},
-    {"system": "inventory", "key": "damaged", "value": "Damaged", "category": "inventory_condition", "description": "Item is non-functional and requires repair"},
-
     # Inventory Classification
     {"system": "inventory", "key": "equipment", "value": "Equipment", "category": "inventory_classification", "description": "Durable equipment for repeated use"},
     {"system": "inventory", "key": "consumable", "value": "Consumable", "category": "inventory_classification", "description": "Consumable items that are used up"},
     {"system": "inventory", "key": "perishable", "value": "Perishable", "category": "inventory_classification", "description": "Perishable items with expiration dates"},
 
+    # Inventory Item Status
+    {"system": "inventory", "key": "healthy", "value": "Healthy", "category": "inventory_status", "description": "Item has healthy stock level"},
+    {"system": "inventory", "key": "low_stock", "value": "Low Stock", "category": "inventory_status", "description": "Item stock is below threshold"},
+    {"system": "inventory", "key": "out_of_stock", "value": "Out of Stock", "category": "inventory_status", "description": "Item has no available stock"},
+    {"system": "inventory", "key": "near_expiry", "value": "Near Expiry", "category": "inventory_status", "description": "Perishable item has near-expiry stock"},
+
+    # Inventory Item Condition
+    {"system": "inventory", "key": "excellent", "value": "Excellent", "category": "inventory_condition", "description": "Item is in excellent condition"},
+    {"system": "inventory", "key": "good", "value": "Good", "category": "inventory_condition", "description": "Item is in good condition"},
+    {"system": "inventory", "key": "fair", "value": "Fair", "category": "inventory_condition", "description": "Item has minor wear"},
+    {"system": "inventory", "key": "poor", "value": "Poor", "category": "inventory_condition", "description": "Item is in poor condition"},
+    {"system": "inventory", "key": "unusable", "value": "Unusable", "category": "inventory_condition", "description": "Item is unusable"},
+
     # Inventory Categories
-    {"system": "inventory", "key": "administrative_office", "value": "Administrative & Office", "category": "inventory_category", "description": "General office supplies, furniture, and administrative support assets"},
-    {"system": "inventory", "key": "operational_field", "value": "Operational & Field", "category": "inventory_category", "description": "Field operations, site equipment, and operational tools"},
-    {"system": "inventory", "key": "it_communications", "value": "IT & Communications", "category": "inventory_category", "description": "IT infrastructure, networking, and communication systems"},
-    {"system": "inventory", "key": "facility_maintenance", "value": "Facility & Maintenance", "category": "inventory_category", "description": "Building maintenance, facility management, and utility support"},
-    {"system": "inventory", "key": "safety_security", "value": "Safety & Security", "category": "inventory_category", "description": "Health, safety, security gear, and protective equipment"},
-    {"system": "inventory", "key": "laboratory_research", "value": "Laboratory & Research", "category": "inventory_category", "description": "Scientific research equipment and laboratory operations"},
-    {"system": "inventory", "key": "marketing_events", "value": "Marketing & Events", "category": "inventory_category", "description": "Brand marketing materials and event staging support"},
-    {"system": "inventory", "key": "logistics_supply", "value": "Logistics & Supply Chain", "category": "inventory_category", "description": "Warehouse, shipping, and logistics management assets"},
-    {"system": "inventory", "key": "medical_clinical", "value": "Medical & Clinical", "category": "inventory_category", "description": "Clinical support and medical-related equipment"},
+    {"system": "inventory", "key": "items_tools", "value": "ITEMS/TOOLS", "category": "inventory_category", "description": "General equipment and tools used for maintenance operations"},
+    {"system": "inventory", "key": "declogging", "value": "DECLOGGING", "category": "inventory_category", "description": "Tools and materials used for declogging activities"},
+    {"system": "inventory", "key": "cmp_pm_acu_pm", "value": "CMP PM / ACU PM", "category": "inventory_category", "description": "Preventive maintenance tools for CMP and ACU workflows"},
+    {"system": "inventory", "key": "pm_set_electrical", "value": "PM SET (ELECTRICAL)", "category": "inventory_category", "description": "Electrical preventive maintenance tool sets"},
+    {"system": "inventory", "key": "pm_of_accu_fcu", "value": "PM OF ACCU & FCU", "category": "inventory_category", "description": "Preventive maintenance assets for ACCU and FCU units"},
+    {"system": "inventory", "key": "system_reprocess_replacement_compressor", "value": "SYSTEM REPROCESS & REPLACEMENT OF COMPRESSOR", "category": "inventory_category", "description": "Tools and consumables for system reprocess and compressor replacement"},
+    {"system": "inventory", "key": "exhaust_pm", "value": "EXHAUST PM", "category": "inventory_category", "description": "Equipment used for exhaust preventive maintenance"},
 
     # Inventory Units Status
     {"system": "inventory", "key": "available", "value": "Available", "category": "inventory_units_status", "description": "Unit is available for borrowing"},

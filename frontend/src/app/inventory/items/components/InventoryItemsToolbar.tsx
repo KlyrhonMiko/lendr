@@ -18,11 +18,8 @@ export function InventoryItemsToolbar({
   onClassificationFilterChange,
   itemTypeFilter,
   onItemTypeFilterChange,
-  conditionFilter,
-  onConditionFilterChange,
   classifications,
   itemTypes,
-  conditions,
   onClearExpandedFilters,
 }: {
   search: string;
@@ -35,19 +32,15 @@ export function InventoryItemsToolbar({
   onClassificationFilterChange: (v: string) => void;
   itemTypeFilter: string;
   onItemTypeFilterChange: (v: string) => void;
-  conditionFilter: string;
-  onConditionFilterChange: (v: string) => void;
   classifications: ConfigRead[];
   itemTypes: ConfigRead[];
-  conditions: ConfigRead[];
   onClearExpandedFilters: () => void;
 }) {
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [classificationOpen, setClassificationOpen] = useState(false);
   const [itemTypeOpen, setItemTypeOpen] = useState(false);
-  const [conditionOpen, setConditionOpen] = useState(false);
 
-  const hasActiveFilters = categoryFilter || classificationFilter || itemTypeFilter || conditionFilter;
+  const hasActiveFilters = categoryFilter || classificationFilter || itemTypeFilter;
 
   const categoryOptions = [{ key: '', value: 'All categories' }, ...categories.map((c) => ({ key: c.key, value: c.value }))];
   const classificationOptions = [
@@ -58,11 +51,6 @@ export function InventoryItemsToolbar({
     { key: '', value: 'All types' },
     ...itemTypes.map((t) => ({ key: t.key, value: t.key.charAt(0).toUpperCase() + t.key.slice(1) })),
   ];
-  const conditionOptions = [
-    { key: '', value: 'All conditions' },
-    ...conditions.map((c) => ({ key: c.key, value: c.key.charAt(0).toUpperCase() + c.key.slice(1) })),
-  ];
-
   const clearAllFilters = () => {
     onCategoryFilterChange('');
     onClearExpandedFilters();
@@ -190,37 +178,6 @@ export function InventoryItemsToolbar({
                 )}
               >
                 <Check className={cn('w-4 h-4 shrink-0', itemTypeFilter === opt.key ? 'opacity-100' : 'opacity-0')} />
-                {opt.value}
-              </button>
-            ))}
-          </PopoverContent>
-        </Popover>
-
-        <Popover open={conditionOpen} onOpenChange={setConditionOpen}>
-          <PopoverTrigger
-            type="button"
-            className="h-10 px-3 rounded-lg bg-muted/50 border border-border text-sm font-medium cursor-pointer flex items-center gap-2"
-          >
-            <span className="truncate">
-              {conditionOptions.find((o) => o.key === conditionFilter)?.value ?? 'All conditions'}
-            </span>
-            <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
-          </PopoverTrigger>
-          <PopoverContent align="start" sideOffset={4} className="w-48 p-1 max-h-60 overflow-y-auto">
-            {conditionOptions.map((opt) => (
-              <button
-                key={opt.key || 'all'}
-                type="button"
-                onClick={() => {
-                  onConditionFilterChange(opt.key);
-                  setConditionOpen(false);
-                }}
-                className={cn(
-                  'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left',
-                  conditionFilter === opt.key ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted'
-                )}
-              >
-                <Check className={cn('w-4 h-4 shrink-0', conditionFilter === opt.key ? 'opacity-100' : 'opacity-0')} />
                 {opt.value}
               </button>
             ))}

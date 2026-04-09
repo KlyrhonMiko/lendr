@@ -3,11 +3,11 @@
 import React from 'react';
 import { Wrench, RefreshCw, LogOut } from 'lucide-react';
 import { auth } from '@/lib/auth';
-import { usePublicBranding } from '@/lib/publicBranding';
 
-export function MaintenanceOverlay() {
-  const { brandName } = usePublicBranding();
+const DEFAULT_MAINTENANCE_MESSAGE = "We're currently performing scheduled maintenance to improve your experience. Most features are temporarily unavailable.";
+const DEFAULT_BRAND_NAME = 'Lendr';
 
+export function MaintenanceOverlay({ message }: { message?: string | null }) {
   const handleRefresh = () => {
     window.location.reload();
   };
@@ -29,8 +29,7 @@ export function MaintenanceOverlay() {
             System Maintenance
           </h1>
           <p className="text-muted-foreground leading-relaxed">
-            We're currently performing scheduled maintenance to improve your experience.
-            Most features are temporarily unavailable.
+            {message?.trim() || DEFAULT_MAINTENANCE_MESSAGE}
           </p>
         </div>
 
@@ -53,7 +52,7 @@ export function MaintenanceOverlay() {
         </div>
 
         <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
-          {brandName} Platform
+          {DEFAULT_BRAND_NAME} Platform
         </p>
       </div>
     </div>

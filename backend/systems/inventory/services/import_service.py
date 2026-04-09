@@ -100,19 +100,24 @@ class ImportService:
 
                     # 1. Validation & Parsing
                     name = row.get("name") or ""
-                    item_type = row.get("item_type") or ""
                     classification = row.get("classification") or ""
                     
                     is_trackable = self._parse_bool(row.get("is_trackable", "false"))
                     
-                    if not name or not item_type or not classification:
-                        raise ValueError(f"Missing mandatory item fields: name='{name}', item_type='{item_type}', or classification='{classification}'")
+                    if not name:
+                        raise ValueError("Missing mandatory item field: name")
 
                     # Upsert Item
                     item = self._get_or_create_item(session, row, mode, actor_id)
                     
-                    # 2. Targeted Logic based on Trackability
-                    if is_trackable:
+                    qty_value = str(row.get("quantity") or "").strip()
+                    serial_value = str(row.get("serial_number") or "").strip()
+
+                    # 2. Targeted Logic based on supplied stock data
+                    if qty_value in {"", "0"} and not serial_value:
+                        # Item-only import: keep the record in inventory without creating units/batches.
+                        pass
+                    elif is_trackable:
                         self._handle_unit_import(session, item, row, mode, actor_id)
                     else:
                         self._handle_batch_import(session, item, row, actor_id)
@@ -172,9 +177,9 @@ class ImportService:
             setting = self.inventory_service.config_service.get_by_key(session, val, category=category)
             return setting.key if setting else val
 
-        canonical_item_type = get_canonical(item_type, "inventory_item_type")
-        canonical_classification = get_canonical(classification, "inventory_classification")
-        canonical_category = get_canonical(row.get("category", ""), "inventory_category")
+        canonical_item_type = get_canonical(item_type, "inventory_item_type") or None
+        canonical_classification = get_canonical(classification, "inventory_classification") or None
+        canonical_category = get_canonical(row.get("category", ""), "inventory_category") or None
 
         # Check if exists (following ix_inventory_item_name_active)
         statement = select(InventoryItem).where(
@@ -193,15 +198,11 @@ class ImportService:
                 item_type=canonical_item_type,
                 classification=canonical_classification,
                 is_trackable=self._parse_bool(row.get("is_trackable", "false")),
-                description=(row.get("description") or "").strip() or None,
-                condition=(row.get("condition") or "good").strip().lower()
             )
             item = self.inventory_service.create(session, create_data, prefix="ITEM", actor_id=actor_id)
         elif mode == "overwrite":
-            # Update item metadata if overwrite mode is on
-            item.category = (row.get("category") or item.category)
-            item.description = (row.get("description") or item.description)
-            item.condition = str(row.get("condition") or "good").lower().strip()
+            # Update mutable metadata in overwrite mode, keeping canonical config keys
+            item.category = canonical_category or item.category
             session.add(item)
             # (Note: item_type and is_trackable are usually immutable for items with stock, 
             # so we avoid changing them during simple import for safety)

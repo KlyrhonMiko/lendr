@@ -11,6 +11,7 @@ from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestCreate,
     BorrowRequestRead,
 )
+from core.schemas import ConfigRead, GenericResponse, create_success_response, make_pagination_meta
 from systems.inventory.schemas.inventory_schemas import InventoryCatalogItemRead
 from systems.inventory.services.inventory_service import InventoryService
 from systems.inventory.services.borrow_request_service import BorrowService
@@ -19,6 +20,24 @@ from systems.auth.dependencies import require_permission, require_system_access
 router = APIRouter()
 borrow_service = BorrowService()
 inventory_service = InventoryService()
+
+
+class BorrowerTaxonomyRead(GenericResponse[dict[str, list[ConfigRead]]]):
+    pass
+
+
+@router.get("/taxonomy", response_model=GenericResponse[dict[str, list[ConfigRead]]])
+async def borrower_inventory_taxonomy(request: Request, session: Session = Depends(get_session)):
+    categories = inventory_service.config_service.get_by_category(session, "inventory_category")
+    classifications = inventory_service.config_service.get_by_category(session, "inventory_classification")
+
+    return create_success_response(
+        data={
+            "categories": categories,
+            "classifications": classifications,
+        },
+        request=request,
+    )
 
 
 @router.get("/catalog", response_model=GenericResponse[list[InventoryCatalogItemRead]])
@@ -48,6 +67,10 @@ async def borrower_catalog(
     catalog_items = []
     for item in items:
         item_read = InventoryCatalogItemRead.model_validate(item)
+        balances = inventory_service.get_item_balances(session, item)
+        item_read.total_qty = balances["total_qty"]
+        item_read.available_qty = balances["available_qty"]
+        item_read.condition = inventory_service.get_item_condition(session, item)
         item_read.status_condition = inventory_service.get_item_status(session, item)
         catalog_items.append(item_read)
 

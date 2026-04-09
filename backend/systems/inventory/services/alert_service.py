@@ -19,7 +19,11 @@ class AlertService:
         inv_service = InventoryService()
         
         item = inv_service.get(session, item_id)
-        if not item or item.total_qty <= 0:
+        if not item:
+            return
+
+        balances = inv_service.get_item_balances(session, item)
+        if balances["total_qty"] <= 0:
             return
 
         # Fetch Policy Settings
@@ -39,17 +43,23 @@ class AlertService:
             recipient_roles = ["inventory_manager"]
             specific_recipients = []
 
-        current_pct = (item.available_qty / item.total_qty) * 100
+        current_pct = (balances["available_qty"] / balances["total_qty"]) * 100
         
         alert_type = None
         message = ""
 
         if current_pct <= low_stock_pct:
             alert_type = "LOW_STOCK"
-            message = f"Alert: Item '{item.name}' ({item.item_id}) is at {current_pct:.1f}% capacity ({item.available_qty}/{item.total_qty}). Low stock threshold is {low_stock_pct}%."
+            message = (
+                f"Alert: Item '{item.name}' ({item.item_id}) is at {current_pct:.1f}% capacity "
+                f"({balances['available_qty']}/{balances['total_qty']}). Low stock threshold is {low_stock_pct}%."
+            )
         elif current_pct >= overstock_pct:
             alert_type = "OVERSTOCK"
-            message = f"Warning: Item '{item.name}' ({item.item_id}) is at {current_pct:.1f}% capacity ({item.available_qty}/{item.total_qty}). Overstock threshold is {overstock_pct}%."
+            message = (
+                f"Warning: Item '{item.name}' ({item.item_id}) is at {current_pct:.1f}% capacity "
+                f"({balances['available_qty']}/{balances['total_qty']}). Overstock threshold is {overstock_pct}%."
+            )
 
         if alert_type:
             self.trigger_notifications(session, channels, recipient_roles, alert_type, message, specific_recipients)

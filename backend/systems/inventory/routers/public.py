@@ -112,6 +112,10 @@ async def get_public_item(
         
     item_read_data = item.model_dump()
     item_read = PublicInventoryItemRead(**item_read_data)
+    balances = inventory_service.get_item_balances(session, item)
+    item_read.total_qty = balances["total_qty"]
+    item_read.available_qty = balances["available_qty"]
+    item_read.condition = inventory_service.get_item_condition(session, item)
     item_read.status_condition = inventory_service.get_item_status(session, item)
 
     # Fetch borrow history for item level

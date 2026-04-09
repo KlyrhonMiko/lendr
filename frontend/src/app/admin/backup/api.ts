@@ -24,6 +24,10 @@ export interface BackupTriggerPayload {
   destination: 'local';
 }
 
+export function buildBackupArtifactDownloadPath(artifactId: string): string {
+  return `/admin/backups/artifacts/${artifactId}/download`;
+}
+
 export const backupApi = {
   listRuns: () => api.get<BackupRun[]>('/admin/backups/runs'),
   
@@ -31,20 +35,7 @@ export const backupApi = {
     api.post<BackupRun>('/admin/backups/trigger', data),
     
   downloadArtifact: async (artifactId: string, filename: string) => {
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    const { auth } = await import('@/lib/auth');
-    const token = auth.getToken();
-    
-    const response = await fetch(`${API_BASE_URL}/api/admin/backups/artifacts/${artifactId}/download`, {
-      headers: {
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-      }
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || errorData.detail || 'Failed to download artifact');
-    }
+    const response = await api.getRaw(buildBackupArtifactDownloadPath(artifactId));
 
     const blob = await response.blob();
     const url = window.URL.createObjectURL(blob);

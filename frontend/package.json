@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --experimental-https --experimental-https-key ./certificates/localhost-key.pem --experimental-https-cert ./certificates/localhost.pem -H 192.168.100.104",
+    "dev": "next dev --experimental-https --experimental-https-key ./certificates/localhost-key.pem --experimental-https-cert ./certificates/localhost.pem",
     "cert": "node generate-cert.js",
     "build": "next build",
     "start": "next start",
@@ -22,7 +22,7 @@
     "dompurify": "^3.3.3",
     "html-to-image": "^1.11.13",
     "jspdf": "^4.2.1",
-    "lightningcss-win32-x64-msvc": "^1.32.0",
+    "lightningcss": "^1.32.0",
     "lucide-react": "^0.577.0",
     "next": "^16.2.1",
     "qrcode.react": "^4.2.0",

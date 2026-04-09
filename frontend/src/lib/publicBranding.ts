@@ -24,8 +24,12 @@ export function resolveBrandAssetUrl(path: string | null | undefined): string | 
   if (!path) return null;
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
 
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  if (typeof window !== 'undefined') {
+    return normalizedPath;
+  }
+
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
   return `${baseUrl}${normalizedPath}`;
 }
 

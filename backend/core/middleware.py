@@ -25,6 +25,7 @@ class MaintenanceMiddleware(BaseHTTPMiddleware):
             "/api/admin/settings/operations", # Allow admins to turn it off
             "/api/admin/config",
             "/api/health", # Health probes
+            "/api/health/live", # Public liveness probe
             "/api/assets"
         ]
 

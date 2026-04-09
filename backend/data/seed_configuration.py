@@ -45,6 +45,7 @@ from sqlalchemy import create_engine
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from core.config import settings
 from core.initialization_service import InitializationService, resolve_bootstrap_admin_credentials
+from data.system_init_data import SYSTEM_CONFIGS
 from systems.admin.models.user import User
 
 BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
@@ -397,18 +398,17 @@ def create_setting(
 def seed_inventory_configurations(headers: dict[str, str]) -> None:
     """Seed inventory-related configurations."""
     section("INVENTORY CONFIGURATIONS")
+
+    def _category_entries(category: str) -> list[tuple[str, str, str]]:
+        return [
+            (entry["key"], entry["value"], entry["description"])
+            for entry in SYSTEM_CONFIGS
+            if entry["system"] == "inventory" and entry["category"] == category
+        ]
     
     # inventory_item_type (specific product categories)
     print(f"\n  {CYAN}Category: inventory_item_type{RESET}")
-    item_types = [
-        ("electronics", "Electronics", "Electronic devices and components"),
-        ("tools", "Tools", "Hand tools and power tools"),
-        ("furniture", "Furniture", "Furniture and fixtures"),
-        ("cleaning_supplies", "Cleaning Supplies", "Cleaning supplies and materials"),
-        ("disposables", "Disposables", "Disposable items for single use"),
-        ("chemicals", "Chemicals", "Chemical products and solutions"),
-        ("pharmaceuticals", "Pharmaceuticals", "Pharmaceutical products and medications"),
-    ]
+    item_types = _category_entries("inventory_item_type")
     for key, value, desc in item_types:
         create_setting(
             headers,
@@ -420,61 +420,9 @@ def seed_inventory_configurations(headers: dict[str, str]) -> None:
             endpoint="/api/inventory/config/inventory",
         )
     
-    # inventory_condition
-    print(f"\n  {CYAN}Category: inventory_condition{RESET}")
-    create_setting(
-        headers,
-        system="inventory",
-        key="excellent",
-        value="Excellent",
-        category="inventory_condition",
-        description="Item is in excellent working condition",
-        endpoint="/api/inventory/config/inventory",
-    )
-    create_setting(
-        headers,
-        system="inventory",
-        key="good",
-        value="Good",
-        category="inventory_condition",
-        description="Item is in good working condition",
-        endpoint="/api/inventory/config/inventory",
-    )
-    create_setting(
-        headers,
-        system="inventory",
-        key="fair",
-        value="Fair",
-        category="inventory_condition",
-        description="Item has minor wear but still functional",
-        endpoint="/api/inventory/config/inventory",
-    )
-    create_setting(
-        headers,
-        system="inventory",
-        key="poor",
-        value="Poor",
-        category="inventory_condition",
-        description="Item has significant damage but may still function",
-        endpoint="/api/inventory/config/inventory",
-    )
-    create_setting(
-        headers,
-        system="inventory",
-        key="damaged",
-        value="Damaged",
-        category="inventory_condition",
-        description="Item is non-functional and requires repair",
-        endpoint="/api/inventory/config/inventory",
-    )
-    
     # inventory_classification (handling and usage classification)
     print(f"\n  {CYAN}Category: inventory_classification{RESET}")
-    classifications = [
-        ("equipment", "Equipment", "Durable equipment for repeated use"),
-        ("consumable", "Consumable", "Consumable items that are used up"),
-        ("perishable", "Perishable", "Perishable items with expiration dates"),
-    ]
+    classifications = _category_entries("inventory_classification")
     for key, value, desc in classifications:
         create_setting(
             headers,
@@ -486,19 +434,37 @@ def seed_inventory_configurations(headers: dict[str, str]) -> None:
             endpoint="/api/inventory/config/inventory",
         )
 
+    # inventory_status (item-level health state)
+    print(f"\n  {CYAN}Category: inventory_status{RESET}")
+    statuses = _category_entries("inventory_status")
+    for key, value, desc in statuses:
+        create_setting(
+            headers,
+            system="inventory",
+            key=key,
+            value=value,
+            category="inventory_status",
+            description=desc,
+            endpoint="/api/inventory/config/inventory",
+        )
+
+    # inventory_condition (item-level aggregate condition)
+    print(f"\n  {CYAN}Category: inventory_condition{RESET}")
+    conditions = _category_entries("inventory_condition")
+    for key, value, desc in conditions:
+        create_setting(
+            headers,
+            system="inventory",
+            key=key,
+            value=value,
+            category="inventory_condition",
+            description=desc,
+            endpoint="/api/inventory/config/inventory",
+        )
+
     # inventory_category (business grouping used by item create payloads)
     print(f"\n  {CYAN}Category: inventory_category{RESET}")
-    categories = [
-        ("administrative_office", "Administrative & Office", "General office supplies, furniture, and administrative support assets"),
-        ("operational_field", "Operational & Field", "Field operations, site equipment, and operational tools"),
-        ("it_communications", "IT & Communications", "IT infrastructure, networking, and communication systems"),
-        ("facility_maintenance", "Facility & Maintenance", "Building maintenance, facility management, and utility support"),
-        ("safety_security", "Safety & Security", "Health, safety, security gear, and protective equipment"),
-        ("laboratory_research", "Laboratory & Research", "Scientific research equipment and laboratory operations"),
-        ("marketing_events", "Marketing & Events", "Brand marketing materials and event staging support"),
-        ("logistics_supply", "Logistics & Supply Chain", "Warehouse, shipping, and logistics management assets"),
-        ("medical_clinical", "Medical & Clinical", "Clinical support and medical-related equipment"),
-    ]
+    categories = _category_entries("inventory_category")
     for key, value, desc in categories:
         create_setting(
             headers,

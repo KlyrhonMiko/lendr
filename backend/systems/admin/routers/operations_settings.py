@@ -36,6 +36,7 @@ def _revoke_sessions_background(
         )
         background_session.commit()
 
+@router.get("", include_in_schema=False)
 @router.get("/", response_model=GenericResponse[OperationsSettingsPayload])
 async def get_operations_settings(
     request: Request,
@@ -84,6 +85,7 @@ async def get_operations_settings(
         request=request
     )
 
+@router.put("", include_in_schema=False)
 @router.put("/", response_model=GenericResponse[OperationsSettingsPayload])
 async def update_operations_settings(
     payload: OperationsSettingsPayload,
