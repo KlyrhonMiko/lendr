@@ -5,7 +5,7 @@ export function SystemRegistryPanel({ registry, loading }: { registry: SystemReg
   return (
     <div className="flex flex-col h-full bg-card border border-border rounded-xl overflow-hidden">
       <div className="p-4 border-b border-border flex items-center gap-2">
-        <Database className="w-5 h-5 text-indigo-500" />
+        <Database className="w-5 h-5 text-primary" />
         <h3 className="font-semibold text-sm">System Registry Scale</h3>
       </div>
       <div className="p-6 flex-1">
@@ -18,10 +18,10 @@ export function SystemRegistryPanel({ registry, loading }: { registry: SystemReg
             {registry.map((item) => (
               <div
                 key={item.entity}
-                className="flex items-center justify-between p-3.5 rounded-lg bg-muted/40 border border-border/50 group hover:border-indigo-500/30 transition-colors"
+                className="flex items-center justify-between p-3.5 rounded-lg bg-muted/40 border border-border/50 group hover:border-primary/30 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded bg-indigo-500/10 text-indigo-500">
+                  <div className="p-2 rounded bg-primary/10 text-primary">
                     <FileText className="w-4 h-4" />
                   </div>
                   <span className="text-sm font-medium">{item.entity}</span>

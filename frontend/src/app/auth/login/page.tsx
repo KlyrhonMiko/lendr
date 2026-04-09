@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { KeyRound, User, Loader2, ArrowRight, ShieldCheck } from 'lucide-react';
+import Link from 'next/link';
+import { KeyRound, User, Loader2, ArrowRight, ShieldCheck, Package, ScanLine } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { auth } from '@/lib/auth';
 import { useAuth } from '@/contexts/AuthContext';
@@ -316,7 +317,7 @@ export default function LoginPage() {
                 type="text"
                 required
                 autoComplete="username"
-                className="w-full bg-background border border-border focus:border-yellow-500/50 focus:ring-[3px] focus:ring-yellow-500/10 rounded-xl py-3 pl-11 pr-4 text-foreground placeholder:text-muted-foreground/50 outline-none transition-all text-[15px]"
+                className="w-full bg-background border border-border focus:border-primary/50 focus:ring-[3px] focus:ring-primary/10 rounded-xl py-3 pl-11 pr-4 text-foreground placeholder:text-muted-foreground/50 outline-none transition-all text-[15px]"
                 placeholder="Enter your username"
                 value={formData.username}
                 onChange={(e) => setFormData({ ...formData, username: e.target.value })}
@@ -338,7 +339,7 @@ export default function LoginPage() {
                 type="password"
                 required
                 autoComplete="current-password"
-                className="w-full bg-background border border-border focus:border-yellow-500/50 focus:ring-[3px] focus:ring-yellow-500/10 rounded-xl py-3 pl-11 pr-4 text-foreground placeholder:text-muted-foreground/50 outline-none transition-all text-[15px]"
+                className="w-full bg-background border border-border focus:border-primary/50 focus:ring-[3px] focus:ring-primary/10 rounded-xl py-3 pl-11 pr-4 text-foreground placeholder:text-muted-foreground/50 outline-none transition-all text-[15px]"
                 placeholder="Enter your password"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
@@ -350,7 +351,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-gradient-to-r from-yellow-400 to-yellow-500 text-yellow-950 font-semibold py-3 rounded-xl hover:from-yellow-500 hover:to-yellow-600 active:scale-[0.99] transition-all flex items-center justify-center gap-2 group disabled:opacity-60 disabled:cursor-not-allowed shadow-md shadow-yellow-500/15 text-[15px]"
+            className="w-full bg-primary text-primary-foreground font-semibold py-3 rounded-xl hover:bg-primary/90 active:scale-[0.99] transition-all flex items-center justify-center gap-2 group disabled:opacity-60 disabled:cursor-not-allowed shadow-md shadow-primary/15 text-[15px]"
           >
             {isLoading ? (
               <Loader2 className="w-5 h-5 animate-spin" />
@@ -364,8 +365,31 @@ export default function LoginPage() {
         </form>
       </div>
 
+      {/* Quick access links */}
+      <div className="mt-5 space-y-2.5">
+        <p className="text-xs text-center text-muted-foreground/60 font-medium uppercase tracking-wider">
+          Quick Access
+        </p>
+        <div className="flex items-center justify-center gap-3">
+          <Link
+            href="/borrow"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-card hover:bg-accent text-sm font-medium text-foreground transition-all hover:shadow-sm group"
+          >
+            <Package className="w-4 h-4 text-yellow-600 group-hover:scale-110 transition-transform" />
+            Borrow
+          </Link>
+          <Link
+            href="/scan"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-card hover:bg-accent text-sm font-medium text-foreground transition-all hover:shadow-sm group"
+          >
+            <ScanLine className="w-4 h-4 text-yellow-600 group-hover:scale-110 transition-transform" />
+            Scan QR
+          </Link>
+        </div>
+      </div>
+
       {/* Footer note */}
-      <div className="mt-6 flex items-center justify-center gap-2 text-muted-foreground/60">
+      <div className="mt-5 flex items-center justify-center gap-2 text-muted-foreground/60">
         <ShieldCheck className="w-3.5 h-3.5" />
         <p className="text-xs">
           Accounts are managed by your administrator
@@ -400,7 +424,7 @@ export default function LoginPage() {
                   onChange={(e) =>
                     setRotationForm({ ...rotationForm, currentPassword: e.target.value })
                   }
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-indigo-500/50 focus:ring-[3px] focus:ring-indigo-500/10"
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary/50 focus:ring-[3px] focus:ring-primary/10"
                 />
               </div>
 
@@ -417,7 +441,7 @@ export default function LoginPage() {
                   onChange={(e) =>
                     setRotationForm({ ...rotationForm, newPassword: e.target.value })
                   }
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-indigo-500/50 focus:ring-[3px] focus:ring-indigo-500/10"
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary/50 focus:ring-[3px] focus:ring-primary/10"
                 />
               </div>
 
@@ -434,7 +458,7 @@ export default function LoginPage() {
                   onChange={(e) =>
                     setRotationForm({ ...rotationForm, confirmPassword: e.target.value })
                   }
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-indigo-500/50 focus:ring-[3px] focus:ring-indigo-500/10"
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary/50 focus:ring-[3px] focus:ring-primary/10"
                 />
               </div>
 
@@ -449,7 +473,7 @@ export default function LoginPage() {
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+                  className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
                   disabled={isRotating}
                 >
                   {isRotating ? 'Updating...' : 'Update password'}
@@ -493,7 +517,7 @@ export default function LoginPage() {
                   maxLength={12}
                   value={twoFactorChallengeCode}
                   onChange={(e) => setTwoFactorChallengeCode(e.target.value)}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-yellow-500/50 focus:ring-[3px] focus:ring-yellow-500/10"
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary/50 focus:ring-[3px] focus:ring-primary/10"
                 />
               </div>
 
@@ -508,7 +532,7 @@ export default function LoginPage() {
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-yellow-500 px-4 py-2 text-sm font-semibold text-yellow-950 hover:bg-yellow-600 disabled:opacity-60"
+                  className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
                   disabled={isVerifyingTwoFactorChallenge}
                 >
                   {isVerifyingTwoFactorChallenge ? 'Verifying...' : 'Verify code'}

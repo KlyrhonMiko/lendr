@@ -24,6 +24,7 @@ from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestEventRead,
     BorrowRequestEventGlobalRead,
     ReleaseReceiptRead,
+    ReleaseReceiptSignature,
 )
 from systems.inventory.dependencies import shift_guard
 from systems.inventory.services.borrow_request_service import BorrowService
@@ -504,6 +505,33 @@ async def get_release_receipt(
         receipt = borrow_service.generate_release_receipt(session, request_id)
         return create_success_response(data=receipt, request=request)
     except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post(
+    "/requests/{request_id}/signature",
+    response_model=GenericResponse[BorrowRequestRead],
+)
+async def save_borrow_signature(
+    request_id: str,
+    payload: ReleaseReceiptSignature,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("inventory:borrow_requests:manage")),
+):
+    try:
+        updated_req = borrow_service.save_signature(
+            session, request_id, payload.signature_data
+        )
+        session.commit()
+        return create_success_response(
+            data=borrow_service.serialize_borrow_request(session, updated_req),
+            message="Signature saved",
+            request=request,
+        )
+    except ValueError as e:
+        session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 

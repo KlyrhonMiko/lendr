@@ -49,7 +49,7 @@ export function SettingsToolbar({
           placeholder="Search by key or description..."
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="w-full h-10 pl-10 pr-4 rounded-xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all text-sm font-medium"
+          className="w-full h-10 pl-10 pr-4 rounded-xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all text-sm font-medium"
         />
       </div>
 
@@ -61,7 +61,7 @@ export function SettingsToolbar({
 
       {/* System Filter */}
       <div className="w-44">
-        <Select 
+        <Select
           value={systemFilter}
           onChange={(e) => onSystemFilterChange(e.target.value)}
           options={systemOptions}
@@ -70,7 +70,7 @@ export function SettingsToolbar({
 
       {/* Category Filter */}
       <div className="w-48">
-        <Select 
+        <Select
           value={categoryFilter}
           onChange={(e) => onCategoryFilterChange(e.target.value)}
           options={categoryOptions}
@@ -97,13 +97,13 @@ export function SettingsToolbar({
         </button>
 
         {meta && (
-            <div className="h-6 w-px bg-border mx-2 hidden lg:block" />
+          <div className="h-6 w-px bg-border mx-2 hidden lg:block" />
         )}
 
         {meta && (
-            <span className="text-[11px] text-muted-foreground font-bold uppercase tracking-tight hidden lg:inline">
+          <span className="text-[11px] text-muted-foreground font-bold uppercase tracking-tight hidden lg:inline">
             {meta.total} Result{meta.total !== 1 ? 's' : ''}
-            </span>
+          </span>
         )}
       </div>
     </div>

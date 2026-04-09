@@ -30,7 +30,7 @@ export function SettingsTable({
           {loading ? (
             <tr>
               <td colSpan={4} className="p-12 text-center">
-                <Loader2 className="w-8 h-8 animate-spin text-indigo-500 mx-auto mb-3" />
+                <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-3" />
                 <p className="text-muted-foreground font-medium">Loading parameters...</p>
               </td>
             </tr>
@@ -38,7 +38,7 @@ export function SettingsTable({
             <tr key={`${setting.category}-${setting.key}`} className="hover:bg-muted/30 transition-colors group">
               <td className="p-4 pl-6 max-w-sm">
                 <div className="flex items-start gap-3">
-                  <div className="mt-0.5 w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400 border border-indigo-500/20">
+                  <div className="mt-0.5 w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
                     <Sliders className="w-4 h-4" />
                   </div>
                   <div className="flex flex-col">
@@ -59,7 +59,7 @@ export function SettingsTable({
                 </span>
               </td>
               <td className="p-4">
-                <code className="text-xs px-2 py-1 rounded bg-muted font-mono border border-border/50 text-indigo-400">
+                <code className="text-xs px-2 py-1 rounded bg-muted font-mono border border-border/50 text-primary">
                   {setting.value}
                 </code>
               </td>
@@ -72,7 +72,7 @@ export function SettingsTable({
                 <div className="flex items-center justify-end gap-1">
                   <button
                     onClick={() => onEdit(setting)}
-                    className="p-2 hover:bg-secondary rounded-lg text-muted-foreground hover:text-indigo-400 transition-colors opacity-0 group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+                    className="p-2 hover:bg-secondary rounded-lg text-muted-foreground hover:text-primary transition-colors opacity-0 group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
                     type="button"
                     title={setting.crucial ? 'Required setting cannot be edited from UI' : 'Edit'}
                     disabled={setting.crucial}

@@ -155,12 +155,12 @@ export function HealthSettings() {
                     title={`Backups: ${storageMetrics?.backups.perc.toFixed(1)}%`}
                   />
                   <div
-                    className="h-full bg-sky-500 transition-all duration-500 ease-out"
+                    className="h-full bg-amber-500 transition-all duration-500 ease-out"
                     style={{ width: `${storageMetrics?.attachments.perc}%` }}
                     title={`Attachments: ${storageMetrics?.attachments.perc.toFixed(1)}%`}
                   />
                   <div
-                    className="h-full bg-indigo-500 transition-all duration-500 ease-out"
+                    className="h-full bg-primary transition-all duration-500 ease-out"
                     style={{ width: `${storageMetrics?.logs.perc}%` }}
                     title={`Logs: ${storageMetrics?.logs.perc.toFixed(1)}%`}
                   />
@@ -197,14 +197,14 @@ export function HealthSettings() {
                 label="User Attachments"
                 value={formatBytes(storageMetrics?.attachments.val || 0)}
                 percentage={storageMetrics?.attachments.perc || 0}
-                color="bg-sky-500"
+                color="bg-amber-500"
                 icon={Paperclip}
               />
               <StorageItem
                 label="System Logs"
                 value={formatBytes(storageMetrics?.logs.val || 0)}
                 percentage={storageMetrics?.logs.perc || 0}
-                color="bg-indigo-500"
+                color="bg-primary"
                 icon={FileText}
               />
             </div>

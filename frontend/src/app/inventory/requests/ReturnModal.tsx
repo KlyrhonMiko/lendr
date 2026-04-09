@@ -38,7 +38,8 @@ export function ReturnModal({ request, onClose, onSuccess }: ReturnModalProps) {
   const conditionStyle = (condition: string) => {
     if (!condition) return 'bg-muted/40 border-border text-muted-foreground';
     if (condition === 'good' || condition === 'excellent') return 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500';
-    if (condition === 'fair') return 'bg-amber-500/10 border-amber-500/30 text-amber-500';
+    if (condition === 'fair') return 'bg-primary/10 border-primary/30 text-primary font-bold';
+
     return 'bg-rose-500/10 border-rose-500/30 text-rose-500';
   };
 
@@ -124,7 +125,7 @@ export function ReturnModal({ request, onClose, onSuccess }: ReturnModalProps) {
             <div>
               <h2 className="text-xl font-bold font-heading uppercase tracking-tight">Return Items</h2>
               <p className="text-sm text-muted-foreground font-medium">
-                Request: <span className="text-indigo-400 font-mono">{request.request_id}</span>
+                Request: <span className="text-primary font-mono">{request.request_id}</span>
               </p>
             </div>
           </div>
@@ -136,7 +137,7 @@ export function ReturnModal({ request, onClose, onSuccess }: ReturnModalProps) {
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {loading ? (
             <div className="py-12 text-center">
-              <Loader2 className="w-6 h-6 animate-spin mx-auto text-indigo-500" />
+              <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
               <p className="text-xs text-muted-foreground mt-2 font-medium">Loading assigned units...</p>
             </div>
           ) : (
@@ -152,7 +153,7 @@ export function ReturnModal({ request, onClose, onSuccess }: ReturnModalProps) {
                           <PopoverTrigger
                             type="button"
                             className={cn(
-                              "relative h-8 pl-3 pr-7 rounded-lg border text-xs font-bold text-left focus:outline-none focus:ring-2 focus:ring-indigo-500/25 transition-all cursor-pointer",
+                              "relative h-8 pl-3 pr-7 rounded-lg border text-xs font-bold text-left focus:outline-none focus:ring-2 focus:ring-primary/25 transition-all cursor-pointer",
                               conditionStyle(globalCondition)
                             )}
                           >
@@ -171,7 +172,7 @@ export function ReturnModal({ request, onClose, onSuccess }: ReturnModalProps) {
                                 className={cn(
                                   "w-full flex items-center gap-2 px-3 py-2 text-xs rounded-md transition-colors text-left",
                                   globalCondition === c.key
-                                    ? "bg-indigo-500/10 text-indigo-500 font-bold"
+                                    ? "bg-primary/10 text-primary font-bold"
                                     : "hover:bg-muted text-foreground"
                                 )}
                               >
@@ -184,7 +185,7 @@ export function ReturnModal({ request, onClose, onSuccess }: ReturnModalProps) {
                         <button
                           onClick={applyGlobalCondition}
                           disabled={!globalCondition}
-                          className="h-8 px-3 rounded-lg bg-indigo-500/10 text-indigo-500 text-[10px] font-bold hover:bg-indigo-500/20 disabled:opacity-50 transition-colors uppercase tracking-wider"
+                          className="h-8 px-3 rounded-lg bg-primary/10 text-primary text-[10px] font-bold hover:bg-primary/20 disabled:opacity-50 transition-colors uppercase tracking-wider"
                         >
                           Apply
                         </button>
@@ -215,7 +216,7 @@ export function ReturnModal({ request, onClose, onSuccess }: ReturnModalProps) {
                               <PopoverTrigger
                                 type="button"
                                 className={cn(
-                                  "relative h-9 pl-3 pr-8 rounded-xl border text-xs font-bold text-left focus:outline-none focus:ring-2 focus:ring-indigo-500/25 transition-all cursor-pointer min-w-[120px]",
+                                  "relative h-9 pl-3 pr-8 rounded-xl border text-xs font-bold text-left focus:outline-none focus:ring-2 focus:ring-primary/25 transition-all cursor-pointer min-w-[120px]",
                                   conditionStyle(unitReturn.condition_on_return)
                                 )}
                               >
@@ -232,7 +233,7 @@ export function ReturnModal({ request, onClose, onSuccess }: ReturnModalProps) {
                                   className={cn(
                                     "w-full flex items-center gap-2 px-3 py-2 text-xs rounded-md transition-colors text-left",
                                     !unitReturn.condition_on_return
-                                      ? "bg-indigo-500/10 text-indigo-500 font-bold"
+                                      ? "bg-primary/10 text-primary font-bold"
                                       : "hover:bg-muted text-muted-foreground"
                                   )}
                                 >
@@ -250,7 +251,7 @@ export function ReturnModal({ request, onClose, onSuccess }: ReturnModalProps) {
                                     className={cn(
                                       "w-full flex items-center gap-2 px-3 py-2 text-xs rounded-md transition-colors text-left",
                                       unitReturn.condition_on_return === c.key
-                                        ? "bg-indigo-500/10 text-indigo-500 font-bold"
+                                        ? "bg-primary/10 text-primary font-bold"
                                         : "hover:bg-muted text-foreground"
                                     )}
                                   >
@@ -266,7 +267,7 @@ export function ReturnModal({ request, onClose, onSuccess }: ReturnModalProps) {
                               value={unitReturn.condition_on_return}
                               onChange={(e) => updateUnitReturn(unitReturn.unit_id, 'condition_on_return', e.target.value)}
                               placeholder="Condition (optional)"
-                              className="h-9 w-36 px-3 rounded-xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all text-xs font-medium"
+                              className="h-9 w-36 px-3 rounded-xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all text-xs font-medium"
                             />
                           )}
                         </div>
@@ -275,7 +276,7 @@ export function ReturnModal({ request, onClose, onSuccess }: ReturnModalProps) {
                           value={unitReturn.notes}
                           onChange={(e) => updateUnitReturn(unitReturn.unit_id, 'notes', e.target.value)}
                           placeholder="Notes for this unit (optional)..."
-                          className="w-full h-9 px-3 rounded-xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all text-xs font-medium"
+                          className="w-full h-9 px-3 rounded-xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all text-xs font-medium"
                         />
                       </div>
                     ))}
@@ -292,7 +293,8 @@ export function ReturnModal({ request, onClose, onSuccess }: ReturnModalProps) {
               )}
 
               {hasTrackableItems && assignedUnits.length === 0 && (
-                <div className="p-4 bg-amber-500/10 rounded-2xl border border-amber-500/20 flex items-center gap-3 text-amber-500 text-sm">
+                <div className="p-4 bg-primary/10 rounded-2xl border border-primary/20 flex items-center gap-3 text-primary text-sm font-bold">
+
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   <p>No unreturned units found for this request.</p>
                 </div>
@@ -308,7 +310,7 @@ export function ReturnModal({ request, onClose, onSuccess }: ReturnModalProps) {
               value={globalNotes}
               onChange={(e) => setGlobalNotes(e.target.value)}
               placeholder="General notes about this return..."
-              className="w-full h-20 p-3 rounded-xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all text-sm font-medium resize-none shadow-inner"
+              className="w-full h-20 p-3 rounded-xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all text-sm font-medium resize-none shadow-inner"
             />
           </div>
 

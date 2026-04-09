@@ -56,7 +56,7 @@ export function GeneralSettings() {
       {/* Localization and Regional Settings */}
       <Card className="border-border/50 shadow-sm overflow-hidden">
         <CardHeader className="flex flex-row items-start gap-4 bg-muted/30 pb-6">
-          <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500 shrink-0 transition-colors">
+          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0 transition-colors">
             <Globe className="w-5 h-5" />
           </div>
           <div className="space-y-1">

@@ -36,7 +36,7 @@ export function EditSettingModal({
               type="text"
               value={formData.key}
               onChange={(e) => setFormData({ ...formData, key: e.target.value })}
-              className="w-full h-11 px-4 rounded-xl bg-input/30 border border-border focus:ring-2 focus:ring-indigo-500/30 transition-all font-mono text-sm disabled:opacity-50"
+              className="w-full h-11 px-4 rounded-xl bg-input/30 border border-border focus:ring-2 focus:ring-primary/30 transition-all font-mono text-sm disabled:opacity-50"
               placeholder="e.g. system_name"
             />
             {!editingKey && (
@@ -51,7 +51,7 @@ export function EditSettingModal({
               type="text"
               value={formData.value}
               onChange={(e) => setFormData({ ...formData, value: e.target.value })}
-              className="w-full h-11 px-4 rounded-xl bg-input/30 border border-border focus:ring-2 focus:ring-indigo-500/30 transition-all font-medium"
+              className="w-full h-11 px-4 rounded-xl bg-input/30 border border-border focus:ring-2 focus:ring-primary/30 transition-all font-medium"
             />
           </div>
 
@@ -73,7 +73,7 @@ export function EditSettingModal({
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full h-24 p-4 rounded-xl bg-input/30 border border-border focus:ring-2 focus:ring-indigo-500/30 transition-all font-medium resize-none"
+                  className="w-full h-24 p-4 rounded-xl bg-input/30 border border-border focus:ring-2 focus:ring-primary/30 transition-all font-medium resize-none"
                   placeholder="What does this setting control?"
                 />
               </div>
@@ -84,7 +84,7 @@ export function EditSettingModal({
             <button type="button" onClick={onClose} className="flex-1 py-3 rounded-xl font-semibold bg-secondary hover:bg-secondary/80 transition-colors">
               Cancel
             </button>
-            <button type="submit" className="flex-1 py-3 rounded-xl font-semibold bg-indigo-500 text-white hover:bg-indigo-600 shadow-lg shadow-indigo-500/25 transition-colors">
+            <button type="submit" className="flex-1 py-3 rounded-xl font-semibold bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 transition-colors">
               {editingKey ? 'Update Value' : 'Create Setting'}
             </button>
           </div>

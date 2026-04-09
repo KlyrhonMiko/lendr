@@ -1,5 +1,19 @@
 import { api, buildQueryString } from '@/lib/api';
 
+export interface PublicActiveBorrow {
+  borrower_name: string;
+  customer_name?: string;
+  location_name?: string;
+  released_at?: string;
+  return_at?: string;
+}
+
+export interface PublicBorrowHistory {
+  borrower_name: string;
+  returned_at: string;
+  location_name?: string;
+}
+
 export interface InventoryItem {
   id: string;
   item_id: string;
@@ -13,6 +27,8 @@ export interface InventoryItem {
   classification?: string;
   is_trackable?: boolean;
   description?: string;
+  active_borrows?: PublicActiveBorrow[];
+  borrow_history?: PublicBorrowHistory[];
 }
 
 export interface InventoryItemCreate {
@@ -79,6 +95,8 @@ export interface InventoryUnit {
   condition: string;
   expiration_date?: string | null;
   description?: string;
+  active_borrow?: PublicActiveBorrow;
+  borrow_history?: PublicBorrowHistory[];
 }
 
 export interface InventoryUnitListParams {
@@ -139,6 +157,7 @@ export const inventoryApi = {
     api.get<InventoryItem[]>(`/inventory/items${buildQueryString(params as Record<string, unknown>)}`),
 
   get: (id: string) => api.get<InventoryItem>(`/inventory/items/${id}`),
+  getPublic: (id: string) => api.get<InventoryItem>(`/inventory/public/items/${id}`),
 
   create: (data: InventoryItemCreate) => api.post<InventoryItem>('/inventory/items', data),
 
@@ -152,6 +171,9 @@ export const inventoryApi = {
   // Units
   listUnits: (itemId: string, params: InventoryUnitListParams = {}) =>
     api.get<InventoryUnit[]>(`/inventory/items/${itemId}/units${buildQueryString(params as Record<string, unknown>)}`),
+
+  listPublicUnits: (itemId: string, params: InventoryUnitListParams = {}) =>
+    api.get<InventoryUnit[]>(`/inventory/public/items/${itemId}/units${buildQueryString(params as Record<string, unknown>)}`),
 
   createUnit: (itemId: string, data: InventoryUnitCreate) =>
     api.post<InventoryUnit>(`/inventory/items/${itemId}/units`, data),

@@ -1,6 +1,6 @@
 'use client';
 
-import { Edit2, History as HistoryIcon, Layers, Loader2, MoreHorizontal, Package, ShieldCheck, Trash2 } from 'lucide-react';
+import { Edit2, History as HistoryIcon, Layers, Loader2, MoreHorizontal, Package, Boxes, Trash2, QrCode } from 'lucide-react';
 import { useState } from 'react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import type { InventoryItem } from '../api';
@@ -10,7 +10,8 @@ function conditionStyle(condition?: string) {
     case 'good':
       return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20';
     case 'damaged':
-      return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20';
+      return 'bg-primary/10 text-primary border-primary/20 font-bold';
+
     default:
       return 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20';
   }
@@ -21,7 +22,8 @@ function statusStyle(status?: string) {
     case 'AVAILABLE':
       return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400';
     case 'LOW_STOCK':
-      return 'bg-amber-500/10 text-amber-600 dark:text-amber-400';
+      return 'bg-primary/10 text-primary font-bold';
+
     default:
       return 'bg-rose-500/10 text-rose-600 dark:text-rose-400';
   }
@@ -37,7 +39,8 @@ function formatStatus(status?: string) {
 
 function QuantityBar({ available, total }: { available: number; total: number }) {
   const pct = total > 0 ? Math.round((available / total) * 100) : 0;
-  const barColor = pct > 50 ? 'bg-emerald-500' : pct > 20 ? 'bg-amber-500' : 'bg-rose-500';
+  const barColor = pct > 50 ? 'bg-emerald-500' : pct > 20 ? 'bg-primary' : 'bg-rose-500';
+
 
   return (
     <div className="flex items-center gap-3 min-w-[120px]">
@@ -58,6 +61,7 @@ function ActionMenu({
   onOpenUnitManagement,
   onOpenBatchManagement,
   onOpenEdit,
+  onOpenQrCode,
   onDelete,
 }: {
   item: InventoryItem;
@@ -65,15 +69,14 @@ function ActionMenu({
   onOpenUnitManagement: (itemId: string) => void;
   onOpenBatchManagement: (itemId: string) => void;
   onOpenEdit: (item: InventoryItem) => void;
+  onOpenQrCode: (item: InventoryItem) => void;
   onDelete: (itemId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
 
   const menuItems = [
     { label: 'View History', icon: HistoryIcon, onClick: () => onOpenHistory(item.item_id) },
-    ...(item.is_trackable
-      ? [{ label: 'Manage Units', icon: ShieldCheck, onClick: () => onOpenUnitManagement(item.item_id) }]
-      : [{ label: 'Manage Batches', icon: Layers, onClick: () => onOpenBatchManagement(item.item_id) }]),
+    { label: 'View QR', icon: QrCode, onClick: () => onOpenQrCode(item) },
     { label: 'Edit', icon: Edit2, onClick: () => onOpenEdit(item) },
   ];
 
@@ -127,6 +130,7 @@ export function InventoryItemsTable({
   onOpenUnitManagement,
   onOpenBatchManagement,
   onOpenEdit,
+  onOpenQrCode,
   onDelete,
 }: {
   items: InventoryItem[];
@@ -135,12 +139,13 @@ export function InventoryItemsTable({
   onOpenUnitManagement: (itemId: string) => void;
   onOpenBatchManagement: (itemId: string) => void;
   onOpenEdit: (item: InventoryItem) => void;
+  onOpenQrCode: (item: InventoryItem) => void;
   onDelete: (itemId: string) => void;
 }) {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
-        <Loader2 className="w-7 h-7 animate-spin text-indigo-500" />
+        <Loader2 className="w-7 h-7 animate-spin text-primary" />
         <p className="text-sm text-muted-foreground font-medium">Loading equipment...</p>
       </div>
     );
@@ -182,7 +187,7 @@ export function InventoryItemsTable({
             >
               <td className="px-5 py-3.5">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-indigo-500/8 flex items-center justify-center text-indigo-500 shrink-0">
+                  <div className="w-9 h-9 rounded-lg bg-primary/8 flex items-center justify-center text-primary shrink-0">
                     <Package className="w-4.5 h-4.5" />
                   </div>
                   <div className="min-w-0">
@@ -217,15 +222,35 @@ export function InventoryItemsTable({
               <td className="px-4 py-3.5">
                 <QuantityBar available={item.available_qty} total={item.total_qty} />
               </td>
-              <td className="px-4 py-3.5 text-right">
-                <ActionMenu
-                  item={item}
-                  onOpenHistory={onOpenHistory}
-                  onOpenUnitManagement={onOpenUnitManagement}
-                  onOpenBatchManagement={onOpenBatchManagement}
-                  onOpenEdit={onOpenEdit}
-                  onDelete={onDelete}
-                />
+              <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                <div className="flex items-center justify-end gap-1">
+                  {item.is_trackable ? (
+                    <button
+                      onClick={() => onOpenUnitManagement(item.item_id)}
+                      className="p-2 rounded-lg text-primary hover:bg-primary/10 transition-colors"
+                      title="Manage Units"
+                    >
+                      <Boxes className="w-5 h-5" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => onOpenBatchManagement(item.item_id)}
+                      className="p-2 rounded-lg text-primary hover:bg-primary/10 transition-colors"
+                      title="Manage Batches"
+                    >
+                      <Layers className="w-5 h-5" />
+                    </button>
+                  )}
+                  <ActionMenu
+                    item={item}
+                    onOpenHistory={onOpenHistory}
+                    onOpenUnitManagement={onOpenUnitManagement}
+                    onOpenBatchManagement={onOpenBatchManagement}
+                    onOpenEdit={onOpenEdit}
+                    onOpenQrCode={onOpenQrCode}
+                    onDelete={onDelete}
+                  />
+                </div>
               </td>
             </tr>
           ))}

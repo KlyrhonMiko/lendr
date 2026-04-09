@@ -116,7 +116,7 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
           toast.error(pinValidationMessage);
           return;
         }
-          const updateData: EditableUserUpdate = {
+        const updateData: EditableUserUpdate = {
           ...formData,
           username: employeeId || effectiveUsername,
           ...(employeeId ? { employee_id: employeeId } : {}),
@@ -189,10 +189,10 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
   };
 
   const inputClassName =
-    'w-full h-11 px-4 rounded-lg bg-muted/40 border border-border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/25 focus:border-indigo-500/40 transition-all placeholder:text-muted-foreground/40';
+    'w-full h-11 px-4 rounded-lg bg-muted/40 border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/40 transition-all placeholder:text-muted-foreground/40';
 
   const inputWithIconClassName =
-    'w-full h-11 pl-10 pr-4 rounded-lg bg-muted/40 border border-border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/25 focus:border-indigo-500/40 transition-all placeholder:text-muted-foreground/40';
+    'w-full h-11 pl-10 pr-4 rounded-lg bg-muted/40 border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/40 transition-all placeholder:text-muted-foreground/40';
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
@@ -203,8 +203,8 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center">
-              <UserCircle className="w-5 h-5 text-indigo-500" />
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <UserCircle className="w-5 h-5 text-primary" />
             </div>
             <div>
               <h2 className="text-lg font-semibold tracking-tight">
@@ -232,7 +232,7 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
             {/* Personal Information */}
             <section>
               <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-                <UserCircle className="w-4 h-4 text-indigo-500" />
+                <UserCircle className="w-4 h-4 text-primary" />
                 Personal Information
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -282,7 +282,7 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
             {/* Account & Contact */}
             <section>
               <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-                <Mail className="w-4 h-4 text-indigo-500" />
+                <Mail className="w-4 h-4 text-primary" />
                 Account & Contact
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -397,7 +397,7 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
             {/* System Configuration */}
             <section>
               <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-                <Shield className="w-4 h-4 text-indigo-500" />
+                <Shield className="w-4 h-4 text-primary" />
                 System Configuration
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -409,7 +409,7 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
                     <PopoverTrigger
                       type="button"
                       disabled={configsLoading}
-                      className="relative w-full h-11 pl-10 pr-8 rounded-lg bg-muted/40 border border-border text-sm text-left focus:outline-none focus:ring-2 focus:ring-indigo-500/25 focus:border-indigo-500/40 transition-all disabled:opacity-50 cursor-pointer"
+                      className="relative w-full h-11 pl-10 pr-8 rounded-lg bg-muted/40 border border-border text-sm text-left focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/40 transition-all disabled:opacity-50 cursor-pointer"
                     >
                       <Shield className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 pointer-events-none" />
                       <span className={cn("block truncate", !formData.role && "text-muted-foreground/40")}>
@@ -435,7 +435,7 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
                           className={cn(
                             "w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left",
                             formData.role === r.key
-                              ? "bg-indigo-500/10 text-indigo-600 font-medium"
+                              ? "bg-primary/10 text-primary font-medium"
                               : "hover:bg-muted text-foreground"
                           )}
                         >
@@ -454,7 +454,7 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
                     <PopoverTrigger
                       type="button"
                       disabled={configsLoading}
-                      className="relative w-full h-11 pl-10 pr-8 rounded-lg bg-muted/40 border border-border text-sm text-left focus:outline-none focus:ring-2 focus:ring-indigo-500/25 focus:border-indigo-500/40 transition-all disabled:opacity-50 cursor-pointer"
+                      className="relative w-full h-11 pl-10 pr-8 rounded-lg bg-muted/40 border border-border text-sm text-left focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/40 transition-all disabled:opacity-50 cursor-pointer"
                     >
                       <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 pointer-events-none" />
                       <span className="block truncate">
@@ -478,7 +478,7 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
                           className={cn(
                             "w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left",
                             formData.shift_type === s.key
-                              ? "bg-indigo-500/10 text-indigo-600 font-medium"
+                              ? "bg-primary/10 text-primary font-medium"
                               : "hover:bg-muted text-foreground"
                           )}
                         >
@@ -505,7 +505,7 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
             <button
               type="submit"
               disabled={loading || configsLoading}
-              className="flex-1 h-11 rounded-lg bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+              className="flex-1 h-11 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>

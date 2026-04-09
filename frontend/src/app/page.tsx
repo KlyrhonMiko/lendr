@@ -24,7 +24,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4">
-      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-xl shadow-indigo-500/20 animate-pulse">
+      <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center shadow-xl shadow-primary/20 animate-pulse">
         <span className="text-white font-bold text-3xl font-heading">{brandName.charAt(0).toUpperCase()}</span>
       </div>
       <div className="flex items-center gap-2 text-muted-foreground animate-pulse">

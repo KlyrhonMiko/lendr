@@ -78,7 +78,7 @@ export function InventoryItemsToolbar({
             placeholder="Search equipment..."
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full h-11 pl-12 pr-4 rounded-lg bg-muted/50 border border-border text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/40 transition-all"
+            className="w-full h-11 pl-12 pr-4 rounded-lg bg-muted/50 border border-border text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
           />
           {search && (
             <button
@@ -124,7 +124,7 @@ export function InventoryItemsToolbar({
                 }}
                 className={cn(
                   'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left',
-                  categoryFilter === opt.key ? 'bg-indigo-500/10 text-indigo-600 font-medium' : 'hover:bg-muted'
+                  categoryFilter === opt.key ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted'
                 )}
               >
                 <Check className={cn('w-4 h-4 shrink-0', categoryFilter === opt.key ? 'opacity-100' : 'opacity-0')} />
@@ -155,7 +155,7 @@ export function InventoryItemsToolbar({
                 }}
                 className={cn(
                   'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left',
-                  classificationFilter === opt.key ? 'bg-indigo-500/10 text-indigo-600 font-medium' : 'hover:bg-muted'
+                  classificationFilter === opt.key ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted'
                 )}
               >
                 <Check className={cn('w-4 h-4 shrink-0', classificationFilter === opt.key ? 'opacity-100' : 'opacity-0')} />
@@ -186,7 +186,7 @@ export function InventoryItemsToolbar({
                 }}
                 className={cn(
                   'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left',
-                  itemTypeFilter === opt.key ? 'bg-indigo-500/10 text-indigo-600 font-medium' : 'hover:bg-muted'
+                  itemTypeFilter === opt.key ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted'
                 )}
               >
                 <Check className={cn('w-4 h-4 shrink-0', itemTypeFilter === opt.key ? 'opacity-100' : 'opacity-0')} />
@@ -217,7 +217,7 @@ export function InventoryItemsToolbar({
                 }}
                 className={cn(
                   'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left',
-                  conditionFilter === opt.key ? 'bg-indigo-500/10 text-indigo-600 font-medium' : 'hover:bg-muted'
+                  conditionFilter === opt.key ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted'
                 )}
               >
                 <Check className={cn('w-4 h-4 shrink-0', conditionFilter === opt.key ? 'opacity-100' : 'opacity-0')} />

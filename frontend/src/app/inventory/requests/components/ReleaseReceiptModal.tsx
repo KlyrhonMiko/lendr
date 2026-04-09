@@ -42,16 +42,16 @@ function buildReceiptHtml(receipt: ReleaseReceipt, signatureDataUrl: string | nu
   const today = fmtShort(new Date().toISOString());
 
   const s = {
-    wrap:  'font-family: "Courier New", Courier, monospace; color: #000; width: 100%; max-width: 72mm; margin: 0 auto; font-size: 11px; line-height: 1.45;',
+    wrap: 'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #000; width: 80mm; margin: 0; font-size: 11px; line-height: 1.4;',
     center: 'text-align: center;',
-    bold:   'font-weight: 700;',
-    hr:     'border: none; border-top: 1px dashed #000; margin: 6px 0;',
-    hrSolid:'border: none; border-top: 2px solid #000; margin: 6px 0;',
-    row:    'display: flex; justify-content: space-between; padding: 1px 0;',
-    label:  'color: #555; font-size: 10px;',
-    val:    'font-weight: 600; text-align: right; font-size: 11px;',
-    th:     'padding: 3px 0; font-size: 10px; font-weight: 700; border-bottom: 1px solid #000;',
-    td:     'padding: 3px 0; font-size: 11px; border-bottom: 1px dotted #999;',
+    bold: 'font-weight: 700;',
+    hr: 'border: none; border-top: 1px dashed #000; margin: 6px 0;',
+    hrSolid: 'border: none; border-top: 2px solid #000; margin: 6px 0;',
+    row: 'display: flex; justify-content: space-between; padding: 1px 0;',
+    label: 'color: #555; font-size: 10px;',
+    val: 'font-weight: 600; text-align: right; font-size: 11px;',
+    th: 'padding: 3px 0; font-size: 10px; font-weight: 700; border-bottom: 1px solid #000;',
+    td: 'padding: 3px 0; font-size: 11px; border-bottom: 1px dotted #999;',
   };
 
   const row = (label: string, value: string, extraStyle = '') =>
@@ -67,7 +67,7 @@ function buildReceiptHtml(receipt: ReleaseReceipt, signatureDataUrl: string | nu
       <td style="${s.td} text-align: right; ${s.bold} width: 30px;">${item.qty_released}</td>
     </tr>`).join('');
 
-  return `<div style="${s.wrap}">
+  return `<div class="receipt-print-wrapper" style="${s.wrap}">
 
     <!-- Header -->
     <div style="${s.center} padding-bottom: 4px;">
@@ -135,11 +135,11 @@ function buildReceiptHtml(receipt: ReleaseReceipt, signatureDataUrl: string | nu
     <div style="margin-bottom: 6px;">
       <div style="font-size: 9px; color: #555; margin-bottom: 4px;">Released by:</div>
       ${signatureDataUrl
-        ? `<div style="border: 1px solid #999; height: 50px; display: flex; align-items: center; justify-content: center;">
+      ? `<div style="border: 1px solid #999; height: 50px; display: flex; align-items: center; justify-content: center;">
              <img src="${signatureDataUrl}" style="max-width: 100%; max-height: 44px; object-fit: contain;" />
            </div>`
-        : `<div style="border-bottom: 1px solid #000; height: 50px;"></div>`
-      }
+      : `<div style="border-bottom: 1px solid #000; height: 50px;"></div>`
+    }
       <div style="font-size: 9px; color: #555; margin-top: 2px;">${receipt.released_by_name || ''}</div>
     </div>
 
@@ -176,29 +176,29 @@ function ReceiptPreview({
 }
 
 const PRINT_STYLES = `
-  @page { size: 80mm auto; margin: 3mm; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    margin: 0; padding: 2mm;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+  @page { 
+    size: 80mm auto; 
+    margin: 0; 
   }
-  img { max-width: 100%; }
-  table { border-collapse: collapse; }
+  @media print {
+    html, body {
+      width: 80mm;
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #fff;
+    }
+    .receipt-print-wrapper {
+      width: 80mm;
+      margin: 0 !important;
+      padding: 4mm 6mm !important;
+      box-sizing: border-box;
+    }
+  }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  img { max-width: 100%; height: auto; }
+  table { border-collapse: collapse; width: 100%; }
 `;
 
-const PDF_STYLES = `
-  @page { size: A4; margin: 20mm; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    margin: 0; padding: 30px;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-    display: flex; justify-content: center;
-  }
-  img { max-width: 100%; }
-  table { border-collapse: collapse; }
-`;
 
 export function ReleaseReceiptModal({
   requestId,
@@ -223,7 +223,12 @@ export function ReleaseReceiptModal({
     (async () => {
       try {
         const res = await borrowApi.getReleaseReceipt(requestId);
-        setReceipt(res.data as ReleaseReceipt);
+        const data = res.data as ReleaseReceipt;
+        setReceipt(data);
+        if (data.borrower_signature) {
+          setSignatureDataUrl(data.borrower_signature);
+          setSigned(true);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load receipt');
       } finally {
@@ -238,12 +243,18 @@ export function ReleaseReceiptModal({
     setSigned(false);
   }, []);
 
-  const confirmSignature = useCallback(() => {
+  const confirmSignature = useCallback(async () => {
     if (!sigCanvas.current || sigCanvas.current.isEmpty()) return;
     const dataUrl = sigCanvas.current.getTrimmedCanvas().toDataURL('image/png');
-    setSignatureDataUrl(dataUrl);
-    setSigned(true);
-  }, []);
+
+    try {
+      await borrowApi.saveSignature(requestId, dataUrl);
+      setSignatureDataUrl(dataUrl);
+      setSigned(true);
+    } catch (err) {
+      console.error('Failed to save signature:', err);
+    }
+  }, [requestId]);
 
   const openPrintWindow = useCallback(
     (styles: string, autoClose: boolean) => {
@@ -266,7 +277,78 @@ export function ReleaseReceiptModal({
   );
 
   const handlePrint = useCallback(() => openPrintWindow(PRINT_STYLES, true), [openPrintWindow]);
-  const handleSavePdf = useCallback(() => openPrintWindow(PDF_STYLES, false), [openPrintWindow]);
+  const handleSavePdf = useCallback(async () => {
+    if (!receipt) return;
+
+    try {
+      const htmlToImage = await import('html-to-image');
+      const { jsPDF } = await import('jspdf');
+
+      const html = sanitizeReceiptHtml(buildReceiptHtml(receipt, signatureDataUrl));
+
+      const iframe = document.createElement('iframe');
+      // Position fixed outside the screen
+      iframe.style.position = 'fixed';
+      iframe.style.width = '80mm';
+      iframe.style.height = '2000px'; // Tall enough to capture full content
+      iframe.style.left = '-10000px';
+      iframe.style.top = '-10000px';
+      iframe.style.zIndex = '-9999';
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentWindow?.document || iframe.contentDocument;
+      if (!doc) throw new Error('Could not access iframe document');
+
+      doc.open();
+      doc.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <style>
+              ${PRINT_STYLES}
+              body { background-color: #ffffff; padding: 4mm; }
+            </style>
+          </head>
+          <body>
+            <div style="width: 100%;">
+              ${html}
+            </div>
+          </body>
+        </html>
+      `);
+      doc.close();
+
+      // Wait for rendering
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      // Measure content height
+      const contentHeightPx = doc.body.scrollHeight;
+      const widthMm = 80;
+      // Convert px to mm: (px * 25.4) / 96 (standard DPI)
+      // But more reliably, we can use the ratio from the set width
+      const heightMm = (contentHeightPx * widthMm) / (80 * 3.7795); // 1mm = 3.7795px approx
+
+      const dataUrl = await htmlToImage.toJpeg(doc.body, {
+        quality: 0.98,
+        backgroundColor: '#ffffff',
+        pixelRatio: 2,
+      });
+
+      document.body.removeChild(iframe);
+
+      const pdf = new jsPDF({
+        unit: 'mm',
+        format: [widthMm, Math.max(heightMm, 100)], // Min height 100mm
+        orientation: 'portrait'
+      });
+
+      pdf.addImage(dataUrl, 'JPEG', 0, 0, widthMm, heightMm);
+      pdf.save(`Receipt_${receipt.receipt_number}.pdf`);
+    } catch (err) {
+      console.error('Failed to generate PDF:', err);
+      openPrintWindow(PRINT_STYLES, false);
+    }
+  }, [receipt, signatureDataUrl, openPrintWindow]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -275,8 +357,8 @@ export function ReleaseReceiptModal({
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-border shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center">
-              <FileText className="w-5 h-5 text-sky-600" />
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <FileText className="w-5 h-5 text-primary" />
             </div>
             <div>
               <h2 className="text-lg font-semibold font-heading">Release Receipt</h2>

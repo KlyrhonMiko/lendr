@@ -4,7 +4,7 @@ import FingerprintJS from '@fingerprintjs/fingerprintjs';
 import { tokenStore } from '@/lib/tokenStore';
 import { getCorrelationId, logger, setCorrelationId } from '@/lib/logger';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000');
 
 export interface PaginationMeta {
   total: number;
@@ -56,7 +56,7 @@ let fpPromise: Promise<string> | null = null;
 
 export async function getDeviceId(): Promise<string> {
   if (typeof window === 'undefined') return 'server';
-  
+
   const cachedId = window.sessionStorage.getItem('lendr_fp_id');
   if (cachedId) return cachedId;
 
@@ -125,7 +125,7 @@ export const http = {
         ...errorData,
         correlation_id: errorData.correlation_id ?? responseCorrelationId ?? undefined,
       };
-      
+
       // Handle Maintenance Mode
       if (response.status === 503 && errorPayload.error_type === 'MaintenanceMode') {
         if (typeof window !== 'undefined') {
@@ -139,7 +139,7 @@ export const http = {
         if (typeof window !== 'undefined') {
           // Token is invalid, clear it
           tokenStore.clearToken();
-          
+
           // Only redirect if not already on login page to avoid infinite loops
           if (window.location.pathname !== '/auth/login' && window.location.pathname !== '/auth/admin/login') {
             window.location.href = '/auth/login';

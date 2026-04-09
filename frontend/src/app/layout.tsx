@@ -30,7 +30,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${inter.variable} ${jakarta.variable} antialiased selection:bg-indigo-500/30 font-sans`}
+        className={`${inter.variable} ${jakarta.variable} antialiased selection:bg-yellow-500/30 font-sans`}
       >
         <MaintenanceWrapper>
           <AuthProvider>

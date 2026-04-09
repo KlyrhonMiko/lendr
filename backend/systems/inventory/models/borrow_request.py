@@ -54,6 +54,7 @@ class BorrowRequest(BaseModel, table=True):
     approval_channel: str = Field(default="standard", max_length=50)
 
     is_emergency: bool = Field(default=False)
+    borrower_signature: str | None = Field(default=None)
     compliance_followup_required: bool = Field(default=False)
     compliance_followup_notes: str | None = Field(default=None, max_length=500)
 

@@ -55,8 +55,8 @@
   --card-foreground: oklch(0.12 0.02 240);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.12 0.02 240);
-  --primary: oklch(0.7 0.15 85);
-  --primary-foreground: oklch(0.1 0 0);
+  --primary: oklch(0.795 0.184 86);
+  --primary-foreground: oklch(0.2 0.05 86);
   --secondary: oklch(0.92 0.01 240);
   --secondary-foreground: oklch(0.15 0.03 240);
   --muted: oklch(0.96 0 0);
@@ -66,7 +66,7 @@
   --destructive: oklch(0.55 0.18 25);
   --border: oklch(0.88 0.01 240);
   --input: oklch(0.88 0.01 240);
-  --ring: oklch(0.7 0.15 85 / 0.3);
+  --ring: oklch(0.795 0.184 86 / 0.3);
   --chart-1: oklch(0.7 0.15 85);
   --chart-2: oklch(0.6 0.05 180);
   --chart-3: oklch(0.4 0.05 200);
@@ -90,8 +90,8 @@
   --card-foreground: oklch(0.95 0 0);
   --popover: oklch(0.15 0.01 240);
   --popover-foreground: oklch(0.95 0 0);
-  --primary: oklch(0.65 0.15 85);
-  --primary-foreground: oklch(0.1 0 0);
+  --primary: oklch(0.795 0.184 86);
+  --primary-foreground: oklch(0.2 0.05 86);
   --secondary: oklch(0.25 0.02 240);
   --secondary-foreground: oklch(0.95 0 0);
   --muted: oklch(0.2 0.02 240);
@@ -101,7 +101,7 @@
   --destructive: oklch(0.45 0.15 25);
   --border: oklch(0.25 0.02 240);
   --input: oklch(0.25 0.02 240);
-  --ring: oklch(0.65 0.15 85 / 0.3);
+  --ring: oklch(0.795 0.184 86 / 0.3);
   --chart-1: oklch(0.65 0.15 85);
   --chart-2: oklch(0.65 0.05 180);
   --chart-3: oklch(0.45 0.05 200);
@@ -180,4 +180,19 @@
   100% {
     transform: translateX(200%);
   }
+}
+
+/* Safe area for bottom-pinned elements on iOS */
+.safe-bottom {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+/* Hide scrollbar utility for horizontal scroll containers */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }

@@ -35,7 +35,7 @@ export function UsersTable({
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-3 text-muted-foreground">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-500/60" />
+        <Loader2 className="w-8 h-8 animate-spin text-primary/60" />
         <p className="text-sm font-medium">Loading users...</p>
       </div>
     );
@@ -73,11 +73,10 @@ export function UsersTable({
             {/* User info */}
             <div className="flex items-center gap-3 min-w-0">
               <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 ${
-                  !user.is_deleted
-                    ? 'bg-indigo-500/10 text-indigo-600'
-                    : 'bg-muted text-muted-foreground'
-                }`}
+                className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 ${!user.is_deleted
+                  ? 'bg-primary/10 text-primary'
+                  : 'bg-muted text-muted-foreground'
+                  }`}
               >
                 {user.first_name[0]}{user.last_name[0]}
               </div>
@@ -124,7 +123,7 @@ export function UsersTable({
               <button
                 onClick={() => onEdit(user)}
                 aria-label={`Edit ${user.first_name} ${user.last_name}`}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-muted-foreground hover:text-indigo-600 hover:bg-indigo-500/10 rounded-lg transition-colors shrink-0"
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors shrink-0"
               >
                 <Pencil className="w-4 h-4" />
                 <span className="hidden lg:inline">Edit</span>
@@ -159,11 +158,10 @@ export function UsersTable({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 ${
-                    !user.is_deleted
-                      ? 'bg-indigo-500/10 text-indigo-600'
-                      : 'bg-muted text-muted-foreground'
-                  }`}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 ${!user.is_deleted
+                    ? 'bg-primary/10 text-primary'
+                    : 'bg-muted text-muted-foreground'
+                    }`}
                 >
                   {user.first_name[0]}{user.last_name[0]}
                 </div>
@@ -203,7 +201,7 @@ export function UsersTable({
             <div className="flex flex-wrap items-center gap-2 pl-[52px]">
               <button
                 onClick={() => onEdit(user)}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-500/10 rounded-lg transition-colors hover:bg-indigo-500/20 shrink-0"
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-primary bg-primary/10 rounded-lg transition-colors hover:bg-primary/20 shrink-0"
               >
                 <Pencil className="w-4 h-4" />
                 Edit

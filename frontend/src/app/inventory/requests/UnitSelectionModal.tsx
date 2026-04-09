@@ -34,7 +34,7 @@ interface ItemAssignmentData {
   // For untrackable
   availableBatches: BatchAvailability[];
   selectedBatches: { batch_id: string; qty: number }[];
-  
+
   loading: boolean;
   error: string | null;
 }
@@ -73,16 +73,16 @@ export function UnitSelectionModal({ request, onClose, onSuccess }: UnitSelectio
   const fetchUnitsForItem = async (itemId: string) => {
     try {
       const res = await inventoryApi.listUnits(itemId, { status: 'available', per_page: 100 });
-      setItemsData(prev => prev.map(item => 
-        item.itemId === itemId 
-          ? { ...item, availableUnits: res.data as ItemAssignmentData['availableUnits'], loading: false } 
+      setItemsData(prev => prev.map(item =>
+        item.itemId === itemId
+          ? { ...item, availableUnits: res.data as ItemAssignmentData['availableUnits'], loading: false }
           : item
       ));
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to fetch units';
-      setItemsData(prev => prev.map(item => 
-        item.itemId === itemId 
-          ? { ...item, loading: false, error: message } 
+      setItemsData(prev => prev.map(item =>
+        item.itemId === itemId
+          ? { ...item, loading: false, error: message }
           : item
       ));
     }
@@ -93,16 +93,16 @@ export function UnitSelectionModal({ request, onClose, onSuccess }: UnitSelectio
       const res = await inventoryApi.listBatches(itemId, { include_expired: false });
       // Filter out batches with 0 quantity
       const activeBatches = (res.data as BatchAvailability[]).filter(b => b.available_qty > 0);
-      setItemsData(prev => prev.map(item => 
-        item.itemId === itemId 
-          ? { ...item, availableBatches: activeBatches, loading: false } 
+      setItemsData(prev => prev.map(item =>
+        item.itemId === itemId
+          ? { ...item, availableBatches: activeBatches, loading: false }
           : item
       ));
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to fetch batches';
-      setItemsData(prev => prev.map(item => 
-        item.itemId === itemId 
-          ? { ...item, loading: false, error: message } 
+      setItemsData(prev => prev.map(item =>
+        item.itemId === itemId
+          ? { ...item, loading: false, error: message }
           : item
       ));
     }
@@ -135,15 +135,15 @@ export function UnitSelectionModal({ request, onClose, onSuccess }: UnitSelectio
 
       // Ensure qty doesn't exceed available or requested (requested is more of a validation later)
       const sanitizedQty = Math.max(0, Math.min(qty, batch.available_qty));
-      
+
       const otherAssignmentsTotal = item.selectedBatches
         .filter(b => b.batch_id !== batchId)
         .reduce((sum, b) => sum + b.qty, 0);
-        
+
       if (otherAssignmentsTotal + sanitizedQty > item.qtyRequested) {
         const allowedQty = Math.max(0, item.qtyRequested - otherAssignmentsTotal);
         toast.error(`Cannot exceed requested quantity (${item.qtyRequested}) for ${item.name}`);
-        
+
         const nextBatches = item.selectedBatches.filter(b => b.batch_id !== batchId);
         if (allowedQty > 0) nextBatches.push({ batch_id: batchId, qty: allowedQty });
         return { ...item, selectedBatches: nextBatches };
@@ -262,13 +262,13 @@ export function UnitSelectionModal({ request, onClose, onSuccess }: UnitSelectio
         <div className="flex items-center justify-between p-6 border-b border-border/50">
           <div>
             <h2 className="text-xl font-bold font-heading uppercase tracking-tight">Assign Inventory</h2>
-            <p className="text-sm text-muted-foreground font-medium">Request ID: <span className="text-indigo-400 font-mono">{request.request_id}</span></p>
+            <p className="text-sm text-muted-foreground font-medium">Request ID: <span className="text-primary font-mono">{request.request_id}</span></p>
           </div>
           <div className="flex items-center gap-2">
             {itemsData.length > 0 && (
               <button
                 onClick={autoAssignAll}
-                className="flex items-center gap-1.5 px-3 h-9 rounded-xl bg-indigo-500/10 text-indigo-500 text-xs font-bold hover:bg-indigo-500/20 transition-colors uppercase tracking-wider"
+                className="flex items-center gap-1.5 px-3 h-9 rounded-xl bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-colors uppercase tracking-wider"
               >
                 <Sparkles className="w-3.5 h-3.5" />
                 Auto Assign All
@@ -292,11 +292,12 @@ export function UnitSelectionModal({ request, onClose, onSuccess }: UnitSelectio
                 <div>
                   <h3 className="font-bold text-foreground flex items-center gap-2">
                     {item.name}
-                    <span className="text-xs font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded">{item.itemId}</span>
+                    <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded">{item.itemId}</span>
                     {item.isTrackable ? (
                       <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded uppercase tracking-wider">Trackable</span>
                     ) : (
-                      <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded uppercase tracking-wider">Untrackable</span>
+                      <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded uppercase tracking-wider">Untrackable</span>
+
                     )}
                   </h3>
                   <p className="text-xs text-muted-foreground font-medium">Requested: <span className="text-foreground">{item.qtyRequested}</span> unit{item.qtyRequested !== 1 ? 's' : ''}</p>
@@ -305,18 +306,18 @@ export function UnitSelectionModal({ request, onClose, onSuccess }: UnitSelectio
                   {!item.loading && !item.error && getPercentageSelected(item) < 100 && (
                     <button
                       onClick={() => item.isTrackable ? autoAssignTrackable(item.itemId) : autoAssignUntrackable(item.itemId)}
-                      className="flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-500/10 text-indigo-400 text-[10px] font-bold hover:bg-indigo-500/20 transition-colors uppercase tracking-wider"
+                      className="flex items-center gap-1 px-2 py-1 rounded-lg bg-primary/10 text-primary text-[10px] font-bold hover:bg-primary/20 transition-colors uppercase tracking-wider"
                     >
                       <Sparkles className="w-3 h-3" />
                       Auto
                     </button>
                   )}
-                  <div className={`text-xs font-bold px-3 py-1 rounded-full border transition-all ${
-                    getPercentageSelected(item) === 100 
-                      ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' 
-                      : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
-                  }`}>
-                    {item.isTrackable 
+                  <div className={`text-xs font-bold px-3 py-1 rounded-full border transition-all ${getPercentageSelected(item) === 100
+                    ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                    : 'bg-primary/10 text-primary border-primary/20 font-bold'
+
+                    }`}>
+                    {item.isTrackable
                       ? `${item.selectedUnitIds.length} / ${item.qtyRequested} Selected`
                       : `${item.selectedBatches.reduce((sum, b) => sum + b.qty, 0)} / ${item.qtyRequested} Allocated`
                     }
@@ -326,7 +327,7 @@ export function UnitSelectionModal({ request, onClose, onSuccess }: UnitSelectio
 
               {item.loading ? (
                 <div className="p-8 text-center bg-muted/20 rounded-2xl border border-dashed border-border/50">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-indigo-500" />
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
                   <p className="text-xs text-muted-foreground mt-2 font-medium">Fetching {item.isTrackable ? 'units' : 'batches'}...</p>
                 </div>
               ) : item.error ? (
@@ -351,17 +352,16 @@ export function UnitSelectionModal({ request, onClose, onSuccess }: UnitSelectio
                       <button
                         key={unit.unit_id}
                         onClick={() => toggleUnitSelection(item.itemId, unit.unit_id)}
-                        className={`p-4 rounded-2xl border transition-all text-left flex flex-col gap-1.5 group ${
-                          isSelected
-                            ? 'bg-indigo-500/10 border-indigo-500 shadow-sm'
-                            : 'hover:bg-background/50 border-border group-hover:border-indigo-500/50'
-                        }`}
+                        className={`p-4 rounded-2xl border transition-all text-left flex flex-col gap-1.5 group ${isSelected
+                          ? 'bg-primary/10 border-primary shadow-sm'
+                          : 'hover:bg-background/50 border-border group-hover:border-primary/50'
+                          }`}
                       >
                         <div className="flex items-center justify-between">
-                          <span className={`text-xs font-mono font-bold ${isSelected ? 'text-indigo-400' : 'text-foreground'}`}>
+                          <span className={`text-xs font-mono font-bold ${isSelected ? 'text-primary' : 'text-foreground'}`}>
                             {unit.serial_number}
                           </span>
-                          {isSelected && <CheckCircle2 className="w-4 h-4 text-indigo-500 animate-in zoom-in-50 duration-200" />}
+                          {isSelected && <CheckCircle2 className="w-4 h-4 text-primary animate-in zoom-in-50 duration-200" />}
                         </div>
                         <div className="flex items-center gap-1.5">
                           <span className={`text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded ${conditionColor}`}>
@@ -384,21 +384,19 @@ export function UnitSelectionModal({ request, onClose, onSuccess }: UnitSelectio
                     return (
                       <div
                         key={batch.batch_id}
-                        className={`p-4 rounded-2xl border transition-all flex items-center justify-between gap-4 ${
-                          qty > 0 ? 'bg-indigo-500/10 border-indigo-500' : 'bg-card border-border'
-                        }`}
+                        className={`p-4 rounded-2xl border transition-all flex items-center justify-between gap-4 ${qty > 0 ? 'bg-primary/10 border-primary' : 'bg-card border-border'
+                          }`}
                       >
                         <div className="flex items-center gap-4">
-                          <div className={`p-2 rounded-xl ${qty > 0 ? 'bg-indigo-500/20 text-indigo-500' : 'bg-muted text-muted-foreground'}`}>
+                          <div className={`p-2 rounded-xl ${qty > 0 ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'}`}>
                             <Layers className="w-5 h-5" />
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
                               <span className="text-sm font-bold font-mono">{batch.batch_id}</span>
                               {batch.expiration_date && (
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${
-                                  parseSystemDate(batch.expiration_date) < new Date() ? 'bg-rose-500 text-rose-50' : 'bg-amber-500/10 text-amber-500'
-                                }`}>
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${parseSystemDate(batch.expiration_date) < new Date() ? 'bg-rose-500 text-rose-50' : 'bg-amber-500/10 text-amber-500'
+                                  }`}>
                                   Exp: {parseSystemDate(batch.expiration_date).toLocaleDateString()}
                                 </span>
                               )}
@@ -407,7 +405,7 @@ export function UnitSelectionModal({ request, onClose, onSuccess }: UnitSelectio
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <button 
+                          <button
                             onClick={() => handleBatchQtyChange(item.itemId, batch.batch_id, qty - 1)}
                             className="w-8 h-8 flex items-center justify-center rounded-lg bg-secondary hover:bg-muted font-bold transition-colors"
                           >
@@ -417,9 +415,9 @@ export function UnitSelectionModal({ request, onClose, onSuccess }: UnitSelectio
                             type="number"
                             value={qty}
                             onChange={(e) => handleBatchQtyChange(item.itemId, batch.batch_id, parseInt(e.target.value) || 0)}
-                            className="w-16 h-8 text-center bg-transparent border-b-2 border-indigo-500/50 focus:border-indigo-500 outline-none text-sm font-bold"
+                            className="w-16 h-8 text-center bg-transparent border-b-2 border-primary/50 focus:border-primary outline-none text-sm font-bold"
                           />
-                          <button 
+                          <button
                             onClick={() => handleBatchQtyChange(item.itemId, batch.batch_id, qty + 1)}
                             className="w-8 h-8 flex items-center justify-center rounded-lg bg-secondary hover:bg-muted font-bold transition-colors"
                           >
@@ -442,7 +440,7 @@ export function UnitSelectionModal({ request, onClose, onSuccess }: UnitSelectio
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Add some context to this assignment..."
-              className="w-full h-20 p-3 rounded-xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all text-sm font-medium resize-none shadow-inner"
+              className="w-full h-20 p-3 rounded-xl bg-input/30 border border-border focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all text-sm font-medium resize-none shadow-inner"
             />
           </div>
 
@@ -456,7 +454,7 @@ export function UnitSelectionModal({ request, onClose, onSuccess }: UnitSelectio
             <button
               disabled={!isValid || submitting}
               onClick={handleAssign}
-              className="flex-1 h-12 rounded-2xl bg-indigo-500 text-indigo-50 text-sm font-bold shadow-lg shadow-indigo-500/20 hover:bg-indigo-600 disabled:opacity-50 disabled:grayscale transition-all flex items-center justify-center gap-2 uppercase tracking-wider"
+              className="flex-1 h-12 rounded-2xl bg-primary text-primary-foreground text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 disabled:opacity-50 disabled:grayscale transition-all flex items-center justify-center gap-2 uppercase tracking-wider"
             >
               {submitting ? (
                 <>

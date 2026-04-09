@@ -15,7 +15,7 @@ interface BatchManagementProps {
 
 export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
   const queryClient = useQueryClient();
-  
+
   const [isAdding, setIsAdding] = useState(false);
   const [editingBatch, setEditingBatch] = useState<InventoryBatch | null>(null);
   const [isAdjusting, setIsAdjusting] = useState<InventoryBatch | null>(null);
@@ -99,7 +99,7 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
 
     try {
       const finalQty = isReduction ? -Math.abs(adjustData.qty_change) : Math.abs(adjustData.qty_change);
-      
+
       await inventoryApi.adjustStock(itemId, {
         ...adjustData,
         qty_change: finalQty,
@@ -161,7 +161,7 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
             <div className="flex justify-between items-center mb-6">
               <button
                 onClick={openNewBatch}
-                className="px-4 py-2 bg-indigo-500 text-white text-sm font-semibold rounded-xl flex items-center gap-2"
+                className="px-4 py-2 bg-primary text-primary-foreground text-sm font-semibold rounded-xl flex items-center gap-2"
               >
                 <Plus className="w-4 h-4" /> New Batch
               </button>
@@ -170,7 +170,7 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
 
           {isAdding && (
             <form onSubmit={handleCreateOrUpdate} className="mb-8 p-6 bg-muted/30 rounded-2xl border border-border/50 space-y-4">
-              <h3 className="font-bold text-sm uppercase text-indigo-400">{editingBatch ? 'Edit Batch Metadata' : 'Create New Batch'}</h3>
+              <h3 className="font-bold text-sm uppercase text-primary/80">{editingBatch ? 'Edit Batch Metadata' : 'Create New Batch'}</h3>
               <div className="grid grid-cols-1 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs font-bold uppercase text-muted-foreground">Expiration Date</label>
@@ -194,7 +194,7 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={resetForms} className="px-4 py-2 text-sm font-semibold hover:bg-muted rounded-lg">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-500 text-white text-sm font-semibold rounded-lg">
+                <button type="submit" className="px-4 py-2 bg-primary text-primary-foreground text-sm font-semibold rounded-lg">
                   {editingBatch ? 'Save Changes' : 'Create Batch'}
                 </button>
               </div>
@@ -202,8 +202,8 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
           )}
 
           {isAdjusting && (
-            <form onSubmit={handleAdjustStock} className="mb-8 p-6 bg-indigo-500/5 rounded-2xl border border-indigo-500/20 space-y-4">
-              <h3 className="font-bold text-sm uppercase text-indigo-400">Inventory Adjustment: {isAdjusting.batch_id}</h3>
+            <form onSubmit={handleAdjustStock} className="mb-8 p-6 bg-primary/5 rounded-2xl border border-primary/20 space-y-4">
+              <h3 className="font-bold text-sm uppercase text-primary/80">Inventory Adjustment: {isAdjusting.batch_id}</h3>
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs font-bold uppercase text-muted-foreground">Action</label>
@@ -270,7 +270,7 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={resetForms} className="px-4 py-2 text-sm font-semibold hover:bg-muted rounded-lg">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-500 text-white text-sm font-semibold rounded-lg flex items-center gap-2">
+                <button type="submit" className="px-4 py-2 bg-primary text-primary-foreground text-sm font-semibold rounded-lg flex items-center gap-2">
                   Submit Adjustment
                 </button>
               </div>
@@ -290,14 +290,14 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
               </thead>
               <tbody className="divide-y divide-border/50">
                 {batchesLoading ? (
-                  <tr><td colSpan={5} className="p-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-indigo-500" /></td></tr>
+                  <tr><td colSpan={5} className="p-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" /></td></tr>
                 ) : batches.length === 0 ? (
                   <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">No batches created for this item.</td></tr>
                 ) : batches.map((batch) => (
                   <tr key={batch.batch_id} className="hover:bg-muted/30 group">
                     <td className="p-3 pl-4 text-sm font-mono font-semibold">
                       <div className="flex items-center gap-2">
-                        <Layers className="w-3.5 h-3.5 text-indigo-400" />
+                        <Layers className="w-3.5 h-3.5 text-primary/80" />
                         <div>
                           <div>{batch.batch_id}</div>
                           {batch.description && <div className="text-[10px] text-muted-foreground/70 font-sans font-normal truncate max-w-[120px]">{batch.description}</div>}
@@ -312,20 +312,19 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
                       {batch.expiration_date ? parseSystemDate(batch.expiration_date).toLocaleDateString() : 'No expiry'}
                     </td>
                     <td className="p-3">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                        batch.status === 'healthy' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' :
-                        batch.status === 'low_stock' ? 'bg-amber-500/10 border-amber-500/20 text-amber-500' :
-                        batch.status === 'out_of_stock' ? 'bg-rose-500/10 border-rose-500/20 text-rose-500' :
-                        batch.status === 'near_expiry' ? 'bg-orange-500/10 border-orange-500/20 text-orange-500' :
-                        batch.status === 'expired' ? 'bg-rose-500/10 border-rose-500/20 text-rose-500' :
-                        'bg-blue-500/10 border-blue-500/20 text-blue-500'
-                      }`}>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${batch.status === 'healthy' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' :
+                          batch.status === 'low_stock' ? 'bg-amber-500/10 border-amber-500/20 text-amber-500' :
+                            batch.status === 'out_of_stock' ? 'bg-rose-500/10 border-rose-500/20 text-rose-500' :
+                              batch.status === 'near_expiry' ? 'bg-orange-500/10 border-orange-500/20 text-orange-500' :
+                                batch.status === 'expired' ? 'bg-rose-500/10 border-rose-500/20 text-rose-500' :
+                                  'bg-primary/10 border-primary/20 text-primary'
+                        }`}>
                         {batch.status.replace('_', ' ').toUpperCase()}
                       </span>
                     </td>
                     <td className="p-3 text-right pr-4">
                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => openAdjust(batch)} aria-label={`Adjust stock for batch ${batch.batch_id}`} title="Adjust Stock" className="p-1.5 hover:bg-indigo-500/10 text-indigo-400 rounded-lg">
+                        <button onClick={() => openAdjust(batch)} aria-label={`Adjust stock for batch ${batch.batch_id}`} title="Adjust Stock" className="p-1.5 hover:bg-primary/10 text-primary/80 rounded-lg">
                           <History className="w-4 h-4" />
                         </button>
                         <button onClick={() => openEdit(batch)} aria-label={`Edit metadata for batch ${batch.batch_id}`} title="Edit Metadata" className="p-1.5 hover:bg-secondary text-muted-foreground rounded-lg">

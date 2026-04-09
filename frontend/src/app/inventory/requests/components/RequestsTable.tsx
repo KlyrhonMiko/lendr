@@ -18,9 +18,10 @@ import type { BorrowRequestEvent } from '../api';
 
 function StatusBadge({ status, closeReason }: { status: string; closeReason?: string }) {
   const config: Record<string, { bg: string; text: string; icon: ReactNode }> = {
-    pending: { bg: 'bg-amber-50 border-amber-200', text: 'text-amber-700', icon: <Clock className="w-3 h-3" /> },
-    approved: { bg: 'bg-blue-50 border-blue-200', text: 'text-blue-700', icon: <CheckCircle2 className="w-3 h-3" /> },
-    released: { bg: 'bg-sky-50 border-sky-200', text: 'text-sky-700', icon: <PackageOpen className="w-3 h-3" /> },
+    pending: { bg: 'bg-primary/5 border-primary/20', text: 'text-primary font-bold', icon: <Clock className="w-3 h-3" /> },
+
+    approved: { bg: 'bg-primary/10 border-primary/20', text: 'text-primary', icon: <CheckCircle2 className="w-3 h-3" /> },
+    released: { bg: 'bg-primary/5 border-primary/10', text: 'text-primary/80', icon: <PackageOpen className="w-3 h-3" /> },
     returned: { bg: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-700', icon: <CheckCircle2 className="w-3 h-3" /> },
     rejected: { bg: 'bg-rose-50 border-rose-200', text: 'text-rose-700', icon: <XCircle className="w-3 h-3" /> },
     closed: { bg: 'bg-slate-50 border-slate-200', text: 'text-slate-600', icon: <Archive className="w-3 h-3" /> },
@@ -169,9 +170,8 @@ function ExpandedDetails({
                   {events.map((event, idx) => (
                     <div key={event.event_id} className="relative">
                       <div
-                        className={`absolute -left-5 top-1 w-3.5 h-3.5 rounded-full border-2 border-card z-10 ${
-                          idx === 0 ? 'bg-primary' : 'bg-muted-foreground/20'
-                        }`}
+                        className={`absolute -left-5 top-1 w-3.5 h-3.5 rounded-full border-2 border-card z-10 ${idx === 0 ? 'bg-primary' : 'bg-primary/20'
+                          }`}
                       />
                       <div className="min-w-0">
                         <div className="flex items-baseline gap-2 flex-wrap">
@@ -346,9 +346,8 @@ export function RequestsTable({
               <Fragment key={record.request_id}>
                 <tr
                   onClick={() => onToggleRow(record.request_id)}
-                  className={`border-b border-border/40 transition-colors cursor-pointer group ${
-                    isExpanded ? 'bg-muted/10' : 'hover:bg-muted/20'
-                  }`}
+                  className={`border-b border-border/40 transition-colors cursor-pointer group ${isExpanded ? 'bg-muted/10' : 'hover:bg-muted/20'
+                    }`}
                 >
                   <td className="py-3.5 pl-5 w-8">
                     <div className="text-muted-foreground group-hover:text-foreground transition-colors">

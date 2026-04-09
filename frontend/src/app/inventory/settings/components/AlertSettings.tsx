@@ -69,7 +69,7 @@ function AddRecipientDialog({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger className="text-xs text-indigo-500 hover:text-indigo-600 font-bold flex items-center gap-1 transition-colors hover:underline outline-none">
+      <PopoverTrigger className="text-xs text-primary hover:text-primary-foreground font-bold flex items-center gap-1 transition-colors hover:underline outline-none">
         <Plus className="w-3 h-3" />
         Add Recipient
       </PopoverTrigger>
@@ -110,7 +110,7 @@ function AddRecipientDialog({
           </div>
           <button
             onClick={handleAdd}
-            className="w-full h-10 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl text-sm font-bold transition-all active:scale-[0.98]"
+            className="w-full h-10 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl text-sm font-bold transition-all active:scale-[0.98]"
           >
             Add to List
           </button>
@@ -255,7 +255,7 @@ export function AlertSettings() {
           <div className="space-y-6">
             <div className="grid gap-4">
               <label className="text-sm font-semibold text-foreground px-1 flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
                 Expiry Warning
               </label>
               <div className="flex items-center gap-3">
@@ -272,7 +272,7 @@ export function AlertSettings() {
 
             <div className="grid gap-4">
               <label className="text-sm font-semibold text-foreground px-1 flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
                 Borrow Request Alerts
               </label>
               <div className="flex items-center gap-3">
@@ -304,7 +304,7 @@ export function AlertSettings() {
       {/* Notification Channels */}
       <Card>
         <CardHeader className="flex flex-row items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
+          <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
             <BellRing className="w-6 h-6" />
           </div>
           <div>
@@ -315,8 +315,8 @@ export function AlertSettings() {
         <CardContent className="grid gap-4">
           <div className="flex flex-wrap gap-4">
             {[
-              { id: 'in-app', label: 'In-app Notification', icon: Monitor, color: 'text-indigo-500', bg: 'bg-indigo-500/10' },
-              { id: 'email', label: 'Email', icon: Mail, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+              { id: 'in-app', label: 'In-app Notification', icon: Monitor, color: 'text-primary', bg: 'bg-primary/10' },
+              { id: 'email', label: 'Email', icon: Mail, color: 'text-primary', bg: 'bg-primary/10' },
               { id: 'sms', label: 'SMS', icon: MessageSquare, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
             ].map((channel) => {
               const Icon = channel.icon;
@@ -324,12 +324,12 @@ export function AlertSettings() {
               return (
                 <label
                   key={channel.id}
-                  className={`flex items-center gap-4 p-4 rounded-2xl border transition-all flex-1 min-w-[200px] cursor-pointer ${isChecked ? 'border-indigo-500 bg-indigo-500/5' : 'border-border bg-muted/20 hover:bg-muted/30'
+                  className={`flex items-center gap-4 p-4 rounded-2xl border transition-all flex-1 min-w-[200px] cursor-pointer ${isChecked ? 'border-primary bg-primary/5' : 'border-border bg-muted/20 hover:bg-muted/30'
                     }`}
                 >
                   <input
                     type="checkbox"
-                    className="w-5 h-5 rounded-lg border-border text-indigo-500 focus:ring-indigo-500"
+                    className="w-5 h-5 rounded-lg border-border text-primary focus:ring-primary"
                     checked={isChecked}
                     onChange={() => toggleListValue('notification_channels', channel.id)}
                   />
@@ -389,7 +389,7 @@ export function AlertSettings() {
           <div className="space-y-6">
             <div className="flex items-center justify-between text-sm font-semibold px-1">
               <span className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-blue-500" />
+                <Users className="w-4 h-4 text-primary" />
                 Specific Recipients
               </span>
               <AddRecipientDialog
@@ -409,8 +409,8 @@ export function AlertSettings() {
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">
                 {formData.specific_recipients.map((rec, idx) => (
-                  <div key={idx} className="group relative bg-muted/30 border border-border rounded-2xl p-4 flex items-center gap-4 transition-all hover:border-indigo-500/30 hover:bg-muted/50">
-                    <div className="w-10 h-10 rounded-xl bg-background border border-border flex items-center justify-center text-indigo-500 font-bold text-xs">
+                  <div key={idx} className="group relative bg-muted/30 border border-border rounded-2xl p-4 flex items-center gap-4 transition-all hover:border-primary/30 hover:bg-muted/50">
+                    <div className="w-10 h-10 rounded-xl bg-background border border-border flex items-center justify-center text-primary font-bold text-xs">
                       {rec.name.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -434,7 +434,7 @@ export function AlertSettings() {
           <button
             onClick={handleSave}
             disabled={mutation.isPending}
-            className="flex items-center gap-2 px-8 py-3 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/20 transition-all active:scale-[0.98]"
+            className="flex items-center gap-2 px-8 py-3 bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground rounded-xl text-sm font-bold shadow-lg shadow-primary/20 transition-all active:scale-[0.98]"
           >
             <Save className="w-4 h-4" />
             {mutation.isPending ? 'Saving...' : 'Save Configuration'}
