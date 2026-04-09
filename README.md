@@ -371,6 +371,16 @@ cd lendr   # project root (not backend/)
 npm install
 ```
 
+**Generate Local HTTPS Certificates:**
+
+If you are developing features that require HTTPS (like camera/QR scanning), generate your own local certificates first:
+
+```bash
+npm run cert
+```
+
+> **Note:** This is only needed once. The certificates are ignored by Git and should remain local to your machine.
+
 **Start the development server:**
 
 ```bash

@@ -2,8 +2,9 @@ const selfsigned = require('selfsigned');
 const fs = require('fs');
 
 async function main() {
+    const host = process.env.HOST || '192.168.100.104';
     const attrs = [
-        { name: 'commonName', value: '192.168.100.104' }
+        { name: 'commonName', value: host }
     ];
 
     try {
@@ -16,8 +17,8 @@ async function main() {
                 altNames: [
                     { type: 2, value: 'localhost' },
                     { type: 7, ip: '127.0.0.1' },
-                    { type: 7, ip: '192.168.100.104' }
-                ]
+                    { type: 7, ip: host.match(/^\d+\.\d+\.\d+\.\d+$/) ? host : undefined }
+                ].filter(name => name.ip !== undefined || name.type === 2)
             }]
         });
 
@@ -26,7 +27,7 @@ async function main() {
         const cert = pems.cert || pems.public;
         fs.writeFileSync('./certificates/localhost.pem', cert);
         fs.writeFileSync('./certificates/localhost-key.pem', pems.private);
-        console.log('Certificates generated in ./certificates/');
+        console.log(`Certificates generated for ${host} in ./certificates/`);
     } catch (e) {
         console.error(e);
     }

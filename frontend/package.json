@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --experimental-https --experimental-https-key ./certificates/localhost-key.pem --experimental-https-cert ./certificates/localhost.pem -H 192.168.100.104",
+    "cert": "node generate-cert.js",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
