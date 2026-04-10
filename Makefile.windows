@@ -2,6 +2,7 @@ SHELL := powershell.exe
 .SHELLFLAGS := -NoProfile -ExecutionPolicy Bypass -Command
 
 LAN_COMPOSE := docker compose -f docker-compose.lan.yml
+GET_LAN_IP := Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $$_.IPAddress -match '^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)' -and $$_.IPAddress -ne '127.0.0.1' -and $$_.InterfaceAlias -notmatch 'vEthernet|WSL|Loopback|Docker|VirtualBox|VMware' } | Sort-Object InterfaceMetric | Select-Object -First 1 -ExpandProperty IPAddress
 
 .PHONY: help
 help:
@@ -15,6 +16,7 @@ help:
 	@Write-Host "  make -f Makefile.windows lan-migrate      # Run alembic upgrade head"
 	@Write-Host "  make -f Makefile.windows lan-seed         # Seed configuration"
 	@Write-Host "  make -f Makefile.windows lan-bootstrap    # One-shot bootstrap only"
+	@Write-Host "  make -f Makefile.windows lan-cert         # Generate self-signed certificates for LAN IP"
 	@Write-Host "  make -f Makefile.windows lan-url          # Print access URL for other devices"
 	@Write-Host "  make -f Makefile.windows lan-adminer-up   # Start Adminer on localhost:8080 (optional)"
 	@Write-Host "  make -f Makefile.windows lan-adminer-down # Stop optional Adminer"
@@ -22,7 +24,7 @@ help:
 	@Write-Host "  make -f Makefile.windows lan-down         # Stop LAN stack"
 
 .PHONY: lan-up
-lan-up:
+lan-up: lan-cert
 	$(LAN_COMPOSE) up -d postgres
 	$(LAN_COMPOSE) run --rm --build backend python data/bootstrap_system.py
 	$(LAN_COMPOSE) up --build -d --remove-orphans
@@ -52,13 +54,17 @@ lan-seed:
 	$(LAN_COMPOSE) exec backend python data/seed_configuration.py
 
 .PHONY: lan-bootstrap
-lan-bootstrap:
+lan-bootstrap: lan-cert
 	$(LAN_COMPOSE) up -d postgres
 	$(LAN_COMPOSE) run --rm --build backend python data/bootstrap_system.py
 
+.PHONY: lan-cert
+lan-cert:
+	@$$ip = $(GET_LAN_IP); if (-not $$ip) { Write-Host 'Could not determine a usable LAN IPv4 address automatically.'; exit 1 }; if (-not (Test-Path frontend/certificates/localhost.pem)) { Write-Host "Generating certificates for $$ip..."; Push-Location frontend; $$env:HOST="$$ip"; npm run cert; Pop-Location } else { Write-Host "Certificates already exist in frontend/certificates/" }
+
 .PHONY: lan-url
 lan-url:
-	@$$ip = Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $$_.IPAddress -match '^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)' -and $$_.IPAddress -ne '127.0.0.1' -and $$_.InterfaceAlias -notmatch 'vEthernet|WSL|Loopback|Docker|VirtualBox|VMware' } | Sort-Object InterfaceMetric | Select-Object -First 1 -ExpandProperty IPAddress; if (-not $$ip) { Write-Host 'Could not determine a usable LAN IPv4 address automatically.'; Write-Host 'Run: ipconfig'; exit 1 }; Write-Host 'Open from other devices on the same network:'; Write-Host ('  http://{0}' -f $$ip)
+	@$$ip = $(GET_LAN_IP); if (-not $$ip) { Write-Host 'Could not determine a usable LAN IPv4 address automatically.'; Write-Host 'Run: ipconfig'; exit 1 }; Write-Host 'Open from other devices on the same network:'; Write-Host ('  https://{0}' -f $$ip)
 
 .PHONY: lan-adminer-up
 lan-adminer-up:
@@ -71,7 +77,7 @@ lan-adminer-down:
 .PHONY: lan-adminer-url
 lan-adminer-url:
 	@Write-Host "Adminer (host machine only):"
-	@Write-Host "  http://localhost:8080"
+	@Write-Host "  https://localhost:8080"
 
 .PHONY: lan-down
 lan-down:

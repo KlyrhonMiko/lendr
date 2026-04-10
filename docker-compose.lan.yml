@@ -58,8 +58,10 @@ services:
       - backend
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./frontend/certificates:/etc/caddy/certificates:ro
       - caddy_data:/data
       - caddy_config:/config
 

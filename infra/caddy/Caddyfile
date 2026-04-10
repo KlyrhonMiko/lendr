@@ -1,4 +1,5 @@
-:80 {
+:443 {
+  tls /etc/caddy/certificates/localhost.pem /etc/caddy/certificates/localhost-key.pem
   encode gzip zstd
 
   @api_docs path /docs* /redoc* /openapi.json
@@ -14,4 +15,8 @@
   handle {
     reverse_proxy frontend:3000
   }
+}
+
+:80 {
+  redir https://{host}{uri}
 }
