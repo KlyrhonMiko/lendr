@@ -17,6 +17,7 @@ An inventory and borrowing management system built with **FastAPI** (backend) an
   - [Option A — Docker (Recommended)](#option-a--docker-recommended)
   - [Option A.1 — Docker LAN Host (Caddy)](#option-a1--docker-lan-host-caddy)
   - [Option B — Local Development](#option-b--local-development)
+- [Makefile Command Guide](#makefile-command-guide)
 - [Environment Variables](#environment-variables)
 - [Database Migrations](#database-migrations)
 - [API Reference](#api-reference)
@@ -308,34 +309,7 @@ This mode is intentionally bare-bones:
 
 Use the same variables from Option A. Keep `DATABASE_URL` pointed to the internal postgres service host `postgres`.
 
-**2. Run one-shot bootstrap (first boot, schema-changing updates, and seed/config baseline updates)**
-
-Linux/macOS:
-
-```bash
-make lan-bootstrap
-```
-
-Windows (PowerShell + GNU Make):
-
-```powershell
-make -f Makefile.windows lan-bootstrap
-```
-
-What this does:
-
-1. Starts `postgres` if needed
-2. Runs Alembic migrations
-3. Runs initialization/seed reconciliation
-
-Equivalent manual command:
-
-```bash
-docker compose -f docker-compose.lan.yml up -d postgres
-docker compose -f docker-compose.lan.yml run --rm backend python data/bootstrap_system.py
-```
-
-**3. Start the LAN stack**
+**2. Start the LAN stack (includes one-shot bootstrap init)**
 
 Linux/macOS:
 
@@ -349,9 +323,41 @@ Windows (PowerShell + GNU Make):
 make -f Makefile.windows lan-go
 ```
 
-This one command starts the stack and prints the exact LAN URL to open from other devices.
+How this target is wired:
 
-Additional helpers:
+1. `lan-go` is defined as `lan-go: lan-up lan-url` in both Makefiles.
+2. `lan-up` runs `python data/bootstrap_system.py` before bringing up the full stack.
+
+What this does:
+
+1. Starts `postgres` if needed
+2. Runs Alembic migrations
+3. Runs initialization/seed reconciliation
+4. Builds and starts the full LAN stack
+5. Prints the LAN URL to open from other devices
+
+Optional bootstrap-only command (without starting the full stack):
+
+Linux/macOS:
+
+```bash
+make lan-bootstrap
+```
+
+Windows (PowerShell + GNU Make):
+
+```powershell
+make -f Makefile.windows lan-bootstrap
+```
+
+Equivalent manual command:
+
+```bash
+docker compose -f docker-compose.lan.yml up -d postgres
+docker compose -f docker-compose.lan.yml run --rm backend python data/bootstrap_system.py
+```
+
+**3. Additional helpers**
 
 ```bash
 make lan-ps
@@ -520,6 +526,59 @@ npm run dev
 The frontend will be available at http://localhost:3000.
 
 > The frontend reads `NEXT_PUBLIC_API_URL` (defaults to `http://localhost:8000`) to reach the backend. You can set this in a `.env.local` at the project root if needed.
+
+---
+
+## Makefile Command Guide
+
+Use this guide for LAN-host workflows via `docker-compose.lan.yml`.
+
+### Prerequisites
+
+- Linux/macOS: `make` + Docker Compose v2
+- Windows: GNU Make + PowerShell + Docker Compose v2
+
+### Command Map (Linux/macOS vs Windows)
+
+| Purpose | Linux/macOS | Windows (PowerShell) |
+|---|---|---|
+| Show available targets | `make help` | `make -f Makefile.windows help` |
+| Build/start LAN stack (includes bootstrap init) | `make lan-up` | `make -f Makefile.windows lan-up` |
+| Build/start + print LAN URL (alias: `lan-up` then `lan-url`) | `make lan-go` | `make -f Makefile.windows lan-go` |
+| Initialize DB bootstrap only | `make lan-init` | `make -f Makefile.windows lan-init` |
+| Bootstrap (postgres + migrate + init) | `make lan-bootstrap` | `make -f Makefile.windows lan-bootstrap` |
+| Show running services | `make lan-ps` | `make -f Makefile.windows lan-ps` |
+| Tail stack logs | `make lan-logs` | `make -f Makefile.windows lan-logs` |
+| Run Alembic migrations | `make lan-migrate` | `make -f Makefile.windows lan-migrate` |
+| Seed configuration | `make lan-seed` | `make -f Makefile.windows lan-seed` |
+| Print LAN URL only | `make lan-url` | `make -f Makefile.windows lan-url` |
+| Start optional Adminer | `make lan-adminer-up` | `make -f Makefile.windows lan-adminer-up` |
+| Show Adminer URL | `make lan-adminer-url` | `make -f Makefile.windows lan-adminer-url` |
+| Stop optional Adminer | `make lan-adminer-down` | `make -f Makefile.windows lan-adminer-down` |
+| Stop LAN stack | `make lan-down` | `make -f Makefile.windows lan-down` |
+
+### Common Workflows
+
+1. First-time LAN setup
+  - Linux/macOS: `make lan-go`
+  - Windows: `make -f Makefile.windows lan-go`
+
+2. Run bootstrap only (without starting full stack)
+  - Linux/macOS: `make lan-bootstrap`
+  - Windows: `make -f Makefile.windows lan-bootstrap`
+
+3. Apply code changes to containers
+  - Linux/macOS: `make lan-up`
+  - Windows: `make -f Makefile.windows lan-up`
+  - Note: `lan-up` already runs bootstrap + rebuilds images (`--build`), so `lan-down` first is optional.
+
+4. Stop everything
+  - Linux/macOS: `make lan-down`
+  - Windows: `make -f Makefile.windows lan-down`
+
+5. Check health/troubleshoot
+  - Linux/macOS: `make lan-ps` and `make lan-logs`
+  - Windows: `make -f Makefile.windows lan-ps` and `make -f Makefile.windows lan-logs`
 
 ---
 
