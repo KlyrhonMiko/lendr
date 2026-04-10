@@ -228,7 +228,6 @@ class BorrowService(
 
         items = session.exec(
             select(InventoryItem).where(
-                InventoryItem.is_deleted.is_(False),
                 InventoryItem.id.in_(clean_ids),
             )
         ).all()
@@ -389,18 +388,21 @@ class BorrowService(
         payload["closed_by_user_id"] = user_id_map.get(borrow_req.closed_by)
 
         # Populate items list
-        payload["items"] = [
-            {
-                "item_id": item_details.get("item_id"),
-                "name": item_details.get("name"),
-                "classification": item_details.get("classification"),
-                "item_type": item_details.get("item_type"),
-                "is_trackable": item_details.get("is_trackable", False),
-                "qty_requested": item.qty_requested,
-            }
-            for item in request_items
-            for item_details in [item_details_map.get(item.item_uuid, {})]
-        ]
+        payload_items = []
+        for item in request_items:
+            item_details = item_details_map.get(item.item_uuid, {})
+            fallback_item_id = str(item.item_uuid) if item.item_uuid else "UNKNOWN-ITEM"
+            payload_items.append(
+                {
+                    "item_id": item_details.get("item_id") or fallback_item_id,
+                    "name": item_details.get("name") or "Deleted Inventory Item",
+                    "classification": item_details.get("classification"),
+                    "item_type": item_details.get("item_type"),
+                    "is_trackable": item_details.get("is_trackable", False),
+                    "qty_requested": item.qty_requested,
+                }
+            )
+        payload["items"] = payload_items
 
         # Remove legacy fields from payload
         payload.pop("item_id", None)
