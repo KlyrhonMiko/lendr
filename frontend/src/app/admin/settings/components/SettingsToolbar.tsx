@@ -2,7 +2,7 @@
 
 import { Search, Plus, RefreshCw, Filter } from 'lucide-react';
 import type { PaginationMeta } from '@/lib/api';
-import { Select } from '@/components/ui/select';
+import { FormSelect } from '@/components/ui/form-select';
 
 export function SettingsToolbar({
   search,
@@ -30,13 +30,13 @@ export function SettingsToolbar({
   onOpenNew: () => void;
 }) {
   const categoryOptions = [
-    { label: 'All Categories', value: '' },
-    ...categories.map(c => ({ label: c, value: c }))
+    { label: 'All Categories', key: '' },
+    ...categories.map(c => ({ label: c, key: c }))
   ];
 
   const systemOptions = [
-    { label: 'All Systems', value: '' },
-    ...systems.map(s => ({ label: s, value: s }))
+    { label: 'All Systems', key: '' },
+    ...systems.map(s => ({ label: s, key: s }))
   ];
 
   return (
@@ -61,19 +61,21 @@ export function SettingsToolbar({
 
       {/* System Filter */}
       <div className="w-44">
-        <Select
+        <FormSelect
           value={systemFilter}
-          onChange={(e) => onSystemFilterChange(e.target.value)}
+          onChange={(value) => onSystemFilterChange(value)}
           options={systemOptions}
+          placeholder="All Systems"
         />
       </div>
 
       {/* Category Filter */}
       <div className="w-48">
-        <Select
+        <FormSelect
           value={categoryFilter}
-          onChange={(e) => onCategoryFilterChange(e.target.value)}
+          onChange={(value) => onCategoryFilterChange(value)}
           options={categoryOptions}
+          placeholder="All Categories"
         />
       </div>
 

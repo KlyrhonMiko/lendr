@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { ChevronDown, Search, X, Check } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { FilterSelect } from '@/components/ui/filter-select';
 import { cn } from '@/lib/utils';
 import type { ConfigRead } from '../api';
 import type { PaginationMeta } from '@/lib/api';
@@ -36,21 +37,19 @@ export function InventoryItemsToolbar({
   itemTypes: ConfigRead[];
   onClearExpandedFilters: () => void;
 }) {
-  const [categoryOpen, setCategoryOpen] = useState(false);
-  const [classificationOpen, setClassificationOpen] = useState(false);
-  const [itemTypeOpen, setItemTypeOpen] = useState(false);
+
 
   const hasActiveFilters = categoryFilter || classificationFilter || itemTypeFilter;
 
-  const categoryOptions = [{ key: '', value: 'All categories' }, ...categories.map((c) => ({ key: c.key, value: c.value }))];
-  const classificationOptions = [
-    { key: '', value: 'All classifications' },
-    ...classifications.map((c) => ({ key: c.key, value: c.key.charAt(0).toUpperCase() + c.key.slice(1) })),
-  ];
-  const itemTypeOptions = [
-    { key: '', value: 'All types' },
-    ...itemTypes.map((t) => ({ key: t.key, value: t.key.charAt(0).toUpperCase() + t.key.slice(1) })),
-  ];
+  const categoryOptions = categories.map((c) => ({ key: c.key, value: c.value }));
+  const classificationOptions = classifications.map((c) => ({
+    key: c.key,
+    value: c.key.charAt(0).toUpperCase() + c.key.slice(1),
+  }));
+  const itemTypeOptions = itemTypes.map((t) => ({
+    key: t.key,
+    value: t.key.charAt(0).toUpperCase() + t.key.slice(1),
+  }));
   const clearAllFilters = () => {
     onCategoryFilterChange('');
     onClearExpandedFilters();
@@ -91,98 +90,29 @@ export function InventoryItemsToolbar({
       <div className="flex items-center gap-3 flex-wrap">
         <span className="text-xs font-medium text-muted-foreground mr-1">Filter by:</span>
 
-        <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
-          <PopoverTrigger
-            type="button"
-            className="h-10 px-3 rounded-lg bg-muted/50 border border-border text-sm font-medium cursor-pointer flex items-center gap-2"
-          >
-            <span className="truncate">
-              {categoryOptions.find((o) => o.key === categoryFilter)?.value ?? 'All categories'}
-            </span>
-            <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
-          </PopoverTrigger>
-          <PopoverContent align="start" sideOffset={4} className="w-48 p-1 max-h-60 overflow-y-auto">
-            {categoryOptions.map((opt) => (
-              <button
-                key={opt.key || 'all'}
-                type="button"
-                onClick={() => {
-                  onCategoryFilterChange(opt.key);
-                  setCategoryOpen(false);
-                }}
-                className={cn(
-                  'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left',
-                  categoryFilter === opt.key ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted'
-                )}
-              >
-                <Check className={cn('w-4 h-4 shrink-0', categoryFilter === opt.key ? 'opacity-100' : 'opacity-0')} />
-                {opt.value}
-              </button>
-            ))}
-          </PopoverContent>
-        </Popover>
+        <FilterSelect
+          value={categoryFilter}
+          onChange={onCategoryFilterChange}
+          options={categoryOptions.map(o => ({ key: o.key, label: o.value }))}
+          placeholder="All categories"
+          align="start"
+        />
 
-        <Popover open={classificationOpen} onOpenChange={setClassificationOpen}>
-          <PopoverTrigger
-            type="button"
-            className="h-10 px-3 rounded-lg bg-muted/50 border border-border text-sm font-medium cursor-pointer flex items-center gap-2"
-          >
-            <span className="truncate">
-              {classificationOptions.find((o) => o.key === classificationFilter)?.value ?? 'All classifications'}
-            </span>
-            <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
-          </PopoverTrigger>
-          <PopoverContent align="start" sideOffset={4} className="w-48 p-1 max-h-60 overflow-y-auto">
-            {classificationOptions.map((opt) => (
-              <button
-                key={opt.key || 'all'}
-                type="button"
-                onClick={() => {
-                  onClassificationFilterChange(opt.key);
-                  setClassificationOpen(false);
-                }}
-                className={cn(
-                  'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left',
-                  classificationFilter === opt.key ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted'
-                )}
-              >
-                <Check className={cn('w-4 h-4 shrink-0', classificationFilter === opt.key ? 'opacity-100' : 'opacity-0')} />
-                {opt.value}
-              </button>
-            ))}
-          </PopoverContent>
-        </Popover>
+        <FilterSelect
+          value={classificationFilter}
+          onChange={onClassificationFilterChange}
+          options={classificationOptions.map(o => ({ key: o.key, label: o.value }))}
+          placeholder="All classifications"
+          align="start"
+        />
 
-        <Popover open={itemTypeOpen} onOpenChange={setItemTypeOpen}>
-          <PopoverTrigger
-            type="button"
-            className="h-10 px-3 rounded-lg bg-muted/50 border border-border text-sm font-medium cursor-pointer flex items-center gap-2"
-          >
-            <span className="truncate">
-              {itemTypeOptions.find((o) => o.key === itemTypeFilter)?.value ?? 'All types'}
-            </span>
-            <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
-          </PopoverTrigger>
-          <PopoverContent align="start" sideOffset={4} className="w-48 p-1 max-h-60 overflow-y-auto">
-            {itemTypeOptions.map((opt) => (
-              <button
-                key={opt.key || 'all'}
-                type="button"
-                onClick={() => {
-                  onItemTypeFilterChange(opt.key);
-                  setItemTypeOpen(false);
-                }}
-                className={cn(
-                  'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left',
-                  itemTypeFilter === opt.key ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted'
-                )}
-              >
-                <Check className={cn('w-4 h-4 shrink-0', itemTypeFilter === opt.key ? 'opacity-100' : 'opacity-0')} />
-                {opt.value}
-              </button>
-            ))}
-          </PopoverContent>
-        </Popover>
+        <FilterSelect
+          value={itemTypeFilter}
+          onChange={onItemTypeFilterChange}
+          options={itemTypeOptions.map(o => ({ key: o.key, label: o.value }))}
+          placeholder="All types"
+          align="start"
+        />
 
         {hasActiveFilters && (
           <button

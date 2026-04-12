@@ -3,11 +3,11 @@
 import { useState } from 'react';
 import { Search, X, ChevronDown, Check } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { FilterSelect } from '@/components/ui/filter-select';
 import { cn } from '@/lib/utils';
 import type { PaginationMeta } from '@/lib/api';
 
 const MOVEMENT_TYPE_OPTIONS = [
-  { key: '', value: 'All movement types' },
   { key: 'procurement', value: 'Procurement' },
   { key: 'manual_adjustment', value: 'Adjustment' },
   { key: 'borrow_release', value: 'Release' },
@@ -16,7 +16,6 @@ const MOVEMENT_TYPE_OPTIONS = [
 ];
 
 const REFERENCE_TYPE_OPTIONS = [
-  { key: '', value: 'All reference types' },
   { key: 'borrow_request', value: 'Borrow request' },
   { key: 'inventory_movement', value: 'Inventory movement' },
   { key: 'external_reference', value: 'External reference' },
@@ -43,8 +42,7 @@ export function LedgerFiltersBar({
   onReferenceTypeChange: (v: string) => void;
   meta?: PaginationMeta | null;
 }) {
-  const [movementTypeOpen, setMovementTypeOpen] = useState(false);
-  const [referenceTypeOpen, setReferenceTypeOpen] = useState(false);
+
 
   return (
     <div className="flex flex-col gap-3 p-4 border-b border-border">
@@ -78,36 +76,13 @@ export function LedgerFiltersBar({
       </div>
       <div className="flex items-center gap-3 flex-wrap">
         <span className="text-xs font-medium text-muted-foreground mr-1">Filter by:</span>
-        <Popover open={movementTypeOpen} onOpenChange={setMovementTypeOpen}>
-          <PopoverTrigger
-            type="button"
-            className="h-10 px-3 rounded-lg bg-muted/50 border border-border text-sm font-medium cursor-pointer flex items-center gap-2"
-          >
-            <span className="truncate">
-              {MOVEMENT_TYPE_OPTIONS.find((o) => o.key === movementType)?.value ?? 'All movement types'}
-            </span>
-            <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
-          </PopoverTrigger>
-          <PopoverContent align="start" sideOffset={4} className="w-48 p-1 max-h-60 overflow-y-auto">
-            {MOVEMENT_TYPE_OPTIONS.map((opt) => (
-              <button
-                key={opt.key || 'all'}
-                type="button"
-                onClick={() => {
-                  onMovementTypeChange(opt.key);
-                  setMovementTypeOpen(false);
-                }}
-                className={cn(
-                  'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left',
-                  movementType === opt.key ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted'
-                )}
-              >
-                <Check className={cn('w-4 h-4 shrink-0', movementType === opt.key ? 'opacity-100' : 'opacity-0')} />
-                {opt.value}
-              </button>
-            ))}
-          </PopoverContent>
-        </Popover>
+        <FilterSelect
+          value={movementType}
+          onChange={onMovementTypeChange}
+          options={MOVEMENT_TYPE_OPTIONS.map(o => ({ key: o.key, label: o.value }))}
+          placeholder="All movement types"
+          align="start"
+        />
 
         <div className="relative min-w-[220px]">
           <input
@@ -129,36 +104,13 @@ export function LedgerFiltersBar({
           )}
         </div>
 
-        <Popover open={referenceTypeOpen} onOpenChange={setReferenceTypeOpen}>
-          <PopoverTrigger
-            type="button"
-            className="h-10 px-3 rounded-lg bg-muted/50 border border-border text-sm font-medium cursor-pointer flex items-center gap-2"
-          >
-            <span className="truncate">
-              {REFERENCE_TYPE_OPTIONS.find((o) => o.key === referenceType)?.value ?? 'All reference types'}
-            </span>
-            <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
-          </PopoverTrigger>
-          <PopoverContent align="start" sideOffset={4} className="w-56 p-1 max-h-60 overflow-y-auto">
-            {REFERENCE_TYPE_OPTIONS.map((opt) => (
-              <button
-                key={opt.key || 'all'}
-                type="button"
-                onClick={() => {
-                  onReferenceTypeChange(opt.key);
-                  setReferenceTypeOpen(false);
-                }}
-                className={cn(
-                  'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left',
-                  referenceType === opt.key ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted'
-                )}
-              >
-                <Check className={cn('w-4 h-4 shrink-0', referenceType === opt.key ? 'opacity-100' : 'opacity-0')} />
-                {opt.value}
-              </button>
-            ))}
-          </PopoverContent>
-        </Popover>
+        <FilterSelect
+          value={referenceType}
+          onChange={onReferenceTypeChange}
+          options={REFERENCE_TYPE_OPTIONS.map(o => ({ key: o.key, label: o.value }))}
+          placeholder="All reference types"
+          align="start"
+        />
       </div>
     </div>
   );

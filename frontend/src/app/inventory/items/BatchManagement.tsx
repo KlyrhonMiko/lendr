@@ -4,8 +4,11 @@ import { useState, useCallback } from 'react';
 import { inventoryApi, InventoryBatch, StockAdjustmentPayload } from './api';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { useInventoryBatches } from './lib/useItemQueries';
-import { X, Plus, Edit2, Loader2, Layers, History, TrendingUp, TrendingDown } from 'lucide-react';
+import { format as formatDateFns } from 'date-fns';
+import { X, Plus, Edit2, Loader2, Layers, History as HistoryIcon, TrendingUp, TrendingDown } from 'lucide-react';
 import { toast } from 'sonner';
+import { DatePicker } from '@/components/ui/date-picker';
+import { FormSelect } from '@/components/ui/form-select';
 import { parseSystemDate } from '@/lib/utils';
 
 interface BatchManagementProps {
@@ -22,7 +25,7 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
   const [isReduction, setIsReduction] = useState(false);
 
   const [formData, setFormData] = useState({
-    expiration_date: '',
+    expiration_date: undefined as Date | undefined,
     description: '',
   });
 
@@ -61,7 +64,7 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
     setEditingBatch(null);
     setIsAdjusting(null);
     setIsReduction(false);
-    setFormData({ expiration_date: '', description: '' });
+    setFormData({ expiration_date: undefined, description: '' });
     setAdjustData({
       qty_change: 0,
       movement_type: 'procurement',
@@ -74,7 +77,7 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
     e.preventDefault();
     try {
       const payload = {
-        expiration_date: formData.expiration_date || undefined,
+        expiration_date: formData.expiration_date ? formatDateFns(formData.expiration_date, 'yyyy-MM-dd') : undefined,
         description: formData.description || undefined,
       };
 
@@ -139,13 +142,8 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
     resetForms();
     setEditingBatch(batch);
 
-    let dateVal = '';
-    if (batch.expiration_date) {
-      const d = parseSystemDate(batch.expiration_date);
-      if (!isNaN(d.getTime())) {
-        dateVal = d.toISOString().split('T')[0];
-      }
-    }
+    const parsedDate = batch.expiration_date ? parseSystemDate(batch.expiration_date) : undefined;
+    const dateVal = parsedDate && !isNaN(parsedDate.getTime()) ? parsedDate : undefined;
 
     setFormData({
       expiration_date: dateVal,
@@ -190,11 +188,10 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
               <div className="grid grid-cols-1 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs font-bold uppercase text-muted-foreground">Expiration Date</label>
-                  <input
-                    type="date"
-                    value={formData.expiration_date}
-                    onChange={(e) => setFormData({ ...formData, expiration_date: e.target.value })}
-                    className="w-full h-10 px-3 rounded-lg bg-background border border-border text-sm"
+                  <DatePicker
+                    date={formData.expiration_date}
+                    onChange={(date) => setFormData({ ...formData, expiration_date: date })}
+                    placeholder="Select expiration"
                   />
                 </div>
                 <div className="space-y-1">
@@ -253,25 +250,22 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold uppercase text-muted-foreground">Type</label>
-                  <select
+                  <FormSelect
+                    label="Type"
                     value={adjustData.movement_type}
-                    onChange={(e) => setAdjustData({ ...adjustData, movement_type: e.target.value })}
-                    className="w-full h-10 px-3 rounded-lg bg-background border border-border text-sm"
-                  >
-                    {movementTypes.map(m => <option key={m.key} value={m.key}>{m.value}</option>)}
-                  </select>
+                    onChange={(v) => setAdjustData({ ...adjustData, movement_type: v })}
+                    options={movementTypes.map(m => ({ label: m.value, key: m.key }))}
+                    placeholder="Select Type"
+                  />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold uppercase text-muted-foreground">Reason</label>
-                  <select
-                    value={adjustData.reason_code}
-                    onChange={(e) => setAdjustData({ ...adjustData, reason_code: e.target.value })}
-                    className="w-full h-10 px-3 rounded-lg bg-background border border-border text-sm"
-                  >
-                    <option value="">Select Reason</option>
-                    {reasonCodes.map(r => <option key={r.key} value={r.key}>{r.value}</option>)}
-                  </select>
+                  <FormSelect
+                    label="Reason"
+                    value={adjustData.reason_code || ''}
+                    onChange={(v) => setAdjustData({ ...adjustData, reason_code: v })}
+                    options={reasonCodes.map(r => ({ label: r.value, key: r.key }))}
+                    placeholder="Select Reason"
+                  />
                 </div>
               </div>
               <div className="space-y-1">
@@ -330,11 +324,11 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
                     </td>
                     <td className="p-3">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${batch.status === 'healthy' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' :
-                          batch.status === 'low_stock' ? 'bg-amber-500/10 border-amber-500/20 text-amber-500' :
-                            batch.status === 'out_of_stock' ? 'bg-rose-500/10 border-rose-500/20 text-rose-500' :
-                              batch.status === 'near_expiry' ? 'bg-orange-500/10 border-orange-500/20 text-orange-500' :
-                                batch.status === 'expired' ? 'bg-rose-500/10 border-rose-500/20 text-rose-500' :
-                                  'bg-primary/10 border-primary/20 text-primary'
+                        batch.status === 'low_stock' ? 'bg-amber-500/10 border-amber-500/20 text-amber-500' :
+                          batch.status === 'out_of_stock' ? 'bg-rose-500/10 border-rose-500/20 text-rose-500' :
+                            batch.status === 'near_expiry' ? 'bg-orange-500/10 border-orange-500/20 text-orange-500' :
+                              batch.status === 'expired' ? 'bg-rose-500/10 border-rose-500/20 text-rose-500' :
+                                'bg-primary/10 border-primary/20 text-primary'
                         }`}>
                         {batch.status.replace('_', ' ').toUpperCase()}
                       </span>
@@ -342,7 +336,7 @@ export function BatchManagement({ itemId, onClose }: BatchManagementProps) {
                     <td className="p-3 text-right pr-4">
                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={() => openAdjust(batch)} aria-label={`Adjust stock for batch ${batch.batch_id}`} title="Adjust Stock" className="p-1.5 hover:bg-primary/10 text-primary/80 rounded-lg">
-                          <History className="w-4 h-4" />
+                          <HistoryIcon className="w-4 h-4" />
                         </button>
                         <button onClick={() => openEdit(batch)} aria-label={`Edit metadata for batch ${batch.batch_id}`} title="Edit Metadata" className="p-1.5 hover:bg-secondary text-muted-foreground rounded-lg">
                           <Edit2 className="w-4 h-4" />

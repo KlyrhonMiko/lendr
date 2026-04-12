@@ -13,8 +13,9 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Toggle } from '@/components/ui/toggle';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
+import { FormSelect } from '@/components/ui/form-select';
 import { toast } from 'sonner';
 import type { SecuritySettingsData, SecurityShiftDefinition } from '../api';
 import {
@@ -346,11 +347,9 @@ export function SecuritySettings() {
                     key={role.role}
                     className="flex items-center gap-3 p-3 bg-muted/20 border border-border rounded-xl cursor-pointer hover:bg-muted/30 transition-colors"
                   >
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={draft.two_factor.enforce_for_roles.includes(role.role)}
-                      onChange={() => toggleTwoFactorRole(role.role)}
-                      className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
+                      onCheckedChange={() => toggleTwoFactorRole(role.role)}
                       disabled={isSaving}
                     />
                     <span className="text-sm font-medium">{role.label}</span>
@@ -359,12 +358,13 @@ export function SecuritySettings() {
               </div>
             </div>
 
-            <Select
+            <FormSelect
               label="2FA Method"
               value="authenticator_app"
               onChange={() => undefined}
-              options={[{ label: 'Authenticator App', value: 'authenticator_app' }]}
+              options={[{ label: 'Authenticator App', key: 'authenticator_app' }]}
               disabled
+              placeholder="Select method"
             />
 
             <p className="text-xs text-muted-foreground">

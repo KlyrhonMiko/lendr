@@ -320,28 +320,6 @@ export function useGeneralMutations() {
   return { updateGeneral };
 }
 
-export function useBrandingMutations() {
-  const queryClient = useQueryClient();
-
-  const updateBranding = useMutation({
-    mutationFn: (data: BrandingSettingsData) => api.put('/admin/settings/branding', data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'settings', 'branding'] });
-      toast.success('Branding settings updated successfully');
-    },
-  });
-
-  const uploadBrandingFile = useMutation({
-    mutationFn: (formData: FormData) => api.post<{ url: string }>('/admin/settings/branding/upload', formData),
-    onSuccess: () => {
-      // We don't invalidate here yet because we update the local state in the component, 
-      // but we could invalidate to be safe.
-      queryClient.invalidateQueries({ queryKey: ['admin', 'settings', 'branding'] });
-    }
-  });
-
-  return { updateBranding, uploadBrandingFile };
-}
 
 export function useBackupMutations() {
   const queryClient = useQueryClient();

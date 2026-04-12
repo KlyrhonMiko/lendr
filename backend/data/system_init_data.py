@@ -76,7 +76,7 @@ SYSTEM_CONFIGS = [
     {"system": "inventory", "key": "expiry_threshold", "value": "15", "category": "inventory_threshold_alerts", "description": "Alert when remaining shelf life is below this %"},
     {"system": "inventory", "key": "borrow_request_alert_duration", "value": "60", "category": "inventory_threshold_alerts", "description": "Duration for pending borrow request alerts"},
     {"system": "inventory", "key": "borrow_request_alert_unit", "value": "minutes", "category": "inventory_threshold_alerts", "description": "Time unit for borrow request alerts"},
-    {"system": "inventory", "key": "notification_channels", "value": '["in-app", "email", "sms"]', "category": "inventory_threshold_alerts", "description": "Active channels for system notifications"},
+    {"system": "inventory", "key": "notification_channels", "value": '["in-app", "email"]', "category": "inventory_threshold_alerts", "description": "Active channels for system notifications"},
     {"system": "inventory", "key": "alert_recipient_roles", "value": '["inventory_manager", "admin"]', "category": "inventory_threshold_alerts", "description": "Roles notified of inventory alerts"},
     {"system": "inventory", "key": "specific_recipients", "value": "[]", "category": "inventory_threshold_alerts", "description": "Specific individuals notified of inventory alerts"},
     {"system": "inventory", "key": "damage_writeoff", "value": "Damage / Write-off", "category": "inventory_movements_reason_code", "description": "Damaged stock write-off"},

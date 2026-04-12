@@ -4,6 +4,9 @@ import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { FormSelect } from '@/components/ui/form-select';
+import { DatePicker } from '@/components/ui/date-picker';
+import { format as formatDateFns, parseISO } from 'date-fns';
 import {
   Download,
   Upload,
@@ -71,8 +74,8 @@ export function ImportExportSettings() {
 
   // Audit Log Export State
   const [auditParams, setAuditParams] = useState({
-    from_date: '',
-    to_date: '',
+    from_date: undefined as Date | undefined,
+    to_date: undefined as Date | undefined,
     format: 'csv'
   });
 
@@ -302,27 +305,28 @@ export function ImportExportSettings() {
         </CardHeader>
         <CardContent className="grid gap-10 md:grid-cols-2">
           {/* Inventory Catalog */}
-          <div className="space-y-6">
-            <div className="flex items-center gap-2 text-sm font-semibold text-primary px-1">
+          <div className="flex flex-col h-full">
+            <div className="flex items-center gap-2 text-sm font-semibold text-primary px-1 mb-6">
               <Barcode className="w-4 h-4" />
               Inventory Catalog (Full State)
             </div>
-            <div className="grid gap-4">
+            <div className="flex flex-col flex-1 gap-4">
               <p className="text-xs text-muted-foreground leading-relaxed px-1">
                 Export all catalog items, individual tracked units (with serials), and consumable batches in a single report.
               </p>
-              <Select
+              <FormSelect
                 label="Format"
                 value={catalogParams.format}
-                onChange={(e) => setCatalogParams({ ...catalogParams, format: (e.target as HTMLSelectElement).value })}
+                onChange={(v) => setCatalogParams({ ...catalogParams, format: v })}
                 options={[
-                  { label: 'Excel (XLSX)', value: 'xlsx' },
-                  { label: 'CSV (Comma Separated)', value: 'csv' },
+                  { label: 'Excel (XLSX)', key: 'xlsx' },
+                  { label: 'CSV (Comma Separated)', key: 'csv' },
                 ]}
+                placeholder="Select format"
               />
               <button
                 onClick={() => exportData('catalog', catalogParams)}
-                className="w-full h-11 bg-primary text-primary-foreground rounded-xl text-sm font-bold shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
+                className="w-full h-11 bg-primary text-primary-foreground rounded-xl text-sm font-bold shadow-lg shadow-primary/20 flex items-center justify-center gap-2 mt-auto"
               >
                 <Download className="w-4 h-4" /> Export Complete State
               </button>
@@ -330,38 +334,47 @@ export function ImportExportSettings() {
           </div>
 
           {/* Audit Logs */}
-          <div className="space-y-6">
-            <div className="flex items-center gap-2 text-sm font-semibold text-emerald-500 px-1">
+          <div className="flex flex-col h-full">
+            <div className="flex items-center gap-2 text-sm font-semibold text-emerald-500 px-1 mb-6">
               <FilePieChart className="w-4 h-4" />
               Audit Logs
             </div>
-            <div className="grid gap-4">
+            <div className="flex flex-col flex-1 gap-4">
               <div className="grid grid-cols-2 gap-4">
-                <Input
-                  label="From Date"
-                  type="date"
-                  value={auditParams.from_date}
-                  onChange={(e) => setAuditParams({ ...auditParams, from_date: e.target.value })}
-                />
-                <Input
-                  label="To Date"
-                  type="date"
-                  value={auditParams.to_date}
-                  onChange={(e) => setAuditParams({ ...auditParams, to_date: e.target.value })}
-                />
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-foreground px-1">From Date</label>
+                  <DatePicker
+                    date={auditParams.from_date}
+                    onChange={(date) => setAuditParams({ ...auditParams, from_date: date })}
+                    placeholder="Select start date"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-foreground px-1">To Date</label>
+                  <DatePicker
+                    date={auditParams.to_date}
+                    onChange={(date) => setAuditParams({ ...auditParams, to_date: date })}
+                    placeholder="Select end date"
+                  />
+                </div>
               </div>
-              <Select
+              <FormSelect
                 label="Format"
                 value={auditParams.format}
-                onChange={(e) => setAuditParams({ ...auditParams, format: (e.target as HTMLSelectElement).value })}
+                onChange={(v) => setAuditParams({ ...auditParams, format: v })}
                 options={[
-                  { label: 'CSV (Comma Separated Values)', value: 'csv' },
-                  { label: 'XLSX (Excel Spreadsheet)', value: 'xlsx' },
+                  { label: 'CSV (Comma Separated Values)', key: 'csv' },
+                  { label: 'XLSX (Excel Spreadsheet)', key: 'xlsx' },
                 ]}
+                placeholder="Select format"
               />
               <button
-                onClick={() => exportData('audit', auditParams)}
-                className="w-full h-11 bg-primary text-primary-foreground rounded-xl text-sm font-bold shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
+                onClick={() => exportData('audit', {
+                  ...auditParams,
+                  from_date: auditParams.from_date ? formatDateFns(auditParams.from_date, 'yyyy-MM-dd') : undefined,
+                  to_date: auditParams.to_date ? formatDateFns(auditParams.to_date, 'yyyy-MM-dd') : undefined,
+                })}
+                className="w-full h-11 bg-primary text-primary-foreground rounded-xl text-sm font-bold shadow-lg shadow-primary/20 flex items-center justify-center gap-2 mt-auto"
               >
                 <Download className="w-4 h-4" /> Export Audit Logs
               </button>
@@ -369,98 +382,104 @@ export function ImportExportSettings() {
           </div>
 
           {/* Ledger Data */}
-          <div className="space-y-6">
+          <div className="md:col-span-2 space-y-6">
             <div className="flex items-center gap-2 text-sm font-semibold text-primary px-1">
               <Database className="w-4 h-4" />
               Ledger Data
             </div>
-            <div className="grid gap-6">
-              <div className="space-y-4 p-4 rounded-2xl border border-border bg-muted/5">
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1">Borrow Request History</p>
-                <div className="space-y-4">
-                  <Select
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="flex flex-col p-4 rounded-2xl border border-border bg-muted/5">
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1 mb-4">Borrow Request History</p>
+                <div className="space-y-4 flex-1 mb-4">
+                  <FormSelect
                     label="Specific Borrower (Optional)"
                     value={borrowParams.borrower_id}
-                    onChange={(e) => setBorrowParams({ ...borrowParams, borrower_id: (e.target as HTMLSelectElement).value })}
+                    onChange={(v) => setBorrowParams({ ...borrowParams, borrower_id: v })}
                     options={[
-                      { label: 'All Borrowers', value: '' },
+                      { label: 'All Borrowers', key: '' },
                       ...users.map(u => ({
                         label: `${u.first_name} ${u.last_name} (${u.user_id})`,
-                        value: u.user_id
+                        key: u.user_id
                       }))
                     ]}
+                    placeholder="Search borrowers..."
                   />
                   <div className="grid grid-cols-2 gap-4">
-                    <Select
+                    <FormSelect
                       label="Status Filter"
                       value={borrowParams.status}
-                      onChange={(e) => setBorrowParams({ ...borrowParams, status: (e.target as HTMLSelectElement).value })}
+                      onChange={(v) => setBorrowParams({ ...borrowParams, status: v })}
                       options={[
-                        { label: 'All Statuses', value: 'all' },
-                        { label: 'Pending', value: 'pending' },
-                        { label: 'Approved', value: 'approved' },
-                        { label: 'Returned', value: 'returned' },
+                        { label: 'All Statuses', key: 'all' },
+                        { label: 'Pending', key: 'pending' },
+                        { label: 'Approved', key: 'approved' },
+                        { label: 'Returned', key: 'returned' },
                       ]}
+                      placeholder="Select status"
                     />
-                    <Select
+                    <FormSelect
                       label="Format"
                       value={borrowParams.format}
-                      onChange={(e) => setBorrowParams({ ...borrowParams, format: (e.target as HTMLSelectElement).value })}
+                      onChange={(v) => setBorrowParams({ ...borrowParams, format: v })}
                       options={[
-                        { label: 'Excel (XLSX)', value: 'xlsx' },
-                        { label: 'CSV', value: 'csv' },
+                        { label: 'Excel (XLSX)', key: 'xlsx' },
+                        { label: 'CSV', key: 'csv' },
                       ]}
+                      placeholder="Select format"
                     />
                   </div>
                 </div>
                 <button
                   onClick={() => exportData('requests', borrowParams)}
-                  className="w-full h-10 bg-muted hover:bg-muted font-bold text-xs rounded-lg transition-colors border border-border"
+                  className="w-full h-10 bg-muted hover:bg-muted font-bold text-xs rounded-lg transition-colors border border-border mt-auto"
                 >
                   Export History
                 </button>
               </div>
 
-              <div className="space-y-4 p-4 rounded-2xl border border-border bg-muted/5">
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1">Equipment Movements</p>
-                <div className="space-y-4">
-                  <Select
+              <div className="flex flex-col p-4 rounded-2xl border border-border bg-muted/5">
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1 mb-4">Equipment Movements</p>
+                <div className="space-y-4 flex-1 mb-4">
+                  <FormSelect
                     label="Specific Item (Optional)"
                     value={movementParams.item_id}
-                    onChange={(e) => setMovementParams({ ...movementParams, item_id: (e.target as HTMLSelectElement).value })}
+                    onChange={(v) => setMovementParams({ ...movementParams, item_id: v })}
                     options={[
-                      { label: 'All Items', value: '' },
+                      { label: 'All Items', key: '' },
                       ...items.map(item => ({
                         label: `${item.name} (${item.item_id})`,
-                        value: item.item_id
+                        key: item.item_id
                       }))
                     ]}
+                    placeholder="Search items..."
                   />
                   <div className="grid grid-cols-2 gap-4">
-                    <Select
+                    <FormSelect
                       label="Movement Type"
                       value={movementParams.movement_type}
-                      onChange={(e) => setMovementParams({ ...movementParams, movement_type: (e.target as HTMLSelectElement).value })}
+                      onChange={(v) => setMovementParams({ ...movementParams, movement_type: v })}
                       options={[
-                        { label: 'All Movements', value: 'all' },
-                        { label: 'In Only', value: 'in' },
-                        { label: 'Out Only', value: 'out' },
+                        { label: 'All Movements', key: 'all' },
+                        { label: 'In Only', key: 'in' },
+                        { label: 'Out Only', key: 'out' },
                       ]}
+                      placeholder="Select type"
                     />
-                    <Select
+                    <FormSelect
                       label="Format"
                       value={movementParams.format}
-                      onChange={(e) => setMovementParams({ ...movementParams, format: (e.target as HTMLSelectElement).value })}
+                      onChange={(v) => setMovementParams({ ...movementParams, format: v })}
                       options={[
-                        { label: 'Excel (XLSX)', value: 'xlsx' },
-                        { label: 'CSV', value: 'csv' },
+                        { label: 'Excel (XLSX)', key: 'xlsx' },
+                        { label: 'CSV', key: 'csv' },
                       ]}
+                      placeholder="Select format"
                     />
                   </div>
                 </div>
                 <button
                   onClick={() => exportData('movements', movementParams)}
-                  className="w-full h-10 bg-muted hover:bg-muted font-bold text-xs rounded-lg transition-colors border border-border"
+                  className="w-full h-10 bg-muted hover:bg-muted font-bold text-xs rounded-lg transition-colors border border-border mt-auto"
                 >
                   Export Movements
                 </button>

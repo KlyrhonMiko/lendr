@@ -5,64 +5,9 @@ import type { InventoryItem, ConfigRead } from '../api';
 import type { InventoryItemFormData } from '../lib/inventoryItemForm';
 import { ChevronDown, Package, X, Check } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { FormSelect } from '@/components/ui/form-select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
-import type React from 'react';
-
-function FormPopoverSelect({
-  label,
-  value,
-  onChange,
-  options,
-  placeholder,
-  required,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: { key: string; label: string }[];
-  placeholder: string;
-  required?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const displayValue = options.find((o) => o.key === value)?.label ?? placeholder;
-
-  return (
-    <div className="space-y-1.5">
-      <label className="block text-sm font-medium text-foreground">
-        {label}
-        {required && <span className="text-rose-500 ml-0.5">*</span>}
-      </label>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger
-          type="button"
-          className="w-full h-11 px-3.5 rounded-xl bg-muted/50 border border-border text-sm font-medium cursor-pointer flex items-center justify-between gap-2 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition-all"
-        >
-          <span className={cn('truncate text-left', !value && 'text-muted-foreground')}>{displayValue}</span>
-          <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
-        </PopoverTrigger>
-        <PopoverContent align="start" sideOffset={4} className="w-[var(--radix-popover-trigger-width)] p-1 max-h-60 overflow-y-auto">
-          {options.map((opt) => (
-            <button
-              key={opt.key || 'empty'}
-              type="button"
-              onClick={() => {
-                onChange(opt.key);
-                setOpen(false);
-              }}
-              className={cn(
-                'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left',
-                value === opt.key ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted'
-              )}
-            >
-              <Check className={cn('w-4 h-4 shrink-0', value === opt.key ? 'opacity-100' : 'opacity-0')} />
-              {opt.label}
-            </button>
-          ))}
-        </PopoverContent>
-      </Popover>
-    </div>
-  );
-}
 
 export function InventoryItemFormModal({
   editingItem,
@@ -127,20 +72,20 @@ export function InventoryItemFormModal({
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full h-11 px-3.5 rounded-xl bg-muted/50 border border-border text-sm font-medium focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition-all"
+              className="w-full h-11 px-3.5 rounded-xl bg-muted/50 border border-border text-sm font-medium focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition-all font-heading"
               placeholder="e.g. Dell Latitude Laptop"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <FormPopoverSelect
+            <FormSelect
               label="Category"
               value={formData.category}
               onChange={(v) => setFormData({ ...formData, category: v })}
               options={[{ key: '', label: 'Select category' }, ...categories.map((c) => ({ key: c.key, label: c.value }))]}
               placeholder="Select category"
             />
-            <FormPopoverSelect
+            <FormSelect
               label="Classification"
               value={formData.classification}
               onChange={(v) => setFormData({ ...formData, classification: v })}
@@ -152,18 +97,16 @@ export function InventoryItemFormModal({
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-3">
-            <FormPopoverSelect
-              label="Item Type"
-              value={formData.item_type}
-              onChange={(v) => setFormData({ ...formData, item_type: v })}
-              options={[
-                { key: '', label: 'Select type' },
-                ...itemTypes.map((t) => ({ key: t.key, label: t.key.charAt(0).toUpperCase() + t.key.slice(1) })),
-              ]}
-              placeholder="Select type"
-            />
-          </div>
+          <FormSelect
+            label="Item Type"
+            value={formData.item_type}
+            onChange={(v) => setFormData({ ...formData, item_type: v })}
+            options={[
+              { key: '', label: 'Select type' },
+              ...itemTypes.map((t) => ({ key: t.key, label: t.key.charAt(0).toUpperCase() + t.key.slice(1) })),
+            ]}
+            placeholder="Select type"
+          />
 
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-foreground">Description</label>
@@ -177,20 +120,18 @@ export function InventoryItemFormModal({
 
           {!editingItem && (
             <label className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border/50 cursor-pointer hover:bg-muted/60 transition-colors">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={formData.is_trackable}
-                onChange={(e) => setFormData({ ...formData, is_trackable: e.target.checked })}
-                className="h-4.5 w-4.5 rounded border-border accent-primary"
+                onCheckedChange={(checked: boolean | "indeterminate") => setFormData({ ...formData, is_trackable: checked === true })}
               />
               <div>
-                <p className="text-sm font-medium text-foreground">Track individual units</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Enable serial number or per-unit tracking</p>
+                <p className="text-sm font-medium text-foreground font-heading leading-none">Track individual units</p>
+                <p className="text-xs text-muted-foreground mt-1">Enable serial number or per-unit tracking</p>
               </div>
             </label>
           )}
 
-          <div className="flex gap-3 pt-2">
+          <div className="flex gap-3 pt-4">
             <button
               type="button"
               onClick={() => {

@@ -4,7 +4,7 @@ import { useState, useEffect, ChangeEvent } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Toggle } from '@/components/ui/toggle';
 import { Input, Textarea } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
+import { FormSelect } from '@/components/ui/form-select';
 import { Wrench, Database, Archive, Trash2, Clock, RefreshCw, FileText, Save, Plus } from 'lucide-react';
 import { ArchivesModal } from './ArchivesModal';
 import { useOperationsSettings, useBackupRuns, useOperationsMutations, useBackupMutations } from '../lib/useSettingsQueries';
@@ -83,90 +83,94 @@ export function OperationsSettings() {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Maintenance Mode */}
-      <Card>
-        <CardHeader className="flex flex-row items-center gap-4">
-          <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center text-orange-500">
-            <Wrench className="w-5 h-5" />
-          </div>
-          <div className="flex-1">
-            <CardTitle>Enable Maintenance Mode</CardTitle>
-            <CardDescription>Block user access to the platform for scheduled repairs or updates.</CardDescription>
-          </div>
-          <Toggle
-            label={data.maintenance.enabled ? "Active" : "Inactive"}
-            checked={data.maintenance.enabled}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
-              ...prev,
-              maintenance: { ...prev.maintenance, enabled: e.target.checked }
-            } : null)}
-          />
-        </CardHeader>
-        <CardContent className={data.maintenance.enabled ? "space-y-6 opacity-100 transition-opacity" : "space-y-6 opacity-50 grayscale pointer-events-none transition-opacity"}>
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-foreground px-1">Custom Maintenance Message</label>
-            <Textarea
-              value={data.maintenance.message}
-              onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Maintenance Mode */}
+        <Card>
+          <CardHeader className="flex flex-row items-center gap-4">
+            <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center text-orange-500">
+              <Wrench className="w-5 h-5" />
+            </div>
+            <div className="flex-1">
+              <CardTitle>Enable Maintenance Mode</CardTitle>
+              <CardDescription>Block user access to the platform for scheduled repairs or updates.</CardDescription>
+            </div>
+            <Toggle
+              label={data.maintenance.enabled ? "Active" : "Inactive"}
+              checked={data.maintenance.enabled}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
                 ...prev,
-                maintenance: { ...prev.maintenance, message: e.target.value }
+                maintenance: { ...prev.maintenance, enabled: e.target.checked }
               } : null)}
             />
-          </div>
+          </CardHeader>
+          <CardContent className={data.maintenance.enabled ? "space-y-6 opacity-100 transition-opacity" : "space-y-6 opacity-50 grayscale pointer-events-none transition-opacity"}>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-foreground px-1">Custom Maintenance Message</label>
+              <Textarea
+                value={data.maintenance.message}
+                onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
+                  ...prev,
+                  maintenance: { ...prev.maintenance, message: e.target.value }
+                } : null)}
+              />
+            </div>
 
-          {/* Time scheduling removed per user request for simplicity */}
-        </CardContent>
-      </Card>
+            {/* Time scheduling removed per user request for simplicity */}
+          </CardContent>
+        </Card>
 
-      {/* Automated Backup Schedule */}
-      <Card>
-        <CardHeader className="flex flex-row items-center gap-4">
-          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-            <Database className="w-5 h-5" />
-          </div>
-          <div className="flex-1">
-            <CardTitle>Automated Backup Schedule</CardTitle>
-            <CardDescription>Configure periodic system data backups to ensure data safety.</CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          <Select
-            label="Frequency"
-            value={data.backup_schedule.frequency}
-            onChange={(e: ChangeEvent<HTMLSelectElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
-              ...prev,
-              backup_schedule: { ...prev.backup_schedule, frequency: e.target.value }
-            } : null)}
-            options={[
-              { label: 'Daily', value: 'daily' },
-              { label: 'Weekly', value: 'weekly' },
-              { label: 'Monthly', value: 'monthly' }
-            ]}
-          />
-          <Input
-            label="Backup Time"
-            type="time"
-            value={data.backup_schedule.time}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
-              ...prev,
-              backup_schedule: { ...prev.backup_schedule, time: e.target.value }
-            } : null)}
-          />
-          <Select
-            label="Storage Location"
-            value={data.backup_schedule.storage_location}
-            onChange={(e: ChangeEvent<HTMLSelectElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
-              ...prev,
-              backup_schedule: { ...prev.backup_schedule, storage_location: e.target.value }
-            } : null)}
-            options={[
-              { label: 'Local Server', value: 'local' },
-              { label: 'Amazon S3 (Cloud)', value: 's3' },
-              { label: 'Local + S3 (Mirror)', value: 'both' }
-            ]}
-          />
-        </CardContent>
-      </Card>
+        {/* Automated Backup Schedule */}
+        <Card>
+          <CardHeader className="flex flex-row items-center gap-4">
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+              <Database className="w-5 h-5" />
+            </div>
+            <div className="flex-1">
+              <CardTitle>Automated Backup Schedule</CardTitle>
+              <CardDescription>Configure periodic system data backups to ensure data safety.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-6">
+            <FormSelect
+              label="Frequency"
+              value={data.backup_schedule.frequency}
+              onChange={(value) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
+                ...prev,
+                backup_schedule: { ...prev.backup_schedule, frequency: value }
+              } : null)}
+              options={[
+                { label: 'Daily', key: 'daily' },
+                { label: 'Weekly', key: 'weekly' },
+                { label: 'Monthly', key: 'monthly' }
+              ]}
+              placeholder="Select frequency"
+            />
+            <Input
+              label="Backup Time"
+              type="time"
+              value={data.backup_schedule.time}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
+                ...prev,
+                backup_schedule: { ...prev.backup_schedule, time: e.target.value }
+              } : null)}
+            />
+            <FormSelect
+              label="Storage Location"
+              value={data.backup_schedule.storage_location}
+              onChange={(value) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
+                ...prev,
+                backup_schedule: { ...prev.backup_schedule, storage_location: value }
+              } : null)}
+              options={[
+                { label: 'Local Server', key: 'local' },
+                { label: 'Amazon S3 (Cloud)', key: 's3' },
+                { label: 'Local + S3 (Mirror)', key: 'both' }
+              ]}
+              placeholder="Select location"
+            />
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Backup History */}
       <Card>
@@ -250,14 +254,15 @@ export function OperationsSettings() {
                   archive_policy: { ...prev.archive_policy, audit_logs_value: parseInt(e.target.value) || 0 }
                 } : null)}
               />
-              <Select
-                options={[{ label: 'Days', value: 'd' }, { label: 'Months', value: 'm' }]}
+              <FormSelect
+                options={[{ label: 'Days', key: 'd' }, { label: 'Months', key: 'm' }]}
                 value={data.archive_policy.audit_logs_unit}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
+                onChange={(value) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
                   ...prev,
-                  archive_policy: { ...prev.archive_policy, audit_logs_unit: e.target.value }
+                  archive_policy: { ...prev.archive_policy, audit_logs_unit: value }
                 } : null)}
                 className="w-[110px]"
+                placeholder="Unit"
               />
             </div>
             <div className="flex items-end gap-3">
@@ -271,14 +276,15 @@ export function OperationsSettings() {
                   archive_policy: { ...prev.archive_policy, borrow_records_value: parseInt(e.target.value) || 0 }
                 } : null)}
               />
-              <Select
-                options={[{ label: 'Days', value: 'd' }, { label: 'Months', value: 'm' }, { label: 'Years', value: 'y' }]}
+              <FormSelect
+                options={[{ label: 'Days', key: 'd' }, { label: 'Months', key: 'm' }, { label: 'Years', key: 'y' }]}
                 value={data.archive_policy.borrow_records_unit}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
+                onChange={(value) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
                   ...prev,
-                  archive_policy: { ...prev.archive_policy, borrow_records_unit: e.target.value }
+                  archive_policy: { ...prev.archive_policy, borrow_records_unit: value }
                 } : null)}
                 className="w-[110px]"
+                placeholder="Unit"
               />
             </div>
             <button
@@ -320,14 +326,15 @@ export function OperationsSettings() {
                   retention_policy: { ...prev.retention_policy, delete_older_than_value: parseInt(e.target.value) || 0 }
                 } : null)}
               />
-              <Select
-                options={[{ label: 'Years', value: 'y' }, { label: 'Months', value: 'm' }]}
+              <FormSelect
+                options={[{ label: 'Years', key: 'y' }, { label: 'Months', key: 'm' }]}
                 value={data.retention_policy.delete_older_than_unit}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
+                onChange={(value) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
                   ...prev,
-                  retention_policy: { ...prev.retention_policy, delete_older_than_unit: e.target.value }
+                  retention_policy: { ...prev.retention_policy, delete_older_than_unit: value }
                 } : null)}
                 className="w-[110px]"
+                placeholder="Unit"
               />
             </div>
             <div className="space-y-2">

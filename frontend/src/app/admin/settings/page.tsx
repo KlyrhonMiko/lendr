@@ -9,7 +9,6 @@ import { useAdminSettingsManagement } from './lib/useAdminSettingsManagement';
 
 // New Section Components
 import { GeneralSettings } from './components/GeneralSettings';
-import { BrandingSettings } from './components/BrandingSettings';
 import { OperationsSettings } from './components/OperationsSettings';
 import { HealthSettings } from './components/HealthSettings';
 import { SecuritySettings } from './components/SecuritySettings';
@@ -61,16 +60,14 @@ export default function SettingsPage() {
       <div className="min-h-[600px]">
         {activeTab === 'general' && <GeneralSettings />}
 
-        {activeTab === 'system' && <BrandingSettings />}
-        
         {activeTab === 'operations' && <OperationsSettings />}
-        
+
         {activeTab === 'health' && <HealthSettings />}
-        
+
         {activeTab === 'security' && <SecuritySettings />}
-        
+
         {activeTab === 'dictionary' && (
-          <DictionarySettings 
+          <DictionarySettings
             settings={settings}
             loading={loading}
             meta={meta}

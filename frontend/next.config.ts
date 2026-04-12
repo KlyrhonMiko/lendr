@@ -24,7 +24,7 @@ if (isDevelopment) {
 const contentSecurityPolicy = [
   "default-src 'self'",
   "media-src 'self' data: blob:",
-  `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""}`,
+  `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${isDevelopment ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
   `img-src ${imgSrc.join(" ")}`,
   "font-src 'self' data:",
@@ -36,6 +36,8 @@ const contentSecurityPolicy = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  // @ts-ignore - explicitly required by Next.js dev server for cross-origin LAN access
+  allowedDevOrigins: ["192.168.100.104"],
   async headers() {
     return [
       {

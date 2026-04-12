@@ -5,6 +5,7 @@ import { X, Loader2, Mail, Shield, Clock, Hash, Phone, UserCircle, Check, Chevro
 import { userApi, User, UserCreate, UserUpdate, AuthConfig } from './api';
 import { toast } from 'sonner';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { FormSelect } from '@/components/ui/form-select';
 import { cn } from '@/lib/utils';
 
 interface UserModalProps {
@@ -28,8 +29,7 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
   const [roles, setRoles] = useState<AuthConfig[]>([]);
   const [shifts, setShifts] = useState<AuthConfig[]>([]);
   const [pinLength, setPinLength] = useState(DEFAULT_PIN_LENGTH);
-  const [roleOpen, setRoleOpen] = useState(false);
-  const [shiftOpen, setShiftOpen] = useState(false);
+
 
   const pinValidationMessage = `PIN must be at least ${pinLength} characters`;
   const PASSWORD_POLICY_EXEMPT_ROLES = new Set(['borrower', 'dispatch']);
@@ -401,93 +401,33 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
                 System Configuration
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    Role <span className="text-red-400">*</span>
-                  </label>
-                  <Popover open={roleOpen} onOpenChange={setRoleOpen}>
-                    <PopoverTrigger
-                      type="button"
-                      disabled={configsLoading}
-                      className="relative w-full h-11 pl-10 pr-8 rounded-lg bg-muted/40 border border-border text-sm text-left focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/40 transition-all disabled:opacity-50 cursor-pointer"
-                    >
-                      <Shield className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 pointer-events-none" />
-                      <span className={cn("block truncate", !formData.role && "text-muted-foreground/40")}>
-                        {formData.role
-                          ? `${roles.find(r => r.key === formData.role)?.value || formData.role} (${formData.role})`
-                          : 'Select a role...'}
-                      </span>
-                      {configsLoading ? (
-                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground pointer-events-none" />
-                      ) : (
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-                      )}
-                    </PopoverTrigger>
-                    <PopoverContent align="start" sideOffset={4} className="w-[var(--anchor-width)] p-1 max-h-60 overflow-y-auto">
-                      {roles.map(r => (
-                        <button
-                          key={r.key}
-                          type="button"
-                          onClick={() => {
-                            setFormData(prev => ({ ...prev, role: r.key }));
-                            setRoleOpen(false);
-                          }}
-                          className={cn(
-                            "w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left",
-                            formData.role === r.key
-                              ? "bg-primary/10 text-primary font-medium"
-                              : "hover:bg-muted text-foreground"
-                          )}
-                        >
-                          <Check className={cn("w-4 h-4 shrink-0", formData.role === r.key ? "opacity-100" : "opacity-0")} />
-                          {r.value} ({r.key})
-                        </button>
-                      ))}
-                    </PopoverContent>
-                  </Popover>
+                <div className="relative">
+                  <Shield className="absolute left-3 top-[38px] w-4 h-4 text-muted-foreground/50 pointer-events-none z-10" />
+                  <FormSelect
+                    label="Role"
+                    required
+                    disabled={configsLoading}
+                    value={formData.role}
+                    onChange={(v) => setFormData(prev => ({ ...prev, role: v }))}
+                    options={roles.map(r => ({ key: r.key, label: `${r.value} (${r.key})` }))}
+                    placeholder="Select a role..."
+                    triggerClassName="pl-10 h-11"
+                  />
+                  {configsLoading && <Loader2 className="absolute right-3 top-[38px] w-4 h-4 animate-spin text-muted-foreground z-10" />}
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    Shift <span className="text-red-400">*</span>
-                  </label>
-                  <Popover open={shiftOpen} onOpenChange={setShiftOpen}>
-                    <PopoverTrigger
-                      type="button"
-                      disabled={configsLoading}
-                      className="relative w-full h-11 pl-10 pr-8 rounded-lg bg-muted/40 border border-border text-sm text-left focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/40 transition-all disabled:opacity-50 cursor-pointer"
-                    >
-                      <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 pointer-events-none" />
-                      <span className="block truncate">
-                        {shifts.find(s => s.key === formData.shift_type)?.value || formData.shift_type}
-                      </span>
-                      {configsLoading ? (
-                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground pointer-events-none" />
-                      ) : (
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-                      )}
-                    </PopoverTrigger>
-                    <PopoverContent align="start" sideOffset={4} className="w-[var(--anchor-width)] p-1 max-h-60 overflow-y-auto">
-                      {shifts.map(s => (
-                        <button
-                          key={s.key}
-                          type="button"
-                          onClick={() => {
-                            setFormData(prev => ({ ...prev, shift_type: s.key }));
-                            setShiftOpen(false);
-                          }}
-                          className={cn(
-                            "w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left",
-                            formData.shift_type === s.key
-                              ? "bg-primary/10 text-primary font-medium"
-                              : "hover:bg-muted text-foreground"
-                          )}
-                        >
-                          <Check className={cn("w-4 h-4 shrink-0", formData.shift_type === s.key ? "opacity-100" : "opacity-0")} />
-                          {s.value}
-                        </button>
-                      ))}
-                    </PopoverContent>
-                  </Popover>
+                <div className="relative">
+                  <Clock className="absolute left-3 top-[38px] w-4 h-4 text-muted-foreground/50 pointer-events-none z-10" />
+                  <FormSelect
+                    label="Shift"
+                    required
+                    disabled={configsLoading}
+                    value={formData.shift_type}
+                    onChange={(v) => setFormData(prev => ({ ...prev, shift_type: v }))}
+                    options={shifts.map(s => ({ key: s.key, label: s.value }))}
+                    placeholder="Select a shift..."
+                    triggerClassName="pl-10 h-11"
+                  />
+                  {configsLoading && <Loader2 className="absolute right-3 top-[38px] w-4 h-4 animate-spin text-muted-foreground z-10" />}
                 </div>
               </div>
             </section>

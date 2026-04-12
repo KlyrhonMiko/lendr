@@ -16,6 +16,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { FormSelect } from '@/components/ui/form-select';
 import { toast } from 'sonner';
 import type { SystemSetting, SystemSettingCreate } from '../lib/types';
 import type { PaginationMeta } from '@/lib/api';
@@ -115,14 +116,15 @@ export function DictionarySettings({
               className="w-full h-12 pl-12 pr-4 rounded-2xl bg-muted/20 border border-border focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all text-sm outline-none"
             />
           </div>
-          <div className="w-48">
-            <Select
-              defaultValue={categoryFilter}
-              onChange={(e) => onCategoryFilterChange((e.target as HTMLSelectElement).value)}
+          <div className="w-56">
+            <FormSelect
+              value={categoryFilter}
+              onChange={(v) => onCategoryFilterChange(v || '')}
               options={[
-                { label: 'All Categories', value: '' },
-                ...categories.map(c => ({ label: c, value: c }))
+                { label: 'All Categories', key: '' },
+                ...categories.map(c => ({ label: c, key: c }))
               ]}
+              placeholder="All Categories"
             />
           </div>
         </div>
@@ -154,11 +156,12 @@ export function DictionarySettings({
           </CardHeader>
           <CardContent className="grid gap-6 md:grid-cols-3">
             <div className="space-y-1">
-              <label className="text-xs font-bold text-muted-foreground ml-1">Category</label>
-              <Select
-                defaultValue={newEntry.category}
-                onChange={(e) => setNewEntry({ ...newEntry, category: (e.target as HTMLSelectElement).value })}
-                options={categories.map(c => ({ label: c, value: c }))}
+              <FormSelect
+                label="Category"
+                value={newEntry.category || ''}
+                onChange={(v) => setNewEntry({ ...newEntry, category: v || '' })}
+                options={categories.map(c => ({ label: c, key: c }))}
+                placeholder="Select category"
               />
             </div>
             <div className="space-y-1">

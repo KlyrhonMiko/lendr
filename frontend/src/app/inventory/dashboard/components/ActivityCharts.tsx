@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { InventoryHealth, BorrowingTrend } from '../lib/types';
 import { Activity, ShieldCheck } from 'lucide-react';
+import { FormSelect } from '@/components/ui/form-select';
 
 export function InventoryHealthPanel({ health, loading }: { health: InventoryHealth | null, loading: boolean }) {
   const [activeTab, setActiveTab] = useState<keyof InventoryHealth>('item_statuses');
@@ -24,15 +25,14 @@ export function InventoryHealthPanel({ health, loading }: { health: InventoryHea
           <ShieldCheck className="w-5 h-5 text-emerald-500" />
           <h3 className="font-semibold text-sm">Inventory Health</h3>
         </div>
-        <select
-          className="text-[10px] bg-muted border-none rounded px-1.5 py-1 outline-none"
+        <FormSelect
           value={activeTab}
-          onChange={(e) => setActiveTab(e.target.value as keyof InventoryHealth)}
-        >
-          {tabs.map(tab => (
-            <option key={tab.id} value={tab.id}>{tab.label}</option>
-          ))}
-        </select>
+          onChange={(v: string) => setActiveTab(v as keyof InventoryHealth)}
+          options={tabs.map(tab => ({ label: tab.label, key: tab.id }))}
+          placeholder="View..."
+          className="h-7 px-2"
+          triggerClassName="h-7 text-[10px]"
+        />
       </div>
       <div className="p-4 flex-1">
         {loading ? (
@@ -54,9 +54,9 @@ export function InventoryHealthPanel({ health, loading }: { health: InventoryHea
                 <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
                   <div
                     className={`h-full transition-all duration-500 ${item.label === 'available' || item.label === 'healthy' || item.label === 'good' || item.label === 'excellent' ? 'bg-emerald-500' :
-                        item.label === 'borrowed' ? 'bg-primary' :
-                          item.label === 'maintenance' || item.label === 'fair' || item.label === 'low_stock' || item.label === 'near_expiry' ? 'bg-amber-500' :
-                            'bg-rose-500'
+                      item.label === 'borrowed' ? 'bg-primary' :
+                        item.label === 'maintenance' || item.label === 'fair' || item.label === 'low_stock' || item.label === 'near_expiry' ? 'bg-amber-500' :
+                          'bg-rose-500'
                       }`}
                     style={{ width: `${Math.min(100, (item.count / Math.max(1, totalCount)) * 100)}%` }}
                   />

@@ -7,7 +7,7 @@ import { useAdminAuditLogs } from './useAuditLogQueries';
 const DEFAULT_PER_PAGE = 10;
 
 function timeframeToDateFrom(timeframe: string): string | undefined {
-  if (timeframe === 'all') return undefined;
+  if (!timeframe) return undefined;
 
   const date = new Date();
   if (timeframe === '24h') date.setHours(date.getHours() - 24);
@@ -21,7 +21,7 @@ export function useAuditLogsManagement() {
   const [perPage, setPerPage] = useState(DEFAULT_PER_PAGE);
   const [search, setSearch] = useState('');
   const [entityFilter, setEntityFilter] = useState('');
-  const [timeframe, setTimeframe] = useState('all');
+  const [timeframe, setTimeframe] = useState('');
   const [expandedAuditId, setExpandedAuditId] = useState<string | null>(null);
 
   const date_from = useMemo(() => timeframeToDateFrom(timeframe), [timeframe]);

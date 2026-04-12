@@ -133,14 +133,14 @@ function buildReceiptHtml(receipt: ReleaseReceipt, signatureDataUrl: string | nu
 
     <!-- Signature -->
     <div style="margin-bottom: 6px;">
-      <div style="font-size: 9px; color: #555; margin-bottom: 4px;">Released by:</div>
+      <div style="font-size: 9px; color: #555; margin-bottom: 4px;">Acknowledged by (Borrower):</div>
       ${signatureDataUrl
       ? `<div style="border: 1px solid #999; height: 50px; display: flex; align-items: center; justify-content: center;">
              <img src="${signatureDataUrl}" style="max-width: 100%; max-height: 44px; object-fit: contain;" />
            </div>`
       : `<div style="border-bottom: 1px solid #000; height: 50px;"></div>`
     }
-      <div style="font-size: 9px; color: #555; margin-top: 2px;">${receipt.released_by_name || ''}</div>
+      <div style="font-size: 9px; color: #555; margin-top: 2px;">${receipt.borrower_name || ''}</div>
     </div>
 
     <hr style="${s.hr}">

@@ -2,14 +2,13 @@
 
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
-import { type SettingsListParams, type SystemSetting, type SystemSettingCreate } from '../api';
+import { type ActiveTab, type SettingsListParams, type SystemSetting, type SystemSettingCreate } from '../api';
 import { useDebounce } from './useDebounce';
 
 import { useAdminSettings, useAdminSettingLookups, useAdminSettingMutations, useAuthConfigurations } from './useSettingsQueries';
 
 const DEFAULT_PER_PAGE = 10;
 
-type ActiveTab = 'general' | 'system' | 'operations' | 'health' | 'security' | 'dictionary';
 
 export function useAdminSettingsManagement() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('health');
@@ -34,10 +33,10 @@ export function useAdminSettingsManagement() {
   };
 
   // Queries
-  const { 
-    data: dictionaryRes, 
-    isLoading: dictionaryLoading, 
-    error: dictionaryError 
+  const {
+    data: dictionaryRes,
+    isLoading: dictionaryLoading,
+    error: dictionaryError
   } = useAdminSettings(params);
 
   const {

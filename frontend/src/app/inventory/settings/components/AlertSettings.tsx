@@ -9,11 +9,12 @@ import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { FormSelect } from '@/components/ui/form-select';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface SpecificRecipient {
   name: string;
   email?: string;
-  phone?: string;
 }
 
 interface AlertSettingsData {
@@ -37,33 +38,30 @@ function AddRecipientDialog({
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
 
   const handleAdd = () => {
     if (!name) {
       toast.error('Name is required');
       return;
     }
-    if (!email && !phone) {
-      toast.error('Either email or phone is required');
+    if (!email) {
+      toast.error('Email is required');
       return;
     }
 
     // Duplication Check
     const isDuplicate = existingRecipients.some(rec =>
-      (email && rec.email?.toLowerCase() === email.toLowerCase()) ||
-      (phone && rec.phone === phone)
+      email && rec.email?.toLowerCase() === email.toLowerCase()
     );
 
     if (isDuplicate) {
-      toast.error('A recipient with this email or phone number already exists');
+      toast.error('A recipient with this email already exists');
       return;
     }
 
-    onAdd({ name, email: email || undefined, phone: phone || undefined });
+    onAdd({ name, email: email || undefined });
     setName('');
     setEmail('');
-    setPhone('');
     setOpen(false);
   };
 
@@ -95,15 +93,6 @@ function AddRecipientDialog({
                 placeholder="john@example.com"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                className="h-10 rounded-xl bg-muted/30"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground ml-1">Contact Number</label>
-              <Input
-                placeholder="+63 9xx xxx xxxx"
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
                 className="h-10 rounded-xl bg-muted/30"
               />
             </div>
@@ -284,14 +273,15 @@ export function AlertSettings() {
                   />
                 </div>
                 <div className="w-40">
-                  <Select
+                  <FormSelect
                     value={formData.borrow_request_alert_unit}
-                    onChange={(e) => handleInputChange('borrow_request_alert_unit', e.target.value)}
+                    onChange={(v) => handleInputChange('borrow_request_alert_unit', v || 'minutes')}
                     options={[
-                      { label: 'Minutes', value: 'minutes' },
-                      { label: 'Hours', value: 'hours' },
-                      { label: 'Days', value: 'days' }
+                      { label: 'Minutes', key: 'minutes' },
+                      { label: 'Hours', key: 'hours' },
+                      { label: 'Days', key: 'days' }
                     ]}
+                    placeholder="Select unit"
                   />
                 </div>
               </div>
@@ -301,146 +291,147 @@ export function AlertSettings() {
         </CardContent>
       </Card>
 
-      {/* Notification Channels */}
-      <Card>
-        <CardHeader className="flex flex-row items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
-            <BellRing className="w-6 h-6" />
-          </div>
-          <div>
-            <CardTitle>Notification Channels</CardTitle>
-            <CardDescription>Select how alerts are delivered to the recipients.</CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent className="grid gap-4">
-          <div className="flex flex-wrap gap-4">
-            {[
-              { id: 'in-app', label: 'In-app Notification', icon: Monitor, color: 'text-primary', bg: 'bg-primary/10' },
-              { id: 'email', label: 'Email', icon: Mail, color: 'text-primary', bg: 'bg-primary/10' },
-              { id: 'sms', label: 'SMS', icon: MessageSquare, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-            ].map((channel) => {
-              const Icon = channel.icon;
-              const isChecked = formData.notification_channels.includes(channel.id);
-              return (
-                <label
-                  key={channel.id}
-                  className={`flex items-center gap-4 p-4 rounded-2xl border transition-all flex-1 min-w-[200px] cursor-pointer ${isChecked ? 'border-primary bg-primary/5' : 'border-border bg-muted/20 hover:bg-muted/30'
-                    }`}
-                >
-                  <input
-                    type="checkbox"
-                    className="w-5 h-5 rounded-lg border-border text-primary focus:ring-primary"
-                    checked={isChecked}
-                    onChange={() => toggleListValue('notification_channels', channel.id)}
-                  />
-                  <div className={`w-10 h-10 rounded-xl ${channel.bg} flex items-center justify-center ${channel.color}`}>
-                    <Icon className="w-5 h-5" />
-                  </div>
-                  <span className="font-semibold text-sm">{channel.label}</span>
-                </label>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Alert Recipients */}
-      <Card>
-        <CardHeader className="flex flex-row items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
-            <Users className="w-6 h-6" />
-          </div>
-          <div>
-            <CardTitle>Alert Recipients</CardTitle>
-            <CardDescription>Select which roles or specific users receive each type of alert.</CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-8">
-          <div className="space-y-6">
-            <div className="flex items-center gap-2 text-sm font-semibold px-1">
-              <ShieldCheck className="w-4 h-4 text-emerald-500" />
-              Role-based Targeting
+      {/* Grid Layout for Channels and Recipients */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.5fr] gap-8 items-start">
+        {/* Notification Channels */}
+        <Card className="h-full">
+          <CardHeader className="flex flex-row items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+              <BellRing className="w-6 h-6" />
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div>
+              <CardTitle>Notification Channels</CardTitle>
+              <CardDescription>Select how alerts are delivered.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-col gap-4">
               {[
-                { id: 'inventory_manager', label: 'Inventory Manager' },
-                { id: 'admin', label: 'Admin' }
-              ].map((role) => {
-                const isChecked = formData.alert_recipient_roles.includes(role.id);
+                { id: 'in-app', label: 'In-app Notification', icon: Monitor, color: 'text-primary', bg: 'bg-primary/10' },
+                { id: 'email', label: 'Email', icon: Mail, color: 'text-primary', bg: 'bg-primary/10' },
+              ].map((channel) => {
+                const Icon = channel.icon;
+                const isChecked = formData.notification_channels.includes(channel.id);
                 return (
                   <label
-                    key={role.id}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all cursor-pointer ${isChecked ? 'border-emerald-500 bg-emerald-500/5' : 'border-border bg-card hover:bg-muted'
+                    key={channel.id}
+                    className={`flex items-center gap-4 p-4 rounded-2xl border transition-all cursor-pointer ${isChecked ? 'border-primary bg-primary/5' : 'border-border bg-muted/20 hover:bg-muted/30'
                       }`}
                   >
-                    <input
-                      type="checkbox"
-                      className="w-4 h-4 rounded border-border text-emerald-500 focus:ring-emerald-500"
+                    <Checkbox
                       checked={isChecked}
-                      onChange={() => toggleListValue('alert_recipient_roles', role.id)}
+                      onCheckedChange={() => toggleListValue('notification_channels', channel.id)}
                     />
-                    <span className="text-xs font-bold">{role.label}</span>
+                    <div className={`w-10 h-10 rounded-xl ${channel.bg} flex items-center justify-center ${channel.color}`}>
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <span className="font-semibold text-sm">{channel.label}</span>
                   </label>
                 );
               })}
             </div>
-          </div>
+          </CardContent>
+        </Card>
 
-          <div className="space-y-6">
-            <div className="flex items-center justify-between text-sm font-semibold px-1">
-              <span className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-primary" />
-                Specific Recipients
-              </span>
-              <AddRecipientDialog
-                onAdd={addSpecificRecipient}
-                existingRecipients={formData.specific_recipients}
-              />
+        {/* Alert Recipients */}
+        <Card>
+          <CardHeader className="flex flex-row items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+              <Users className="w-6 h-6" />
+            </div>
+            <div>
+              <CardTitle>Alert Recipients</CardTitle>
+              <CardDescription>Select which roles or specific users receive each type of alert.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-8">
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 text-sm font-semibold px-1">
+                <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                Role-based Targeting
+              </div>
+              <div className="flex flex-wrap gap-3">
+                {[
+                  { id: 'inventory_manager', label: 'Inventory Manager' },
+                  { id: 'admin', label: 'Admin' }
+                ].map((role) => {
+                  const isChecked = formData.alert_recipient_roles.includes(role.id);
+                  return (
+                    <label
+                      key={role.id}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all cursor-pointer ${isChecked ? 'border-emerald-500 bg-emerald-500/5' : 'border-border bg-card hover:bg-muted'
+                        }`}
+                    >
+                      <Checkbox
+                        checked={isChecked}
+                        onCheckedChange={() => toggleListValue('alert_recipient_roles', role.id)}
+                        className="data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
+                      />
+                      <span className="text-xs font-bold">{role.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
 
-            {formData.specific_recipients.length === 0 ? (
-              <div className="bg-muted/10 border border-dashed border-border rounded-2xl p-8 flex flex-col items-center justify-center gap-2 text-muted-foreground animate-in fade-in duration-300">
-                <div className="w-12 h-12 rounded-full bg-muted/30 flex items-center justify-center mb-1">
-                  <Users className="w-6 h-6 opacity-20" />
-                </div>
-                <p className="text-sm font-medium">No specific recipients added</p>
-                <p className="text-xs">Add specific individuals to receive alerts regardless of their role.</p>
+            <div className="space-y-6">
+              <div className="flex items-center justify-between text-sm font-semibold px-1">
+                <span className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-primary" />
+                  Specific Recipients
+                </span>
+                <AddRecipientDialog
+                  onAdd={addSpecificRecipient}
+                  existingRecipients={formData.specific_recipients}
+                />
               </div>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {formData.specific_recipients.map((rec, idx) => (
-                  <div key={idx} className="group relative bg-muted/30 border border-border rounded-2xl p-4 flex items-center gap-4 transition-all hover:border-primary/30 hover:bg-muted/50">
-                    <div className="w-10 h-10 rounded-xl bg-background border border-border flex items-center justify-center text-primary font-bold text-xs">
-                      {rec.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold truncate">{rec.name}</p>
-                      <p className="text-[10px] text-muted-foreground truncate">{rec.email || rec.phone || 'No contact info'}</p>
-                    </div>
-                    <button
-                      onClick={() => removeSpecificRecipient(idx)}
-                      aria-label={`Remove recipient ${rec.name}`}
-                      className="opacity-0 group-hover:opacity-100 p-2 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-all"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
+
+              {formData.specific_recipients.length === 0 ? (
+                <div className="bg-muted/10 border border-dashed border-border rounded-2xl p-8 flex flex-col items-center justify-center gap-2 text-muted-foreground animate-in fade-in duration-300">
+                  <div className="w-12 h-12 rounded-full bg-muted/30 flex items-center justify-center mb-1">
+                    <Users className="w-6 h-6 opacity-20" />
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </CardContent>
-        <CardFooter className="flex justify-end p-6 border-t border-border/50">
-          <button
-            onClick={handleSave}
-            disabled={mutation.isPending}
-            className="flex items-center gap-2 px-8 py-3 bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground rounded-xl text-sm font-bold shadow-lg shadow-primary/20 transition-all active:scale-[0.98]"
-          >
-            <Save className="w-4 h-4" />
-            {mutation.isPending ? 'Saving...' : 'Save Configuration'}
-          </button>
-        </CardFooter>
-      </Card>
+                  <p className="text-sm font-medium">No specific recipients added</p>
+                  <p className="text-xs">Add specific individuals to receive alerts.</p>
+                </div>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {formData.specific_recipients.map((rec, idx) => (
+                    <div key={idx} className="group relative bg-muted/30 border border-border rounded-2xl p-4 flex items-center gap-4 transition-all hover:border-primary/30 hover:bg-muted/50">
+                      <div className="w-10 h-10 rounded-xl bg-background border border-border flex items-center justify-center text-primary font-bold text-xs">
+                        {rec.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold truncate">{rec.name}</p>
+                        <p className="text-[10px] text-muted-foreground truncate">{rec.email || 'No contact info'}</p>
+                      </div>
+                      <button
+                        onClick={() => removeSpecificRecipient(idx)}
+                        aria-label={`Remove recipient ${rec.name}`}
+                        className="opacity-0 group-hover:opacity-100 p-2 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-all"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Persistent Action Footer */}
+      <div className="sticky bottom-0 left-0 right-0 py-4 bg-background/80 backdrop-blur-md border-t border-border/50 flex justify-end px-2 z-10">
+        <button
+          onClick={handleSave}
+          disabled={mutation.isPending}
+          className="flex items-center gap-2 px-10 py-3.5 bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground rounded-2xl text-sm font-bold shadow-xl shadow-primary/20 transition-all active:scale-[0.98]"
+        >
+          <Save className="w-4 h-4" />
+          {mutation.isPending ? 'Saving Settings...' : 'Save Configuration'}
+        </button>
+      </div>
     </div>
   );
 }

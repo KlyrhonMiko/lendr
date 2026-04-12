@@ -23,6 +23,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { FilterSelect } from '@/components/ui/filter-select';
+import { FormSelect } from '@/components/ui/form-select';
 import { cn, parseSystemDate } from '@/lib/utils';
 import { logger } from '@/lib/logger';
 import { QrCodeModal } from '@/components/ui/QrCodeModal';
@@ -36,107 +38,7 @@ interface UnitManagementProps {
   onClose: () => void;
 }
 
-function FilterSelect({
-  value,
-  onChange,
-  options,
-  placeholder,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  options: { key: string; label: string }[];
-  placeholder: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const display = options.find((o) => o.key === value)?.label ?? placeholder;
 
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        type="button"
-        className="h-9 px-3 rounded-xl bg-muted/50 border border-border text-xs font-medium cursor-pointer flex items-center gap-1.5 hover:bg-muted transition-colors"
-      >
-        <span className={cn('truncate', !value && 'text-muted-foreground')}>{display}</span>
-        <ChevronDown className="w-3 h-3 text-muted-foreground shrink-0" />
-      </PopoverTrigger>
-      <PopoverContent align="end" sideOffset={4} className="w-44 p-1 max-h-52 overflow-y-auto">
-        <button
-          type="button"
-          onClick={() => { onChange(''); setOpen(false); }}
-          className={cn(
-            'w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors text-left',
-            !value ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted'
-          )}
-        >
-          <Check className={cn('w-3.5 h-3.5 shrink-0', !value ? 'opacity-100' : 'opacity-0')} />
-          {placeholder}
-        </button>
-        {options.map((opt) => (
-          <button
-            key={opt.key}
-            type="button"
-            onClick={() => { onChange(opt.key); setOpen(false); }}
-            className={cn(
-              'w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors text-left',
-              value === opt.key ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted'
-            )}
-          >
-            <Check className={cn('w-3.5 h-3.5 shrink-0', value === opt.key ? 'opacity-100' : 'opacity-0')} />
-            {opt.label}
-          </button>
-        ))}
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-function FormSelect({
-  label,
-  value,
-  onChange,
-  options,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: { key: string; label: string }[];
-  placeholder: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const display = options.find((o) => o.key === value)?.label ?? placeholder;
-
-  return (
-    <div className="space-y-1.5">
-      <label className="block text-sm font-medium text-foreground">{label}</label>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger
-          type="button"
-          className="w-full h-11 px-3.5 rounded-xl bg-muted/50 border border-border text-sm font-medium cursor-pointer flex items-center justify-between gap-2 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition-all"
-        >
-          <span className={cn('truncate text-left', !value && 'text-muted-foreground')}>{display}</span>
-          <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
-        </PopoverTrigger>
-        <PopoverContent align="start" sideOffset={4} className="w-[var(--radix-popover-trigger-width)] p-1 max-h-60 overflow-y-auto">
-          {options.map((opt) => (
-            <button
-              key={opt.key}
-              type="button"
-              onClick={() => { onChange(opt.key); setOpen(false); }}
-              className={cn(
-                'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left',
-                value === opt.key ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted'
-              )}
-            >
-              <Check className={cn('w-4 h-4 shrink-0', value === opt.key ? 'opacity-100' : 'opacity-0')} />
-              {opt.label}
-            </button>
-          ))}
-        </PopoverContent>
-      </Popover>
-    </div>
-  );
-}
 
 const STATUS_COLORS: Record<string, string> = {
   available: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',

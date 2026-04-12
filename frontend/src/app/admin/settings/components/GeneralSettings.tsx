@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select } from '@/components/ui/select';
+import { FormSelect } from '@/components/ui/form-select';
 import { Globe, Save, Loader2 } from 'lucide-react';
 import { useGeneralSettings, useGeneralMutations } from '../lib/useSettingsQueries';
 import type { GeneralSettingsData } from '../api';
@@ -65,46 +65,50 @@ export function GeneralSettings() {
           </div>
         </CardHeader>
         <CardContent className="grid gap-6 md:grid-cols-2 pt-6">
-          <Select
+          <FormSelect
             label="Timezone"
             value={settings.localization.timezone}
-            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => updateLocalization('timezone', e.target.value)}
+            onChange={(value) => updateLocalization('timezone', value)}
             options={[
-              { label: '(UTC+08:00) Manila, Beijing, Singapore', value: 'Asia/Manila' },
-              { label: '(UTC+00:00) Coordinated Universal Time', value: 'UTC' },
-              { label: '(UTC+09:00) Tokyo, Seoul', value: 'Asia/Tokyo' },
-              { label: '(UTC-05:00) Eastern Time (US & Canada)', value: 'America/New_York' },
-              { label: '(UTC+01:00) Central European Time', value: 'Europe/Berlin' }
+              { label: '(UTC+08:00) Manila, Beijing, Singapore', key: 'Asia/Manila' },
+              { label: '(UTC+00:00) Coordinated Universal Time', key: 'UTC' },
+              { label: '(UTC+09:00) Tokyo, Seoul', key: 'Asia/Tokyo' },
+              { label: '(UTC-05:00) Eastern Time (US & Canada)', key: 'America/New_York' },
+              { label: '(UTC+01:00) Central European Time', key: 'Europe/Berlin' }
             ]}
+            placeholder="Select timezone"
           />
-          <Select
+          <FormSelect
             label="Date Format"
             value={settings.localization.date_format}
-            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => updateLocalization('date_format', e.target.value)}
+            onChange={(value) => updateLocalization('date_format', value)}
             options={[
-              { label: 'MM/DD/YYYY (USA Style)', value: 'MM/DD/YYYY' },
-              { label: 'DD/MM/YYYY (PH Style)', value: 'DD/MM/YYYY' },
-              { label: 'YYYY-MM-DD (ISO standard)', value: 'YYYY-MM-DD' }
+              { label: 'MM/DD/YYYY (USA Style)', key: 'MM/DD/YYYY' },
+              { label: 'DD/MM/YYYY (PH Style)', key: 'DD/MM/YYYY' },
+              { label: 'YYYY-MM-DD (ISO standard)', key: 'YYYY-MM-DD' }
             ]}
+            placeholder="Select date format"
           />
-          <Select
+          <FormSelect
             label="Time Format"
             value={settings.localization.time_format}
-            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => updateLocalization('time_format', e.target.value)}
+            onChange={(value) => updateLocalization('time_format', value)}
             options={[
-              { label: '12-hour (AM/PM)', value: '12h' },
-              { label: '24-hour (Military)', value: '24h' }
+              { label: '12-hour (AM/PM)', key: '12h' },
+              { label: '24-hour (Military)', key: '24h' }
             ]}
+            placeholder="Select time format"
           />
-          <Select
+          <FormSelect
             label="Language"
             value={settings.localization.language}
-            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => updateLocalization('language', e.target.value)}
+            onChange={(value) => updateLocalization('language', value)}
             options={[
-              { label: 'English (US)', value: 'en' },
-              { label: 'Spanish (Coming Soon)', value: 'es' },
-              { label: 'French (Coming Soon)', value: 'fr' }
+              { label: 'English (US)', key: 'en' },
+              { label: 'Spanish (Coming Soon)', key: 'es' },
+              { label: 'French (Coming Soon)', key: 'fr' }
             ]}
+            placeholder="Select language"
           />
         </CardContent>
       </Card>

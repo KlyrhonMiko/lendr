@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { History, Search, Loader2, AlertCircle, User, Calendar, Tag, Info } from 'lucide-react';
+import { History, Search, Loader2, AlertCircle, User, Calendar as CalendarIcon, Tag, Info } from 'lucide-react';
+import { DatePicker } from '@/components/ui/date-picker';
+import { format as formatDateFns, parseISO } from 'date-fns';
 import { BorrowRequestEventGlobal } from '../api';
 import { useGlobalBorrowEvents } from '../lib/useRequestQueries';
 import { Pagination } from '@/components/ui/Pagination';
@@ -22,8 +24,8 @@ export default function RequestHistoryPage() {
   const [eventTypeFilter, setEventTypeFilter] = useState('');
   const [requestIdFilter, setRequestIdFilter] = useState('');
   const [actorNameFilter, setActorNameFilter] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
 
   const debouncedRequestId = useDebounce(requestIdFilter, 400);
   const debouncedActorName = useDebounce(actorNameFilter, 400);
@@ -34,8 +36,8 @@ export default function RequestHistoryPage() {
     event_type: eventTypeFilter || undefined,
     request_id: debouncedRequestId || undefined,
     actor_name: debouncedActorName || undefined,
-    date_from: dateFrom || undefined,
-    date_to: dateTo || undefined,
+    date_from: dateFrom ? formatDateFns(dateFrom, 'yyyy-MM-dd') : undefined,
+    date_to: dateTo ? formatDateFns(dateTo, 'yyyy-MM-dd') : undefined,
   });
 
   const events = (eventsResponse?.data as BorrowRequestEventGlobal[]) || [];
@@ -120,20 +122,18 @@ export default function RequestHistoryPage() {
           <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3">
-                <Calendar className="w-4 h-4 text-muted-foreground" />
+                <CalendarIcon className="w-4 h-4 text-muted-foreground" />
                 <div className="flex items-center gap-2">
-                  <input
-                    type="date"
-                    value={dateFrom}
-                    onChange={(e) => setDateFrom(e.target.value)}
-                    className="h-10 px-3 rounded-lg bg-input/30 border border-border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  <DatePicker
+                    date={dateFrom}
+                    onChange={setDateFrom}
+                    placeholder="From Date"
                   />
                   <span className="text-muted-foreground text-xs font-bold uppercase tracking-wider">to</span>
-                  <input
-                    type="date"
-                    value={dateTo}
-                    onChange={(e) => setDateTo(e.target.value)}
-                    className="h-10 px-3 rounded-lg bg-input/30 border border-border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  <DatePicker
+                    date={dateTo}
+                    onChange={setDateTo}
+                    placeholder="To Date"
                   />
                 </div>
               </div>
@@ -144,8 +144,8 @@ export default function RequestHistoryPage() {
                     setRequestIdFilter('');
                     setActorNameFilter('');
                     setEventTypeFilter('');
-                    setDateFrom('');
-                    setDateTo('');
+                    setDateFrom(undefined);
+                    setDateTo(undefined);
                   }}
                   className="text-xs font-bold text-rose-500 hover:text-rose-400 transition-colors uppercase tracking-widest px-2 py-1 rounded-lg hover:bg-rose-500/10"
                 >

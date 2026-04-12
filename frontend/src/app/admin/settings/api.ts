@@ -28,6 +28,8 @@ export interface SettingsListParams {
   system?: string;
 }
 
+export type ActiveTab = 'general' | 'operations' | 'health' | 'security' | 'dictionary';
+
 export const settingsApi = {
   list: (params: SettingsListParams = {}) =>
     api.get<SystemSetting[]>(`/admin/config${buildQueryString(params as Record<string, unknown>)}`),
@@ -51,7 +53,7 @@ export const settingsApi = {
   listSystems: () => api.get<string[]>('/admin/config/systems'),
   listTables: () => api.get<string[]>('/admin/config/tables'),
   listTableColumns: (tableName: string) => api.get<string[]>(`/admin/config/tables/${tableName}/columns`),
-  restore: (key: string, category = 'general') => 
+  restore: (key: string, category = 'general') =>
     api.post<SystemSetting>(`/admin/config/${encodeURIComponent(key)}/restore?category=${encodeURIComponent(category)}`, {}),
 
   delete: (key: string, category = 'general') =>
@@ -222,7 +224,7 @@ export const healthApi = {
   getStorage: () => api.get<HealthStorage>('/admin/health/storage'),
   getSessions: () => api.get<HealthSession[]>('/admin/health/sessions'),
   terminateSession: (sessionId: string) => api.delete(`/admin/health/sessions/${sessionId}`),
-  getLogs: (params: { page?: number; per_page?: number } = {}) => 
+  getLogs: (params: { page?: number; per_page?: number } = {}) =>
     api.get<HealthLog[]>(`/admin/health/logs${buildQueryString(params as Record<string, unknown>)}`),
 };
 
@@ -262,13 +264,13 @@ export interface ArchivedBorrowRequest extends BorrowRequest {
 export const archivesApi = {
   getAuditLogs: (params: { page?: number; per_page?: number } = {}) =>
     api.get<ArchivedAuditLog[]>(`/admin/settings/operations/archives/audit-logs${buildQueryString(params as Record<string, unknown>)}`),
-  
+
   getBorrowRequests: (params: { page?: number; per_page?: number } = {}) =>
     api.get<ArchivedBorrowRequest[]>(`/admin/settings/operations/archives/borrow-requests${buildQueryString(params as Record<string, unknown>)}`),
-  
+
   restore: (entityType: 'audit-log' | 'borrow-request', id: string) =>
     api.post(`/admin/settings/operations/archives/${entityType}/${id}/restore`),
-  
+
   updateTags: (entityType: 'audit-log' | 'borrow-request', id: string, tags: string[]) =>
     api.patch(`/admin/settings/operations/archives/${entityType}/${id}/tags`, { tags }),
 };
