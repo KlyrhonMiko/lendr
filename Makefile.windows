@@ -77,7 +77,7 @@ lan-adminer-down:
 .PHONY: lan-adminer-url
 lan-adminer-url:
 	@Write-Host "Adminer (host machine only):"
-	@Write-Host "  https://localhost:8080"
+	@Write-Host "  http://localhost:8080"
 
 .PHONY: lan-down
 lan-down:
