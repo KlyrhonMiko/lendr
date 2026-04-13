@@ -30,6 +30,7 @@ class BorrowRequestUnit(BaseModel, table=True):
 
     released_by: UUID | None = Field(default=None, foreign_key="users.id")
     released_at: datetime | None = Field(default=None)
+    condition_on_release: str | None = Field(default=None, max_length=100)
 
     returned_by: UUID | None = Field(default=None, foreign_key="users.id")
     returned_at: datetime | None = Field(default=None)

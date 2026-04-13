@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { logger } from '@/lib/logger';
 import { toast } from 'sonner';
 
 export interface ImportHistoryErrorLogEntry {
@@ -28,6 +29,12 @@ export interface ImportHistoryItem {
   error_log?: ImportHistoryErrorLogEntry[];
 }
 
+export interface ExportBorrower {
+  user_id: string;
+  first_name: string;
+  last_name: string;
+}
+
 function resolveErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) {
     return error.message;
@@ -35,18 +42,130 @@ function resolveErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-export const EXPORT_ENDPOINT_MAP: Record<string, string> = {
+export type ExportEndpointType = 'catalog' | 'audit' | 'requests' | 'movements';
+
+export const EXPORT_ENDPOINT_MAP: Record<ExportEndpointType, string> = {
   catalog: '/inventory/data/export/catalog',
   audit: '/inventory/data/export/audit-logs',
   requests: '/inventory/data/export/ledger/requests',
   movements: '/inventory/data/export/ledger/movements',
 };
 
-export function buildExportDownloadPath(type: string, params: Record<string, unknown>): string {
+export type ReportTimelineMode = 'daily' | 'rolling_7_day' | 'monthly' | 'yearly';
+export type ReportTimelineSelection = ReportTimelineMode | '';
+
+export const REPORT_TIMELINE_MODE_OPTIONS: Array<{ key: ReportTimelineMode; label: string }> = [
+  { key: 'daily', label: 'Daily (Current Date)' },
+  { key: 'rolling_7_day', label: 'Rolling 7 Day' },
+  { key: 'monthly', label: 'Monthly' },
+  { key: 'yearly', label: 'Yearly' },
+];
+
+export type ExportQueryValue = string | number | boolean | Date | null | undefined;
+
+export interface ReportExportFilterContract {
+  timeline_mode?: ReportTimelineSelection;
+  anchor_date?: string | Date;
+  date_from?: string | Date;
+  date_to?: string | Date;
+  serial_number?: string;
+  borrower_id?: string;
+  include_receipt_rendered?: boolean;
+  include_deleted?: boolean;
+  include_archived?: boolean;
+}
+
+export interface ExportEndpointInput extends ReportExportFilterContract {
+  format?: string;
+  status?: string;
+  movement_type?: string;
+  item_id?: string;
+  from_date?: string | Date;
+  to_date?: string | Date;
+  search?: string;
+  [key: string]: ExportQueryValue;
+}
+
+export interface BorrowHistoryExportFormValues extends ReportExportFilterContract {
+  format: string;
+  status?: string;
+}
+
+export interface MovementExportFormValues extends ReportExportFilterContract {
+  format: string;
+  movement_type?: string;
+  item_id?: string;
+}
+
+export function isRolling7DayTimelineMode(timelineMode?: ReportTimelineSelection): boolean {
+  return timelineMode === 'rolling_7_day';
+}
+
+function normalizeTimelineMode(value?: ReportTimelineSelection): ReportTimelineMode | undefined {
+  return value || undefined;
+}
+
+function normalizeSelectAll(value?: string): string | undefined {
+  if (!value || value === 'all') {
+    return undefined;
+  }
+  return value;
+}
+
+function normalizeOptionalText(value?: string): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+export function composeBorrowHistoryExportParams(params: BorrowHistoryExportFormValues): ExportEndpointInput {
+  const timelineMode = normalizeTimelineMode(params.timeline_mode);
+
+  return {
+    format: params.format,
+    status: normalizeSelectAll(params.status),
+    ...(timelineMode ? { timeline_mode: timelineMode } : {}),
+    ...(isRolling7DayTimelineMode(timelineMode) ? { anchor_date: params.anchor_date } : {}),
+    borrower_id: normalizeOptionalText(params.borrower_id),
+    include_receipt_rendered: params.include_receipt_rendered,
+    include_deleted: params.include_deleted,
+    include_archived: params.include_archived,
+  };
+}
+
+export function composeMovementExportParams(params: MovementExportFormValues): ExportEndpointInput {
+  const timelineMode = normalizeTimelineMode(params.timeline_mode);
+
+  return {
+    format: params.format,
+    movement_type: normalizeSelectAll(params.movement_type),
+    item_id: normalizeOptionalText(params.item_id),
+    ...(timelineMode ? { timeline_mode: timelineMode } : {}),
+    ...(isRolling7DayTimelineMode(timelineMode) ? { anchor_date: params.anchor_date } : {}),
+    serial_number: normalizeOptionalText(params.serial_number),
+    include_deleted: params.include_deleted,
+    include_archived: params.include_archived,
+  };
+}
+
+function toLocalDateQueryString(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function serializeExportQueryValue(value: ExportQueryValue): string {
+  if (value instanceof Date) {
+    return toLocalDateQueryString(value);
+  }
+  return String(value);
+}
+
+export function buildExportDownloadPath(type: ExportEndpointType, params: ExportEndpointInput): string {
   const queryParams = new URLSearchParams();
   Object.entries(params).forEach(([key, val]) => {
     if (val !== null && val !== undefined && val !== '') {
-      queryParams.append(key, String(val));
+      queryParams.append(key, serializeExportQueryValue(val));
     }
   });
 
@@ -70,6 +189,22 @@ export function useImportHistory(page: number, perPage: number) {
       const response = await api.get<ImportHistoryItem[]>(`/inventory/data/import/history?page=${page}&per_page=${perPage}`);
       return response;
     },
+  });
+}
+
+export function useExportBorrowers() {
+  return useQuery({
+    queryKey: ['inventory', 'export', 'borrowers'],
+    queryFn: async () => {
+      try {
+        const response = await api.get<ExportBorrower[]>('/inventory/data/borrowers');
+        return response.data;
+      } catch (error) {
+        logger.error('Failed to fetch borrowers for export filter', { error });
+        return [];
+      }
+    },
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -109,7 +244,7 @@ export function useImportInventory() {
 
 export function useExportData() {
   return {
-    exportData: async (type: string, params: Record<string, unknown>) => {
+    exportData: async (type: ExportEndpointType, params: ExportEndpointInput) => {
       const url = buildExportDownloadPath(type, params);
       
       try {

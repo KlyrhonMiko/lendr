@@ -1235,6 +1235,7 @@ class BorrowService(
                     unit.status = "borrowed"
                     assignment.released_at = now
                     assignment.released_by = actor_id
+                    assignment.condition_on_release = unit.condition
 
                     if assignment.approved_by is None:
                         assignment.approved_by = db_request.approved_by
@@ -1243,15 +1244,16 @@ class BorrowService(
                     session.add(unit)
                     session.add(assignment)
 
-                self.inventory_service.adjust_stock(
-                    session,
-                    item.item_id,
-                    -borrow_item.qty_requested,
-                    movement_type="borrow_release",
-                    reference_id=db_request.request_id,
-                    reference_type="borrow_request",
-                    actor_id=actor_id,
-                )
+                    self.inventory_service.adjust_stock(
+                        session,
+                        item.item_id,
+                        -1,
+                        movement_type="borrow_release",
+                        reference_id=db_request.request_id,
+                        reference_type="borrow_request",
+                        actor_id=actor_id,
+                        unit_uuid=unit.id,
+                    )
             else:
                 # Enforce batch assignments for non-trackable items
                 batch_assignments = self._validate_batch_assignment_prerequisites(
@@ -1403,15 +1405,16 @@ class BorrowService(
                     session.add(unit)
                     session.add(assignment)
 
-                self.inventory_service.adjust_stock(
-                    session,
-                    item.item_id,
-                    borrow_item.qty_requested,
-                    movement_type="borrow_return",
-                    reference_id=db_request.request_id,
-                    reference_type="borrow_request",
-                    actor_id=actor_id,
-                )
+                    self.inventory_service.adjust_stock(
+                        session,
+                        item.item_id,
+                        1,
+                        movement_type="borrow_return",
+                        reference_id=db_request.request_id,
+                        reference_type="borrow_request",
+                        actor_id=actor_id,
+                        unit_uuid=unit.id,
+                    )
             else:
                 # Check for batch assignments
                 batch_assignments = [

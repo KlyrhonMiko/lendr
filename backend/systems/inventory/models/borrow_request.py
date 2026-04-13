@@ -37,7 +37,7 @@ class BorrowRequest(BaseModel, table=True):
     closed_by: UUID | None = Field(default=None, foreign_key="users.id")
     close_reason: str | None = Field(default=None, max_length=100)
 
-    request_date: datetime = Field(default_factory=get_now_manila)
+    request_date: datetime = Field(default_factory=get_now_manila, index=True)
     notes: str | None = Field(default=None, max_length=500)
 
     customer_name: str | None = Field(default=None, max_length=255)

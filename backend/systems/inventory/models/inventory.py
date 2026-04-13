@@ -29,4 +29,8 @@ class InventoryItem(BaseModel, table=True):
             unique=True,
             postgresql_where=text("is_deleted IS FALSE"),
         ),
+        Index(
+            "ix_inventory_created_at",
+            "created_at",
+        ),
     )

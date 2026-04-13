@@ -66,10 +66,11 @@ export function useInventoryItemMutations() {
 }
 
 // Units
-export function useInventoryUnits(itemId: string, params: InventoryUnitListParams) {
+export function useInventoryUnits(itemId: string | undefined, params: InventoryUnitListParams, enabled = true) {
   return useQuery({
-    queryKey: ['inventory', 'items', itemId, 'units', params],
+    queryKey: ['inventory', 'items', itemId ?? '', 'units', params],
     queryFn: async () => await inventoryApi.listUnits(itemId, params),
+    enabled: Boolean(itemId) && enabled,
     staleTime: STALE_TIME,
   });
 }
