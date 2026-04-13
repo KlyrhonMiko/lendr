@@ -1,9 +1,9 @@
 from datetime import datetime, timezone
 import re
-from fastapi import HTTPException
 from collections import Counter
 from typing import Any, Optional, cast
 from uuid import UUID
+from sqlalchemy import and_, or_
 from systems.admin.models.user import User
 from sqlmodel import Session, select, func
 from systems.inventory.services.configuration_service import InventoryConfigService
@@ -191,14 +191,36 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             statement = statement.where(InventoryItem.classification == classification)
 
         if in_stock_only:
-            all_items = session.exec(statement.order_by(InventoryItem.name.asc())).all()
-            filtered_items = [
-                item
-                for item in all_items
-                if self.get_item_balances(session, item)["available_qty"] > 0
-            ]
-            total_count = len(filtered_items)
-            return list(filtered_items[skip : skip + limit]), total_count
+            trackable_available_exists = (
+                select(InventoryUnit.id)
+                .where(
+                    InventoryUnit.inventory_uuid == InventoryItem.id,
+                    InventoryUnit.is_deleted.is_(False),
+                    InventoryUnit.status == "available",
+                )
+                .exists()
+            )
+            non_trackable_available_exists = (
+                select(InventoryBatch.id)
+                .where(
+                    InventoryBatch.inventory_uuid == InventoryItem.id,
+                    InventoryBatch.is_deleted.is_(False),
+                    InventoryBatch.available_qty > 0,
+                )
+                .exists()
+            )
+            statement = statement.where(
+                or_(
+                    and_(
+                        InventoryItem.is_trackable.is_(True),
+                        trackable_available_exists,
+                    ),
+                    and_(
+                        InventoryItem.is_trackable.is_(False),
+                        non_trackable_available_exists,
+                    ),
+                )
+            )
 
         count_statement = select(func.count()).select_from(statement.subquery())
         total_count = session.exec(count_statement).one()
@@ -284,9 +306,8 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         ).first()
 
         if existing:
-            raise HTTPException(
-                status_code=400,
-                detail=f"An active item with name '{db_obj.name}' already exists. Cannot restore duplicate."
+            raise ValueError(
+                f"An active item with name '{db_obj.name}' already exists. Cannot restore duplicate."
             )
 
         return super().restore(session, db_obj, actor_id=actor_id)
@@ -588,6 +609,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         note: str | None = None,
         actor_id: UUID | None = None,
         batch_id: str | None = None,
+        unit_uuid: UUID | None = None,
     ) -> InventoryItem:
         """
         Transactional stock adjustment for an item, optionally targeting a specific batch.
@@ -625,6 +647,9 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         if not db_obj:
             raise ValueError(f"Item {item_id} not found")
 
+        current_balances = self.get_item_balances(session, db_obj)
+        old_qty = current_balances["available_qty"]
+
         batch = None
         if batch_id:
             batch = self.get_batch(session, batch_id)
@@ -632,18 +657,19 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                 raise ValueError(f"Batch {batch_id} not found")
             if batch.inventory_uuid != db_obj.id:
                 raise ValueError(f"Batch {batch_id} does not belong to item {item_id}")
-                
-            # Update batch quantities
-            batch.available_qty += qty_change
-            if qty_change > 0:
-                batch.total_qty += qty_change
-                
-            # Auto-update status based on thresholds
-            batch.status = self.recalculate_batch_status(session, batch)
 
-            session.add(batch)
+        unit = None
+        if unit_uuid:
+            if batch_id:
+                raise ValueError("batch_id and unit_uuid cannot both be set")
 
-        old_qty = self.get_item_balances(session, db_obj)["available_qty"]
+            unit = session.exec(
+                select(InventoryUnit).where(InventoryUnit.id == unit_uuid)
+            ).first()
+            if not unit:
+                raise ValueError(f"Unit {unit_uuid} not found")
+            if unit.inventory_uuid != db_obj.id:
+                raise ValueError(f"Unit {unit_uuid} does not belong to item {item_id}")
 
         resolved_reference_type = self._resolve_reference_context(
             movement_type=movement_type,
@@ -651,19 +677,42 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             reference_type=reference_type,
         )
 
-        current_balances = self.get_item_balances(session, db_obj)
+        effective_qty_change = qty_change
+        if unit is not None:
+            if qty_change < 0 and unit.status != "available":
+                effective_qty_change = 0
+            elif qty_change > 0 and unit.status == "available":
+                effective_qty_change = 0
 
-        # Validation: prevent negative stock
-        if current_balances["available_qty"] < 0:
+        projected_available_qty = current_balances["available_qty"] + effective_qty_change
+
+        if projected_available_qty < 0:
             raise ValueError(
-                f"Insufficient total stock for {item_id}. Available: {current_balances['available_qty'] - qty_change}"
+                f"Insufficient available stock for {item_id}. "
+                f"Available: {current_balances['available_qty']}, Requested change: {qty_change}"
             )
+
+        if batch is not None:
+            projected_batch_available_qty = batch.available_qty + qty_change
+            if projected_batch_available_qty < 0:
+                raise ValueError(
+                    f"Insufficient available stock in batch {batch.batch_id}. "
+                    f"Available: {batch.available_qty}, Requested change: {qty_change}"
+                )
+
+            batch.available_qty = projected_batch_available_qty
+            if qty_change > 0 and movement_type != "borrow_return":
+                batch.total_qty += qty_change
+
+            batch.status = self.recalculate_batch_status(session, batch)
+            session.add(batch)
 
         # LOG THE MOVEMENT (The Ledger)
         movement = InventoryMovement(
             movement_id=get_next_sequence(session, InventoryMovement, "movement_id", "MOV"),
             inventory_uuid=db_obj.id,
             batch_uuid=batch.id if batch else None,
+            unit_uuid=unit.id if unit else None,
             qty_change=qty_change,
             movement_type=movement_type,
             reason_code=reason_code,
@@ -674,7 +723,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         )
 
         audit_data_after = {
-            "qty": current_balances["available_qty"],
+            "qty": projected_available_qty,
             "qty_change": qty_change,
             "movement_type": movement_type,
             "reason_code": reason_code,
@@ -684,6 +733,8 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         }
         if batch:
             audit_data_after["batch_id"] = batch.batch_id
+        if unit:
+            audit_data_after["unit_id"] = unit.unit_id
 
         audit_service.log_action(
             db=session,

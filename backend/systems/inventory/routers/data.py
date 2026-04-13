@@ -1,6 +1,9 @@
-from typing import List, Optional
+from typing import List
 from datetime import datetime
+import logging
+
 from fastapi import APIRouter, Depends, Query, UploadFile, File, Request, HTTPException
+from pydantic import ValidationError
 from sqlmodel import Session
 
 from core.database import get_session
@@ -8,13 +11,39 @@ from core.schemas import GenericResponse, create_success_response, make_paginati
 from systems.auth.dependencies import require_permission, get_current_user
 from systems.admin.models.user import User
 from systems.admin.schemas.user_schemas import UserRead
+from systems.inventory.schemas.import_export_schemas import (
+    AuditLogExportFilters,
+    CatalogExportFilters,
+    ImportHistoryRead,
+    ImportResponse,
+    LedgerMovementsExportFilters,
+    LedgerRequestsExportFilters,
+)
 from systems.inventory.services.import_service import ImportService
 from systems.inventory.services.export_service import ExportService
-from systems.inventory.schemas.import_export_schemas import ImportHistoryRead, ImportResponse
 
 router = APIRouter()
 import_service = ImportService()
 export_service = ExportService()
+logger = logging.getLogger("app")
+
+EXPORT_VALIDATION_ERROR_DETAIL = "Invalid export request parameters."
+
+
+def _get_ledger_movements_filters(request: Request) -> LedgerMovementsExportFilters:
+    filter_payload = dict(request.query_params)
+
+    # Canonical fields take precedence when both canonical and alias are provided.
+    if "date_from" in filter_payload:
+        filter_payload.pop("from_date", None)
+    if "date_to" in filter_payload:
+        filter_payload.pop("to_date", None)
+
+    try:
+        return LedgerMovementsExportFilters(**filter_payload)
+    except ValidationError as exc:
+        logger.exception("Ledger movement export filter validation failed: %s", exc)
+        raise HTTPException(status_code=400, detail=EXPORT_VALIDATION_ERROR_DETAIL) from exc
 
 @router.get("/borrowers", response_model=GenericResponse[List[UserRead]])
 async def get_borrowers(
@@ -86,41 +115,107 @@ async def import_inventory(
 
 @router.get("/export/audit-logs")
 async def export_audit_logs(
-    format: str = Query(..., pattern="^(csv|xlsx)$"),
-    from_date: Optional[datetime] = None,
-    to_date: Optional[datetime] = None,
+    filters: AuditLogExportFilters = Depends(),
+    from_date: datetime | None = Query(default=None),
+    to_date: datetime | None = Query(default=None),
     session: Session = Depends(get_session),
     _: None = Depends(require_permission("inventory:config:manage")),
 ):
-    return export_service.export_audit_logs(session, format, from_date, to_date)
+    effective_date_from = filters.date_from or from_date
+    effective_date_to = filters.date_to or to_date
+    try:
+        return export_service.export_audit_logs(
+            session,
+            format=filters.format,
+            timeline_mode=filters.timeline_mode,
+            anchor_date=filters.anchor_date,
+            date_from=effective_date_from,
+            date_to=effective_date_to,
+            include_deleted=filters.include_deleted,
+            include_archived=filters.include_archived,
+        )
+    except ValueError as exc:
+        logger.exception("Audit log export validation failed: %s", exc)
+        raise HTTPException(status_code=400, detail=EXPORT_VALIDATION_ERROR_DETAIL) from exc
 
 @router.get("/export/ledger/requests")
 async def export_borrow_history(
-    format: str = Query(..., pattern="^(csv|xlsx)$"),
-    status: Optional[str] = None,
-    borrower_id: Optional[str] = None,
+    filters: LedgerRequestsExportFilters = Depends(),
+    from_date: datetime | None = Query(default=None),
+    to_date: datetime | None = Query(default=None),
     session: Session = Depends(get_session),
     _: None = Depends(require_permission("inventory:config:manage")),
 ):
-    return export_service.export_borrow_history(session, format, status, borrower_id)
+    effective_date_from = filters.date_from or from_date
+    effective_date_to = filters.date_to or to_date
+    try:
+        return export_service.export_borrow_history(
+            session,
+            format=filters.format,
+            status=filters.status,
+            item_id=filters.item_id,
+            borrower_id=filters.borrower_id,
+            serial_number=filters.serial_number,
+            include_receipt_rendered=filters.include_receipt_rendered,
+            timeline_mode=filters.timeline_mode,
+            anchor_date=filters.anchor_date,
+            date_from=effective_date_from,
+            date_to=effective_date_to,
+            include_deleted=filters.include_deleted,
+            include_archived=filters.include_archived,
+        )
+    except ValueError as exc:
+        logger.exception("Ledger request export validation failed: %s", exc)
+        raise HTTPException(status_code=400, detail=EXPORT_VALIDATION_ERROR_DETAIL) from exc
 
 @router.get("/export/ledger/movements")
 async def export_movements(
-    format: str = Query(..., pattern="^(csv|xlsx)$"),
-    movement_type: Optional[str] = None,
-    item_id: Optional[str] = None,
+    filters: LedgerMovementsExportFilters = Depends(_get_ledger_movements_filters),
     session: Session = Depends(get_session),
     _: None = Depends(require_permission("inventory:config:manage")),
 ):
-    return export_service.export_movements(session, format, movement_type, item_id)
+    try:
+        return export_service.export_movements(
+            session,
+            format=filters.format,
+            movement_type=filters.movement_type,
+            item_id=filters.item_id,
+            serial_number=filters.serial_number,
+            timeline_mode=filters.timeline_mode,
+            anchor_date=filters.anchor_date,
+            date_from=filters.date_from,
+            date_to=filters.date_to,
+            include_deleted=filters.include_deleted,
+            include_archived=filters.include_archived,
+        )
+    except ValueError as exc:
+        logger.exception("Ledger movement export validation failed: %s", exc)
+        raise HTTPException(status_code=400, detail=EXPORT_VALIDATION_ERROR_DETAIL) from exc
 
 @router.get("/export/catalog")
 async def export_catalog(
-    format: str = Query(..., pattern="^(csv|xlsx)$"),
+    filters: CatalogExportFilters = Depends(),
+    from_date: datetime | None = Query(default=None),
+    to_date: datetime | None = Query(default=None),
     session: Session = Depends(get_session),
     _: None = Depends(require_permission("inventory:config:manage")),
 ):
-    return export_service.export_inventory(session, format)
+    effective_date_from = filters.date_from or from_date
+    effective_date_to = filters.date_to or to_date
+    try:
+        return export_service.export_inventory(
+            session,
+            format=filters.format,
+            timeline_mode=filters.timeline_mode,
+            anchor_date=filters.anchor_date,
+            date_from=effective_date_from,
+            date_to=effective_date_to,
+            include_deleted=filters.include_deleted,
+            include_archived=filters.include_archived,
+        )
+    except ValueError as exc:
+        logger.exception("Catalog export validation failed: %s", exc)
+        raise HTTPException(status_code=400, detail=EXPORT_VALIDATION_ERROR_DETAIL) from exc
 
 @router.get("/import/template")
 async def get_import_template():

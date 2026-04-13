@@ -6,13 +6,13 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { FormSelect } from '@/components/ui/form-select';
 import { DatePicker } from '@/components/ui/date-picker';
+import { Checkbox } from '@/components/ui/checkbox';
 import { format as formatDateFns, parseISO } from 'date-fns';
 import {
   Download,
   Upload,
   History,
   FileText,
-  Clock,
   CheckCircle2,
   XCircle,
   RefreshCcw,
@@ -20,7 +20,6 @@ import {
   Database,
   FileSpreadsheet,
   FilePieChart,
-  Mail,
   ShieldCheck,
   Barcode,
   Layers,
@@ -30,6 +29,10 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import {
+  REPORT_TIMELINE_MODE_OPTIONS,
+  composeBorrowHistoryExportParams,
+  composeMovementExportParams,
+  isRolling7DayTimelineMode,
   useImportHistory,
   useImportInventory,
   useExportData,
@@ -37,7 +40,7 @@ import {
   ImportHistoryItem,
   ImportHistoryErrorLogEntry,
 } from '../lib/useImportExport';
-import { useInventoryItems } from '@/app/inventory/items/lib/useItemQueries';
+import { useInventoryItems, useInventoryUnits } from '@/app/inventory/items/lib/useItemQueries';
 import { User as SystemUser } from '@/app/admin/users/api';
 import { logger } from '@/lib/logger';
 
@@ -86,16 +89,30 @@ export function ImportExportSettings() {
 
   // Ledger Export State
   const [borrowParams, setBorrowParams] = useState({
+    timeline_mode: '' as '' | 'daily' | 'rolling_7_day' | 'monthly' | 'yearly',
+    anchor_date: undefined as Date | undefined,
     status: 'all',
     format: 'xlsx',
-    borrower_id: ''
+    borrower_id: '',
+    include_receipt_rendered: false,
+    include_deleted: false,
+    include_archived: false,
   });
 
   const [movementParams, setMovementParams] = useState({
+    timeline_mode: '' as '' | 'daily' | 'rolling_7_day' | 'monthly' | 'yearly',
+    anchor_date: undefined as Date | undefined,
     movement_type: 'all',
     item_id: '',
-    format: 'xlsx'
+    serial_number: '',
+    format: 'xlsx',
+    include_deleted: false,
+    include_archived: false,
   });
+
+  const selectedMovementItemId = movementParams.item_id || undefined;
+  const { data: itemUnitsResponse } = useInventoryUnits(selectedMovementItemId, { per_page: 500 }, Boolean(selectedMovementItemId));
+  const itemUnits = itemUnitsResponse?.data || [];
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -108,6 +125,17 @@ export function ImportExportSettings() {
 
   const importHistory = historyResponse?.data || [];
   const meta = historyResponse?.meta;
+  const borrowHistoryNeedsAnchorDate = isRolling7DayTimelineMode(borrowParams.timeline_mode);
+  const equipmentHistoryNeedsAnchorDate = isRolling7DayTimelineMode(movementParams.timeline_mode);
+  const serialOptions = selectedMovementItemId
+    ? [
+      { label: 'All Serials', key: '' },
+      ...itemUnits.map((unit) => ({
+        label: `${unit.serial_number} (${unit.unit_id})`,
+        key: unit.serial_number,
+      })),
+    ]
+    : [];
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
@@ -303,250 +331,281 @@ export function ImportExportSettings() {
             <CardDescription>Export audit logs and ledger data to various formats.</CardDescription>
           </div>
         </CardHeader>
-        <CardContent className="grid gap-10 md:grid-cols-2">
-          {/* Inventory Catalog */}
-          <div className="flex flex-col h-full">
-            <div className="flex items-center gap-2 text-sm font-semibold text-primary px-1 mb-6">
-              <Barcode className="w-4 h-4" />
-              Inventory Catalog (Full State)
-            </div>
-            <div className="flex flex-col flex-1 gap-4">
-              <p className="text-xs text-muted-foreground leading-relaxed px-1">
-                Export all catalog items, individual tracked units (with serials), and consumable batches in a single report.
-              </p>
-              <FormSelect
-                label="Format"
-                value={catalogParams.format}
-                onChange={(v) => setCatalogParams({ ...catalogParams, format: v })}
-                options={[
-                  { label: 'Excel (XLSX)', key: 'xlsx' },
-                  { label: 'CSV (Comma Separated)', key: 'csv' },
-                ]}
-                placeholder="Select format"
-              />
-              <button
-                onClick={() => exportData('catalog', catalogParams)}
-                className="w-full h-11 bg-primary text-primary-foreground rounded-xl text-sm font-bold shadow-lg shadow-primary/20 flex items-center justify-center gap-2 mt-auto"
-              >
-                <Download className="w-4 h-4" /> Export Complete State
-              </button>
-            </div>
-          </div>
-
-          {/* Audit Logs */}
-          <div className="flex flex-col h-full">
-            <div className="flex items-center gap-2 text-sm font-semibold text-emerald-500 px-1 mb-6">
-              <FilePieChart className="w-4 h-4" />
-              Audit Logs
-            </div>
-            <div className="flex flex-col flex-1 gap-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-foreground px-1">From Date</label>
-                  <DatePicker
-                    date={auditParams.from_date}
-                    onChange={(date) => setAuditParams({ ...auditParams, from_date: date })}
-                    placeholder="Select start date"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-foreground px-1">To Date</label>
-                  <DatePicker
-                    date={auditParams.to_date}
-                    onChange={(date) => setAuditParams({ ...auditParams, to_date: date })}
-                    placeholder="Select end date"
-                  />
-                </div>
-              </div>
-              <FormSelect
-                label="Format"
-                value={auditParams.format}
-                onChange={(v) => setAuditParams({ ...auditParams, format: v })}
-                options={[
-                  { label: 'CSV (Comma Separated Values)', key: 'csv' },
-                  { label: 'XLSX (Excel Spreadsheet)', key: 'xlsx' },
-                ]}
-                placeholder="Select format"
-              />
-              <button
-                onClick={() => exportData('audit', {
-                  ...auditParams,
-                  from_date: auditParams.from_date ? formatDateFns(auditParams.from_date, 'yyyy-MM-dd') : undefined,
-                  to_date: auditParams.to_date ? formatDateFns(auditParams.to_date, 'yyyy-MM-dd') : undefined,
-                })}
-                className="w-full h-11 bg-primary text-primary-foreground rounded-xl text-sm font-bold shadow-lg shadow-primary/20 flex items-center justify-center gap-2 mt-auto"
-              >
-                <Download className="w-4 h-4" /> Export Audit Logs
-              </button>
-            </div>
-          </div>
-
-          {/* Ledger Data */}
-          <div className="md:col-span-2 space-y-6">
-            <div className="flex items-center gap-2 text-sm font-semibold text-primary px-1">
-              <Database className="w-4 h-4" />
-              Ledger Data
-            </div>
-            <div className="grid gap-6 md:grid-cols-2">
-              <div className="flex flex-col p-4 rounded-2xl border border-border bg-muted/5">
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1 mb-4">Borrow Request History</p>
-                <div className="space-y-4 flex-1 mb-4">
-                  <FormSelect
-                    label="Specific Borrower (Optional)"
-                    value={borrowParams.borrower_id}
-                    onChange={(v) => setBorrowParams({ ...borrowParams, borrower_id: v })}
-                    options={[
-                      { label: 'All Borrowers', key: '' },
-                      ...users.map(u => ({
-                        label: `${u.first_name} ${u.last_name} (${u.user_id})`,
-                        key: u.user_id
-                      }))
-                    ]}
-                    placeholder="Search borrowers..."
-                  />
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormSelect
-                      label="Status Filter"
-                      value={borrowParams.status}
-                      onChange={(v) => setBorrowParams({ ...borrowParams, status: v })}
-                      options={[
-                        { label: 'All Statuses', key: 'all' },
-                        { label: 'Pending', key: 'pending' },
-                        { label: 'Approved', key: 'approved' },
-                        { label: 'Returned', key: 'returned' },
-                      ]}
-                      placeholder="Select status"
-                    />
-                    <FormSelect
-                      label="Format"
-                      value={borrowParams.format}
-                      onChange={(v) => setBorrowParams({ ...borrowParams, format: v })}
-                      options={[
-                        { label: 'Excel (XLSX)', key: 'xlsx' },
-                        { label: 'CSV', key: 'csv' },
-                      ]}
-                      placeholder="Select format"
+        <CardContent className="space-y-8">
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="flex flex-col p-4 rounded-2xl border border-border bg-muted/5">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1 mb-4">Borrow Request History</p>
+              <div className="space-y-4 flex-1 mb-4">
+                <FormSelect
+                  label="Timeline Mode"
+                  value={borrowParams.timeline_mode}
+                  onChange={(v) => setBorrowParams({ ...borrowParams, timeline_mode: v as typeof borrowParams.timeline_mode, anchor_date: v === 'rolling_7_day' ? borrowParams.anchor_date : undefined })}
+                  options={REPORT_TIMELINE_MODE_OPTIONS}
+                  placeholder="Select timeline"
+                />
+                {borrowHistoryNeedsAnchorDate && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-foreground px-1">Anchor Date</label>
+                    <DatePicker
+                      date={borrowParams.anchor_date}
+                      onChange={(date) => setBorrowParams({ ...borrowParams, anchor_date: date })}
+                      placeholder="Required for rolling 7 day"
                     />
                   </div>
+                )}
+                <FormSelect
+                  label="Specific Borrower (Optional)"
+                  value={borrowParams.borrower_id}
+                  onChange={(v) => setBorrowParams({ ...borrowParams, borrower_id: v })}
+                  options={[
+                    { label: 'All Borrowers', key: '' },
+                    ...users.map((u) => ({
+                      label: `${u.first_name} ${u.last_name} (${u.user_id})`,
+                      key: u.user_id,
+                    })),
+                  ]}
+                  placeholder="Search borrowers..."
+                />
+                <div className="flex flex-wrap gap-6 items-center pt-2 pb-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="b-include-receipt"
+                      checked={borrowParams.include_receipt_rendered}
+                      onCheckedChange={(checked) => setBorrowParams({ ...borrowParams, include_receipt_rendered: checked === true })}
+                    />
+                    <label htmlFor="b-include-receipt" className="text-sm font-bold text-muted-foreground cursor-pointer select-none">
+                      Include Receipt
+                    </label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="b-include-deleted"
+                      checked={borrowParams.include_deleted}
+                      onCheckedChange={(checked) => setBorrowParams({ ...borrowParams, include_deleted: checked === true })}
+                    />
+                    <label htmlFor="b-include-deleted" className="text-sm font-bold text-muted-foreground cursor-pointer select-none">
+                      Include Deleted
+                    </label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="b-include-archived"
+                      checked={borrowParams.include_archived}
+                      onCheckedChange={(checked) => setBorrowParams({ ...borrowParams, include_archived: checked === true })}
+                    />
+                    <label htmlFor="b-include-archived" className="text-sm font-bold text-muted-foreground cursor-pointer select-none">
+                      Include Archived
+                    </label>
+                  </div>
                 </div>
-                <button
-                  onClick={() => exportData('requests', borrowParams)}
-                  className="w-full h-10 bg-muted hover:bg-muted font-bold text-xs rounded-lg transition-colors border border-border mt-auto"
-                >
-                  Export History
-                </button>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormSelect
+                    label="Status Filter"
+                    value={borrowParams.status}
+                    onChange={(v) => setBorrowParams({ ...borrowParams, status: v })}
+                    options={[
+                      { label: 'All Statuses', key: 'all' },
+                      { label: 'Pending', key: 'pending' },
+                      { label: 'Approved', key: 'approved' },
+                      { label: 'Returned', key: 'returned' },
+                    ]}
+                    placeholder="Select status"
+                  />
+                  <FormSelect
+                    label="Format"
+                    value={borrowParams.format}
+                    onChange={(v) => setBorrowParams({ ...borrowParams, format: v })}
+                    options={[
+                      { label: 'Excel (XLSX)', key: 'xlsx' },
+                      { label: 'CSV', key: 'csv' },
+                    ]}
+                    placeholder="Select format"
+                  />
+                </div>
               </div>
+              <button
+                onClick={() => exportData('requests', composeBorrowHistoryExportParams(borrowParams))}
+                disabled={borrowHistoryNeedsAnchorDate && !borrowParams.anchor_date}
+                className="w-full h-10 rounded-lg transition-colors border mt-auto bg-yellow-400 text-yellow-950 border-yellow-300 font-bold text-xs hover:bg-yellow-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Export Borrow Request History
+              </button>
+            </div>
 
-              <div className="flex flex-col p-4 rounded-2xl border border-border bg-muted/5">
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1 mb-4">Equipment Movements</p>
-                <div className="space-y-4 flex-1 mb-4">
+            <div className="flex flex-col p-4 rounded-2xl border border-border bg-muted/5">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1 mb-4">Equipment History</p>
+              <div className="space-y-4 flex-1 mb-4">
+                <FormSelect
+                  label="Timeline Mode"
+                  value={movementParams.timeline_mode}
+                  onChange={(v) => setMovementParams({ ...movementParams, timeline_mode: v as typeof movementParams.timeline_mode, anchor_date: v === 'rolling_7_day' ? movementParams.anchor_date : undefined })}
+                  options={REPORT_TIMELINE_MODE_OPTIONS}
+                  placeholder="Select timeline"
+                />
+                {equipmentHistoryNeedsAnchorDate && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-foreground px-1">Anchor Date</label>
+                    <DatePicker
+                      date={movementParams.anchor_date}
+                      onChange={(date) => setMovementParams({ ...movementParams, anchor_date: date })}
+                      placeholder="Required for rolling 7 day"
+                    />
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-4">
                   <FormSelect
                     label="Specific Item (Optional)"
                     value={movementParams.item_id}
-                    onChange={(v) => setMovementParams({ ...movementParams, item_id: v })}
+                    onChange={(v) => setMovementParams({ ...movementParams, item_id: v, serial_number: '' })}
                     options={[
                       { label: 'All Items', key: '' },
-                      ...items.map(item => ({
+                      ...items.map((item) => ({
                         label: `${item.name} (${item.item_id})`,
-                        key: item.item_id
-                      }))
+                        key: item.item_id,
+                      })),
                     ]}
                     placeholder="Search items..."
                   />
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormSelect
-                      label="Movement Type"
-                      value={movementParams.movement_type}
-                      onChange={(v) => setMovementParams({ ...movementParams, movement_type: v })}
-                      options={[
-                        { label: 'All Movements', key: 'all' },
-                        { label: 'In Only', key: 'in' },
-                        { label: 'Out Only', key: 'out' },
-                      ]}
-                      placeholder="Select type"
+                  <FormSelect
+                    label="Serial Number"
+                    value={movementParams.serial_number}
+                    onChange={(v) => setMovementParams({ ...movementParams, serial_number: v })}
+                    options={serialOptions}
+                    placeholder={selectedMovementItemId ? 'Select serial number' : 'Select an item first'}
+                    disabled={!selectedMovementItemId}
+                  />
+                </div>
+                <div className="flex flex-wrap gap-6 items-center pt-2 pb-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="e-include-deleted"
+                      checked={movementParams.include_deleted}
+                      onCheckedChange={(checked) => setMovementParams({ ...movementParams, include_deleted: checked === true })}
                     />
-                    <FormSelect
-                      label="Format"
-                      value={movementParams.format}
-                      onChange={(v) => setMovementParams({ ...movementParams, format: v })}
-                      options={[
-                        { label: 'Excel (XLSX)', key: 'xlsx' },
-                        { label: 'CSV', key: 'csv' },
-                      ]}
-                      placeholder="Select format"
+                    <label htmlFor="e-include-deleted" className="text-sm font-bold text-muted-foreground cursor-pointer select-none">
+                      Include Deleted
+                    </label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="e-include-archived"
+                      checked={movementParams.include_archived}
+                      onCheckedChange={(checked) => setMovementParams({ ...movementParams, include_archived: checked === true })}
                     />
+                    <label htmlFor="e-include-archived" className="text-sm font-bold text-muted-foreground cursor-pointer select-none">
+                      Include Archived
+                    </label>
                   </div>
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormSelect
+                    label="Movement Type"
+                    value={movementParams.movement_type}
+                    onChange={(v) => setMovementParams({ ...movementParams, movement_type: v })}
+                    options={[
+                      { label: 'All Movements', key: 'all' },
+                      { label: 'In Only', key: 'in' },
+                      { label: 'Out Only', key: 'out' },
+                    ]}
+                    placeholder="Select type"
+                  />
+                  <FormSelect
+                    label="Format"
+                    value={movementParams.format}
+                    onChange={(v) => setMovementParams({ ...movementParams, format: v })}
+                    options={[
+                      { label: 'Excel (XLSX)', key: 'xlsx' },
+                      { label: 'CSV', key: 'csv' },
+                    ]}
+                    placeholder="Select format"
+                  />
+                </div>
+              </div>
+              <button
+                onClick={() => exportData('movements', composeMovementExportParams(movementParams))}
+                disabled={equipmentHistoryNeedsAnchorDate && !movementParams.anchor_date}
+                className="w-full h-10 rounded-lg transition-colors border mt-auto bg-yellow-400 text-yellow-950 border-yellow-300 font-bold text-xs hover:bg-yellow-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Export Equipment History
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-10 md:grid-cols-2">
+            {/* Inventory Catalog */}
+            <div className="flex flex-col h-full">
+              <div className="flex items-center gap-2 text-sm font-semibold text-primary px-1 mb-6">
+                <Barcode className="w-4 h-4" />
+                Inventory Catalog (Full State)
+              </div>
+              <div className="flex flex-col flex-1 gap-4">
+                <p className="text-xs text-muted-foreground leading-relaxed px-1">
+                  Export all catalog items, individual tracked units (with serials), and consumable batches in a single report.
+                </p>
+                <FormSelect
+                  label="Format"
+                  value={catalogParams.format}
+                  onChange={(v) => setCatalogParams({ ...catalogParams, format: v })}
+                  options={[
+                    { label: 'Excel (XLSX)', key: 'xlsx' },
+                    { label: 'CSV (Comma Separated)', key: 'csv' },
+                  ]}
+                  placeholder="Select format"
+                />
                 <button
-                  onClick={() => exportData('movements', movementParams)}
-                  className="w-full h-10 bg-muted hover:bg-muted font-bold text-xs rounded-lg transition-colors border border-border mt-auto"
+                  onClick={() => exportData('catalog', catalogParams)}
+                  className="w-full h-11 bg-primary text-primary-foreground rounded-xl text-sm font-bold shadow-lg shadow-primary/20 flex items-center justify-center gap-2 mt-auto"
                 >
-                  Export Movements
+                  <Download className="w-4 h-4" /> Export Complete State
                 </button>
               </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* Scheduled Exports */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
-              <Clock className="w-6 h-6" />
-            </div>
-            <div>
-              <CardTitle>Scheduled Exports</CardTitle>
-              <CardDescription>Automate your reports and deliver them periodically.</CardDescription>
-            </div>
-          </div>
-          <button className="bg-primary text-primary-foreground px-4 py-2 rounded-xl text-xs font-bold shadow-lg shadow-primary/20">
-            Create Schedule +
-          </button>
-        </CardHeader>
-        <CardContent className="relative">
-          {/* Overlay for Coming Soon */}
-          <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-b-3xl">
-            <div className="px-6 py-3 bg-primary text-primary-foreground rounded-2xl font-bold shadow-2xl flex items-center gap-2 animate-pulse">
-              <Clock className="w-5 h-5" /> Feature Coming Soon
-            </div>
-          </div>
-
-          <div className="grid gap-6 md:grid-cols-3 opacity-40 grayscale">
-            <div className="space-y-4 p-6 rounded-3xl bg-muted/30 border border-border border-dashed flex flex-col items-center justify-center text-center">
-              <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center text-muted-foreground mb-2">
-                <Mail className="w-6 h-6" />
+            {/* Audit Logs */}
+            <div className="flex flex-col h-full">
+              <div className="flex items-center gap-2 text-sm font-semibold text-emerald-500 px-1 mb-6">
+                <FilePieChart className="w-4 h-4" />
+                Audit Logs
               </div>
-              <div>
-                <p className="text-sm font-bold">Email Delivery</p>
-                <p className="text-xs text-muted-foreground">Receive reports directly in your inbox.</p>
-              </div>
-            </div>
-
-            <div className="space-y-4 p-6 rounded-3xl bg-primary/5 border border-primary/20 flex flex-col">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-2 py-1 rounded-full">Weekly</span>
-                <button aria-label="Remove weekly report schedule" className="text-rose-500"><XCircle className="w-4 h-4" /></button>
-              </div>
-              <p className="text-sm font-bold truncate">Audit Logs Weekly Report</p>
-              <p className="text-xs text-muted-foreground">Every Monday at 8:00 AM</p>
-              <div className="mt-auto pt-4 border-t border-primary/10 flex items-center justify-between">
-                <span className="text-xs text-primary">Scheduled</span>
-                <RefreshCcw className="w-3 h-3 text-primary animate-spin-slow" />
-              </div>
-            </div>
-
-            <div className="space-y-4 p-6 rounded-3xl bg-primary/5 border border-primary/20 flex flex-col">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-2 py-1 rounded-full">Daily</span>
-                <button aria-label="Remove daily report schedule" className="text-rose-500"><XCircle className="w-4 h-4" /></button>
-              </div>
-              <p className="text-sm font-bold truncate">Daily Movements Summary</p>
-              <p className="text-xs text-muted-foreground">Daily at 11:59 PM</p>
-              <div className="mt-auto pt-4 border-t border-primary/10 flex items-center justify-between">
-                <span className="text-xs text-primary">Scheduled</span>
-                <RefreshCcw className="w-3 h-3 text-primary animate-spin-slow" />
+              <div className="flex flex-col flex-1 gap-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-foreground px-1">From Date</label>
+                    <DatePicker
+                      date={auditParams.from_date}
+                      onChange={(date) => setAuditParams({ ...auditParams, from_date: date })}
+                      placeholder="Select start date"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-foreground px-1">To Date</label>
+                    <DatePicker
+                      date={auditParams.to_date}
+                      onChange={(date) => setAuditParams({ ...auditParams, to_date: date })}
+                      placeholder="Select end date"
+                    />
+                  </div>
+                </div>
+                <FormSelect
+                  label="Format"
+                  value={auditParams.format}
+                  onChange={(v) => setAuditParams({ ...auditParams, format: v })}
+                  options={[
+                    { label: 'CSV (Comma Separated Values)', key: 'csv' },
+                    { label: 'XLSX (Excel Spreadsheet)', key: 'xlsx' },
+                  ]}
+                  placeholder="Select format"
+                />
+                <button
+                  onClick={() => exportData('audit', {
+                    ...auditParams,
+                    from_date: auditParams.from_date ? formatDateFns(auditParams.from_date, 'yyyy-MM-dd') : undefined,
+                    to_date: auditParams.to_date ? formatDateFns(auditParams.to_date, 'yyyy-MM-dd') : undefined,
+                  })}
+                  className="w-full h-11 bg-primary text-primary-foreground rounded-xl text-sm font-bold shadow-lg shadow-primary/20 flex items-center justify-center gap-2 mt-auto"
+                >
+                  <Download className="w-4 h-4" /> Export Audit Logs
+                </button>
               </div>
             </div>
           </div>

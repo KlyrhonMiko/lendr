@@ -10,6 +10,7 @@ class InventoryMovement(BaseModel, table=True):
     movement_id: str = Field(unique=True, index=True, max_length=50)
     inventory_uuid: UUID | None = Field(default=None, foreign_key="inventory.id", index=True)
     batch_uuid: UUID | None = Field(default=None, foreign_key="inventory_batches.id", index=True)
+    unit_uuid: UUID | None = Field(default=None, foreign_key="inventory_units.id", index=True)
     
     actor_id: UUID | None = Field(
         default=None, 
@@ -30,4 +31,4 @@ class InventoryMovement(BaseModel, table=True):
     reference_type: str | None = Field(default=None, index=True, max_length=50)
     
     note: str | None = Field(default=None, max_length=500)
-    occurred_at: datetime = Field(default_factory=get_now_manila)
+    occurred_at: datetime = Field(default_factory=get_now_manila, index=True)
