@@ -142,6 +142,22 @@ export function AlertSettings() {
     }
   });
 
+  // Mutation to send test email
+  const testEmailMutation = useMutation({
+    mutationFn: () => api.post('/inventory/settings/test-email'),
+    onSuccess: (response) => {
+      const data = response.data as any;
+      if (data && data.success) {
+        toast.success('Test email sent! Please check your inbox.');
+      } else {
+        toast.error(data?.message || 'Failed to send test email. Check SMTP settings.');
+      }
+    },
+    onError: (error: any) => {
+      toast.error(`Test email failed: ${error.message}`);
+    }
+  });
+
   const handleSave = () => {
     if (formData) {
       mutation.mutate(formData);
@@ -299,9 +315,20 @@ export function AlertSettings() {
             <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
               <BellRing className="w-6 h-6" />
             </div>
-            <div>
-              <CardTitle>Notification Channels</CardTitle>
-              <CardDescription>Select how alerts are delivered.</CardDescription>
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between px-1">
+                <div>
+                  <CardTitle>Notification Channels</CardTitle>
+                  <CardDescription>Select how alerts are delivered.</CardDescription>
+                </div>
+                <button
+                  onClick={() => testEmailMutation.mutate()}
+                  disabled={testEmailMutation.isPending}
+                  className="text-[10px] font-bold uppercase tracking-wider bg-primary/10 hover:bg-primary/20 text-primary px-3 py-1.5 rounded-lg transition-all active:scale-95 disabled:opacity-50"
+                >
+                  {testEmailMutation.isPending ? 'Sending...' : 'Send Test Email'}
+                </button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">

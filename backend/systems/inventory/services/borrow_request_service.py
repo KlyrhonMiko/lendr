@@ -428,6 +428,10 @@ class BorrowService(
         db_request = self.get(session, request_id)
         if not db_request:
             raise ValueError("Request not found")
+            
+        if db_request.receipt_snapshot:
+            return db_request.receipt_snapshot
+
         if db_request.status not in ("released", "returned", "closed"):
             raise ValueError("Receipt is only available for released requests")
 
@@ -504,6 +508,14 @@ class BorrowService(
             raise ValueError("Request not found")
 
         db_request.borrower_signature = signature_data
+        
+        # Capture snapshot of the receipt with the signature
+        receipt = self.generate_release_receipt(session, request_id)
+        if hasattr(receipt, "model_dump"):
+            db_request.receipt_snapshot = receipt.model_dump(mode="json")
+        else:
+            db_request.receipt_snapshot = receipt
+
         session.add(db_request)
         return db_request
 

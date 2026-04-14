@@ -6,6 +6,7 @@ from sqlmodel import Session
 from core.database import get_session
 from core.deps import get_current_user
 from core.schemas import GenericResponse, PaginationMeta, create_success_response, make_pagination_meta
+from core.websockets import manager
 from systems.admin.models.user import User
 from systems.inventory.schemas.inventory_schemas import (
     InventoryItemCreate,
@@ -72,6 +73,7 @@ async def create_item(
         actor_id=current_user.id,
     )
     session.commit()
+    await manager.broadcast_catalog_update()
     session.refresh(item)
 
     item_read = _to_inventory_item_read(session, item)
@@ -170,6 +172,7 @@ async def update_item(
         actor_id=current_user.id,
     )
     session.commit()
+    await manager.broadcast_catalog_update()
     session.refresh(updated_item)
 
     item_read = _to_inventory_item_read(session, updated_item)
@@ -210,6 +213,7 @@ async def adjust_stock(
             actor_id=current_user.id,
         )
         session.commit()
+        await manager.broadcast_catalog_update()
         session.refresh(item)
 
         item_read = _to_inventory_item_read(session, item)
@@ -247,6 +251,7 @@ async def delete_item(
         actor_id=current_user.id,
     )
     session.commit()
+    await manager.broadcast_catalog_update()
     session.refresh(deleted_item)
 
     item_read = _to_inventory_item_read(session, deleted_item)
@@ -287,6 +292,7 @@ async def restore_item(
         actor_id=current_user.id,
     )
     session.commit()
+    await manager.broadcast_catalog_update()
     session.refresh(restored_item)
 
     item_read = _to_inventory_item_read(session, restored_item)
@@ -407,6 +413,7 @@ async def create_unit(
             actor_id=current_user.id,
         )
         session.commit()
+        await manager.broadcast_catalog_update()
         session.refresh(unit)
         unit_read = InventoryUnitRead.model_validate(unit)
 
@@ -452,6 +459,7 @@ async def create_units_batch(
             actor_id=current_user.id,
         )
         session.commit()
+        await manager.broadcast_catalog_update()
         for unit in created_units:
             session.refresh(unit)
         units_read = [InventoryUnitRead.model_validate(u) for u in created_units]
@@ -547,6 +555,7 @@ async def update_unit(
             actor_id=current_user.id,
         )
         session.commit()
+        await manager.broadcast_catalog_update()
         session.refresh(unit)
         unit_read = InventoryUnitRead.model_validate(unit)
 
@@ -588,6 +597,7 @@ async def retire_unit(
             actor_id=current_user.id,
         )
         session.commit()
+        await manager.broadcast_catalog_update()
         session.refresh(unit)
         unit_read = InventoryUnitRead.model_validate(unit)
 
@@ -660,6 +670,7 @@ async def create_batch(
             actor_id=current_user.id,
         )
         session.commit()
+        await manager.broadcast_catalog_update()
         session.refresh(batch)
         batch_read = InventoryBatchRead.model_validate(batch)
 
@@ -696,6 +707,7 @@ async def update_batch(
             actor_id=current_user.id,
         )
         session.commit()
+        await manager.broadcast_catalog_update()
         session.refresh(batch)
         batch_read = InventoryBatchRead.model_validate(batch)
 
@@ -766,6 +778,7 @@ async def reverse_movement(
             actor_id=current_user.id,
         )
         session.commit()
+        await manager.broadcast_catalog_update()
         session.refresh(reversal)
 
         response = InventoryMovementReversalRead(

@@ -285,10 +285,16 @@ export function RequestsTable({
     }
 
     if (record.status === 'closed') {
+      actions.push(
+        <ActionButton key="receipt" label="Receipt" variant="default" onClick={() => onShowReceipt(record.request_id)} />,
+      );
       return (
-        <span className="text-[11px] text-muted-foreground">
-          {record.closed_at ? `Closed ${formatDate(record.closed_at).split(',')[0]}` : 'Finalized'}
-        </span>
+        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+          {actions}
+          <span className="text-[11px] text-muted-foreground ml-1.5">
+            {record.closed_at ? `Closed ${formatDate(record.closed_at).split(',')[0]}` : 'Finalized'}
+          </span>
+        </div>
       );
     }
 

@@ -34,7 +34,7 @@ export function parseSystemDate(dateStr: string | null | undefined): Date {
         month = parseInt(p1, 10) - 1;
         day = parseInt(p2, 10);
         year = parseInt(p3, 10);
-        
+
         // Basic heuristic: if month > 11, swap day and month
         if (month > 11) {
           [month, day] = [day - 1, month + 1];
@@ -53,4 +53,20 @@ export function parseSystemDate(dateStr: string | null | undefined): Date {
 
   // 2. Fallback to native parsing
   return new Date(dateStr);
+}
+
+/**
+ * Formats a date or date string into "DD Month YYYY" format.
+ */
+export function formatDate(date: Date | string | null | undefined): string {
+  if (!date) return '';
+
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return '';
+
+  const day = d.getDate();
+  const month = d.toLocaleString('default', { month: 'long' });
+  const year = d.getFullYear();
+
+  return `${day} ${month} ${year}`;
 }

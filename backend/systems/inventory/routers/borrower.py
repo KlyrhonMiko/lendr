@@ -6,6 +6,7 @@ from sqlmodel import Session
 from core.database import get_session
 from core.deps import get_current_user
 from core.schemas import GenericResponse, create_success_response, make_pagination_meta
+from core.websockets import manager
 from systems.admin.models.user import User
 from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestCreate,
@@ -136,6 +137,7 @@ async def borrower_submit_request(
             actor_id=current_user.id,
         )
         session.commit()
+        await manager.broadcast_catalog_update()
         return create_success_response(
             data=borrow_service.serialize_borrow_request(session, created_request),
             message="Request submitted successfully via Portal",

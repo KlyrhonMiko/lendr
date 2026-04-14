@@ -3,6 +3,7 @@ from sqlmodel import Session, select
 from systems.inventory.services.configuration_service import InventoryConfigService
 from systems.admin.models.user import User
 from utils.logging import get_logger
+from utils.mailing import send_email
 
 
 logger = get_logger("inventory.alerts")
@@ -66,27 +67,43 @@ class AlertService:
 
     def trigger_notifications(self, session: Session, channels: list[str], roles: list[str], alert_type: str, message: str, specific_recipients: list[dict] = None):
         """
-        Mock implementation of multi-channel notification triggering.
+        Trigger multi-channel notifications.
         """
         # 1. Find system recipients based on roles
-        users = session.exec(select(User).where(User.role.in_(roles))).all()
+        users = session.exec(select(User).where(User.role.in_(roles), User.is_deleted.is_(False))).all()
+        user_emails = [u.email for u in users if u.email]
         user_ids = [u.user_id for u in users]
         
         # 2. Add specific recipients
         specific_labels = []
+        recipient_emails = list(user_emails)
         if specific_recipients:
             for rec in specific_recipients:
-                label = f"{rec.get('name')} ({rec.get('email') or rec.get('phone')})"
+                label = f"{rec.get('name')} ({rec.get('email')})"
                 specific_labels.append(label)
+                if rec.get('email'):
+                    recipient_emails.append(rec.get('email'))
 
-        # For now, this writes to structured logs and can later feed a notifications table.
+        # Log the trigger
         logger.info(
-            "Triggered inventory alert type=%s channels=%s system_recipients=%s external_recipients=%s message=%s",
+            "Triggering inventory alert type=%s channels=%s system_recipients=%s external_recipients=%s message=%s",
             alert_type,
             ",".join(channels),
             ",".join(user_ids),
             ",".join(specific_labels),
             message,
         )
+
+        # 3. Handle Email Channel
+        if "email" in channels:
+            subject = f"Inventory Alert: {alert_type}"
+            # Deduplicate emails
+            unique_emails = list(set(recipient_emails))
+            for email in unique_emails:
+                send_email(
+                    to_email=email,
+                    subject=subject,
+                    body=message
+                )
 
 alert_service = AlertService()

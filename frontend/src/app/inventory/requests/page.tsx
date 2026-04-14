@@ -17,9 +17,11 @@ import { RequestsToolbar } from './components/RequestsToolbar';
 import { RequestsTable } from './components/RequestsTable';
 import { ConfirmBorrowActionModal } from './components/ConfirmBorrowActionModal';
 import { ReleaseReceiptModal } from './components/ReleaseReceiptModal';
+import { useInventoryWebSocket } from '@/hooks/useInventoryWebSocket';
 import { logger } from '@/lib/logger';
 
 export default function BorrowsPage() {
+  useInventoryWebSocket();
 
   const [requestEvents, setRequestEvents] = useState<Record<string, BorrowRequestEvent[]>>({});
   const [loadingEvents, setLoadingEvents] = useState<Record<string, boolean>>({});
@@ -89,11 +91,11 @@ export default function BorrowsPage() {
   const isFullyAssigned = useCallback((record: BorrowRecord) => {
     const assignments = assignmentsMap[record.request_id];
     if (!assignments) return false;
-    
+
     const totalRequested = record.items.reduce((sum, item) => sum + item.qty_requested, 0);
     const totalAssignedUnits = assignments.units.length;
     const totalAssignedBatches = assignments.batches.reduce((sum: number, b: BorrowRequestBatch) => sum + b.qty_assigned, 0);
-    
+
     return (totalAssignedUnits + totalAssignedBatches) >= totalRequested;
   }, [assignmentsMap]);
 
@@ -115,7 +117,7 @@ export default function BorrowsPage() {
     try {
       await executeAction.mutateAsync({ action, id: requestId, payload: { notes } });
       toast.success(`Request ${action.replaceAll('_', ' ')}d successfully`);
-      
+
       if (expandedIds.has(requestId)) {
         void fetchRequestEvents(requestId, true);
       }

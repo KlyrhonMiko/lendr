@@ -55,6 +55,7 @@ class BorrowRequest(BaseModel, table=True):
 
     is_emergency: bool = Field(default=False)
     borrower_signature: str | None = Field(default=None)
+    receipt_snapshot: dict | None = Field(default=None, sa_column=Column(JSON))
     compliance_followup_required: bool = Field(default=False)
     compliance_followup_notes: str | None = Field(default=None, max_length=500)
 

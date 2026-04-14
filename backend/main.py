@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 import time
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -15,6 +15,7 @@ from core.initialization_service import InitializationService
 from core.request_context import reset_correlation_id, set_correlation_id
 from core.schemas import GenericResponse, create_error_response, create_success_response
 from utils.logging import setup_logging, get_logger, setup_health_logging, log_operation
+from core.websockets import manager
 
 # Routers
 from systems.admin.routers.backup import router as backup
@@ -427,6 +428,16 @@ async def public_liveness(request: Request):
         message="Liveness check OK",
         request=request,
     )
+
+@app.websocket("/api/ws/borrower")
+async def websocket_borrower_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            # We mostly broadcast to clients, but we receive to keep the connection alive
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
 
 @app.get("/")
 async def root():
