@@ -8,6 +8,10 @@ export interface User {
   first_name: string;
   last_name: string;
   middle_name?: string;
+  contact_number?: string;
+  password?: string;
+  current_password?: string;
+  password_rotated_at?: string;
   role: string;
   is_active?: boolean;
 }
@@ -317,10 +321,17 @@ export const auth = {
       throw error;
     }
   },
+  updateMe: async (data: Partial<User>): Promise<User> => {
+    const response = await http.request<User>('/auth/me', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+    return response.data;
+  },
 
   getRedirectPath: (role?: string): string => {
     if (!role) return '/auth/login';
-    
+
     const ROLE_REDIRECT_MAP: Record<string, string> = {
       'admin': '/admin/dashboard',
       'inventory_manager': '/inventory/dashboard',

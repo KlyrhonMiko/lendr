@@ -15,7 +15,7 @@ from core.database import get_session
 from core.schemas import GenericResponse, create_success_response
 from systems.admin.models.user import User
 from systems.admin.services.audit_service import audit_service
-from systems.admin.schemas.user_schemas import UserRead
+from systems.admin.schemas.user_schemas import UserRead, UserUpdate
 from systems.auth.dependencies import get_current_user, require_permission, reusable_oauth2
 from systems.auth.schemas.auth_schemas import (
     BootstrapPasswordRotateRequest,
@@ -156,9 +156,6 @@ def _safe_log_auth_event(
         logger.warning("Failed to write auth audit event: %s", exc)
 
 
-def _commit_if_needed(session: Session) -> None:
-    if session.new or session.dirty or session.deleted:
-        session.commit()
 
 
 def _enforce_auth_rate_limit(
@@ -588,6 +585,55 @@ async def read_users_me(
     return create_success_response(data=current_user, request=request)
 
 
+@router.patch("/me", response_model=GenericResponse[UserRead], responses={401: {"model": GenericResponse}})
+async def update_users_me(
+    user_data: UserUpdate,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("auth:session:manage")),
+):
+    from systems.admin.services.user_service import UserService
+    user_service = UserService()
+
+    if user_data.password:
+        if not user_data.current_password:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Current password is required to change password",
+            )
+        
+        from utils.security import verify_and_update_password
+        verified, _ = verify_and_update_password(user_data.current_password, current_user.hashed_password)
+        if not verified:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Incorrect current password",
+            )
+
+    should_revoke_sessions = user_service.requires_session_revocation(current_user, user_data)
+    updated_user = user_service.update(
+        session,
+        current_user,
+        user_data,
+        actor_id=current_user.id,
+    )
+
+    message = "Profile updated successfully"
+    if should_revoke_sessions:
+        auth_service.revoke_sessions_for_user(session, updated_user.id)
+        message = "Profile updated successfully. Active sessions were revoked for security."
+
+    session.commit()
+    session.refresh(updated_user)
+
+    return create_success_response(
+        data=updated_user,
+        message=message,
+        request=request,
+    )
+
+
 @router.get(
     "/rbac/policy",
     response_model=GenericResponse[RolePolicyRead],
@@ -658,7 +704,7 @@ async def refresh_token(
                 raise HTTPException(status_code=401, detail="Session expired or invalid")
             auth_service.extend_user_session(session, session_id, access_token_expires)
 
-        _commit_if_needed(session)
+        session.commit()
 
         # Generate new token
         access_token = auth_service.create_access_token(

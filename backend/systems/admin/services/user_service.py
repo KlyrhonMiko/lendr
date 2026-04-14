@@ -120,6 +120,7 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
         password = data.pop("password")
         self.password_policy_service.validate_for_role(session, password, normalized_role)
         data["hashed_password"] = get_password_hash(password)
+        data["password_rotated_at"] = get_now_manila()
 
         if not data.get(self.lookup_field):
             data[self.lookup_field] = get_next_sequence(session, self.model, self.lookup_field, prefix)
@@ -157,6 +158,11 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
             target_role = obj_data.get("role") or db_obj.role
             self.password_policy_service.validate_for_role(session, password, target_role)
             obj_data["hashed_password"] = get_password_hash(password)
+            obj_data["password_rotated_at"] = get_now_manila()
+            obj_data["must_change_password"] = False
+
+        # Pop non-model fields
+        obj_data.pop("current_password", None)
 
         for key, value in obj_data.items():
             setattr(db_obj, key, value)

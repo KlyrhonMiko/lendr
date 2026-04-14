@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
@@ -15,6 +16,7 @@ class UserBase(BaseModel):
     role: Optional[str] = Field(default=None, max_length=50)
     employee_id: Optional[str] = Field(default=None, max_length=50)
     shift_type: str = Field(default="day", max_length=20)
+    password_rotated_at: Optional[datetime] = Field(default=None)
 
 
 class UserCreate(UserBase):
@@ -31,6 +33,7 @@ class UserCreate(UserBase):
 
 class UserUpdate(UserBase):
     password: Optional[str] = Field(default=None, min_length=6, max_length=255)
+    current_password: Optional[str] = Field(default=None)
 
 
 class UserRead(UserBase):

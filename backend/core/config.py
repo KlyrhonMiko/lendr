@@ -81,6 +81,17 @@ class Settings(BaseSettings):
     INITIAL_ADMIN_PASSWORD: str | None = None
     ALLOW_INSECURE_DEV_DEFAULT_ADMIN: bool = False
 
+    # SMTP Settings
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int = 587
+    SMTP_USER: str | None = None
+    SMTP_PASSWORD: str | None = None
+    SMTP_FROM_EMAIL: str = "noreply@lendr.app"
+    SMTP_FROM_NAME: str = "Lendr System"
+    SMTP_TLS: bool = True
+    SMTP_SSL: bool = False
+    SMTP_TIMEOUT: int = 10
+
 settings = Settings()
 if not settings.DATABASE_URL:
     raise RuntimeError("DATABASE_URL is required — set it in the environment or .env(.local) file.")

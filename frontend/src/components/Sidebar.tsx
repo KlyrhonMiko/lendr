@@ -28,6 +28,7 @@ const navigation = {
     { name: 'Requests', href: '/inventory/requests', icon: ClipboardList },
     { name: 'Audit Logs', href: '/inventory/audit_logs', icon: ScrollText },
     { name: 'Ledger', href: '/inventory/ledger', icon: Activity },
+    { name: 'Profile', href: '/inventory/profile', icon: Users },
     { name: 'Settings', href: '/inventory/settings', icon: Settings },
   ],
   borrow_portal: [
