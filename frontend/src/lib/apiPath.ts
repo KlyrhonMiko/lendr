@@ -6,3 +6,12 @@ export function buildApiRequestUrl(url: string): string {
 
   return `${baseUrl}/api${normalizedPath}`;
 }
+
+export function buildWebSocketUrl(path: string): string {
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const wsProtocol = baseUrl.startsWith('https') ? 'wss' : 'ws';
+  const wsBase = baseUrl.replace(/^https?:\/\//, '');
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+
+  return `${wsProtocol}://${wsBase}/api${normalizedPath}`;
+}

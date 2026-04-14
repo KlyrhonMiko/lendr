@@ -7,6 +7,7 @@ from sqlmodel import Session
 from core.database import get_session
 from core.deps import get_current_user
 from core.schemas import GenericResponse, create_success_response, make_pagination_meta
+from core.websockets import manager
 from systems.admin.models.user import User
 from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestApprove,
@@ -56,6 +57,7 @@ async def create_request(
             actor_id=current_user.id,
         )
         session.commit()
+        await manager.broadcast_catalog_update()
 
         return create_success_response(
             data=borrow_service.serialize_borrow_request(session, borrow_req),
@@ -210,6 +212,7 @@ async def release_request(
             note=payload.notes,
         )
         session.commit()
+        await manager.broadcast_catalog_update()
 
         return create_success_response(
             data=borrow_service.serialize_borrow_request(session, updated_req),
@@ -249,6 +252,7 @@ async def assign_units_to_request(
             note=payload.notes,
         )
         session.commit()
+        await manager.broadcast_catalog_update()
 
         return create_success_response(
             data=assignments, message="Units assigned to request", request=request
@@ -282,6 +286,7 @@ async def assign_batches_to_request(
             note=payload.notes,
         )
         session.commit()
+        await manager.broadcast_catalog_update()
 
         return create_success_response(
             data=assignments, message="Batches assigned to request", request=request
@@ -355,6 +360,7 @@ async def return_request(
             unit_returns=payload.unit_returns,
         )
         session.commit()
+        await manager.broadcast_catalog_update()
 
         return create_success_response(
             data=borrow_service.serialize_borrow_request(session, updated_req),
@@ -392,6 +398,7 @@ async def reopen_request(
             note=payload.notes,
         )
         session.commit()
+        await manager.broadcast_catalog_update()
 
         return create_success_response(
             data=borrow_service.serialize_borrow_request(session, updated_req),
@@ -552,6 +559,7 @@ async def close_request(
             session, request_id, current_user.id, notes=payload.notes
         )
         session.commit()
+        await manager.broadcast_catalog_update()
 
         return create_success_response(
             data=borrow_service.serialize_borrow_request(session, updated_req),

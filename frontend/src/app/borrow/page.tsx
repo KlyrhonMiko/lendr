@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { ShieldCheck, CheckCircle2, X, Delete, Loader2 } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { posApi, BorrowCatalogItem } from './api';
+import { useInventoryWebSocket } from '@/hooks/useInventoryWebSocket';
 import type { ConfigRead } from '../inventory/items/api';
 import { toast } from 'sonner';
 import { auth } from '@/lib/auth';
@@ -19,10 +21,8 @@ interface BorrowerTaxonomyData {
 }
 
 export default function BorrowPage() {
-  const [items, setItems] = useState<BorrowCatalogItem[]>([]);
-  const [categoryConfigs, setCategoryConfigs] = useState<ConfigRead[]>([]);
-  const [classificationConfigs, setClassificationConfigs] = useState<ConfigRead[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  useInventoryWebSocket();
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,26 +40,26 @@ export default function BorrowPage() {
   const [success, setSuccess] = useState(false);
   const [submittedByEmployeeName, setSubmittedByEmployeeName] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const { data: items = [], isLoading: isLoadingCatalog } = useQuery({
+    queryKey: ['borrow', 'catalog'],
+    queryFn: async () => {
+      const res = await posApi.listCatalog({ per_page: 200 });
+      return res.data;
+    },
+  });
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const [invRes, categoryRes] = await Promise.all([
-        posApi.listCatalog({ per_page: 200 }),
-        api.get<BorrowerTaxonomyData>('/inventory/borrower/taxonomy'),
-      ]);
-      setItems(invRes.data);
-      setCategoryConfigs(categoryRes.data?.categories || []);
-      setClassificationConfigs(categoryRes.data?.classifications || []);
-    } catch {
-      toast.error('Failed to load inventory data');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: taxonomy } = useQuery({
+    queryKey: ['borrow', 'taxonomy'],
+    queryFn: async () => {
+      const res = await api.get<BorrowerTaxonomyData>('/inventory/borrower/taxonomy');
+      return res.data;
+    },
+    refetchInterval: 300000, // 5 minutes for taxonomy
+  });
+
+  const categoryConfigs = taxonomy?.categories || [];
+  const classificationConfigs = taxonomy?.classifications || [];
+  const loading = isLoadingCatalog;
 
   const categoryLabels = useMemo(() => {
     return Object.fromEntries(categoryConfigs.map((category) => [category.key, category.value]));
@@ -305,10 +305,12 @@ export default function BorrowPage() {
       setSuccess(true);
       toast.success(`Borrow request submitted for ${cart.length} item(s) by ${displayName}`);
 
+      // Invalidate queries to refresh available quantities
+      queryClient.invalidateQueries({ queryKey: ['borrow', 'catalog'] });
+
       // Delay clearing and fetching to allow success animation
       setTimeout(() => {
         handleClear();
-        fetchData();
         setStep('selection');
         setSuccess(false);
         setSubmittedByEmployeeName(null);
