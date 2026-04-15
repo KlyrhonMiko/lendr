@@ -54,6 +54,12 @@ export interface UserTwoFactorStatus {
   enrolled_at: string | null;
 }
 
+export interface UserTwoFactorEnrollmentInitiateResponse {
+  method: string;
+  secret: string;
+  provisioning_uri: string;
+}
+
 export interface SecurityPasswordRules {
   min_length: number;
 }
@@ -83,6 +89,15 @@ export const userApi = {
 
   resetTwoFactor: (userId: string) =>
     api.post<UserTwoFactorStatus>(`/admin/users/${userId}/2fa/reset`),
+
+  getTwoFactorStatus: (userId: string) =>
+    api.get<UserTwoFactorStatus>(`/admin/users/${userId}/2fa/status`),
+
+  initiateTwoFactorEnrollment: (userId: string) =>
+    api.post<UserTwoFactorEnrollmentInitiateResponse>(`/admin/users/${userId}/2fa/enroll/initiate`),
+
+  verifyTwoFactorEnrollment: (userId: string, code: string) =>
+    api.post<UserTwoFactorStatus>(`/admin/users/${userId}/2fa/enroll/verify`, { code }),
 
   getConfigs: (category: string) =>
     api.get<AuthConfig[]>(`/auth/config?category=${category}`),

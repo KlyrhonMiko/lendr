@@ -1,5 +1,6 @@
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlmodel import Session
 
 from core.database import get_session
@@ -8,12 +9,20 @@ from systems.auth.dependencies import require_permission
 from core.schemas import GenericResponse, create_success_response, make_pagination_meta
 from systems.admin.models.user import User
 from systems.admin.schemas.user_schemas import UserCreate, UserRead, UserUpdate
-from systems.auth.schemas.auth_schemas import TwoFactorStatusRead
+from systems.auth.schemas.auth_schemas import (
+    TwoFactorCodeVerifyRequest,
+    TwoFactorEnrollmentInitiateRead,
+    TwoFactorStatusRead,
+)
 from systems.admin.services.user_service import UserService
 from systems.auth.services.auth_service import auth_service
 
 router = APIRouter()
 user_service = UserService()
+
+TWO_FACTOR_BORROWER_FORBIDDEN_DETAIL = (
+    "Borrower accounts are not eligible for two-factor enrollment or disable actions."
+)
 
 
 def _commit_and_refresh(session: Session, obj: User) -> None:
@@ -25,6 +34,15 @@ def _commit_and_refresh(session: Session, obj: User) -> None:
     refresh = getattr(session, "refresh", None)
     if callable(refresh):
         refresh(obj)
+
+
+def _ensure_two_factor_management_allowed(target_user: User) -> None:
+    normalized_role = (target_user.role or "").strip().lower()
+    if normalized_role in ("borrower", "brwr"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=TWO_FACTOR_BORROWER_FORBIDDEN_DETAIL,
+        )
 
 
 @router.post(
@@ -99,6 +117,107 @@ async def get_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return create_success_response(data=user, request=request)
+
+
+@router.get(
+    "/{user_id}/2fa/status",
+    response_model=GenericResponse[TwoFactorStatusRead],
+    responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}},
+)
+async def get_user_two_factor_status(
+    user_id: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("admin:users:manage")),
+):
+    target_user = user_service.get(session, user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    enabled, enrolled_at = auth_service.get_two_factor_status(session, target_user.id)
+    return create_success_response(
+        data=TwoFactorStatusRead(
+            enabled=enabled,
+            method="authenticator_app",
+            enrolled_at=enrolled_at,
+        ),
+        request=request,
+    )
+
+
+@router.post(
+    "/{user_id}/2fa/enroll/initiate",
+    response_model=GenericResponse[TwoFactorEnrollmentInitiateRead],
+    responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}},
+)
+async def initiate_user_two_factor_enrollment(
+    user_id: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("admin:users:manage")),
+):
+    target_user = user_service.get(session, user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    _ensure_two_factor_management_allowed(target_user)
+
+    try:
+        enrollment = auth_service.begin_two_factor_enrollment(session, target_user)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    session.commit()
+    return create_success_response(
+        data=TwoFactorEnrollmentInitiateRead(**enrollment),
+        message="Two-factor enrollment initiated",
+        request=request,
+    )
+
+
+@router.post(
+    "/{user_id}/2fa/enroll/verify",
+    response_model=GenericResponse[TwoFactorStatusRead],
+    responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}},
+)
+async def verify_user_two_factor_enrollment(
+    user_id: str,
+    payload: TwoFactorCodeVerifyRequest,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("admin:users:manage")),
+):
+    target_user = user_service.get(session, user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    _ensure_two_factor_management_allowed(target_user)
+
+    try:
+        verified, enrolled_at = auth_service.verify_two_factor_enrollment(
+            session,
+            target_user,
+            payload.code,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    if not verified:
+        session.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authenticator code",
+        )
+
+    session.commit()
+    return create_success_response(
+        data=TwoFactorStatusRead(enabled=True, method="authenticator_app", enrolled_at=enrolled_at),
+        message="Two-factor authentication enabled",
+        request=request,
+    )
 
 
 @router.post(

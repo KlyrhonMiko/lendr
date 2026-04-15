@@ -170,6 +170,29 @@ export const api = {
     }
   },
 
+  disableTwoFactorEnrollment: async (code: string) => {
+    try {
+      const response = await http.request<TwoFactorStatusResponse>('/auth/2fa/disable', {
+        method: 'POST',
+        body: JSON.stringify({ code }),
+      });
+      return unwrapAuthPayload(response as ApiResponse<TwoFactorStatusResponse> | TwoFactorStatusResponse);
+    } catch (error: unknown) {
+      throw toAuthApiError(error, 'Failed to disable two-factor authentication');
+    }
+  },
+
+  getTwoFactorStatus: async () => {
+    try {
+      const response = await http.request<TwoFactorStatusResponse>('/auth/2fa/status', {
+        method: 'GET',
+      });
+      return unwrapAuthPayload(response as ApiResponse<TwoFactorStatusResponse> | TwoFactorStatusResponse);
+    } catch (error: unknown) {
+      throw toAuthApiError(error, 'Failed to load two-factor authentication status');
+    }
+  },
+
   rotateBootstrapPassword: async (payload: BootstrapRotatePasswordPayload) => {
     try {
       return await http.request('/auth/bootstrap/rotate-password', {

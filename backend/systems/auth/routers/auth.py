@@ -49,6 +49,9 @@ TWO_FACTOR_ENROLLMENT_REQUIRED_DETAIL = (
     "Sign in to an existing session and complete authenticator setup first."
 )
 TWO_FACTOR_VERIFY_FAILED_DETAIL = "Invalid or expired two-factor challenge or authenticator code."
+TWO_FACTOR_BORROWER_FORBIDDEN_DETAIL = (
+    "Borrower accounts are not eligible for two-factor enrollment or disable actions."
+)
 
 # Restrict /api/auth/me to non-privileged self-service fields only.
 SELF_UPDATE_ALLOWED_FIELDS = {
@@ -61,6 +64,15 @@ SELF_UPDATE_ALLOWED_FIELDS = {
     "password",
     "current_password",
 }
+
+
+def _ensure_two_factor_account_management_allowed(user: User) -> None:
+    normalized_role = (user.role or "").strip().lower()
+    if normalized_role in ("borrower", "brwr"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=TWO_FACTOR_BORROWER_FORBIDDEN_DETAIL,
+        )
 
 
 @dataclass(frozen=True)
@@ -263,7 +275,10 @@ async def login_for_access_token(
             detail=BOOTSTRAP_ROTATION_REQUIRED_DETAIL,
         )
 
-    if auth_service.is_two_factor_required_for_user(session, user):
+    normalized_role = (user.role or "").strip().lower()
+    if normalized_role not in ("borrower", "brwr") and auth_service.is_two_factor_required_for_user(
+        session, user
+    ):
         if not auth_service.has_active_two_factor_enrollment(session, user.id):
             audit_service.log_action(
                 db=session,
@@ -347,6 +362,8 @@ async def initiate_two_factor_enrollment(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
+    _ensure_two_factor_account_management_allowed(current_user)
+
     try:
         enrollment = auth_service.begin_two_factor_enrollment(session, current_user)
     except ValueError as exc:
@@ -370,6 +387,8 @@ async def verify_two_factor_enrollment(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
+    _ensure_two_factor_account_management_allowed(current_user)
+
     try:
         verified, enrolled_at = auth_service.verify_two_factor_enrollment(
             session,
@@ -394,6 +413,26 @@ async def verify_two_factor_enrollment(
     )
 
 
+@router.get(
+    "/2fa/status",
+    response_model=GenericResponse[TwoFactorStatusRead],
+)
+async def get_current_user_two_factor_status(
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    enabled, enrolled_at = auth_service.get_two_factor_status(session, current_user.id)
+    return create_success_response(
+        data=TwoFactorStatusRead(
+            enabled=enabled,
+            method="authenticator_app",
+            enrolled_at=enrolled_at,
+        ),
+        request=request,
+    )
+
+
 @router.post("/2fa/disable", response_model=GenericResponse[TwoFactorStatusRead])
 async def disable_two_factor_enrollment(
     payload: TwoFactorDisableRequest,
@@ -401,6 +440,8 @@ async def disable_two_factor_enrollment(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
+    _ensure_two_factor_account_management_allowed(current_user)
+
     try:
         disabled, _ = auth_service.disable_two_factor_enrollment(session, current_user, payload.code)
     except ValueError as exc:
@@ -627,10 +668,17 @@ async def update_users_me(
     if sensitive_fields_changed:
         from utils.security import verify_and_update_password
 
-        verified, _ = verify_and_update_password(
-            sanitized_user_data.current_password,
+        current_password = sanitized_user_data.current_password
+        if current_password is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Current password is required to change password, email, or username",
+            )
+
+        verified = verify_and_update_password(
+            current_password,
             current_user.hashed_password,
-        )
+        )[0]
         if not verified:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
