@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_serializer
 
 
 class Token(BaseModel):
@@ -28,6 +28,19 @@ class BootstrapPasswordRotateRequest(BaseModel):
     username: str = Field(..., min_length=1, max_length=255)
     current_password: str = Field(..., min_length=6, max_length=255)
     new_password: str = Field(..., min_length=6, max_length=255)
+
+
+class SelfProfileUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    first_name: str | None = Field(default=None, max_length=100)
+    last_name: str | None = Field(default=None, max_length=100)
+    middle_name: str | None = Field(default=None, max_length=100)
+    email: EmailStr | None = Field(default=None, max_length=255)
+    contact_number: str | None = Field(default=None, max_length=20)
+    username: str | None = Field(default=None, max_length=50)
+    password: str | None = Field(default=None, min_length=6, max_length=255)
+    current_password: str | None = Field(default=None, min_length=6, max_length=255)
 
 
 class TwoFactorEnrollmentInitiateRead(BaseModel):

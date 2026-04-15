@@ -958,4 +958,41 @@ class AuthService:
 
         session.flush()
 
+    def revoke_other_sessions_for_user(
+        self,
+        session: Session,
+        user_uuid: UUID,
+        keep_session_id: str | None,
+    ):
+        """Revoke all active sessions for a specific user except keep_session_id."""
+        now = get_now_manila()
+
+        user_session_stmt = select(UserSession).where(
+            UserSession.user_uuid == user_uuid,
+            UserSession.is_revoked.is_(False),
+            UserSession.expires_at > now,
+        )
+        if keep_session_id:
+            user_session_stmt = user_session_stmt.where(UserSession.session_id != keep_session_id)
+
+        borrower_session_stmt = select(BorrowerSession).where(
+            BorrowerSession.borrower_uuid == user_uuid,
+            BorrowerSession.is_revoked.is_(False),
+            BorrowerSession.expires_at > now,
+        )
+        if keep_session_id:
+            borrower_session_stmt = borrower_session_stmt.where(BorrowerSession.session_id != keep_session_id)
+
+        user_sessions = session.exec(user_session_stmt).all()
+        for db_session in user_sessions:
+            db_session.is_revoked = True
+            session.add(db_session)
+
+        borrower_sessions = session.exec(borrower_session_stmt).all()
+        for db_session in borrower_sessions:
+            db_session.is_revoked = True
+            session.add(db_session)
+
+        session.flush()
+
 auth_service = AuthService()

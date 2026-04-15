@@ -9,11 +9,8 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import {
     User as UserIcon,
-    Mail,
-    Phone,
     Edit3,
     Save,
-    X,
 } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 
@@ -22,6 +19,7 @@ export default function ProfilePage() {
     const [isEditing, setIsEditing] = useState(false);
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState<Partial<User>>({});
+    const [currentPasswordForSensitive, setCurrentPasswordForSensitive] = useState('');
 
     const [showPasswordForm, setShowPasswordForm] = useState(false);
     const [passwordData, setPasswordData] = useState({ current: '', new: '', confirm: '' });
@@ -33,6 +31,7 @@ export default function ProfilePage() {
                 last_name: user.last_name,
                 middle_name: user.middle_name || '',
                 email: user.email,
+                username: user.username,
                 contact_number: user.contact_number || '',
             });
         }
@@ -44,14 +43,42 @@ export default function ProfilePage() {
     };
 
     const handleSave = async () => {
+        const isEmailChanged = (formData.email || '').trim() !== user?.email;
+        const isUsernameChanged = (formData.username || '').trim() !== user?.username;
+        const requiresCurrentPassword = isEmailChanged || isUsernameChanged;
+
+        if (requiresCurrentPassword && !currentPasswordForSensitive) {
+            toast.error('Current password is required when changing email or username');
+            return;
+        }
+
+        const payload: Partial<User> = {
+            first_name: formData.first_name,
+            last_name: formData.last_name,
+            middle_name: formData.middle_name,
+            email: formData.email,
+            contact_number: formData.contact_number,
+            username: formData.username,
+        };
+
+        if (requiresCurrentPassword) {
+            payload.current_password = currentPasswordForSensitive;
+        }
+
         setLoading(true);
         try {
-            await auth.updateMe(formData);
+            await auth.updateMe(payload);
             await refreshUser();
             setIsEditing(false);
-            toast.success('Profile updated successfully');
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to update profile');
+            setCurrentPasswordForSensitive('');
+            if (requiresCurrentPassword) {
+                toast.success('Profile updated successfully. Sensitive changes were verified.');
+            } else {
+                toast.success('Profile updated successfully');
+            }
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Failed to update profile';
+            toast.error(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -77,11 +104,13 @@ export default function ProfilePage() {
                 password: passwordData.new,
                 current_password: passwordData.current
             });
+            await refreshUser();
             setShowPasswordForm(false);
             setPasswordData({ current: '', new: '', confirm: '' });
             toast.success('Password updated successfully');
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to update password');
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Failed to update password';
+            toast.error(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -114,7 +143,15 @@ export default function ProfilePage() {
                     </Button>
                 ) : (
                     <div className="flex gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)} disabled={loading}>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                                setIsEditing(false);
+                                setCurrentPasswordForSensitive('');
+                            }}
+                            disabled={loading}
+                        >
                             Cancel
                         </Button>
                         <Button size="sm" onClick={handleSave} className="gap-2">
@@ -162,12 +199,28 @@ export default function ProfilePage() {
                             disabled={!isEditing || loading}
                         />
                         <Input
+                            label="Username"
+                            name="username"
+                            value={formData.username || ''}
+                            onChange={handleInputChange}
+                            disabled={!isEditing || loading}
+                        />
+                        <Input
                             label="Contact Number"
                             name="contact_number"
                             value={formData.contact_number || ''}
                             onChange={handleInputChange}
                             disabled={!isEditing || loading}
                         />
+                        {isEditing && (
+                            <Input
+                                type="password"
+                                label="Current Password (required for email/username changes)"
+                                value={currentPasswordForSensitive}
+                                onChange={(e) => setCurrentPasswordForSensitive(e.target.value)}
+                                disabled={loading}
+                            />
+                        )}
                     </CardContent>
                 </Card>
 

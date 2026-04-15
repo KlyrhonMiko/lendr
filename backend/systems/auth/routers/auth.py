@@ -20,6 +20,7 @@ from systems.auth.dependencies import get_current_user, require_permission, reus
 from systems.auth.schemas.auth_schemas import (
     BootstrapPasswordRotateRequest,
     RolePolicyRead,
+    SelfProfileUpdate,
     SessionPolicyRead,
     Token,
     TwoFactorChallengeRead,
@@ -590,10 +591,11 @@ async def read_users_me(
 
 @router.patch("/me", response_model=GenericResponse[UserRead], responses={401: {"model": GenericResponse}})
 async def update_users_me(
-    user_data: UserUpdate,
+    user_data: SelfProfileUpdate,
     request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
+    token: str = Depends(reusable_oauth2),
     _: None = Depends(require_permission("auth:session:manage")),
 ):
     from systems.admin.services.user_service import UserService
@@ -610,14 +612,21 @@ async def update_users_me(
 
     sanitized_user_data = UserUpdate(**incoming_updates)
 
-    if sanitized_user_data.password:
-        if not sanitized_user_data.current_password:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Current password is required to change password",
-            )
-        
+    sensitive_fields_changed = bool(sanitized_user_data.password)
+    if sanitized_user_data.email is not None and sanitized_user_data.email != current_user.email:
+        sensitive_fields_changed = True
+    if sanitized_user_data.username is not None and sanitized_user_data.username != current_user.username:
+        sensitive_fields_changed = True
+
+    if sensitive_fields_changed and not sanitized_user_data.current_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is required to change password, email, or username",
+        )
+
+    if sensitive_fields_changed:
         from utils.security import verify_and_update_password
+
         verified, _ = verify_and_update_password(
             sanitized_user_data.current_password,
             current_user.hashed_password,
@@ -627,6 +636,21 @@ async def update_users_me(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Incorrect current password",
             )
+
+    try:
+        token_payload = decode_access_token(token)
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Could not validate credentials",
+        )
+
+    current_session_id = token_payload.get("session_id")
+    if not current_session_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Could not validate credentials",
+        )
 
     should_revoke_sessions = user_service.requires_session_revocation(current_user, sanitized_user_data)
     updated_user = user_service.update(
@@ -638,8 +662,12 @@ async def update_users_me(
 
     message = "Profile updated successfully"
     if should_revoke_sessions:
-        auth_service.revoke_sessions_for_user(session, updated_user.id)
-        message = "Profile updated successfully. Active sessions were revoked for security."
+        auth_service.revoke_other_sessions_for_user(
+            session,
+            updated_user.id,
+            keep_session_id=current_session_id,
+        )
+        message = "Profile updated successfully. Other active sessions were revoked for security."
 
     session.commit()
     session.refresh(updated_user)
