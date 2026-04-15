@@ -11,6 +11,12 @@ import { auth } from '@/lib/auth';
 import { api } from '@/lib/api';
 import { CartItem } from './lib/types';
 import { validateBorrowSubmission, validatePinVerificationInput } from './lib/validation';
+import {
+  BORROW_KIOSK_ROLE_ERROR,
+  BORROW_KIOSK_TWO_FACTOR_ERROR,
+  isBorrowerRole,
+  isTwoFactorChallengeResponse,
+} from './lib/authFlow';
 import { SelectionView } from './components/SelectionView';
 import { CheckoutView } from './components/CheckoutView';
 import { formatCategoryLabel } from './lib/utils';
@@ -196,6 +202,44 @@ export default function BorrowPage() {
     setTimeout(() => pinInputRefs.current[focusIdx]?.focus(), 0);
   }, []);
 
+  const revokeBorrowerSession = useCallback(async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      // Keep flow usable even if logout request fails.
+    } finally {
+      auth.clearToken();
+    }
+  }, []);
+
+  const loginAsBorrower = useCallback(async (username: string, password: string) => {
+    const loginRes = await api.login({
+      username,
+      password,
+    });
+
+    if (isTwoFactorChallengeResponse(loginRes)) {
+      throw new Error(BORROW_KIOSK_TWO_FACTOR_ERROR);
+    }
+
+    auth.setToken(loginRes.access_token);
+
+    let borrowerUser = null;
+    try {
+      borrowerUser = await auth.getUser();
+    } catch (error) {
+      await revokeBorrowerSession();
+      throw error;
+    }
+
+    if (!isBorrowerRole(borrowerUser?.role)) {
+      await revokeBorrowerSession();
+      throw new Error(BORROW_KIOSK_ROLE_ERROR);
+    }
+
+    return borrowerUser;
+  }, [revokeBorrowerSession]);
+
   const handleConfirmPin = async () => {
     const pinValidationError = validatePinVerificationInput(employeeId, pinDraft);
     if (pinValidationError) {
@@ -207,20 +251,10 @@ export default function BorrowPage() {
 
     setIsPinVerifying(true);
     try {
-      const loginRes = await api.borrowerLogin({
-        username: employeeId.trim(),
-        password: cleaned,
-      });
+      await loginAsBorrower(employeeId.trim(), cleaned);
 
       // Revoke verification session immediately; request submission will open a fresh session.
-      auth.setToken(loginRes.access_token);
-      try {
-        await api.post('/auth/logout');
-      } catch {
-        // Keep flow usable even if logout request fails; local token is still cleared below.
-      } finally {
-        auth.clearToken();
-      }
+      await revokeBorrowerSession();
 
       setEmployeePin(cleaned);
       setIsPinModalOpen(false);
@@ -258,16 +292,10 @@ export default function BorrowPage() {
 
     try {
       // 1. Validate credentials (Login) as borrower
-      const loginRes = await api.borrowerLogin({
-        username: employeeId.trim(),
-        password: employeePin.trim(),
-      });
-
-      // 2. Set token temporarily for the borrow request
-      auth.setToken(loginRes.access_token);
+      const borrowerUser = await loginAsBorrower(employeeId.trim(), employeePin.trim());
       hasBorrowerSession = true;
 
-      // 3. Submit borrow request
+      // 2. Submit borrow request
       await posApi.createBatchBorrow({
         items: cart.map((i) => ({ item_id: i.item_id, qty_requested: i.cartQty })),
         notes: [
@@ -282,24 +310,15 @@ export default function BorrowPage() {
       });
 
       let displayName = employeeId.trim();
-      try {
-        const borrowerUser = await auth.getUser();
-        if (borrowerUser) {
-          displayName =
-            [borrowerUser.first_name, borrowerUser.last_name].filter(Boolean).join(' ').trim() ||
-            borrowerUser.username;
-        }
-      } catch {
-        // Continue with fallback display name when profile lookup fails.
+      if (borrowerUser) {
+        displayName =
+          [borrowerUser.first_name, borrowerUser.last_name].filter(Boolean).join(' ').trim() ||
+          borrowerUser.username;
       }
 
       // Explicitly revoke the session server-side, then clear local token for shared devices.
-      try {
-        await api.post('/auth/logout');
-      } catch {
-        // Ensure local logout still happens even if network/session revoke fails.
-      }
-      auth.clearToken();
+      await revokeBorrowerSession();
+      hasBorrowerSession = false;
 
       setSubmittedByEmployeeName(displayName);
       setSuccess(true);
@@ -317,11 +336,7 @@ export default function BorrowPage() {
       }, 3000);
     } catch (error: unknown) {
       if (hasBorrowerSession) {
-        try {
-          await api.post('/auth/logout');
-        } catch {
-          // Clear local token even if remote revoke fails.
-        }
+        await revokeBorrowerSession();
       }
 
       // Ensure token is cleared even on error

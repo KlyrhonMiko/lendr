@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Package, Settings, Activity,
-  Users, ScrollText, ClipboardList, Box, X
+  Users, ScrollText, ClipboardList, Box, X, History, UserCircle
 } from 'lucide-react';
 import { usePublicBranding } from '@/lib/publicBranding';
 
@@ -13,6 +13,7 @@ const systemMeta: Record<string, string> = {
   admin: 'Administration',
   inventory: 'Inventory',
   borrow_portal: 'Borrow Portal',
+  borrowers: 'Borrowers',
 };
 
 const navigation = {
@@ -34,6 +35,10 @@ const navigation = {
   borrow_portal: [
     { name: 'Request Form', href: '/borrow', icon: Box },
   ],
+  borrowers: [
+    { name: 'History', href: '/borrowers/history', icon: History },
+    { name: 'Account', href: '/borrowers/account', icon: UserCircle },
+  ],
 };
 
 interface SidebarProps {
@@ -48,6 +53,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const getSystem = () => {
     if (pathname.startsWith('/inventory')) return 'inventory';
     if (pathname.startsWith('/admin')) return 'admin';
+    if (pathname.startsWith('/borrowers')) return 'borrowers';
     if (pathname.startsWith('/borrow')) return 'borrow_portal';
     return null;
   };

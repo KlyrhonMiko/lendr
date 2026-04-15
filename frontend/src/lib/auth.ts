@@ -336,7 +336,7 @@ export const auth = {
       'admin': '/admin/dashboard',
       'inventory_manager': '/inventory/dashboard',
       'dispatch': '/inventory/dashboard',
-      'borrower': '/borrow_portal/request_form',
+      'borrower': '/borrowers/history',
       'finance_manager': '/inventory/dashboard',
       'accountant': '/inventory/dashboard',
       'employee': '/borrow_portal/request_form',

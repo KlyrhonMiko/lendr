@@ -49,6 +49,18 @@ TWO_FACTOR_ENROLLMENT_REQUIRED_DETAIL = (
 )
 TWO_FACTOR_VERIFY_FAILED_DETAIL = "Invalid or expired two-factor challenge or authenticator code."
 
+# Restrict /api/auth/me to non-privileged self-service fields only.
+SELF_UPDATE_ALLOWED_FIELDS = {
+    "first_name",
+    "last_name",
+    "middle_name",
+    "email",
+    "contact_number",
+    "username",
+    "password",
+    "current_password",
+}
+
 
 @dataclass(frozen=True)
 class RateLimitRule:
@@ -242,13 +254,6 @@ async def login_for_access_token(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    # Borrower accounts must use the Borrow portal (/borrow), not this login page
-    if user.role and user.role.lower() in ("borrower", "brwr"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Borrower accounts cannot sign in here. Please use the Borrow portal instead.",
         )
 
     if auth_service.should_force_bootstrap_password_rotation(user):
@@ -492,6 +497,13 @@ async def borrower_login(
             detail="Incorrect PIN",
         )
 
+    normalized_role = (user.role or "").strip().lower()
+    if normalized_role not in ("borrower", "brwr"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Borrower accounts only. Please use /api/auth/login.",
+        )
+
     if auth_service.should_force_bootstrap_password_rotation(user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -499,22 +511,13 @@ async def borrower_login(
         )
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-
-    if user.role == "borrower":
-        db_session = auth_service.create_borrower_session(
-            session=session,
-            user_id=user.user_id,
-            expires_delta=access_token_expires,
-            user_uuid=user.id,
-            device_id=device_id,
-        )
-    else:
-        db_session = auth_service.create_user_session(
-                session=session,
-                user_uuid=user.id,
-                expires_delta=access_token_expires,
-                device_id=device_id,
-            )
+    db_session = auth_service.create_borrower_session(
+        session=session,
+        user_id=user.user_id,
+        expires_delta=access_token_expires,
+        user_uuid=user.id,
+        device_id=device_id,
+    )
 
     access_token = auth_service.create_access_token(
         data={"sub": user.user_id, "session_id": db_session.session_id}, 
@@ -596,26 +599,40 @@ async def update_users_me(
     from systems.admin.services.user_service import UserService
     user_service = UserService()
 
-    if user_data.password:
-        if not user_data.current_password:
+    incoming_updates = user_data.model_dump(exclude_unset=True)
+    disallowed_fields = sorted(set(incoming_updates) - SELF_UPDATE_ALLOWED_FIELDS)
+    if disallowed_fields:
+        blocked_fields = ", ".join(disallowed_fields)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Self-service profile update cannot modify: {blocked_fields}",
+        )
+
+    sanitized_user_data = UserUpdate(**incoming_updates)
+
+    if sanitized_user_data.password:
+        if not sanitized_user_data.current_password:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Current password is required to change password",
             )
         
         from utils.security import verify_and_update_password
-        verified, _ = verify_and_update_password(user_data.current_password, current_user.hashed_password)
+        verified, _ = verify_and_update_password(
+            sanitized_user_data.current_password,
+            current_user.hashed_password,
+        )
         if not verified:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Incorrect current password",
             )
 
-    should_revoke_sessions = user_service.requires_session_revocation(current_user, user_data)
+    should_revoke_sessions = user_service.requires_session_revocation(current_user, sanitized_user_data)
     updated_user = user_service.update(
         session,
         current_user,
-        user_data,
+        sanitized_user_data,
         actor_id=current_user.id,
     )
 
@@ -695,7 +712,10 @@ async def refresh_token(
             
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         
-        if user.role == "borrower":
+        # Session source is determined by the issued session id prefix,
+        # so borrower-role users can refresh both standard (USE-*) and
+        # borrower-portal (BSE-*) login tokens.
+        if str(session_id).startswith("BSE-"):
             if not auth_service.is_borrower_session_valid(session, session_id):
                 raise HTTPException(status_code=401, detail="Session expired or invalid")
             auth_service.extend_borrower_session(session, session_id, access_token_expires)

@@ -108,14 +108,15 @@ async def borrower_get_requests(
             date_from=date_from,
             date_to=date_to,
         )
+        # TODO: Consider eager-loading related data in service serialization to reduce N+1 queries.
         serialized = borrow_service.serialize_borrow_requests(session, requests)
         return create_success_response(
             data=serialized,
             meta=make_pagination_meta(total=total, skip=skip, limit=per_page, page=page, per_page=per_page),
             request=request,
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Unable to fetch borrower requests at this time.")
 
 
 

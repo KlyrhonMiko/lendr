@@ -182,19 +182,8 @@ export const api = {
   },
 
   borrowerLogin: async (formData: LoginCredentials) => {
-    const body = new FormData();
-    body.append('username', formData.username);
-    body.append('password', formData.password);
-
-    try {
-      const response = await http.request<AuthTokenResponse>('/auth/borrower/login', {
-        method: 'POST',
-        body,
-      });
-      return unwrapAuthPayload(response as ApiResponse<AuthTokenResponse> | AuthTokenResponse);
-    } catch (error: unknown) {
-      throw toAuthApiError(error, 'Invalid borrower pin');
-    }
+    // Keep compatibility for any legacy caller while enforcing the unified login flow.
+    return api.login(formData);
   },
 
   get: <T>(url: string) => http.request<T>(url, { method: 'GET' }),
