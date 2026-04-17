@@ -1,6 +1,7 @@
 from collections import deque
 from datetime import timedelta
 import hashlib
+import re
 import threading
 import time
 from dataclasses import dataclass
@@ -284,13 +285,6 @@ async def login_for_access_token(
         )
 
     user, credential_mode = auth_result
-
-    # Borrower accounts must use the Borrow portal (/borrow), not this login page
-    if user.role and user.role.lower() in ("borrower", "brwr"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Borrower accounts cannot sign in here. Please use the Borrow portal instead.",
-        )
 
     if credential_mode == "primary" and auth_service.should_force_first_login_password_rotation(user):
         return _build_forced_password_change_response()
@@ -714,6 +708,12 @@ async def update_users_me(
     user_service = UserService()
 
     if user_data.password:
+        if auth_service.is_borrower_role(current_user.role) and not re.fullmatch(r"\d{6}", user_data.password):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Borrower password must be exactly 6 numeric digits",
+            )
+
         if not user_data.current_password:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -721,7 +721,10 @@ async def update_users_me(
             )
         
         from utils.security import verify_and_update_password
-        verified, _ = verify_and_update_password(user_data.current_password, current_user.hashed_password)
+        verified, _upgraded_hash = verify_and_update_password(
+            user_data.current_password,
+            current_user.hashed_password,
+        )
         if not verified:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
