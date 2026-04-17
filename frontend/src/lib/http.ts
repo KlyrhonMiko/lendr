@@ -25,6 +25,7 @@ export interface ApiResponse<T> {
 interface ErrorPayload {
   message?: string;
   detail?: string;
+  code?: string;
   error_type?: string;
   correlation_id?: string;
 }

@@ -173,6 +173,10 @@ export interface SecuritySessionTimeoutSettings {
   warning_minutes: number;
 }
 
+export interface SecuritySecondaryPasswordSettings {
+  rotation_interval_days: number;
+}
+
 export interface SecurityRbacOverviewSettings {
   policy_source: 'rbac_roles';
   last_updated_at: string | null;
@@ -205,6 +209,7 @@ export interface SecuritySettingsData {
   two_factor: SecurityTwoFactorSettings;
   password_rules: SecurityPasswordRulesSettings;
   session_timeout: SecuritySessionTimeoutSettings;
+  secondary_password: SecuritySecondaryPasswordSettings;
   rbac_overview: SecurityRbacOverviewSettings;
   shift_definitions: SecurityShiftDefinitionsSettings;
 }

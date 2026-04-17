@@ -169,6 +169,27 @@ SYSTEM_CONFIGS = [
     {"system": "admin", "key": "morning", "value": "Morning", "category": "users_shift_type", "description": "Morning shift (typically 6am-2pm)"},
     {"system": "admin", "key": "evening", "value": "Evening", "category": "users_shift_type", "description": "Evening shift (typically 2pm-10pm)"},
 
+    # Security Settings (Auth Source of Truth)
+    {"system": "admin", "key": "two_factor_enabled", "value": "true", "category": "security_settings", "description": "Enable or disable mandatory two-factor authentication policy."},
+    {"system": "admin", "key": "two_factor_method", "value": "authenticator_app", "category": "security_settings", "description": "Two-factor method policy for the security settings page."},
+    {"system": "admin", "key": "two_factor_enforce_for_roles", "value": '["admin", "inventory_manager", "finance_manager"]', "category": "security_settings", "description": "Roles that require authenticator-app two-factor verification."},
+    {"system": "admin", "key": "two_factor_enforce_on", "value": "next_login", "category": "security_settings", "description": "When two-factor requirements are enforced for covered roles."},
+    {"system": "admin", "key": "password_min_length", "value": "6", "category": "security_settings", "description": "Minimum required password length."},
+    {"system": "admin", "key": "password_require_uppercase", "value": "false", "category": "security_settings", "description": "Require uppercase characters in passwords."},
+    {"system": "admin", "key": "password_require_lowercase", "value": "false", "category": "security_settings", "description": "Require lowercase characters in passwords."},
+    {"system": "admin", "key": "password_require_number", "value": "false", "category": "security_settings", "description": "Require numeric characters in passwords."},
+    {"system": "admin", "key": "password_require_special", "value": "false", "category": "security_settings", "description": "Require special characters in passwords."},
+    {"system": "admin", "key": "password_applies_when_role_not_in", "value": '["borrower", "dispatch"]', "category": "security_settings", "description": "Roles excluded from password rule enforcement."},
+    {"system": "admin", "key": "session_inactive_minutes", "value": "30", "category": "security_settings", "description": "Session inactivity timeout duration in minutes."},
+    {"system": "admin", "key": "session_warning_minutes", "value": "5", "category": "security_settings", "description": "Session timeout warning lead time in minutes."},
+    {"system": "admin", "key": "secondary_password_rotation_interval_days", "value": "30", "category": "security_settings", "description": "How often secondary passwords rotate automatically in days."},
+
+    # Shift Definitions (Auth Source of Truth)
+    {"system": "admin", "key": "day", "value": '{"label":"Day","start":"08:00","end":"17:00","days":[1,2,3,4,5]}', "category": "users_shift_definition", "description": "Rich shift semantics used by the security settings page."},
+    {"system": "admin", "key": "night", "value": '{"label":"Night","start":"17:00","end":"02:00","days":[1,2,3,4,5]}', "category": "users_shift_definition", "description": "Rich shift semantics used by the security settings page."},
+    {"system": "admin", "key": "morning", "value": '{"label":"Morning","start":"06:00","end":"14:00","days":[1,2,3,4,5]}', "category": "users_shift_definition", "description": "Rich shift semantics used by the security settings page."},
+    {"system": "admin", "key": "evening", "value": '{"label":"Evening","start":"14:00","end":"22:00","days":[1,2,3,4,5]}', "category": "users_shift_definition", "description": "Rich shift semantics used by the security settings page."},
+
     # Backup & Audit Taxonomies
     {"system": "admin", "key": "local", "value": "local", "category": "backup_runs_destination", "description": "Local filesystem destination"},
     {"system": "admin", "key": "s3", "value": "s3", "category": "backup_runs_destination", "description": "Amazon S3 bucket destination"},

@@ -1,10 +1,12 @@
 import string
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from fastapi import HTTPException
 from sqlmodel import Session
 
-from systems.admin.services.configuration_service import ConfigurationService
+if TYPE_CHECKING:
+    from systems.auth.services.configuration_service import AuthConfigService
 
 
 SECURITY_SETTINGS_CATEGORY = "security_settings"
@@ -29,7 +31,9 @@ class PasswordPolicy:
 
 class PasswordPolicyService:
     def __init__(self):
-        self.configuration_service = ConfigurationService()
+        from systems.auth.services.configuration_service import AuthConfigService
+
+        self.auth_config_service = AuthConfigService()
 
     @staticmethod
     def _parse_bool(value: str | None, default: bool) -> bool:
@@ -65,7 +69,7 @@ class PasswordPolicyService:
 
     def get_policy(self, session: Session) -> PasswordPolicy:
         min_length = self._parse_int(
-            self.configuration_service.get_value(
+            self.auth_config_service.get_value(
                 session,
                 KEY_PASSWORD_MIN_LENGTH,
                 "6",
@@ -77,7 +81,7 @@ class PasswordPolicyService:
         return PasswordPolicy(
             min_length=min_length,
             require_uppercase=self._parse_bool(
-                self.configuration_service.get_value(
+                self.auth_config_service.get_value(
                     session,
                     KEY_PASSWORD_REQUIRE_UPPERCASE,
                     "false",
@@ -86,7 +90,7 @@ class PasswordPolicyService:
                 False,
             ),
             require_lowercase=self._parse_bool(
-                self.configuration_service.get_value(
+                self.auth_config_service.get_value(
                     session,
                     KEY_PASSWORD_REQUIRE_LOWERCASE,
                     "false",
@@ -95,7 +99,7 @@ class PasswordPolicyService:
                 False,
             ),
             require_number=self._parse_bool(
-                self.configuration_service.get_value(
+                self.auth_config_service.get_value(
                     session,
                     KEY_PASSWORD_REQUIRE_NUMBER,
                     "false",
@@ -104,7 +108,7 @@ class PasswordPolicyService:
                 False,
             ),
             require_special=self._parse_bool(
-                self.configuration_service.get_value(
+                self.auth_config_service.get_value(
                     session,
                     KEY_PASSWORD_REQUIRE_SPECIAL,
                     "false",

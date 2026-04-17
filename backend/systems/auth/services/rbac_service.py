@@ -5,7 +5,7 @@ from typing import Any
 from sqlmodel import Session
 
 from systems.admin.models.user import User
-from systems.admin.services.configuration_service import ConfigurationService
+from systems.auth.services.configuration_service import AuthConfigService
 
 
 PERMISSION_PATTERN = re.compile(r"^[a-z0-9_]+:[a-z0-9_]+:[a-z0-9_]+$")
@@ -127,7 +127,7 @@ DEFAULT_ROLE_POLICIES: dict[str, dict[str, list[str] | str]] = {
 
 class RBACService:
     def __init__(self):
-        self.config_service = ConfigurationService()
+        self.config_service = AuthConfigService()
 
     def _build_policies(
         self, session: Session

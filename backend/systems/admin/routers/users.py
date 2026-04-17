@@ -8,7 +8,16 @@ from core.deps import get_current_user
 from systems.auth.dependencies import require_permission
 from core.schemas import GenericResponse, create_success_response, make_pagination_meta
 from systems.admin.models.user import User
-from systems.admin.schemas.user_schemas import UserCreate, UserRead, UserUpdate
+from systems.admin.schemas.user_schemas import (
+    GeneratedUserCredentialsRead,
+    UserCreate,
+    UserCreateResultRead,
+    UserLoginPasswordResetRequest,
+    UserLoginPasswordResetResultRead,
+    UserRead,
+    UserSecondaryPasswordRead,
+    UserUpdate,
+)
 from systems.auth.schemas.auth_schemas import (
     TwoFactorCodeVerifyRequest,
     TwoFactorEnrollmentInitiateRead,
@@ -47,7 +56,7 @@ def _ensure_two_factor_management_allowed(target_user: User) -> None:
 
 @router.post(
     "/register",
-    response_model=GenericResponse[UserRead],
+    response_model=GenericResponse[UserCreateResultRead],
     status_code=201,
     responses={400: {"model": GenericResponse}},
 )
@@ -58,10 +67,27 @@ async def register_user(
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_permission("admin:users:manage")),
 ):
-    user = user_service.create(session, user_data, actor_id=current_user.id)
+    user, generated_credentials = user_service.create_with_generated_credentials(
+        session,
+        user_data,
+        actor_id=current_user.id,
+    )
     _commit_and_refresh(session, user)
+
+    generated_credentials_payload = None
+    if generated_credentials:
+        generated_credentials_payload = GeneratedUserCredentialsRead(
+            one_time_login_password=generated_credentials["one_time_login_password"],
+            secondary_password=generated_credentials["secondary_password"],
+        )
+
     return create_success_response(
-        data=user, message="User registered successfully", request=request
+        data=UserCreateResultRead(
+            user=UserRead.model_validate(user),
+            generated_credentials=generated_credentials_payload,
+        ),
+        message="User registered successfully",
+        request=request,
     )
 
 
@@ -120,11 +146,90 @@ async def get_user(
 
 
 @router.get(
+    "/{user_id}/secondary-password",
+    response_model=GenericResponse[UserSecondaryPasswordRead],
+    responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}},
+)
+@router.get(
+    "/{user_id}/recovery-credential",
+    response_model=GenericResponse[UserSecondaryPasswordRead],
+    include_in_schema=False,
+)
+async def get_user_secondary_password(
+    user_id: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("admin:users:manage")),
+):
+    user = user_service.get(session, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    secondary_password = user_service.get_secondary_password(
+        session,
+        user,
+        actor_id=current_user.id,
+    )
+    _commit_and_refresh(session, user)
+
+    return create_success_response(
+        data=UserSecondaryPasswordRead(
+            user_id=user.user_id,
+            secondary_password=secondary_password,
+            rotated_at=user.recovery_credential_rotated_at,
+        ),
+        message="Secondary password retrieved successfully",
+        request=request,
+    )
+
+
+@router.post(
+    "/{user_id}/reset-login-password",
+    response_model=GenericResponse[UserLoginPasswordResetResultRead],
+    responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}},
+)
+async def reset_user_login_password(
+    user_id: str,
+    payload: UserLoginPasswordResetRequest,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("admin:users:manage")),
+):
+    user = user_service.get(session, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    new_one_time_password, new_secondary_password = user_service.reset_login_password(
+        session,
+        user,
+        secondary_password=payload.secondary_password,
+        actor_id=current_user.id,
+    )
+
+    auth_service.revoke_sessions_for_user(session, user.id)
+    _commit_and_refresh(session, user)
+
+    return create_success_response(
+        data=UserLoginPasswordResetResultRead(
+            user_id=user.user_id,
+            generated_credentials=GeneratedUserCredentialsRead(
+                one_time_login_password=new_one_time_password,
+                secondary_password=new_secondary_password,
+            ),
+            must_change_password=user.must_change_password,
+        ),
+        message="Login password reset successfully and secondary password rotated",
+        request=request,
+    )
+
+@router.get(
     "/{user_id}/2fa/status",
     response_model=GenericResponse[TwoFactorStatusRead],
     responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}},
 )
-async def get_user_two_factor_status(
+async def get_user_two_factor_status_v1(
     user_id: str,
     request: Request,
     session: Session = Depends(get_session),
@@ -144,7 +249,6 @@ async def get_user_two_factor_status(
         ),
         request=request,
     )
-
 
 @router.post(
     "/{user_id}/2fa/enroll/initiate",
@@ -220,6 +324,7 @@ async def verify_user_two_factor_enrollment(
     )
 
 
+
 @router.post(
     "/{user_id}/2fa/reset",
     response_model=GenericResponse[TwoFactorStatusRead],
@@ -251,6 +356,34 @@ async def reset_user_two_factor_enrollment(
             enrolled_at=None,
         ),
         message="Two-factor authentication reset successfully",
+        request=request,
+    )
+
+
+@router.get(
+    "/{user_id}/2fa/status",
+    response_model=GenericResponse[TwoFactorStatusRead],
+    responses={404: {"model": GenericResponse}, 401: {"model": GenericResponse}},
+)
+async def get_user_two_factor_status(
+    user_id: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("admin:users:manage")),
+):
+    target_user = user_service.get(session, user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    enabled, enrolled_at = auth_service.get_two_factor_status(session, target_user.id)
+
+    return create_success_response(
+        data=TwoFactorStatusRead(
+            enabled=enabled,
+            method="authenticator_app",
+            enrolled_at=enrolled_at,
+        ),
         request=request,
     )
 

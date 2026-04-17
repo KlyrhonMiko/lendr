@@ -26,7 +26,7 @@ export interface LoginCredentials {
   password: string;
 }
 
-interface BootstrapRotatePasswordPayload {
+export interface FirstLoginRotatePasswordPayload {
   username: string;
   current_password: string;
   new_password: string;
@@ -35,6 +35,7 @@ interface BootstrapRotatePasswordPayload {
 interface ErrorPayload {
   message?: string;
   detail?: string;
+  code?: string;
 }
 
 export interface AuthTokenResponse {
@@ -49,7 +50,18 @@ export interface TwoFactorChallengeResponse {
   method: string;
 }
 
-export type LoginResponse = AuthTokenResponse | TwoFactorChallengeResponse;
+export interface FirstLoginPasswordChangeRequiredResponse {
+  auth_state: 'password_change_required';
+  code: 'AUTH.FIRST_LOGIN_PASSWORD_CHANGE_REQUIRED' | string;
+  password_change_required: true;
+  rotation_endpoint: string;
+  legacy_rotation_endpoint?: string | null;
+}
+
+export type LoginResponse =
+  | AuthTokenResponse
+  | TwoFactorChallengeResponse
+  | FirstLoginPasswordChangeRequiredResponse;
 
 export interface TwoFactorEnrollmentInitiateResponse {
   method: string;
@@ -63,13 +75,17 @@ export interface TwoFactorStatusResponse {
   enrolled_at: string | null;
 }
 
+const DEFAULT_FIRST_LOGIN_ROTATION_ENDPOINT = '/auth/first-login/rotate-password';
+
 export class AuthApiError extends Error {
   status: number;
+  code: string | null;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, code: string | null = null) {
     super(message);
     this.name = 'AuthApiError';
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -93,6 +109,34 @@ function unwrapAuthPayload<T>(payload: ApiResponse<T> | T): T {
   return payload;
 }
 
+function normalizeAuthEndpoint(endpoint: string): string {
+  const trimmed = endpoint.trim();
+  if (!trimmed) {
+    return DEFAULT_FIRST_LOGIN_ROTATION_ENDPOINT;
+  }
+
+  let candidate = trimmed;
+
+  if (candidate.startsWith('http://') || candidate.startsWith('https://')) {
+    try {
+      candidate = new URL(candidate).pathname;
+    } catch {
+      return DEFAULT_FIRST_LOGIN_ROTATION_ENDPOINT;
+    }
+  }
+
+  const normalizedPath = candidate.startsWith('/') ? candidate : `/${candidate}`;
+
+  if (normalizedPath === '/api') {
+    return '/';
+  }
+  if (normalizedPath.startsWith('/api/')) {
+    return normalizedPath.slice(4);
+  }
+
+  return normalizedPath;
+}
+
 function toAuthApiError(error: unknown, fallback: string): AuthApiError {
   if (error instanceof AuthApiError) {
     return error;
@@ -102,6 +146,7 @@ function toAuthApiError(error: unknown, fallback: string): AuthApiError {
     return new AuthApiError(
       error.status,
       resolveAuthErrorMessage(error.payload, fallback),
+      error.payload.code ?? null,
     );
   }
 
@@ -193,14 +238,19 @@ export const api = {
     }
   },
 
-  rotateBootstrapPassword: async (payload: BootstrapRotatePasswordPayload) => {
+  rotateFirstLoginPassword: async (
+    payload: FirstLoginRotatePasswordPayload,
+    endpoint: string = DEFAULT_FIRST_LOGIN_ROTATION_ENDPOINT,
+  ) => {
+    const normalizedEndpoint = normalizeAuthEndpoint(endpoint);
+
     try {
-      return await http.request('/auth/bootstrap/rotate-password', {
+      return await http.request(normalizedEndpoint, {
         method: 'POST',
         body: JSON.stringify(payload),
       });
     } catch (error: unknown) {
-      throw toAuthApiError(error, 'Failed to rotate bootstrap password');
+      throw toAuthApiError(error, 'Failed to rotate first-login password');
     }
   },
 

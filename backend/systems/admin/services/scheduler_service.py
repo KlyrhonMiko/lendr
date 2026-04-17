@@ -7,6 +7,7 @@ from core.database import engine
 from systems.admin.services.backup_service import backup_service
 from systems.admin.services.archive_service import archive_service
 from systems.admin.services.configuration_service import ConfigurationService
+from systems.admin.services.user_service import UserService
 from utils.logging import log_operation
 from utils.time_utils import DEFAULT_TZ
 
@@ -16,6 +17,7 @@ class SchedulerService:
     def __init__(self):
         self.scheduler = BackgroundScheduler(timezone=DEFAULT_TZ)
         self.config_service = ConfigurationService()
+        self.user_service = UserService()
         self.job_id = "automated_backup"
         self.ops_job_id = "operations_maintenance"
 
@@ -119,6 +121,16 @@ class SchedulerService:
             
             # 2. Purge cycle
             archive_service.run_purge_cycle(actor_id=None)
+
+            # 3. Secondary password due-rotation cycle
+            with Session(engine) as session:
+                rotated_count = self.user_service.rotate_due_secondary_passwords(session, actor_id=None)
+                if rotated_count:
+                    session.commit()
+                    log_operation(
+                        "SEC-PASS-ROTATE",
+                        f"Rotated {rotated_count} secondary password(s) due for expiration",
+                    )
             
             log_operation("OPS-MAINT-DONE", "Scheduled system operations maintenance completed")
         except Exception as e:

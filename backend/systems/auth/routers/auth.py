@@ -18,7 +18,8 @@ from systems.admin.services.audit_service import audit_service
 from systems.admin.schemas.user_schemas import UserRead, UserUpdate
 from systems.auth.dependencies import get_current_user, require_permission, reusable_oauth2
 from systems.auth.schemas.auth_schemas import (
-    BootstrapPasswordRotateRequest,
+    FirstLoginPasswordRotateRequest,
+    ForcedPasswordChangeRequiredRead,
     RolePolicyRead,
     SelfProfileUpdate,
     SessionPolicyRead,
@@ -39,10 +40,10 @@ from core.config import settings
 router = APIRouter()
 auth_service = AuthService()
 
-BOOTSTRAP_ROTATION_REQUIRED_DETAIL = (
-    "Bootstrap admin password rotation required. "
-    "Use /api/auth/bootstrap/rotate-password before signing in."
-)
+FORCED_PASSWORD_CHANGE_CODE = "AUTH.FIRST_LOGIN_PASSWORD_CHANGE_REQUIRED"
+FORCED_PASSWORD_CHANGE_DETAIL = "Password rotation is required before completing login."
+FIRST_LOGIN_ROTATION_ENDPOINT = "/api/auth/first-login/rotate-password"
+BORROWER_ONLY_LOGIN_DETAIL = "Borrower accounts only. Please use /api/auth/login."
 AUTH_RATE_LIMIT_EXCEEDED_DETAIL = "Too many authentication attempts. Please try again later."
 TWO_FACTOR_ENROLLMENT_REQUIRED_DETAIL = (
     "Two-factor authentication enrollment is required before login. "
@@ -83,37 +84,56 @@ class RateLimitRule:
 
 
 def _build_rate_limit_rules() -> dict[str, tuple[RateLimitRule, ...]]:
+    auth_login_rules = (
+        RateLimitRule(
+            scope="ip",
+            max_attempts=max(settings.AUTH_RATE_LIMIT_IP_MAX_ATTEMPTS, 1),
+            window_seconds=max(settings.AUTH_RATE_LIMIT_IP_WINDOW_SECONDS, 1),
+        ),
+        RateLimitRule(
+            scope="identity",
+            max_attempts=max(settings.AUTH_RATE_LIMIT_IDENTITY_MAX_ATTEMPTS, 1),
+            window_seconds=max(settings.AUTH_RATE_LIMIT_IDENTITY_WINDOW_SECONDS, 1),
+        ),
+    )
+
     return {
-        "login": (
-            RateLimitRule(
-                scope="ip",
-                max_attempts=max(settings.AUTH_RATE_LIMIT_IP_MAX_ATTEMPTS, 1),
-                window_seconds=max(settings.AUTH_RATE_LIMIT_IP_WINDOW_SECONDS, 1),
-            ),
-            RateLimitRule(
-                scope="identity",
-                max_attempts=max(settings.AUTH_RATE_LIMIT_IDENTITY_MAX_ATTEMPTS, 1),
-                window_seconds=max(settings.AUTH_RATE_LIMIT_IDENTITY_WINDOW_SECONDS, 1),
-            ),
-        ),
-        "borrower_login": (
-            RateLimitRule(
-                scope="ip",
-                max_attempts=max(settings.AUTH_RATE_LIMIT_IP_MAX_ATTEMPTS, 1),
-                window_seconds=max(settings.AUTH_RATE_LIMIT_IP_WINDOW_SECONDS, 1),
-            ),
-            RateLimitRule(
-                scope="identity",
-                max_attempts=max(settings.AUTH_RATE_LIMIT_IDENTITY_MAX_ATTEMPTS, 1),
-                window_seconds=max(settings.AUTH_RATE_LIMIT_IDENTITY_WINDOW_SECONDS, 1),
-            ),
-        ),
+        "login": auth_login_rules,
+        "borrower_login": auth_login_rules,
+        "first_login_rotate_password": auth_login_rules,
     }
 
 # Process-local limiter store. For multi-worker deployments, replace with shared storage.
 _rate_limit_store: dict[str, deque[float]] = {}
 _rate_limit_lock = threading.Lock()
 logger = get_logger("auth")
+
+
+def _cleanup_rate_limit_buckets_for_endpoint(
+    *,
+    endpoint_key: str,
+    now: float,
+    max_window_seconds: int,
+) -> None:
+    if max_window_seconds <= 0:
+        return
+
+    cutoff = now - max_window_seconds
+    endpoint_prefix = f"{endpoint_key}:"
+    stale_bucket_keys: list[str] = []
+
+    for bucket_key, bucket in _rate_limit_store.items():
+        if not bucket_key.startswith(endpoint_prefix):
+            continue
+
+        while bucket and bucket[0] <= cutoff:
+            bucket.popleft()
+
+        if not bucket:
+            stale_bucket_keys.append(bucket_key)
+
+    for bucket_key in stale_bucket_keys:
+        _rate_limit_store.pop(bucket_key, None)
 
 
 def _get_client_ip(request: Request) -> str:
@@ -197,6 +217,11 @@ def _enforce_auth_rate_limit(
     client_ip = _get_client_ip(request)
 
     with _rate_limit_lock:
+        _cleanup_rate_limit_buckets_for_endpoint(
+            endpoint_key=endpoint_key,
+            now=now,
+            max_window_seconds=max(rule.window_seconds for rule in rules),
+        )
         buckets_to_increment: list[deque[float]] = []
 
         for rule in rules:
@@ -224,7 +249,17 @@ def _enforce_auth_rate_limit(
             bucket.append(now)
 
 
-@router.post("/login", response_model=Token | TwoFactorChallengeRead)
+def _build_forced_password_change_response() -> ForcedPasswordChangeRequiredRead:
+    return ForcedPasswordChangeRequiredRead(
+        auth_state="password_change_required",
+        code=FORCED_PASSWORD_CHANGE_CODE,
+        detail=FORCED_PASSWORD_CHANGE_DETAIL,
+        password_change_required=True,
+        rotation_endpoint=FIRST_LOGIN_ROTATION_ENDPOINT,
+    )
+
+
+@router.post("/login", response_model=Token | TwoFactorChallengeRead | ForcedPasswordChangeRequiredRead)
 async def login_for_access_token(
     request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
@@ -252,8 +287,12 @@ async def login_for_access_token(
         )
         raise
 
-    user = auth_service.authenticate_user(session, form_data.username, form_data.password)
-    if not user:
+    auth_result = auth_service.authenticate_user_for_login(
+        session,
+        form_data.username,
+        form_data.password,
+    )
+    if not auth_result:
         _safe_log_auth_event(
             session=session,
             request=request,
@@ -269,11 +308,17 @@ async def login_for_access_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    if auth_service.should_force_bootstrap_password_rotation(user):
+    user, credential_mode = auth_result
+
+    # Borrower accounts must use the Borrow portal (/borrow), not this login page
+    if user.role and user.role.lower() in ("borrower", "brwr"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=BOOTSTRAP_ROTATION_REQUIRED_DETAIL,
+            detail="Borrower accounts cannot sign in here. Please use the Borrow portal instead.",
         )
+
+    if credential_mode == "primary" and auth_service.should_force_first_login_password_rotation(user):
+        return _build_forced_password_change_response()
 
     normalized_role = (user.role or "").strip().lower()
     if normalized_role not in ("borrower", "brwr") and auth_service.is_two_factor_required_for_user(
@@ -287,6 +332,13 @@ async def login_for_access_token(
                 action="two_factor_login_allowed_bootstrap_pending",
                 actor_id=user.id,
             )
+
+            if credential_mode == "secondary":
+                auth_service.rotate_secondary_credential_after_login(
+                    session,
+                    user,
+                    reason_code="login_two_factor_bootstrap_pending",
+                )
 
             access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
@@ -317,6 +369,7 @@ async def login_for_access_token(
             session=session,
             user=user,
             device_id=device_id,
+            used_secondary_password=credential_mode == "secondary",
         )
         session.commit()
 
@@ -328,6 +381,13 @@ async def login_for_access_token(
         )
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+
+    if credential_mode == "secondary":
+        auth_service.rotate_secondary_credential_after_login(
+            session,
+            user,
+            reason_code="login_completed",
+        )
 
     db_session = auth_service.create_user_session(
         session=session,
@@ -462,6 +522,28 @@ async def disable_two_factor_enrollment(
     )
 
 
+@router.get(
+    "/2fa/status",
+    response_model=GenericResponse[TwoFactorStatusRead],
+    responses={401: {"model": GenericResponse}},
+)
+async def get_two_factor_status(
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    enabled, enrolled_at = auth_service.get_two_factor_status(session, current_user.id)
+
+    return create_success_response(
+        data=TwoFactorStatusRead(
+            enabled=enabled,
+            method="authenticator_app",
+            enrolled_at=enrolled_at,
+        ),
+        request=request,
+    )
+
+
 @router.post("/2fa/verify", response_model=Token)
 async def verify_two_factor_login_challenge(
     payload: TwoFactorChallengeVerifyRequest,
@@ -539,17 +621,10 @@ async def borrower_login(
             detail="Incorrect PIN",
         )
 
-    normalized_role = (user.role or "").strip().lower()
-    if normalized_role not in ("borrower", "brwr"):
+    if not auth_service.is_borrower_role(user.role):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Borrower accounts only. Please use /api/auth/login.",
-        )
-
-    if auth_service.should_force_bootstrap_password_rotation(user):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=BOOTSTRAP_ROTATION_REQUIRED_DETAIL,
+            detail=BORROWER_ONLY_LOGIN_DETAIL,
         )
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -578,45 +653,96 @@ async def borrower_login(
     return Token(access_token=access_token, token_type="bearer")
 
 
-@router.post("/bootstrap/rotate-password", response_model=GenericResponse)
-async def rotate_bootstrap_password(
+async def _rotate_first_login_password(
     request: Request,
-    payload: BootstrapPasswordRotateRequest,
-    session: Session = Depends(get_session),
+    payload: FirstLoginPasswordRotateRequest,
+    session: Session,
+    success_message: str = "Initial password rotated successfully",
 ):
+    device_id = request.headers.get("X-Device-ID")
+    username = _normalize_identity(payload.username)
+    try:
+        _enforce_auth_rate_limit(
+            request=request,
+            endpoint_key="first_login_rotate_password",
+            identity=username,
+        )
+    except HTTPException as exc:
+        _safe_log_auth_event(
+            session=session,
+            request=request,
+            endpoint=FIRST_LOGIN_ROTATION_ENDPOINT,
+            action="rate_limit_triggered",
+            username=username,
+            device_id=device_id,
+            extra_metadata={"retry_after_seconds": int(exc.headers.get("Retry-After", "0"))}
+            if exc.headers and exc.headers.get("Retry-After")
+            else None,
+        )
+        raise
+
     if payload.new_password == payload.current_password:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="New password must be different from current password",
         )
 
-    user = auth_service.authenticate_bootstrap_admin(
+    auth_result = auth_service.authenticate_first_login_rotation_user_with_mode(
         session,
         payload.username,
         payload.current_password,
     )
-    if not user:
+    if not auth_result:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid bootstrap admin credentials",
+            detail="Invalid credentials for first-login password rotation",
         )
 
-    auth_service.rotate_bootstrap_admin_password(session, user, payload.new_password)
+    user, credential_mode = auth_result
+
+    try:
+        auth_service.rotate_first_login_password(
+            session,
+            user,
+            payload.new_password,
+            used_secondary_password=credential_mode == "secondary",
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    # Revoke any pre-existing sessions to guarantee clean post-rotation auth state.
     auth_service.revoke_sessions_for_user(session, user.id)
 
     audit_service.log_action(
         db=session,
         entity_type="user",
         entity_id=user.user_id,
-        action="bootstrap_password_rotated",
+        action="first_login_password_rotated",
         actor_id=user.id,
     )
     session.commit()
 
     return create_success_response(
         data=None,
-        message="Bootstrap admin password rotated successfully",
+        message=success_message,
         request=request,
+    )
+
+
+@router.post("/first-login/rotate-password", response_model=GenericResponse)
+async def rotate_first_login_password(
+    request: Request,
+    payload: FirstLoginPasswordRotateRequest,
+    session: Session = Depends(get_session),
+):
+    return await _rotate_first_login_password(
+        request=request,
+        payload=payload,
+        session=session,
+        success_message="Initial password rotated successfully",
     )
 
 

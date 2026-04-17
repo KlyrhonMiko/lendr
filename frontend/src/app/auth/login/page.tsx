@@ -10,11 +10,9 @@ import { loginApi } from './api';
 import { toast } from "sonner";
 import {
   AuthApiError,
+  FirstLoginPasswordChangeRequiredResponse,
   TwoFactorChallengeResponse,
 } from '@/lib/api';
-
-const BOOTSTRAP_ROTATION_REQUIRED_TEXT =
-  'bootstrap admin password rotation required';
 
 interface LoginCredentials {
   username: string;
@@ -49,6 +47,7 @@ export default function LoginPage() {
   const [isVerifyingTwoFactorChallenge, setIsVerifyingTwoFactorChallenge] = useState(false);
   const [showRotationModal, setShowRotationModal] = useState(false);
   const [isRotating, setIsRotating] = useState(false);
+  const [rotationEndpoint, setRotationEndpoint] = useState<string | null>(null);
   const [rotationForm, setRotationForm] = useState({
     currentPassword: '',
     newPassword: '',
@@ -69,8 +68,6 @@ export default function LoginPage() {
   const handleTokenLogin = async (accessToken: string) => {
     auth.setToken(accessToken);
 
-    const user = await auth.getUser();
-    hydrateUser(user);
     const redirectPath = auth.getRedirectPath(user?.role);
     redirectToApp(redirectPath);
   };
@@ -86,8 +83,27 @@ export default function LoginPage() {
     toast.info('Two-factor authentication is required. Enter your authenticator code.');
   };
 
+  const openRotationModal = (
+    branch: FirstLoginPasswordChangeRequiredResponse,
+    currentPassword: string,
+  ) => {
+    setRotationEndpoint(loginApi.getRotationEndpoint(branch));
+    setRotationForm({
+      currentPassword,
+      newPassword: '',
+      confirmPassword: '',
+    });
+    setShowRotationModal(true);
+    toast.info('This account must rotate password before first sign-in.');
+  };
+
   const completeLogin = async (credentials: LoginCredentials) => {
     const data = await loginApi.login(credentials);
+
+    if (loginApi.isPasswordChangeRequired(data)) {
+      openRotationModal(data, credentials.password);
+      return;
+    }
 
     if (loginApi.isTwoFactorChallenge(data)) {
       openTwoFactorChallengeModal(data);
@@ -102,17 +118,18 @@ export default function LoginPage() {
       return false;
     }
 
-    if (!error.message.toLowerCase().includes(BOOTSTRAP_ROTATION_REQUIRED_TEXT)) {
+    if (error.code !== 'AUTH.FIRST_LOGIN_PASSWORD_CHANGE_REQUIRED') {
       return false;
     }
 
+    setRotationEndpoint('/auth/first-login/rotate-password');
     setRotationForm({
       currentPassword: formData.password,
       newPassword: '',
       confirmPassword: '',
     });
     setShowRotationModal(true);
-    toast.info('Bootstrap admin must rotate password before first sign-in.');
+    toast.info('This account must rotate password before first sign-in.');
     return true;
   };
 
@@ -185,14 +202,15 @@ export default function LoginPage() {
 
     setIsRotating(true);
     try {
-      await loginApi.rotateBootstrapPassword({
+      await loginApi.rotateFirstLoginPassword({
         username: formData.username,
         current_password: rotationForm.currentPassword,
         new_password: rotationForm.newPassword,
-      });
+      }, rotationEndpoint ?? undefined);
 
       toast.success('Password rotated. Signing you in...');
       setShowRotationModal(false);
+      setRotationEndpoint(null);
 
       const nextCredentials = {
         username: formData.username,
@@ -321,11 +339,11 @@ export default function LoginPage() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
           role="dialog"
           aria-modal="true"
-          aria-labelledby="bootstrap-rotate-title"
+          aria-labelledby="first-login-rotate-title"
         >
           <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl">
-            <h2 id="bootstrap-rotate-title" className="text-lg font-semibold text-foreground">
-              Change bootstrap password
+            <h2 id="first-login-rotate-title" className="text-lg font-semibold text-foreground">
+              Change first-login password
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               This account must rotate its initial password before first sign-in.
@@ -386,7 +404,10 @@ export default function LoginPage() {
                 <button
                   type="button"
                   className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
-                  onClick={() => setShowRotationModal(false)}
+                  onClick={() => {
+                    setShowRotationModal(false);
+                    setRotationEndpoint(null);
+                  }}
                   disabled={isRotating}
                 >
                   Cancel
@@ -462,7 +483,6 @@ export default function LoginPage() {
           </div>
         </div>
       )}
-
     </div>
   );
 }

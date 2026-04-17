@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Loader2, Mail, Shield, Clock, Hash, Phone, UserCircle, Check, ChevronDown, KeyRound } from 'lucide-react';
+import { X, Loader2, Mail, Shield, Clock, Hash, Phone, UserCircle, Check, ChevronDown, KeyRound, RotateCcwKey } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   userApi,
@@ -16,11 +16,14 @@ import { toast } from 'sonner';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { FormSelect } from '@/components/ui/form-select';
 import { cn } from '@/lib/utils';
+import type { UserCredentialReveal } from './lib/types';
 
 interface UserModalProps {
   user?: User;
   onClose: () => void;
   onSuccess: () => void;
+  onCredentialReveal: (payload: UserCredentialReveal) => void;
+  onRefetchUsers?: () => void;
 }
 
 type EditableUserUpdate = UserUpdate & {
@@ -28,38 +31,45 @@ type EditableUserUpdate = UserUpdate & {
   password?: string;
 };
 
-export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
+export function UserModal({
+  user,
+  onClose,
+  onSuccess,
+  onCredentialReveal,
+  onRefetchUsers,
+}: UserModalProps) {
   const isEdit = !!user;
   const MIN_TWO_FACTOR_CODE_LENGTH = 6;
   const DEFAULT_PIN_LENGTH = 6;
   const SCHEMA_PASSWORD_MIN_LENGTH = 6;
+
   const [loading, setLoading] = useState(false);
   const [resettingTwoFactor, setResettingTwoFactor] = useState(false);
+  const [twoFactorStatus, setTwoFactorStatus] = useState<UserTwoFactorStatus | null>(null);
+  const [twoFactorStatusLoading, setTwoFactorStatusLoading] = useState(false);
+  const [retrievingRecoveryCredential, setRetrievingRecoveryCredential] = useState(false);
+  const [resettingLoginPassword, setResettingLoginPassword] = useState(false);
   const [configsLoading, setConfigsLoading] = useState(true);
   const [roles, setRoles] = useState<AuthConfig[]>([]);
   const [shifts, setShifts] = useState<AuthConfig[]>([]);
   const [pinLength, setPinLength] = useState(DEFAULT_PIN_LENGTH);
-  const [twoFactorStatus, setTwoFactorStatus] = useState<UserTwoFactorStatus | null>(null);
-  const [twoFactorStatusLoading, setTwoFactorStatusLoading] = useState(false);
+  
   const [isInitiatingTwoFactorEnrollment, setIsInitiatingTwoFactorEnrollment] = useState(false);
   const [isVerifyingTwoFactorEnrollment, setIsVerifyingTwoFactorEnrollment] = useState(false);
   const [twoFactorEnrollment, setTwoFactorEnrollment] = useState<UserTwoFactorEnrollmentInitiateResponse | null>(null);
   const [twoFactorEnrollmentCode, setTwoFactorEnrollmentCode] = useState('');
 
-
   const pinValidationMessage = `PIN must be at least ${pinLength} characters`;
-  const PASSWORD_POLICY_EXEMPT_ROLES = new Set(['borrower', 'dispatch']);
+  const BORROWER_ROLE_KEYS = new Set(['borrower', 'brwr']);
+  const PASSWORD_POLICY_EXEMPT_ROLES = new Set(['borrower', 'brwr', 'dispatch']);
 
   const normalizeRole = (role: string | undefined): string => (role || '').trim().toLowerCase();
-  const isBorrowerRole = (role: string | undefined): boolean => {
-    const normalized = normalizeRole(role);
-    return normalized === 'borrower' || normalized === 'brwr';
-  };
+  
+  const isBorrowerRoleKey = (role: string | undefined): boolean =>
+    BORROWER_ROLE_KEYS.has(normalizeRole(role));
 
   const isRolePasswordPolicyExempt = (role: string | undefined): boolean =>
     PASSWORD_POLICY_EXEMPT_ROLES.has(normalizeRole(role));
-
-  const isTwoFactorEligibleUser = !isBorrowerRole(user?.role);
 
   const [formData, setFormData] = useState({
     username: user?.username || '',
@@ -73,6 +83,11 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
     role: user?.role || '',
     shift_type: user?.shift_type || 'day',
   });
+
+  const isBorrowerRole = isBorrowerRoleKey(formData.role || user?.role);
+  const isTwoFactorEligibleUser = !isBorrowerRole;
+  const borrowerActionDisabledReason =
+    'Unavailable for borrower accounts because this role uses borrower PIN login flows.';
 
   useEffect(() => {
     const normalizePinLength = (value: unknown): number => {
@@ -119,6 +134,7 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
 
   useEffect(() => {
     if (!isEdit || !user) {
+      setTwoFactorStatus(null);
       return;
     }
 
@@ -127,10 +143,6 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
       try {
         const response = await userApi.getTwoFactorStatus(user.user_id);
         setTwoFactorStatus(response.data);
-        if (response.data.enabled) {
-          setTwoFactorEnrollment(null);
-          setTwoFactorEnrollmentCode('');
-        }
       } catch {
         toast.error('Failed to load 2FA status');
       } finally {
@@ -142,16 +154,14 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
   }, [isEdit, user]);
 
   const formatTwoFactorDate = (value: string | null) => {
-    if (!value) {
-      return 'N/A';
-    }
-
+    if (!value) return 'N/A';
     const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-      return value;
-    }
+    return isNaN(date.getTime()) ? value : date.toLocaleString();
+  };
 
-    return date.toLocaleString();
+  const toOptionalText = (value: string): string | undefined => {
+    const trimmed = value.trim();
+    return trimmed ? trimmed : undefined;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -162,7 +172,6 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
       const pin = (formData.password || '').trim();
       const effectiveRole = formData.role || user?.role;
       const enforcePasswordRules = !isRolePasswordPolicyExempt(effectiveRole);
-
       const effectiveUsername = employeeId || (formData.username || '').trim();
 
       if (isEdit) {
@@ -175,41 +184,62 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
           toast.error(pinValidationMessage);
           return;
         }
+
+        const { password: _ignoredPassword, ...formDataWithoutPassword } = formData;
         const updateData: EditableUserUpdate = {
-          ...formData,
-          username: employeeId || effectiveUsername,
+          ...formDataWithoutPassword,
+          username: effectiveUsername,
           ...(employeeId ? { employee_id: employeeId } : {}),
           ...(pin ? { password: pin } : {}),
         };
-        await userApi.update(user.user_id, updateData);
+        await userApi.update(user!.user_id, updateData);
         toast.success('User updated successfully');
       } else {
         if (!employeeId) {
           toast.error('Employee ID is required');
           return;
         }
-        if (!pin) {
-          toast.error('PIN is required');
-          return;
-        }
 
-        if (pin.length < SCHEMA_PASSWORD_MIN_LENGTH) {
-          toast.error(`PIN must be at least ${SCHEMA_PASSWORD_MIN_LENGTH} characters`);
-          return;
-        }
-
-        if (enforcePasswordRules && pin.length < pinLength) {
-          toast.error(pinValidationMessage);
-          return;
+        if (isBorrowerRole) {
+          if (!pin) {
+            toast.error('PIN is required for borrower accounts');
+            return;
+          }
+          if (pin.length < SCHEMA_PASSWORD_MIN_LENGTH) {
+            toast.error(`PIN must be at least ${SCHEMA_PASSWORD_MIN_LENGTH} characters`);
+            return;
+          }
+          if (enforcePasswordRules && pin.length < pinLength) {
+            toast.error(pinValidationMessage);
+            return;
+          }
         }
 
         const createPayload: UserCreate = {
-          ...(formData as Omit<UserCreate, 'username'>),
           username: employeeId,
+          email: formData.email,
+          first_name: formData.first_name,
+          last_name: formData.last_name,
+          role: formData.role,
+          shift_type: formData.shift_type,
           employee_id: employeeId,
+          middle_name: toOptionalText(formData.middle_name),
+          contact_number: toOptionalText(formData.contact_number),
+          ...(isBorrowerRole ? { password: pin } : {}),
         };
 
-        await userApi.register(createPayload);
+        const created = await userApi.register(createPayload);
+
+        if (created.data.generated_credentials) {
+          onCredentialReveal({
+            source: 'create',
+            userId: created.data.user.user_id,
+            userName: `${created.data.user.first_name} ${created.data.user.last_name}`,
+            oneTimeLoginPassword: created.data.generated_credentials.one_time_login_password,
+            secondaryPassword: created.data.generated_credentials.secondary_password ?? undefined,
+          });
+        }
+
         toast.success('User registered successfully');
       }
       onSuccess();
@@ -223,7 +253,6 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
 
   const handleResetTwoFactor = async () => {
     if (!user) return;
-
     const confirmed = window.confirm(
       `Reset 2FA for ${user.first_name} ${user.last_name}? Their authenticator enrollment will be removed and active sessions will be revoked.`,
     );
@@ -232,6 +261,7 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
     setResettingTwoFactor(true);
     try {
       await userApi.resetTwoFactor(user.user_id);
+      setTwoFactorStatus({ enabled: false, enrolled_at: null, method: 'authenticator_app' });
       toast.success('2FA reset successfully');
       onSuccess();
     } catch (err: unknown) {
@@ -243,10 +273,7 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
   };
 
   const handleStartTwoFactorEnrollment = async () => {
-    if (!user) {
-      return;
-    }
-
+    if (!user) return;
     setIsInitiatingTwoFactorEnrollment(true);
     try {
       const response = await userApi.initiateTwoFactorEnrollment(user.user_id);
@@ -263,11 +290,7 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
 
   const handleVerifyTwoFactorEnrollment = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!user) {
-      return;
-    }
-
+    if (!user) return;
     const code = twoFactorEnrollmentCode.trim();
     if (code.length < MIN_TWO_FACTOR_CODE_LENGTH) {
       toast.error('Enter a valid authenticator code.');
@@ -289,9 +312,73 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
     }
   };
 
-  const handleCancelTwoFactorEnrollment = () => {
-    setTwoFactorEnrollment(null);
-    setTwoFactorEnrollmentCode('');
+  const handleRetrieveSecondaryPassword = async () => {
+    if (!user) return;
+    if (isBorrowerRole) {
+      toast.info(borrowerActionDisabledReason);
+      return;
+    }
+    const confirmed = window.confirm(
+      `Retrieve secondary password for ${user.first_name} ${user.last_name}? This reveal should only be done for verified identity requests.`,
+    );
+    if (!confirmed) return;
+
+    setRetrievingRecoveryCredential(true);
+    try {
+      const result = await userApi.getSecondaryPassword(user.user_id);
+      onCredentialReveal({
+        source: 'secondary_password',
+        userId: result.data.user_id,
+        userName: `${user.first_name} ${user.last_name}`,
+        secondaryPassword: result.data.secondary_password,
+        rotatedAt: result.data.rotated_at,
+      });
+      toast.success('Secondary password retrieved');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to retrieve secondary password';
+      toast.error(message);
+    } finally {
+      setRetrievingRecoveryCredential(false);
+    }
+  };
+
+  const handleResetLoginPassword = async () => {
+    if (!user) return;
+    if (isBorrowerRole) {
+      toast.info(borrowerActionDisabledReason);
+      return;
+    }
+    const confirmed = window.confirm(
+      `Reset login password for ${user.first_name} ${user.last_name}? This will generate a new one-time password and rotate the secondary password.`,
+    );
+    if (!confirmed) return;
+
+    const secondaryPassword = window.prompt(`Enter current secondary password for ${user.first_name} ${user.last_name}:`);
+    if (!secondaryPassword?.trim()) {
+      toast.error('Secondary password is required');
+      return;
+    }
+
+    setResettingLoginPassword(true);
+    try {
+      const result = await userApi.resetLoginPassword(user.user_id, {
+        secondary_password: secondaryPassword.trim(),
+      });
+      onCredentialReveal({
+        source: 'reset_login_password',
+        userId: result.data.user_id,
+        userName: `${user.first_name} ${user.last_name}`,
+        oneTimeLoginPassword: result.data.generated_credentials.one_time_login_password,
+        secondaryPassword: result.data.generated_credentials.secondary_password ?? undefined,
+      });
+      onRefetchUsers?.();
+      toast.success('Login password reset successfully');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to reset login password';
+      toast.error(message);
+    } finally {
+      setResettingLoginPassword(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -299,411 +386,149 @@ export function UserModal({ user, onClose, onSuccess }: UserModalProps) {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const inputClassName =
-    'w-full h-11 px-4 rounded-lg bg-muted/40 border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/40 transition-all placeholder:text-muted-foreground/40';
+  const inputClassName = 'w-full h-11 px-4 rounded-lg bg-muted/40 border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/40 transition-all';
+  const inputWithIconClassName = 'w-full h-11 pl-10 pr-4 rounded-lg bg-muted/40 border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/40 transition-all';
 
-  const inputWithIconClassName =
-    'w-full h-11 pl-10 pr-4 rounded-lg bg-muted/40 border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/40 transition-all placeholder:text-muted-foreground/40';
+  const twoFactorStatusLabel = twoFactorStatusLoading ? 'Checking 2FA...' : twoFactorStatus?.enabled ? '2FA Enabled' : '2FA Disabled';
+  const twoFactorStatusClassName = twoFactorStatus?.enabled ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20' : 'bg-amber-500/10 text-amber-700 border-amber-500/20';
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div
-        className="w-full max-w-xl bg-card border border-border rounded-xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
+      <div className="w-full max-w-xl bg-card border border-border rounded-xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
         <div className="flex items-center justify-between px-6 py-5 border-b border-border">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
               <UserCircle className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold tracking-tight">
-                {isEdit ? 'Edit User' : 'Add New User'}
-              </h2>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                {isEdit
-                  ? `Updating ${user.first_name} ${user.last_name}'s profile`
-                  : 'Fill in the details to create a new user account'}
-              </p>
+              <h2 className="text-lg font-semibold tracking-tight">{isEdit ? 'Edit User' : 'Add New User'}</h2>
+              {isEdit && (
+                <div className={cn('inline-flex items-center mt-2 rounded-full border px-2.5 py-1 text-xs font-medium', twoFactorStatusClassName)}>
+                  {twoFactorStatusLabel}
+                </div>
+              )}
             </div>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Close user modal"
-            className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <button onClick={onClose} className="p-2 text-muted-foreground hover:bg-muted rounded-lg transition-colors"><X className="w-5 h-5" /></button>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
           <div className="p-6 space-y-6">
-            {/* Personal Information */}
             <section>
-              <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-                <UserCircle className="w-4 h-4 text-primary" />
-                Personal Information
-              </h3>
+              <h3 className="text-sm font-semibold mb-4 flex items-center gap-2"><UserCircle className="w-4 h-4 text-primary" />Personal Information</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    First Name <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    required
-                    name="first_name"
-                    value={formData.first_name}
-                    onChange={handleChange}
-                    className={inputClassName}
-                    placeholder="e.g. Juan"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    Last Name <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    required
-                    name="last_name"
-                    value={formData.last_name}
-                    onChange={handleChange}
-                    className={inputClassName}
-                    placeholder="e.g. Dela Cruz"
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    Middle Name <span className="text-muted-foreground font-normal">(optional)</span>
-                  </label>
-                  <input
-                    name="middle_name"
-                    value={formData.middle_name}
-                    onChange={handleChange}
-                    className={inputClassName}
-                    placeholder="e.g. Santos"
-                  />
-                </div>
+                <div><label className="block text-sm font-medium mb-1.5">First Name *</label><input required name="first_name" value={formData.first_name} onChange={handleChange} className={inputClassName} /></div>
+                <div><label className="block text-sm font-medium mb-1.5">Last Name *</label><input required name="last_name" value={formData.last_name} onChange={handleChange} className={inputClassName} /></div>
+                <div className="sm:col-span-2"><label className="block text-sm font-medium mb-1.5">Middle Name</label><input name="middle_name" value={formData.middle_name} onChange={handleChange} className={inputClassName} /></div>
               </div>
             </section>
 
-            <hr className="border-border" />
+            <hr />
 
-            {/* Account & Contact */}
             <section>
-              <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-                <Mail className="w-4 h-4 text-primary" />
-                Account & Contact
-              </h3>
+              <h3 className="text-sm font-semibold mb-4 flex items-center gap-2"><Mail className="w-4 h-4 text-primary" />Account & Contact</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div><label className="block text-sm font-medium mb-1.5">Employee ID *</label><div className="relative"><Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" /><input name="employee_id" value={formData.employee_id} onChange={handleChange} required={!isEdit} className={inputWithIconClassName} /></div></div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    Employee ID <span className="text-red-400">{!isEdit ? '*' : ''}</span>
-                  </label>
-                  <div className="relative">
-                    <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 pointer-events-none" />
-                    <input
-                      name="employee_id"
-                      value={formData.employee_id}
-                      onChange={handleChange}
-                      required={!isEdit}
-                      className={inputWithIconClassName}
-                      placeholder="e.g. EMP-001"
-                    />
-                  </div>
+                  <label className="block text-sm font-medium mb-1.5">{isBorrowerRole ? 'PIN Code' : 'Password'}</label>
+                  {isEdit || isBorrowerRole ? <input type="password" name="password" value={formData.password} onChange={handleChange} className={inputClassName} placeholder={isEdit ? 'Leave blank to keep current' : 'Enter PIN'} /> : <div className="h-11 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 text-sm text-amber-700 flex items-center">Auto-generated after creation</div>}
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    PIN Code <span className="text-red-400">{!isEdit ? '*' : ''}</span>
-                    {isEdit && (
-                      <span className="text-muted-foreground font-normal text-xs ml-1">(leave blank to keep current)</span>
-                    )}
-                  </label>
-                  <input
-                    type="password"
-                    name="password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    className={inputClassName}
-                    placeholder="Enter PIN"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    Email Address <span className="text-red-400">*</span>
-                  </label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 pointer-events-none" />
-                    <input
-                      required
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      className={inputWithIconClassName}
-                      placeholder="e.g. juan@company.com"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    Contact Number <span className="text-muted-foreground font-normal">(optional)</span>
-                  </label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 pointer-events-none" />
-                    <input
-                      name="contact_number"
-                      value={formData.contact_number}
-                      onChange={handleChange}
-                      className={inputWithIconClassName}
-                      placeholder="e.g. 09123456789"
-                    />
-                  </div>
-                </div>
+                <div><label className="block text-sm font-medium mb-1.5">Email Address *</label><div className="relative"><Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" /><input required type="email" name="email" value={formData.email} onChange={handleChange} className={inputWithIconClassName} /></div></div>
+                <div><label className="block text-sm font-medium mb-1.5">Contact Number</label><div className="relative"><Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" /><input name="contact_number" value={formData.contact_number} onChange={handleChange} className={inputWithIconClassName} /></div></div>
               </div>
             </section>
-
-            <hr className="border-border" />
 
             {isEdit && (
               <>
+                <hr />
                 <section>
-                  <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-                    <KeyRound className="w-4 h-4 text-amber-500" />
-                    2FA Security
-                  </h3>
+                  <h3 className="text-sm font-semibold mb-4 flex items-center gap-2"><Shield className="w-4 h-4 text-amber-500" />Security Actions</h3>
+                  
                   <div className="space-y-3">
-                    <div className="rounded-lg border border-border bg-muted/20 p-4">
-                      <p className="text-sm font-medium text-foreground">Current status</p>
-                      {twoFactorStatusLoading ? (
-                        <p className="text-sm text-muted-foreground mt-1">Loading 2FA status...</p>
-                      ) : (
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {twoFactorStatus?.enabled ? 'Enabled' : 'Disabled'}
-                          {twoFactorStatus?.enabled
-                            ? ` • Method: ${twoFactorStatus.method} • Enrolled: ${formatTwoFactorDate(twoFactorStatus.enrolled_at)}`
-                            : ''}
-                        </p>
+                    {/* 2FA Section */}
+                    <div className="rounded-lg border bg-muted/20 p-4 space-y-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="text-sm font-medium">Authenticator (2FA)</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {twoFactorStatus?.enabled ? `Enabled (Enrolled: ${formatTwoFactorDate(twoFactorStatus.enrolled_at)})` : 'Not configured'}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          {isTwoFactorEligibleUser && !twoFactorStatus?.enabled && !twoFactorEnrollment && (
+                            <button type="button" onClick={handleStartTwoFactorEnrollment} disabled={isInitiatingTwoFactorEnrollment} className="text-xs font-medium bg-primary text-primary-foreground px-3 py-1.5 rounded-md hover:bg-primary/90 flex items-center gap-1.5">
+                              {isInitiatingTwoFactorEnrollment ? <Loader2 className="w-3 h-3 animate-spin" /> : <Shield className="w-3 h-3" />}
+                              Setup 2FA
+                            </button>
+                          )}
+                          {isTwoFactorEligibleUser && twoFactorStatus?.enabled && (
+                            <button type="button" onClick={handleResetTwoFactor} disabled={resettingTwoFactor} className="text-xs font-medium bg-amber-500/10 text-amber-700 border border-amber-500/20 px-3 py-1.5 rounded-md hover:bg-amber-500/20 flex items-center gap-1.5">
+                              {resettingTwoFactor ? <Loader2 className="w-3 h-3 animate-spin" /> : <KeyRound className="w-3 h-3" />}
+                              Reset 2FA
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 2FA Enrollment UI */}
+                      {twoFactorEnrollment && (
+                         <div className="mt-4 pt-4 border-t border-border space-y-4">
+                            <div className="flex justify-center bg-white p-3 rounded-lg w-fit mx-auto">
+                              <QRCodeSVG value={twoFactorEnrollment.provisioning_uri} size={150} />
+                            </div>
+                            <div className="grid gap-2">
+                              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Secret Key</p>
+                              <code className="bg-background border rounded px-3 py-2 text-xs font-mono break-all select-all">{twoFactorEnrollment.secret}</code>
+                            </div>
+                            <form onSubmit={handleVerifyTwoFactorEnrollment} className="flex gap-2">
+                              <input 
+                                placeholder="Enter 6-digit code"
+                                value={twoFactorEnrollmentCode}
+                                onChange={(e) => setTwoFactorEnrollmentCode(e.target.value)}
+                                className="flex-1 bg-background border rounded px-3 h-9 text-sm"
+                              />
+                              <button type="submit" disabled={isVerifyingTwoFactorEnrollment} className="bg-primary text-primary-foreground px-4 rounded h-9 text-xs font-medium">
+                                {isVerifyingTwoFactorEnrollment ? 'Verifying...' : 'Complete Setup'}
+                              </button>
+                              <button type="button" onClick={() => setTwoFactorEnrollment(null)} className="px-3 border rounded text-xs">Cancel</button>
+                            </form>
+                         </div>
                       )}
                     </div>
 
-                    {!isTwoFactorEligibleUser && (
-                      <div className="rounded-lg border border-border bg-muted/20 p-4">
-                        <p className="text-sm font-medium text-foreground">2FA setup excluded</p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Borrower users are excluded from admin-assisted 2FA setup.
-                        </p>
-                      </div>
-                    )}
-
-                    {isTwoFactorEligibleUser && !twoFactorStatus?.enabled && !twoFactorEnrollment && (
-                      <div className="rounded-lg border border-border bg-muted/20 p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium text-foreground">Admin-assisted setup</p>
-                          <p className="text-sm text-muted-foreground">
-                            Generate a QR and secret for this user, then verify using their authenticator code.
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleStartTwoFactorEnrollment}
-                          disabled={isInitiatingTwoFactorEnrollment || loading}
-                          className="inline-flex items-center justify-center gap-2 h-11 px-4 rounded-lg border border-border bg-background hover:bg-muted disabled:opacity-50 transition-colors shrink-0"
-                        >
-                          {isInitiatingTwoFactorEnrollment ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Starting...
-                            </>
-                          ) : (
-                            'Set up 2FA'
-                          )}
+                    {/* Secondary Password & Reset Section */}
+                    {!isBorrowerRole && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <button type="button" onClick={handleRetrieveSecondaryPassword} disabled={retrievingRecoveryCredential} className="flex items-center justify-center gap-2 h-11 px-4 rounded-lg border border-blue-500/20 bg-blue-500/10 text-blue-700 text-xs font-medium hover:bg-blue-500/15">
+                           {retrievingRecoveryCredential ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
+                           View Secondary Password
                         </button>
-                      </div>
-                    )}
-
-                    {isTwoFactorEligibleUser && twoFactorEnrollment && (
-                      <div className="space-y-4 rounded-lg border border-border bg-muted/20 p-4">
-                        <div className="space-y-2">
-                          <p className="text-xs font-medium text-muted-foreground">Scan QR code</p>
-                          <div className="flex justify-center">
-                            <div className="rounded-lg bg-white p-2">
-                              <QRCodeSVG
-                                value={twoFactorEnrollment.provisioning_uri}
-                                size={160}
-                                bgColor="#FFFFFF"
-                                fgColor="#111827"
-                                level="M"
-                                includeMargin
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label htmlFor="admin-two-factor-secret" className="text-sm font-medium text-foreground">
-                            Secret key
-                          </label>
-                          <input
-                            id="admin-two-factor-secret"
-                            type="text"
-                            readOnly
-                            value={twoFactorEnrollment.secret}
-                            onFocus={(e) => e.currentTarget.select()}
-                            className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-mono text-foreground outline-none"
-                          />
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label htmlFor="admin-two-factor-uri" className="text-sm font-medium text-foreground">
-                            Provisioning URI
-                          </label>
-                          <textarea
-                            id="admin-two-factor-uri"
-                            readOnly
-                            value={twoFactorEnrollment.provisioning_uri}
-                            rows={3}
-                            className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-xs text-foreground outline-none"
-                          />
-                        </div>
-
-                        <form onSubmit={handleVerifyTwoFactorEnrollment} className="space-y-3">
-                          <div className="space-y-1.5">
-                            <label htmlFor="admin-two-factor-code" className="text-sm font-medium text-foreground">
-                              Authenticator code
-                            </label>
-                            <input
-                              id="admin-two-factor-code"
-                              type="text"
-                              required
-                              inputMode="numeric"
-                              autoComplete="one-time-code"
-                              minLength={MIN_TWO_FACTOR_CODE_LENGTH}
-                              maxLength={12}
-                              value={twoFactorEnrollmentCode}
-                              onChange={(e) => setTwoFactorEnrollmentCode(e.target.value)}
-                              className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary/50 focus:ring-[3px] focus:ring-primary/10"
-                            />
-                          </div>
-
-                          <div className="flex justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={handleCancelTwoFactorEnrollment}
-                              disabled={isVerifyingTwoFactorEnrollment}
-                              className="inline-flex items-center justify-center h-9 px-3 rounded-md border border-border bg-background hover:bg-muted disabled:opacity-50 text-sm"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="submit"
-                              disabled={isVerifyingTwoFactorEnrollment}
-                              className="inline-flex items-center justify-center h-9 px-3 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 text-sm"
-                            >
-                              {isVerifyingTwoFactorEnrollment ? 'Verifying...' : 'Verify 2FA'}
-                            </button>
-                          </div>
-                        </form>
-                      </div>
-                    )}
-
-                    {isTwoFactorEligibleUser && (
-                      <div className="rounded-lg border border-border bg-muted/20 p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium text-foreground">Authenticator reset</p>
-                          <p className="text-sm text-muted-foreground">
-                            Use this if the user lost their authenticator device. The current 2FA enrollment will be removed and they will sign in without 2FA until they enroll again.
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleResetTwoFactor}
-                          disabled={resettingTwoFactor || loading}
-                          className="inline-flex items-center justify-center gap-2 h-11 px-4 rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-700 hover:bg-amber-500/15 disabled:opacity-50 transition-colors shrink-0"
-                        >
-                          {resettingTwoFactor ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Resetting...
-                            </>
-                          ) : (
-                            <>
-                              <KeyRound className="w-4 h-4" />
-                              Reset 2FA
-                            </>
-                          )}
+                        <button type="button" onClick={handleResetLoginPassword} disabled={resettingLoginPassword} className="flex items-center justify-center gap-2 h-11 px-4 rounded-lg border border-red-500/20 bg-red-500/10 text-red-600 text-xs font-medium hover:bg-red-500/15">
+                           {resettingLoginPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcwKey className="w-4 h-4" />}
+                           Reset Login Password
                         </button>
                       </div>
                     )}
                   </div>
                 </section>
-
-                <hr className="border-border" />
               </>
             )}
 
-            {/* System Configuration */}
+            <hr />
+
             <section>
-              <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-                <Shield className="w-4 h-4 text-primary" />
-                System Configuration
-              </h3>
+              <h3 className="text-sm font-semibold mb-4 flex items-center gap-2"><Shield className="w-4 h-4 text-primary" />System Configuration</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="relative">
-                  <Shield className="absolute left-3 top-[38px] w-4 h-4 text-muted-foreground/50 pointer-events-none z-10" />
-                  <FormSelect
-                    label="Role"
-                    required
-                    disabled={configsLoading}
-                    value={formData.role}
-                    onChange={(v) => setFormData(prev => ({ ...prev, role: v }))}
-                    options={roles.map(r => ({ key: r.key, label: `${r.value} (${r.key})` }))}
-                    placeholder="Select a role..."
-                    triggerClassName="pl-10 h-11"
-                  />
-                  {configsLoading && <Loader2 className="absolute right-3 top-[38px] w-4 h-4 animate-spin text-muted-foreground z-10" />}
-                </div>
-                <div className="relative">
-                  <Clock className="absolute left-3 top-[38px] w-4 h-4 text-muted-foreground/50 pointer-events-none z-10" />
-                  <FormSelect
-                    label="Shift"
-                    required
-                    disabled={configsLoading}
-                    value={formData.shift_type}
-                    onChange={(v) => setFormData(prev => ({ ...prev, shift_type: v }))}
-                    options={shifts.map(s => ({ key: s.key, label: s.value }))}
-                    placeholder="Select a shift..."
-                    triggerClassName="pl-10 h-11"
-                  />
-                  {configsLoading && <Loader2 className="absolute right-3 top-[38px] w-4 h-4 animate-spin text-muted-foreground z-10" />}
-                </div>
+                <FormSelect label="Role" value={formData.role} onChange={(v) => setFormData(p => ({ ...p, role: v }))} options={roles.map(r => ({ key: r.key, label: r.value }))} triggerClassName="h-11" />
+                <FormSelect label="Shift" value={formData.shift_type} onChange={(v) => setFormData(p => ({ ...p, shift_type: v }))} options={shifts.map(s => ({ key: s.key, label: s.value }))} triggerClassName="h-11" />
               </div>
             </section>
           </div>
 
-          {/* Footer */}
-          <div className="flex items-center gap-3 px-6 py-4 border-t border-border bg-muted/20">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 h-11 rounded-lg border border-border text-sm font-medium hover:bg-muted transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading || configsLoading}
-              className="flex-1 h-11 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                isEdit ? 'Save Changes' : 'Create User'
-              )}
+          <div className="flex gap-3 px-6 py-4 border-t bg-muted/20">
+            <button type="button" onClick={onClose} className="flex-1 h-11 rounded-lg border text-sm font-medium hover:bg-muted">Cancel</button>
+            <button type="submit" disabled={loading} className="flex-1 h-11 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 flex items-center justify-center gap-2">
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (isEdit ? 'Save Changes' : 'Create User')}
             </button>
           </div>
         </form>

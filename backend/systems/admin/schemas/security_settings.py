@@ -55,6 +55,12 @@ class SessionTimeoutSettings(BaseModel):
         return warning_minutes
 
 
+class SecondaryPasswordSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    rotation_interval_days: int = Field(default=30, ge=1, le=365)
+
+
 class RbacRoleDefinition(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -127,5 +133,6 @@ class SecuritySettingsPayload(BaseModel):
     two_factor: TwoFactorSettings = Field(default_factory=TwoFactorSettings)
     password_rules: PasswordRulesSettings = Field(default_factory=PasswordRulesSettings)
     session_timeout: SessionTimeoutSettings = Field(default_factory=SessionTimeoutSettings)
+    secondary_password: SecondaryPasswordSettings = Field(default_factory=SecondaryPasswordSettings)
     rbac_overview: RbacOverviewSettings = Field(default_factory=RbacOverviewSettings)
     shift_definitions: ShiftDefinitionsSettings = Field(default_factory=ShiftDefinitionsSettings)

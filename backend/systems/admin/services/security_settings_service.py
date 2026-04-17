@@ -5,7 +5,6 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlmodel import Session, select
 
-from core.base_model import ConfigurationBase
 from systems.admin.models.user import User
 from systems.admin.schemas.security_settings import (
     RbacOverviewSettings,
@@ -13,7 +12,6 @@ from systems.admin.schemas.security_settings import (
     SecuritySettingsPayload,
 )
 from systems.admin.services.audit_service import audit_service
-from systems.admin.services.configuration_service import ConfigurationService
 from systems.admin.services.shift_definitions_service import ShiftDefinitionsService
 from systems.auth.services.configuration_service import AuthConfigService
 from systems.auth.services.rbac_service import rbac_service
@@ -35,6 +33,7 @@ KEY_PASSWORD_REQUIRE_SPECIAL = "password_require_special"
 KEY_PASSWORD_APPLIES_WHEN_ROLE_NOT_IN = "password_applies_when_role_not_in"
 KEY_SESSION_INACTIVE_MINUTES = "session_inactive_minutes"
 KEY_SESSION_WARNING_MINUTES = "session_warning_minutes"
+KEY_SECONDARY_PASSWORD_ROTATION_INTERVAL_DAYS = "secondary_password_rotation_interval_days"
 
 SECURITY_UPDATE_DESCRIPTIONS = {
     KEY_TWO_FACTOR_ENABLED: "Enable or disable mandatory two-factor authentication policy.",
@@ -49,6 +48,7 @@ SECURITY_UPDATE_DESCRIPTIONS = {
     KEY_PASSWORD_APPLIES_WHEN_ROLE_NOT_IN: "Roles excluded from password rule enforcement.",
     KEY_SESSION_INACTIVE_MINUTES: "Session inactivity timeout duration in minutes.",
     KEY_SESSION_WARNING_MINUTES: "Session timeout warning lead time in minutes.",
+    KEY_SECONDARY_PASSWORD_ROTATION_INTERVAL_DAYS: "How often secondary passwords rotate automatically in days.",
 }
 
 
@@ -81,31 +81,33 @@ def _parse_json_str_list(value: str, default: list[str]) -> list[str]:
 
 class SecuritySettingsService:
     def __init__(self) -> None:
-        self.admin_config_service = ConfigurationService()
         self.auth_config_service = AuthConfigService()
         self.shift_definitions_service = ShiftDefinitionsService(
-            admin_config_service=self.admin_config_service,
             auth_config_service=self.auth_config_service,
         )
-
-    def _get_compat_category_settings(self, session: Session, category: str):
-        auth_settings = self.auth_config_service.get_by_category(session, category)
-        admin_settings = self.admin_config_service.get_by_category(session, category)
-        by_key: dict[str, ConfigurationBase] = {}
-        for setting in admin_settings:
-            by_key[str(setting.key).strip().lower()] = setting
-        for setting in auth_settings:
-            by_key[str(setting.key).strip().lower()] = setting
-        return [by_key[key] for key in sorted(by_key.keys())]
 
     def _resolve_known_roles(self, session: Session) -> set[str]:
         return {
             str(setting.key).strip().lower()
-            for setting in self._get_compat_category_settings(session, USERS_ROLE_CATEGORY)
+            for setting in self.auth_config_service.get_by_category(session, USERS_ROLE_CATEGORY)
         }
 
+    def _get_security_setting_value(
+        self,
+        session: Session,
+        *,
+        key: str,
+        default: str,
+    ) -> str:
+        return self.auth_config_service.get_value(
+            session,
+            key,
+            default,
+            category=SECURITY_SETTINGS_CATEGORY,
+        )
+
     def _resolve_rbac_last_updated_at(self, session: Session) -> datetime | None:
-        rbac_settings = self.admin_config_service.get_by_category(session, RBAC_ROLES_CATEGORY)
+        rbac_settings = self.auth_config_service.get_by_category(session, RBAC_ROLES_CATEGORY)
         return max((setting.updated_at for setting in rbac_settings), default=None) if rbac_settings else None
 
     def _resolve_user_count_by_role(self, session: Session) -> dict[str, int]:
@@ -123,7 +125,7 @@ class SecuritySettingsService:
         role_counts = self._resolve_user_count_by_role(session)
         ordered_roles = [
             str(setting.key).strip().lower()
-            for setting in self._get_compat_category_settings(session, USERS_ROLE_CATEGORY)
+            for setting in self.auth_config_service.get_by_category(session, USERS_ROLE_CATEGORY)
         ]
         for role_key in sorted(role_policies.keys()) + sorted(role_counts.keys()):
             if role_key not in ordered_roles:
@@ -161,11 +163,10 @@ class SecuritySettingsService:
         known_roles = self._resolve_known_roles(session)
         default_two_factor_roles = ["admin", "manager", "staff"]
         enforce_roles = _parse_json_str_list(
-            self.admin_config_service.get_value(
+            self._get_security_setting_value(
                 session,
-                KEY_TWO_FACTOR_ENFORCE_FOR_ROLES,
-                json.dumps(default_two_factor_roles),
-                category=SECURITY_SETTINGS_CATEGORY,
+                key=KEY_TWO_FACTOR_ENFORCE_FOR_ROLES,
+                default=json.dumps(default_two_factor_roles),
             ),
             default_two_factor_roles,
         )
@@ -177,102 +178,101 @@ class SecuritySettingsService:
             {
                 "two_factor": {
                     "enabled": _parse_bool(
-                        self.admin_config_service.get_value(
+                        self._get_security_setting_value(
                             session,
-                            KEY_TWO_FACTOR_ENABLED,
-                            "true",
-                            category=SECURITY_SETTINGS_CATEGORY,
+                            key=KEY_TWO_FACTOR_ENABLED,
+                            default="true",
                         ),
                         True,
                     ),
-                    "method": self.admin_config_service.get_value(
+                    "method": self._get_security_setting_value(
                         session,
-                        KEY_TWO_FACTOR_METHOD,
-                        "authenticator_app",
-                        category=SECURITY_SETTINGS_CATEGORY,
+                        key=KEY_TWO_FACTOR_METHOD,
+                        default="authenticator_app",
                     ),
                     "enforce_for_roles": enforce_roles,
-                    "enforce_on": self.admin_config_service.get_value(
+                    "enforce_on": self._get_security_setting_value(
                         session,
-                        KEY_TWO_FACTOR_ENFORCE_ON,
-                        "next_login",
-                        category=SECURITY_SETTINGS_CATEGORY,
+                        key=KEY_TWO_FACTOR_ENFORCE_ON,
+                        default="next_login",
                     ),
                 },
                 "password_rules": {
                     "min_length": _parse_int(
-                        self.admin_config_service.get_value(
+                        self._get_security_setting_value(
                             session,
-                            KEY_PASSWORD_MIN_LENGTH,
-                            "6",
-                            category=SECURITY_SETTINGS_CATEGORY,
+                            key=KEY_PASSWORD_MIN_LENGTH,
+                            default="6",
                         ),
                         6,
                     ),
                     "require_uppercase": _parse_bool(
-                        self.admin_config_service.get_value(
+                        self._get_security_setting_value(
                             session,
-                            KEY_PASSWORD_REQUIRE_UPPERCASE,
-                            "false",
-                            category=SECURITY_SETTINGS_CATEGORY,
+                            key=KEY_PASSWORD_REQUIRE_UPPERCASE,
+                            default="false",
                         ),
                         False,
                     ),
                     "require_lowercase": _parse_bool(
-                        self.admin_config_service.get_value(
+                        self._get_security_setting_value(
                             session,
-                            KEY_PASSWORD_REQUIRE_LOWERCASE,
-                            "false",
-                            category=SECURITY_SETTINGS_CATEGORY,
+                            key=KEY_PASSWORD_REQUIRE_LOWERCASE,
+                            default="false",
                         ),
                         False,
                     ),
                     "require_number": _parse_bool(
-                        self.admin_config_service.get_value(
+                        self._get_security_setting_value(
                             session,
-                            KEY_PASSWORD_REQUIRE_NUMBER,
-                            "false",
-                            category=SECURITY_SETTINGS_CATEGORY,
+                            key=KEY_PASSWORD_REQUIRE_NUMBER,
+                            default="false",
                         ),
                         False,
                     ),
                     "require_special": _parse_bool(
-                        self.admin_config_service.get_value(
+                        self._get_security_setting_value(
                             session,
-                            KEY_PASSWORD_REQUIRE_SPECIAL,
-                            "false",
-                            category=SECURITY_SETTINGS_CATEGORY,
+                            key=KEY_PASSWORD_REQUIRE_SPECIAL,
+                            default="false",
                         ),
                         False,
                     ),
                     "applies_when_role_not_in": _parse_json_str_list(
-                        self.admin_config_service.get_value(
+                        self._get_security_setting_value(
                             session,
-                            KEY_PASSWORD_APPLIES_WHEN_ROLE_NOT_IN,
-                            json.dumps(["borrower", "dispatch"]),
-                            category=SECURITY_SETTINGS_CATEGORY,
+                            key=KEY_PASSWORD_APPLIES_WHEN_ROLE_NOT_IN,
+                            default=json.dumps(["borrower", "dispatch"]),
                         ),
                         ["borrower", "dispatch"],
                     ),
                 },
                 "session_timeout": {
                     "inactive_minutes": _parse_int(
-                        self.admin_config_service.get_value(
+                        self._get_security_setting_value(
                             session,
-                            KEY_SESSION_INACTIVE_MINUTES,
-                            "30",
-                            category=SECURITY_SETTINGS_CATEGORY,
+                            key=KEY_SESSION_INACTIVE_MINUTES,
+                            default="30",
                         ),
                         30,
                     ),
                     "warning_minutes": _parse_int(
-                        self.admin_config_service.get_value(
+                        self._get_security_setting_value(
                             session,
-                            KEY_SESSION_WARNING_MINUTES,
-                            "5",
-                            category=SECURITY_SETTINGS_CATEGORY,
+                            key=KEY_SESSION_WARNING_MINUTES,
+                            default="5",
                         ),
                         5,
+                    ),
+                },
+                "secondary_password": {
+                    "rotation_interval_days": _parse_int(
+                        self._get_security_setting_value(
+                            session,
+                            key=KEY_SECONDARY_PASSWORD_ROTATION_INTERVAL_DAYS,
+                            default="30",
+                        ),
+                        30,
                     ),
                 },
                 "rbac_overview": self.build_rbac_overview(session).model_dump(mode="json"),
@@ -313,10 +313,11 @@ class SecuritySettingsService:
             KEY_PASSWORD_APPLIES_WHEN_ROLE_NOT_IN: json.dumps(payload.password_rules.applies_when_role_not_in),
             KEY_SESSION_INACTIVE_MINUTES: str(payload.session_timeout.inactive_minutes),
             KEY_SESSION_WARNING_MINUTES: str(payload.session_timeout.warning_minutes),
+            KEY_SECONDARY_PASSWORD_ROTATION_INTERVAL_DAYS: str(payload.secondary_password.rotation_interval_days),
         }
 
         for key, value in updates.items():
-            self.admin_config_service.set_value(
+            self.auth_config_service.set_value(
                 session,
                 key,
                 value,

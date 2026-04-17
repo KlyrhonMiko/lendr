@@ -24,7 +24,7 @@ class SessionPolicyRead(BaseModel):
     warning_minutes: int = Field(..., ge=0)
 
 
-class BootstrapPasswordRotateRequest(BaseModel):
+class FirstLoginPasswordRotateRequest(BaseModel):
     username: str = Field(..., min_length=1, max_length=255)
     current_password: str = Field(..., min_length=6, max_length=255)
     new_password: str = Field(..., min_length=6, max_length=255)
@@ -41,6 +41,14 @@ class SelfProfileUpdate(BaseModel):
     username: str | None = Field(default=None, max_length=50)
     password: str | None = Field(default=None, min_length=6, max_length=255)
     current_password: str | None = Field(default=None, min_length=6, max_length=255)
+
+
+class ForcedPasswordChangeRequiredRead(BaseModel):
+    auth_state: str = Field(default="password_change_required")
+    code: str = Field(default="AUTH.FIRST_LOGIN_PASSWORD_CHANGE_REQUIRED")
+    detail: str = Field(default="Password rotation is required before completing login.")
+    password_change_required: bool = True
+    rotation_endpoint: str = Field(default="/api/auth/first-login/rotate-password")
 
 
 class TwoFactorEnrollmentInitiateRead(BaseModel):
