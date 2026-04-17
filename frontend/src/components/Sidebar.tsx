@@ -12,6 +12,7 @@ import { usePublicBranding } from '@/lib/publicBranding';
 const systemMeta: Record<string, string> = {
   admin: 'Administration',
   inventory: 'Inventory',
+  borrower: 'Borrower',
   borrow_portal: 'Borrow Portal',
   borrowers: 'Borrowers',
 };
@@ -67,6 +68,10 @@ const navigation: Record<string, { section: string; items: { name: string; href:
       ]
     }
   ],
+  borrower: [
+    { name: 'Request History', href: '/borrower/history', icon: ClipboardList },
+    { name: 'Profile', href: '/borrower/profile', icon: Users },
+  ],
   borrow_portal: [
     {
       section: 'Borrowing',
@@ -94,6 +99,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
     if (pathname.startsWith('/inventory')) return 'inventory';
     if (pathname.startsWith('/admin')) return 'admin';
     if (pathname.startsWith('/borrowers')) return 'borrowers';
+    if (pathname.startsWith('/borrower')) return 'borrower';
     if (pathname.startsWith('/borrow')) return 'borrow_portal';
     return null;
   };
