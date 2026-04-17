@@ -7,6 +7,7 @@ export interface BorrowCatalogItem {
   total_qty: number;
   available_qty: number;
   condition: string;
+  is_trackable: boolean;
   item_type?: string;
   classification?: string;
   description?: string;

@@ -8,10 +8,24 @@ export function buildApiRequestUrl(url: string): string {
 }
 
 export function buildWebSocketUrl(path: string): string {
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-  const wsProtocol = baseUrl.startsWith('https') ? 'wss' : 'ws';
-  const wsBase = baseUrl.replace(/^https?:\/\//, '');
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
 
+  // In the browser, mirror API requests and use same-origin (/api/*) so
+  // websocket routing works across localhost, LAN dev hosts, and reverse proxies.
+  if (typeof window !== 'undefined') {
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    return `${wsProtocol}://${window.location.host}/api${normalizedPath}`;
+  }
+
+  const serverOrigin = (() => {
+    try {
+      return new URL(SERVER_API_BASE_URL).origin;
+    } catch {
+      return 'http://localhost:8000';
+    }
+  })();
+
+  const wsProtocol = serverOrigin.startsWith('https') ? 'wss' : 'ws';
+  const wsBase = serverOrigin.replace(/^https?:\/\//, '');
   return `${wsProtocol}://${wsBase}/api${normalizedPath}`;
 }
