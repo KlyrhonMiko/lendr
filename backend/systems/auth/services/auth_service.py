@@ -9,11 +9,11 @@ from sqlmodel import Session, select
 from core.config import settings
 from systems.admin.models.user import User
 from systems.admin.services.audit_service import audit_service
-from systems.admin.services.configuration_service import ConfigurationService
 from systems.admin.services.password_policy_service import PasswordPolicyService
 from systems.admin.services.user_service import UserService
 from systems.auth.models.auth_two_factor_challenge import AuthTwoFactorChallenge
 from systems.auth.models.borrower_session import BorrowerSession
+from systems.auth.services.configuration_service import AuthConfigService
 from utils.id_generator import get_next_sequence
 from utils.security import (
     build_totp_provisioning_uri,
@@ -41,12 +41,15 @@ TWO_FACTOR_METHOD_AUTHENTICATOR_APP = "authenticator_app"
 TWO_FACTOR_CHALLENGE_TTL_MINUTES = 5
 TWO_FACTOR_CHALLENGE_MAX_FAILURES = 5
 DEFAULT_SESSION_WARNING_MINUTES = 5
+SECONDARY_PASSWORD_TOKEN_BYTES = 24
 
 
 class AuthService:
+    _BORROWER_ROLES = {"borrower", "brwr"}
+
     def __init__(self):
         self.user_service = UserService()
-        self.configuration_service = ConfigurationService()
+        self.auth_config_service = AuthConfigService()
         self.password_policy_service = PasswordPolicyService()
 
     @staticmethod
@@ -89,7 +92,7 @@ class AuthService:
     def _load_two_factor_policy(self, session: Session) -> dict[str, Any]:
         default_roles = ["admin", "manager", "staff"]
         enabled = self._parse_bool(
-            self.configuration_service.get_value(
+            self.auth_config_service.get_value(
                 session,
                 KEY_TWO_FACTOR_ENABLED,
                 "true",
@@ -97,14 +100,14 @@ class AuthService:
             ),
             True,
         )
-        method = self.configuration_service.get_value(
+        method = self.auth_config_service.get_value(
             session,
             KEY_TWO_FACTOR_METHOD,
             TWO_FACTOR_METHOD_AUTHENTICATOR_APP,
             category=SECURITY_SETTINGS_CATEGORY,
         )
         enforce_roles = self._parse_json_role_list(
-            self.configuration_service.get_value(
+            self.auth_config_service.get_value(
                 session,
                 KEY_TWO_FACTOR_ENFORCE_FOR_ROLES,
                 json.dumps(default_roles),
@@ -112,7 +115,7 @@ class AuthService:
             ),
             default_roles,
         )
-        enforce_on = self.configuration_service.get_value(
+        enforce_on = self.auth_config_service.get_value(
             session,
             KEY_TWO_FACTOR_ENFORCE_ON,
             "next_login",
@@ -340,6 +343,7 @@ class AuthService:
         session: Session,
         user: User,
         device_id: str | None,
+        used_secondary_password: bool = False,
     ) -> AuthTwoFactorChallenge:
         expires_at = get_now_manila() + timedelta(minutes=TWO_FACTOR_CHALLENGE_TTL_MINUTES)
         challenge = AuthTwoFactorChallenge(
@@ -347,6 +351,7 @@ class AuthService:
             user_uuid=user.id,
             device_id=device_id,
             expires_at=expires_at,
+            used_secondary_password=used_secondary_password,
         )
         session.add(challenge)
         session.flush()
@@ -360,6 +365,31 @@ class AuthService:
         )
 
         return challenge
+
+    def rotate_secondary_credential_after_login(
+        self,
+        session: Session,
+        user: User,
+        *,
+        reason_code: str,
+    ) -> None:
+        now = get_now_manila()
+        user.recovery_credential_encrypted = encrypt_sensitive_value(
+            secrets.token_urlsafe(SECONDARY_PASSWORD_TOKEN_BYTES)
+        )
+        user.recovery_credential_rotated_at = now
+        user.updated_at = now
+        session.add(user)
+        session.flush()
+
+        audit_service.log_action(
+            db=session,
+            entity_type="user",
+            entity_id=user.user_id,
+            action="secondary_credential_rotated_on_login",
+            actor_id=user.id,
+            reason_code=reason_code,
+        )
 
     def _get_active_two_factor_secret(self, session: Session, user_uuid: UUID) -> str | None:
         credential = self.get_two_factor_credential(session, user_uuid)
@@ -479,6 +509,13 @@ class AuthService:
             credential.updated_at = now
             session.add(credential)
 
+        if challenge.used_secondary_password:
+            self.rotate_secondary_credential_after_login(
+                session,
+                user,
+                reason_code="login_two_factor_completed",
+            )
+
         db_session = self.create_user_session(
             session=session,
             user_uuid=user.id,
@@ -502,7 +539,7 @@ class AuthService:
 
     def get_session_timeout_policy(self, session: Session) -> dict[str, int]:
         inactive_minutes = self._parse_non_negative_int(
-            self.configuration_service.get_value(
+            self.auth_config_service.get_value(
                 session,
                 KEY_SESSION_INACTIVE_MINUTES,
                 str(settings.AUTH_SESSION_INACTIVITY_TIMEOUT_MINUTES),
@@ -517,7 +554,7 @@ class AuthService:
             else 0
         )
         warning_minutes = self._parse_non_negative_int(
-            self.configuration_service.get_value(
+            self.auth_config_service.get_value(
                 session,
                 KEY_SESSION_WARNING_MINUTES,
                 str(default_warning_minutes),
@@ -645,14 +682,37 @@ class AuthService:
             existing_session.updated_at = now
             session.add(existing_session)
 
-    def authenticate_user(self, session: Session, username_or_email: str, password: str) -> User | None:
-        statement = select(User).where((User.username == username_or_email) | (User.email == username_or_email)).where(User.is_deleted.is_(False))
+    def _get_active_user_by_identity(self, session: Session, username_or_email: str) -> User | None:
+        statement = (
+            select(User)
+            .where((User.username == username_or_email) | (User.email == username_or_email))
+            .where(User.is_deleted.is_(False))
+        )
+        return session.exec(statement).first()
 
-        user = session.exec(statement).first()
+    def _verify_primary_password(self, user: User, password: str) -> tuple[bool, str | None]:
+        verified, upgraded_hash = verify_and_update_password(password, user.hashed_password)
+        return verified, upgraded_hash
+
+    def _verify_secondary_password(self, user: User, password: str) -> bool:
+        encrypted_value = user.recovery_credential_encrypted
+        provided = password.strip()
+        if not encrypted_value or not provided:
+            return False
+
+        try:
+            current_value = decrypt_sensitive_value(encrypted_value)
+        except ValueError:
+            return False
+
+        return secrets.compare_digest(current_value, provided)
+
+    def authenticate_user(self, session: Session, username_or_email: str, password: str) -> User | None:
+        user = self._get_active_user_by_identity(session, username_or_email)
         if not user:
             return None
 
-        verified, upgraded_hash = verify_and_update_password(password, user.hashed_password)
+        verified, upgraded_hash = self._verify_primary_password(user, password)
         if not verified:
             return None
 
@@ -663,11 +723,54 @@ class AuthService:
 
         return user
 
+    def authenticate_user_for_login(
+        self,
+        session: Session,
+        username_or_email: str,
+        password: str,
+    ) -> tuple[User, str] | None:
+        user = self._get_active_user_by_identity(session, username_or_email)
+        if not user:
+            return None
+
+        primary_verified, upgraded_hash = self._verify_primary_password(user, password)
+        if primary_verified:
+            if upgraded_hash:
+                user.hashed_password = upgraded_hash
+                user.updated_at = get_now_manila()
+                session.add(user)
+            return user, "primary"
+
+        if self.is_borrower_role(user.role):
+            return None
+
+        if not self._verify_secondary_password(user, password):
+            return None
+
+        return user, "secondary"
+
     def is_bootstrap_admin(self, user: User | None) -> bool:
         return bool(user and user.user_id == "ADMIN-001")
 
+    def is_borrower_role(self, role: str | None) -> bool:
+        return self._normalize_role(role) in self._BORROWER_ROLES
+
+    def should_force_first_login_password_rotation(self, user: User | None) -> bool:
+        if not user:
+            return False
+
+        # Phase 3 marks one-time credential flows with must_change_password=True
+        # and password_rotated_at unset until first successful rotation.
+        if self.is_borrower_role(user.role):
+            return False
+
+        if not user.must_change_password:
+            return False
+
+        return user.password_rotated_at is None
+
     def should_force_bootstrap_password_rotation(self, user: User | None) -> bool:
-        return bool(self.is_bootstrap_admin(user) and user.must_change_password)
+        return bool(self.is_bootstrap_admin(user) and self.should_force_first_login_password_rotation(user))
 
     def authenticate_bootstrap_admin(
         self,
@@ -695,6 +798,70 @@ class AuthService:
         user.must_change_password = False
         user.password_rotated_at = get_now_manila()
         user.updated_at = get_now_manila()
+
+        session.add(user)
+        session.flush()
+        session.refresh(user)
+        return user
+
+    def authenticate_first_login_rotation_user(
+        self,
+        session: Session,
+        username_or_email: str,
+        password: str,
+    ) -> User | None:
+        auth_result = self.authenticate_first_login_rotation_user_with_mode(
+            session,
+            username_or_email,
+            password,
+        )
+        if not auth_result:
+            return None
+        return auth_result[0]
+
+    def authenticate_first_login_rotation_user_with_mode(
+        self,
+        session: Session,
+        username_or_email: str,
+        password: str,
+    ) -> tuple[User, str] | None:
+        auth_result = self.authenticate_user_for_login(session, username_or_email, password)
+        if not auth_result:
+            return None
+
+        user, credential_mode = auth_result
+        # Primary credential rotation remains limited to forced first-login flow.
+        # Secondary credential can initiate rotation as a recovery path.
+        if credential_mode == "primary" and not self.should_force_first_login_password_rotation(user):
+            return None
+
+        return user, credential_mode
+
+    def rotate_first_login_password(
+        self,
+        session: Session,
+        user: User,
+        new_password: str,
+        *,
+        used_secondary_password: bool = False,
+    ) -> User:
+        if not used_secondary_password and not self.should_force_first_login_password_rotation(user):
+            raise ValueError("User is not eligible for first-login password rotation")
+
+        self.password_policy_service.validate_for_role(session, new_password, user.role)
+
+        now = get_now_manila()
+        user.hashed_password = get_password_hash(new_password)
+        user.must_change_password = False
+        user.password_rotated_at = now
+
+        if used_secondary_password:
+            user.recovery_credential_encrypted = encrypt_sensitive_value(
+                secrets.token_urlsafe(SECONDARY_PASSWORD_TOKEN_BYTES)
+            )
+            user.recovery_credential_rotated_at = now
+
+        user.updated_at = now
 
         session.add(user)
         session.flush()

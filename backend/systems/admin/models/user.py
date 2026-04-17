@@ -37,6 +37,12 @@ class User(BaseModel, table=True):
     shift_type: str = Field(default="day", max_length=20)
     must_change_password: bool = Field(default=False, nullable=False)
     password_rotated_at: datetime | None = Field(default=None, nullable=True)
+    recovery_credential_encrypted: str | None = Field(
+        default=None,
+        max_length=1024,
+        nullable=True,
+    )
+    recovery_credential_rotated_at: datetime | None = Field(default=None, nullable=True)
 
     @property
     def full_name(self) -> str:

@@ -7,12 +7,12 @@ from core.database import get_session
 from core.schemas import GenericResponse, create_success_response
 from systems.admin.models.user import User
 from systems.admin.schemas.role_schemas import RolePermissionUpdate
-from systems.admin.services.configuration_service import ConfigurationService
 from systems.auth.dependencies import get_current_user, require_permission
+from systems.auth.services.configuration_service import AuthConfigService
 from systems.auth.services.rbac_service import normalize_role, validate_role_policy_payload
 
 router = APIRouter()
-config_service = ConfigurationService()
+config_service = AuthConfigService()
 
 @router.post("/permissions", response_model=GenericResponse[dict], status_code=200)
 async def update_role_permissions(

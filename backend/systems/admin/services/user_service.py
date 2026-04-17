@@ -1,5 +1,10 @@
-from typing import Optional
+import secrets
+import string
+from datetime import timedelta
+from typing import Any, Optional
 from uuid import UUID
+
+from fastapi import HTTPException
 from sqlmodel import Session, select, func, or_
 
 from core.base_service import BaseService
@@ -7,10 +12,27 @@ from systems.admin.models.user import User
 from systems.admin.services.password_policy_service import PasswordPolicyService
 from systems.admin.schemas.user_schemas import UserCreate, UserUpdate
 from utils.id_generator import get_next_sequence
-from utils.security import get_password_hash
+from utils.security import decrypt_sensitive_value, encrypt_sensitive_value, get_password_hash
 from utils.time_utils import get_now_manila
 
+
 class UserService(BaseService[User, UserCreate, UserUpdate]):
+    _BORROWER_ROLES = {"borrower", "brwr"}
+    _SECURITY_SETTINGS_CATEGORY = "security_settings"
+    _SECONDARY_PASSWORD_ROTATION_INTERVAL_KEY = "secondary_password_rotation_interval_days"
+    _DEFAULT_SECONDARY_PASSWORD_ROTATION_DAYS = 30
+    _SENSITIVE_AUDIT_KEYS = {
+        "password",
+        "hashed_password",
+        "secondary_password",
+        "current_password",
+        "recovery_credential",
+        "recovery_credential_encrypted",
+        "one_time_login_password",
+        "generated_credentials",
+    }
+    _SPECIAL_PASSWORD_CHARS = "!@#$%^&*()-_=+"
+
     def __init__(self):
         super().__init__(User, lookup_field="user_id")
         self.password_policy_service = PasswordPolicyService()
@@ -18,6 +40,174 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
     @staticmethod
     def _normalize_role(role: str | None) -> str:
         return (role or "").strip().lower()
+
+    @classmethod
+    def _is_borrower_role(cls, role: str | None) -> bool:
+        return cls._normalize_role(role) in cls._BORROWER_ROLES
+
+    @classmethod
+    def _redact_sensitive_payload(cls, value: Any, *, parent_key: str | None = None) -> Any:
+        if parent_key and parent_key.lower() in cls._SENSITIVE_AUDIT_KEYS:
+            return "[REDACTED]"
+
+        if isinstance(value, dict):
+            return {
+                key: cls._redact_sensitive_payload(nested_value, parent_key=key)
+                for key, nested_value in value.items()
+            }
+
+        if isinstance(value, list):
+            return [
+                cls._redact_sensitive_payload(item, parent_key=parent_key)
+                for item in value
+            ]
+
+        return value
+
+    def _generate_policy_compliant_password(self, session: Session, role: str, *, min_length: int = 12) -> str:
+        normalized_role = self._normalize_role(role)
+        policy = self.password_policy_service.get_policy(session)
+        target_length = max(policy.min_length, min_length)
+
+        char_groups: list[str] = []
+        if policy.require_uppercase:
+            char_groups.append(string.ascii_uppercase)
+        if policy.require_lowercase:
+            char_groups.append(string.ascii_lowercase)
+        if policy.require_number:
+            char_groups.append(string.digits)
+        if policy.require_special:
+            char_groups.append(self._SPECIAL_PASSWORD_CHARS)
+
+        if not char_groups:
+            # Keep generated passwords strong even when policy is permissive.
+            char_groups = [string.ascii_uppercase, string.ascii_lowercase, string.digits]
+
+        universal_charset = "".join(char_groups)
+
+        for _ in range(20):
+            required = [secrets.choice(group) for group in char_groups]
+            remaining = [
+                secrets.choice(universal_charset)
+                for _ in range(max(target_length - len(required), 0))
+            ]
+            password_chars = required + remaining
+            secrets.SystemRandom().shuffle(password_chars)
+            generated = "".join(password_chars)
+
+            try:
+                self.password_policy_service.validate_for_role(
+                    session,
+                    generated,
+                    normalized_role,
+                )
+            except HTTPException:
+                continue
+
+            return generated
+
+        raise RuntimeError("Unable to generate a password that satisfies policy requirements")
+
+    def _generate_secondary_password(self) -> str:
+        return secrets.token_urlsafe(24)
+
+    def _get_secondary_password_rotation_interval_days(self, session: Session) -> int:
+        from systems.auth.services.configuration_service import AuthConfigService
+
+        auth_config_service = AuthConfigService()
+        raw_value = auth_config_service.get_value(
+            session,
+            self._SECONDARY_PASSWORD_ROTATION_INTERVAL_KEY,
+            str(self._DEFAULT_SECONDARY_PASSWORD_ROTATION_DAYS),
+            category=self._SECURITY_SETTINGS_CATEGORY,
+        )
+
+        try:
+            parsed = int(str(raw_value).strip())
+        except (TypeError, ValueError):
+            return self._DEFAULT_SECONDARY_PASSWORD_ROTATION_DAYS
+
+        return max(1, min(parsed, 365))
+
+    def _rotate_secondary_password(self, user: User) -> str:
+        secondary_password = self._generate_secondary_password()
+        user.recovery_credential_encrypted = encrypt_sensitive_value(secondary_password)
+        user.recovery_credential_rotated_at = get_now_manila()
+        return secondary_password
+
+    def _is_secondary_password_due_for_rotation(self, session: Session, user: User) -> bool:
+        if self._is_borrower_role(user.role):
+            return False
+
+        if not user.recovery_credential_encrypted or user.recovery_credential_rotated_at is None:
+            return True
+
+        interval_days = self._get_secondary_password_rotation_interval_days(session)
+        now = get_now_manila()
+        next_rotation_at = user.recovery_credential_rotated_at + timedelta(days=interval_days)
+        return now >= next_rotation_at
+
+    def rotate_due_secondary_passwords(
+        self,
+        session: Session,
+        actor_id: UUID | None = None,
+    ) -> int:
+        candidates = session.exec(
+            select(User).where(
+                User.is_deleted.is_(False),
+            )
+        ).all()
+
+        rotated_count = 0
+        for user in candidates:
+            if not self._is_secondary_password_due_for_rotation(session, user):
+                continue
+
+            before = user.model_dump(mode="json")
+            self._rotate_secondary_password(user)
+            user.updated_at = get_now_manila()
+            session.add(user)
+
+            self._log_audit(
+                session=session,
+                action="secondary_password_auto_rotated",
+                entity_id=user.user_id,
+                before=self._redact_sensitive_payload(before),
+                after=self._redact_sensitive_payload(user.model_dump(mode="json")),
+                actor_id=actor_id,
+                reason_code="secondary_password_due_rotation",
+            )
+            rotated_count += 1
+
+        if rotated_count:
+            session.flush()
+
+        return rotated_count
+
+    def _verify_secondary_password(self, user: User, secondary_password: str) -> bool:
+        encrypted_value = user.recovery_credential_encrypted
+        if not encrypted_value:
+            raise HTTPException(
+                status_code=404,
+                detail="Secondary password is not available for this user.",
+            )
+
+        try:
+            current_value = decrypt_sensitive_value(encrypted_value)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=500,
+                detail="Secondary password is unavailable due to a decryption error.",
+            ) from exc
+
+        provided = secondary_password.strip()
+        if not provided:
+            raise HTTPException(
+                status_code=400,
+                detail="Secondary password is required.",
+            )
+
+        return secrets.compare_digest(current_value, provided)
 
     def requires_session_revocation(self, user: User, schema: UserUpdate) -> bool:
         updates = schema.model_dump(exclude_unset=True)
@@ -91,8 +281,22 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
         schema: UserCreate,
         actor_id: UUID | None = None,
     ) -> User:
+        created, _ = self.create_with_generated_credentials(
+            session,
+            schema,
+            actor_id=actor_id,
+        )
+        return created
+
+    def create_with_generated_credentials(
+        self,
+        session: Session,
+        schema: UserCreate,
+        actor_id: UUID | None = None,
+    ) -> tuple[User, dict[str, str] | None]:
         from systems.auth.services.configuration_service import AuthConfigService
-        self.config_service = AuthConfigService()
+
+        auth_config_service = AuthConfigService()
         self.validate_uniqueness(
             session,
             schema,
@@ -101,7 +305,7 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
 
         normalized_role = self._normalize_role(schema.role)
 
-        setting = self.config_service.get_by_key(
+        setting = auth_config_service.get_by_key(
             session,
             key=normalized_role,
             category="users_role"
@@ -117,10 +321,44 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
 
         data = schema.model_dump()
         data["role"] = normalized_role
-        password = data.pop("password")
-        self.password_policy_service.validate_for_role(session, password, normalized_role)
-        data["hashed_password"] = get_password_hash(password)
-        data["password_rotated_at"] = get_now_manila()
+        supplied_password = data.pop("password", None)
+
+        generated_credentials: dict[str, str] | None = None
+        if self._is_borrower_role(normalized_role):
+            if not supplied_password:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Borrower PIN/password is required.",
+                )
+
+            self.password_policy_service.validate_for_role(
+                session,
+                supplied_password,
+                normalized_role,
+            )
+            data["hashed_password"] = get_password_hash(supplied_password)
+            data["password_rotated_at"] = get_now_manila()
+            data["must_change_password"] = False
+            data["recovery_credential_encrypted"] = None
+            data["recovery_credential_rotated_at"] = None
+        else:
+            one_time_login_password = self._generate_policy_compliant_password(
+                session,
+                normalized_role,
+                min_length=12,
+            )
+            secondary_password = self._generate_secondary_password()
+
+            data["hashed_password"] = get_password_hash(one_time_login_password)
+            data["must_change_password"] = True
+            data["password_rotated_at"] = None
+            data["recovery_credential_encrypted"] = encrypt_sensitive_value(secondary_password)
+            data["recovery_credential_rotated_at"] = get_now_manila()
+
+            generated_credentials = {
+                "one_time_login_password": one_time_login_password,
+                "secondary_password": secondary_password,
+            }
 
         if not data.get(self.lookup_field):
             data[self.lookup_field] = get_next_sequence(session, self.model, self.lookup_field, prefix)
@@ -132,13 +370,13 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
             session=session,
             action="created",
             entity_id=db_obj.user_id,
-            after=db_obj.model_dump(mode="json"),
+            after=self._redact_sensitive_payload(db_obj.model_dump(mode="json")),
             actor_id=actor_id,
         )
 
         session.flush()
         session.refresh(db_obj)
-        return db_obj
+        return db_obj, generated_credentials
 
     def update(
         self,
@@ -174,11 +412,110 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
             session=session,
             action="updated",
             entity_id=db_obj.user_id,
-            before=before,
-            after=db_obj.model_dump(mode="json"),
+            before=self._redact_sensitive_payload(before),
+            after=self._redact_sensitive_payload(db_obj.model_dump(mode="json")),
             actor_id=actor_id,
         )
 
         session.flush()
         session.refresh(db_obj)
         return db_obj
+
+    def get_secondary_password(
+        self,
+        session: Session,
+        user: User,
+        actor_id: UUID | None = None,
+    ) -> str:
+        if self._is_borrower_role(user.role):
+            raise HTTPException(
+                status_code=400,
+                detail="Borrower accounts do not use admin recovery credentials.",
+            )
+
+        encrypted_value = user.recovery_credential_encrypted
+        if not encrypted_value:
+            raise HTTPException(
+                status_code=404,
+                detail="Secondary password is not available for this user.",
+            )
+
+        try:
+            secondary_password = decrypt_sensitive_value(encrypted_value)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=500,
+                detail="Secondary password is unavailable due to a decryption error.",
+            ) from exc
+
+        before = user.model_dump(mode="json")
+
+        self._log_audit(
+            session=session,
+            action="secondary_password_retrieved",
+            entity_id=user.user_id,
+            before=self._redact_sensitive_payload(before),
+            after=self._redact_sensitive_payload(user.model_dump(mode="json")),
+            actor_id=actor_id,
+            reason_code="secondary_password_retrieval",
+        )
+
+        return secondary_password
+
+    def get_recovery_credential(
+        self,
+        session: Session,
+        user: User,
+        actor_id: UUID | None = None,
+    ) -> str:
+        # Backward-compatibility wrapper for legacy callers.
+        return self.get_secondary_password(session, user, actor_id=actor_id)
+
+    def reset_login_password(
+        self,
+        session: Session,
+        user: User,
+        secondary_password: str,
+        actor_id: UUID | None = None,
+    ) -> tuple[str, str]:
+        if self._is_borrower_role(user.role):
+            raise HTTPException(
+                status_code=400,
+                detail="Borrower accounts are not eligible for admin login password reset.",
+            )
+
+        if not self._verify_secondary_password(user, secondary_password):
+            raise HTTPException(
+                status_code=403,
+                detail="Invalid secondary password.",
+            )
+
+        before = user.model_dump(mode="json")
+        new_one_time_password = self._generate_policy_compliant_password(
+            session,
+            user.role,
+            min_length=12,
+        )
+        new_secondary_password = self._generate_secondary_password()
+
+        user.hashed_password = get_password_hash(new_one_time_password)
+        user.must_change_password = True
+        user.password_rotated_at = None
+        user.recovery_credential_encrypted = encrypt_sensitive_value(new_secondary_password)
+        user.recovery_credential_rotated_at = get_now_manila()
+        user.updated_at = get_now_manila()
+        session.add(user)
+
+        self._log_audit(
+            session=session,
+            action="login_password_reset",
+            entity_id=user.user_id,
+            before=self._redact_sensitive_payload(before),
+            after=self._redact_sensitive_payload(user.model_dump(mode="json")),
+            actor_id=actor_id,
+            reason_code="admin_secondary_password_verified_reset",
+        )
+
+        session.flush()
+        session.refresh(user)
+        return new_one_time_password, new_secondary_password

@@ -1,15 +1,20 @@
 'use client';
 
+import { useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { Pagination } from '@/components/ui/Pagination';
 import { UserModal } from './UserModal';
 import { ConfirmActionModal } from './components/ConfirmActionModal';
+import { UserCredentialsModal } from './components/UserCredentialsModal';
 import { UsersPageHeader } from './components/UsersPageHeader';
 import { UsersTable } from './components/UsersTable';
 import { UsersToolbar } from './components/UsersToolbar';
 import { useUsersManagement } from './lib/useUsersManagement';
+import type { UserCredentialReveal } from './lib/types';
 
 export default function UsersPage() {
+  const [revealedCredentials, setRevealedCredentials] = useState<UserCredentialReveal | null>(null);
+
   const {
     users,
     meta,
@@ -91,10 +96,19 @@ export default function UsersPage() {
         <UserModal
           user={selectedUser}
           onClose={closeUserModal}
+          onCredentialReveal={(payload) => setRevealedCredentials(payload)}
+          onRefetchUsers={fetchUsers}
           onSuccess={() => {
             closeUserModal();
             fetchUsers();
           }}
+        />
+      )}
+
+      {revealedCredentials && (
+        <UserCredentialsModal
+          reveal={revealedCredentials}
+          onClose={() => setRevealedCredentials(null)}
         />
       )}
     </div>

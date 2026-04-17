@@ -16,7 +16,13 @@ from systems.auth.services.rbac_service import normalize_role, validate_role_pol
 
 logger = get_logger("core.init")
 
-AUTH_CONFIG_CATEGORIES = {"users_role", "users_shift_type"}
+AUTH_CONFIG_CATEGORIES = {
+    "security_settings",
+    "rbac_roles",
+    "users_role",
+    "users_shift_type",
+    "users_shift_definition",
+}
 NON_CRUCIAL_SEED_CATEGORIES = {
     "inventory_item_type",
     "inventory_classification",
@@ -133,6 +139,7 @@ class InitializationService:
     def rebalance_misplaced_configurations(self, session: Session):
         """Move wrongly stored rows out of admin_configurations into their proper tables."""
         moved = 0
+        reconciled = 0
         removed = 0
 
         misplaced_rows = session.exec(
@@ -171,14 +178,37 @@ class InitializationService:
                     )
                 )
                 moved += 1
+            else:
+                changed = False
+                if existing.is_deleted:
+                    existing.is_deleted = False
+                    existing.deleted_at = None
+                    changed = True
+                if existing.system != target_system:
+                    existing.system = target_system
+                    changed = True
+                if existing.value != row.value:
+                    existing.value = row.value
+                    changed = True
+                if existing.description != row.description:
+                    existing.description = row.description
+                    changed = True
+                if existing.crucial != row.crucial:
+                    existing.crucial = row.crucial
+                    changed = True
+
+                if changed:
+                    session.add(existing)
+                    reconciled += 1
 
             session.delete(row)
             removed += 1
 
-        if moved or removed:
+        if moved or reconciled or removed:
             logger.info(
-                "Rebalanced misplaced configs: moved=%s removed_from_admin=%s",
+                "Rebalanced misplaced configs: moved=%s reconciled=%s removed_from_admin=%s",
                 moved,
+                reconciled,
                 removed,
             )
         else:
@@ -244,7 +274,9 @@ class InitializationService:
 
     def seed_rbac_roles(self, session: Session):
         """Idempotently seed RBAC role-specific permissions."""
-        count = 0
+        created_count = 0
+        reconciled_count = 0
+        restored_count = 0
         for role_data in RBAC_ROLES:
             role_key = normalize_role(str(role_data.get("role", "")))
             try:
@@ -262,24 +294,54 @@ class InitializationService:
                 ) from exc
             
             existing = session.exec(
-                select(AdminConfig).where(
-                    AdminConfig.key == role_key,
-                    AdminConfig.category == "rbac_roles"
+                select(AuthConfig).where(
+                    AuthConfig.key == role_key,
+                    AuthConfig.category == "rbac_roles"
                 )
             ).first()
 
+            description = f"Dynamic override for role: {role_data['role']}"
+            serialized_payload = json.dumps(payload)
+
             if not existing:
-                config = AdminConfig(
+                config = AuthConfig(
+                    system="admin",
                     key=role_key,
-                    value=json.dumps(payload),
+                    value=serialized_payload,
                     category="rbac_roles",
-                    description=f"Dynamic override for role: {role_data['role']}"
+                    description=description,
                 )
                 session.add(config)
-                count += 1
+                created_count += 1
+                continue
+
+            changed = False
+            if existing.system != "admin":
+                existing.system = "admin"
+                changed = True
+            if existing.value != serialized_payload:
+                existing.value = serialized_payload
+                changed = True
+            if existing.description != description:
+                existing.description = description
+                changed = True
+            if existing.is_deleted:
+                existing.is_deleted = False
+                existing.deleted_at = None
+                restored_count += 1
+                changed = True
+
+            if changed:
+                session.add(existing)
+                reconciled_count += 1
         
-        if count > 0:
-            logger.info(f"Synchronized {count} new role permission sets.")
+        if created_count or reconciled_count:
+            logger.info(
+                "Synchronized role permission sets: created=%s reconciled=%s restored=%s",
+                created_count,
+                reconciled_count,
+                restored_count,
+            )
         else:
             logger.debug("Role permissions are up to date.")
 

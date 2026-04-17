@@ -18,3 +18,4 @@ class AuthTwoFactorChallenge(BaseModel, table=True):
     is_consumed: bool = Field(default=False, index=True)
     consumed_at: datetime | None = Field(default=None)
     failure_count: int = Field(default=0, ge=0)
+    used_secondary_password: bool = Field(default=False)
