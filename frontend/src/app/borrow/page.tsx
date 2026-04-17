@@ -20,6 +20,8 @@ interface BorrowerTaxonomyData {
   classifications: ConfigRead[];
 }
 
+type BorrowItemKind = 'trackable' | 'untrackable';
+
 export default function BorrowPage() {
   const queryClient = useQueryClient();
   useInventoryWebSocket();
@@ -39,6 +41,7 @@ export default function BorrowPage() {
   const [step, setStep] = useState<'selection' | 'checkout'>('selection');
   const [success, setSuccess] = useState(false);
   const [submittedByEmployeeName, setSubmittedByEmployeeName] = useState<string | null>(null);
+  const [selectedItemKind, setSelectedItemKind] = useState<BorrowItemKind | null>(null);
 
   const { data: items = [], isLoading: isLoadingCatalog } = useQuery({
     queryKey: ['borrow', 'catalog'],
@@ -81,13 +84,19 @@ export default function BorrowPage() {
   const filteredItems = useMemo(
     () =>
       items.filter((i) => {
+        const matchesKind =
+          selectedItemKind === null
+            ? false
+            : selectedItemKind === 'trackable'
+              ? i.is_trackable
+              : !i.is_trackable;
         const matchesSearch =
           i.name.toLowerCase().includes(search.toLowerCase()) ||
           i.category.toLowerCase().includes(search.toLowerCase());
         const matchesCategory = selectedCategory === 'All' || i.category === selectedCategory;
-        return matchesSearch && matchesCategory;
+        return matchesKind && matchesSearch && matchesCategory;
       }),
-    [items, search, selectedCategory],
+    [items, search, selectedCategory, selectedItemKind],
   );
 
   const totalCartItems = cart.reduce((acc, curr) => acc + curr.cartQty, 0);
@@ -133,6 +142,20 @@ export default function BorrowPage() {
     setIsPinModalOpen(false);
     setIsPinVerifying(false);
     setPinDraft('');
+  };
+
+  const handleSelectItemKind = (kind: BorrowItemKind) => {
+    setSelectedItemKind(kind);
+    setSearch('');
+    setSelectedCategory('All');
+  };
+
+  const handleBackToItemKindSelection = () => {
+    handleClear();
+    setStep('selection');
+    setSelectedItemKind(null);
+    setSearch('');
+    setSelectedCategory('All');
   };
 
   const pinInputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -345,6 +368,9 @@ export default function BorrowPage() {
           categories={categories}
           categoryLabels={categoryLabels}
           classificationLabels={classificationLabels}
+          selectedItemKind={selectedItemKind}
+          onSelectItemKind={handleSelectItemKind}
+          onBackToItemKindSelection={handleBackToItemKindSelection}
           selectedCategory={selectedCategory}
           onCategoryChange={setSelectedCategory}
           totalItems={items.length}

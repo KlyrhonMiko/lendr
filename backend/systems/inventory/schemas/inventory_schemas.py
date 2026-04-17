@@ -40,6 +40,7 @@ class InventoryCatalogItemRead(BaseModel):
     condition: str = "good"
     item_type: Optional[str] = None
     classification: Optional[str] = None
+    is_trackable: bool = False
     description: Optional[str] = None
     status_condition: Optional[str] = None
 

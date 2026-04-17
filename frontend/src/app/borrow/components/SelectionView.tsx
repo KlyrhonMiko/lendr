@@ -7,6 +7,7 @@ import { formatCategoryLabel } from '../lib/utils';
 import {
   Search,
   ShoppingCart,
+  Undo2,
   Plus,
   Minus,
   Trash2,
@@ -25,6 +26,9 @@ interface SelectionViewProps {
   categories: string[];
   categoryLabels: Record<string, string>;
   classificationLabels: Record<string, string>;
+  selectedItemKind: 'trackable' | 'untrackable' | null;
+  onSelectItemKind: (kind: 'trackable' | 'untrackable') => void;
+  onBackToItemKindSelection: () => void;
   selectedCategory: string;
   onCategoryChange: (v: string) => void;
   totalItems: number;
@@ -45,6 +49,9 @@ export function SelectionView({
   categories,
   categoryLabels,
   classificationLabels,
+  selectedItemKind,
+  onSelectItemKind,
+  onBackToItemKindSelection,
   selectedCategory,
   onCategoryChange,
   totalItems,
@@ -58,6 +65,39 @@ export function SelectionView({
 }: SelectionViewProps) {
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
 
+  if (!selectedItemKind) {
+    return (
+      <div className="mx-auto w-full max-w-3xl rounded-2xl border bg-card p-6 shadow-sm md:p-10 animate-in fade-in duration-300">
+        <div className="text-center">
+          <h1 className="text-2xl font-semibold tracking-tight">Choose Item Type</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Select what you want to borrow first before viewing the catalog.
+          </p>
+        </div>
+
+        <div className="mt-8 grid gap-4 md:grid-cols-2">
+          <button
+            onClick={() => onSelectItemKind('trackable')}
+            className="rounded-2xl border bg-background px-5 py-6 text-left transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+          >
+            <p className="text-sm font-semibold text-foreground">Equipments</p>
+            <p className="mt-1 text-xs text-muted-foreground">Trackable Items</p>
+          </button>
+
+          <button
+            onClick={() => onSelectItemKind('untrackable')}
+            className="rounded-2xl border bg-background px-5 py-6 text-left transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+          >
+            <p className="text-sm font-semibold text-foreground">Materials</p>
+            <p className="mt-1 text-xs text-muted-foreground">Untrackable Items</p>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const selectedKindLabel = selectedItemKind === 'trackable' ? 'Equipments' : 'Materials';
+
   return (
     <>
       <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 lg:h-[calc(100vh-2rem)] animate-in fade-in duration-500">
@@ -69,11 +109,25 @@ export function SelectionView({
               <div>
                 <h1 className="text-xl lg:text-2xl font-semibold tracking-tight">Select Items</h1>
                 <p className="text-xs lg:text-sm text-muted-foreground mt-0.5 lg:mt-1">
-                  Browse and add items to your request
+                  Browse and add {selectedKindLabel.toLowerCase()} to your request
                   <span className="ml-1.5 text-[11px] font-medium text-muted-foreground/70">
                     ({totalItems} total)
                   </span>
                 </p>
+              </div>
+
+              <div className="flex w-full sm:w-auto items-center gap-2">
+                <span className="hidden sm:inline-flex rounded-full border bg-muted/50 px-3 py-1 text-xs font-medium text-muted-foreground">
+                  {selectedKindLabel}
+                </span>
+                <button
+                  onClick={onBackToItemKindSelection}
+                  className="inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  title="Back to item type selection (this will reset your current borrow request)"
+                >
+                  <Undo2 className="h-3.5 w-3.5" />
+                  Back
+                </button>
               </div>
 
               <div className="relative w-full sm:w-72 lg:w-80">
