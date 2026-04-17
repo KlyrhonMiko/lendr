@@ -433,31 +433,36 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
                 detail="Borrower accounts do not use admin recovery credentials.",
             )
 
-        encrypted_value = user.recovery_credential_encrypted
-        if not encrypted_value:
-            raise HTTPException(
-                status_code=404,
-                detail="Secondary password is not available for this user.",
-            )
-
-        try:
-            secondary_password = decrypt_sensitive_value(encrypted_value)
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=500,
-                detail="Secondary password is unavailable due to a decryption error.",
-            ) from exc
-
         before = user.model_dump(mode="json")
+        encrypted_value = user.recovery_credential_encrypted
+        action = "secondary_password_retrieved"
+        reason_code = "secondary_password_retrieval"
+
+        if not encrypted_value:
+            # Legacy non-borrower users can exist without a secondary password.
+            # Bootstrap one on first privileged retrieval request.
+            secondary_password = self._rotate_secondary_password(user)
+            user.updated_at = get_now_manila()
+            session.add(user)
+            action = "secondary_password_bootstrapped"
+            reason_code = "secondary_password_bootstrap"
+        else:
+            try:
+                secondary_password = decrypt_sensitive_value(encrypted_value)
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Secondary password is unavailable due to a decryption error.",
+                ) from exc
 
         self._log_audit(
             session=session,
-            action="secondary_password_retrieved",
+            action=action,
             entity_id=user.user_id,
             before=self._redact_sensitive_payload(before),
             after=self._redact_sensitive_payload(user.model_dump(mode="json")),
             actor_id=actor_id,
-            reason_code="secondary_password_retrieval",
+            reason_code=reason_code,
         )
 
         return secondary_password
