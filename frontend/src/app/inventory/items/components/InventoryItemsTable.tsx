@@ -150,7 +150,7 @@ export function InventoryItemsTable({
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
         <Loader2 className="w-7 h-7 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground font-medium">Loading equipment...</p>
+        <p className="text-sm text-muted-foreground font-medium">Loading inventory...</p>
       </div>
     );
   }
@@ -161,9 +161,9 @@ export function InventoryItemsTable({
         <div className="w-16 h-16 rounded-2xl bg-muted/80 flex items-center justify-center mb-4">
           <Package className="w-8 h-8 text-muted-foreground/50" />
         </div>
-        <h3 className="text-base font-semibold text-foreground mb-1">No equipment found</h3>
+        <h3 className="text-base font-semibold text-foreground mb-1">No items found</h3>
         <p className="text-sm text-muted-foreground max-w-sm">
-          Try adjusting your search or filters, or add new equipment to get started.
+          Try adjusting your search or filters, or add new items to get started.
         </p>
       </div>
     );
@@ -174,7 +174,7 @@ export function InventoryItemsTable({
       <table className="w-full text-left">
         <thead>
           <tr className="border-b border-border">
-            <th className="px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Equipment Name</th>
+            <th className="px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Item Name</th>
             <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Category</th>
             <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Classification</th>
             <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Condition</th>
@@ -192,7 +192,7 @@ export function InventoryItemsTable({
               <td className="px-5 py-3.5">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-primary/8 flex items-center justify-center text-primary shrink-0">
-                    <Package className="w-4.5 h-4.5" />
+                    {item.is_trackable ? <Package className="w-4.5 h-4.5" /> : <Boxes className="w-4.5 h-4.5" />}
                   </div>
                   <div className="min-w-0">
                     <p className="font-semibold text-sm text-foreground truncate">{item.name}</p>

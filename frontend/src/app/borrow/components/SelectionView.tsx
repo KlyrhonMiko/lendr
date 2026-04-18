@@ -67,29 +67,40 @@ export function SelectionView({
 
   if (!selectedItemKind) {
     return (
-      <div className="mx-auto w-full max-w-3xl rounded-2xl border bg-card p-6 shadow-sm md:p-10 animate-in fade-in duration-300">
-        <div className="text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">Choose Item Type</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Select what you want to borrow first before viewing the catalog.
+      <div className="mx-auto w-full max-w-4xl rounded-3xl border bg-card p-8 md:p-14 shadow-xl animate-in zoom-in-95 duration-500">
+        <div className="text-center max-w-xl mx-auto">
+          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
+            <Package2 className="w-8 h-8 text-primary" />
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Borrowing Module</h1>
+          <p className="mt-3 text-base text-muted-foreground leading-relaxed">
+            Please select the type of items you need. We've separated our inventory to help you find what you need faster.
           </p>
         </div>
 
-        <div className="mt-8 grid gap-4 md:grid-cols-2">
+        <div className="mt-12 grid gap-6 md:grid-cols-2">
           <button
             onClick={() => onSelectItemKind('trackable')}
-            className="rounded-2xl border bg-background px-5 py-6 text-left transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+            className="group relative flex flex-col items-center text-center rounded-3xl border bg-background p-8 transition-all hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg hover:bg-primary/5 active:scale-[0.98]"
           >
-            <p className="text-sm font-semibold text-foreground">Equipments</p>
-            <p className="mt-1 text-xs text-muted-foreground">Trackable Items</p>
+            <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+              <Package2 className="w-7 h-7" />
+            </div>
+            <h3 className="text-xl font-bold text-foreground">Equipments</h3>
+            <p className="mt-2 text-sm text-muted-foreground">Trackable assets that require return (e.g., Tools, Electronics, Gear)</p>
+            <div className="mt-6 text-xs font-bold text-primary uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Select Equipments</div>
           </button>
 
           <button
             onClick={() => onSelectItemKind('untrackable')}
-            className="rounded-2xl border bg-background px-5 py-6 text-left transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+            className="group relative flex flex-col items-center text-center rounded-3xl border bg-background p-8 transition-all hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg hover:bg-primary/5 active:scale-[0.98]"
           >
-            <p className="text-sm font-semibold text-foreground">Materials</p>
-            <p className="mt-1 text-xs text-muted-foreground">Untrackable Items</p>
+            <div className="w-14 h-14 rounded-2xl bg-orange-500/10 text-orange-500 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+              <Package2 className="w-7 h-7" />
+            </div>
+            <h3 className="text-xl font-bold text-foreground">Materials</h3>
+            <p className="mt-2 text-sm text-muted-foreground">Untrackable or consumable items (e.g., Supplies, Components, Parts)</p>
+            <div className="mt-6 text-xs font-bold text-orange-600 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Select Materials</div>
           </button>
         </div>
       </div>
