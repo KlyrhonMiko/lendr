@@ -20,6 +20,7 @@ interface FormSelectProps {
     disabled?: boolean;
     className?: string;
     triggerClassName?: string;
+    labelClassName?: string;
     autoWidth?: boolean;
 }
 
@@ -33,6 +34,7 @@ export function FormSelect({
     disabled,
     className,
     triggerClassName,
+    labelClassName,
     autoWidth = true,
 }: FormSelectProps) {
     const [open, setOpen] = useState(false);
@@ -42,7 +44,7 @@ export function FormSelect({
     return (
         <div className={cn('space-y-1.5', className)}>
             {label && (
-                <label className="block text-sm font-medium text-foreground">
+                <label className={cn('block text-sm font-medium text-foreground', labelClassName)}>
                     {label}
                     {required && <span className="text-rose-500 ml-0.5">*</span>}
                 </label>
