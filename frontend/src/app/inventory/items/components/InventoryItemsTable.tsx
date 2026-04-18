@@ -8,6 +8,8 @@ import type { InventoryItem } from '../api';
 function conditionStyle(condition?: string) {
   switch (condition?.toLowerCase()) {
     case 'good':
+    case 'excellent':
+    case 'healthy':
       return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20';
     case 'damaged':
       return 'bg-primary/10 text-primary border-primary/20 font-bold';
@@ -20,6 +22,8 @@ function conditionStyle(condition?: string) {
 function statusStyle(status?: string) {
   switch (status?.toUpperCase()) {
     case 'AVAILABLE':
+    case 'EXCELLENT':
+    case 'HEALTHY':
       return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400';
     case 'LOW_STOCK':
       return 'bg-primary/10 text-primary font-bold';
