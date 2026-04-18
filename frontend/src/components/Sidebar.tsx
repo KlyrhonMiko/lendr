@@ -150,8 +150,13 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             )}
             <div className="flex flex-col min-w-0">
               <span className="text-[13px] font-bold font-heading tracking-tight text-sidebar-foreground uppercase leading-[1.15] break-words">
-                {brandName}
+                {brandName.replace(/\s+enterprise$/i, '')}
               </span>
+              {/enterprise/i.test(brandName) && (
+                <span className="text-[10px] font-medium font-heading text-sidebar-foreground/60 uppercase tracking-wider">
+                  Enterprise
+                </span>
+              )}
             </div>
           </div>
           <button
