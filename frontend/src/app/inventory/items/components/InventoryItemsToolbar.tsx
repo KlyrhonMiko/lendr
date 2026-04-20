@@ -56,16 +56,16 @@ export function InventoryItemsToolbar({
   };
 
   return (
-    <div className="flex flex-col gap-3 p-4 border-b border-border">
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[200px] max-w-md">
+    <div className="flex flex-col lg:flex-row lg:items-center gap-4 p-4 border-b border-border">
+      <div className="flex items-center gap-3 flex-1">
+        <div className="relative flex-1 max-w-md">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
           <input
             type="text"
             placeholder="Search equipment..."
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full h-11 pl-12 pr-4 rounded-lg bg-muted/50 border border-border text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
+            className="w-full h-11 pl-12 pr-4 rounded-lg bg-muted/50 border border-border text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all font-medium"
           />
           {search && (
             <button
@@ -80,48 +80,50 @@ export function InventoryItemsToolbar({
         </div>
 
         {meta && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">{meta.total}</span>
-            <span>item{meta.total !== 1 ? 's' : ''} total</span>
+          <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground whitespace-nowrap">
+            <span className="font-semibold text-foreground">{meta.total}</span>
+            <span className="uppercase tracking-tight opacity-70">items total</span>
           </div>
         )}
       </div>
 
-      <div className="flex items-center gap-3 flex-wrap">
-        <span className="text-xs font-medium text-muted-foreground mr-1">Filter by:</span>
+      <div className="flex items-center gap-3 flex-wrap lg:flex-nowrap">
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/70 whitespace-nowrap">Filters:</span>
 
-        <FilterSelect
-          value={categoryFilter}
-          onChange={onCategoryFilterChange}
-          options={categoryOptions.map(o => ({ key: o.key, label: o.value }))}
-          placeholder="All categories"
-          align="start"
-        />
+          <FilterSelect
+            value={categoryFilter}
+            onChange={onCategoryFilterChange}
+            options={categoryOptions.map(o => ({ key: o.key, label: o.value }))}
+            placeholder="All categories"
+            align="end"
+          />
 
-        <FilterSelect
-          value={classificationFilter}
-          onChange={onClassificationFilterChange}
-          options={classificationOptions.map(o => ({ key: o.key, label: o.value }))}
-          placeholder="All classifications"
-          align="start"
-        />
+          <FilterSelect
+            value={classificationFilter}
+            onChange={onClassificationFilterChange}
+            options={classificationOptions.map(o => ({ key: o.key, label: o.value }))}
+            placeholder="Classifications"
+            align="end"
+          />
 
-        <FilterSelect
-          value={itemTypeFilter}
-          onChange={onItemTypeFilterChange}
-          options={itemTypeOptions.map(o => ({ key: o.key, label: o.value }))}
-          placeholder="All types"
-          align="start"
-        />
+          <FilterSelect
+            value={itemTypeFilter}
+            onChange={onItemTypeFilterChange}
+            options={itemTypeOptions.map(o => ({ key: o.key, label: o.value }))}
+            placeholder="Types"
+            align="end"
+          />
+        </div>
 
         {hasActiveFilters && (
           <button
             type="button"
             onClick={clearAllFilters}
-            className="h-10 px-4 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-border transition-colors flex items-center gap-2"
+            className="h-10 px-3 rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-border transition-colors flex items-center gap-2 whitespace-nowrap"
           >
-            <X className="w-4 h-4" />
-            Clear Filters
+            <X className="w-3.5 h-3.5" />
+            Clear
           </button>
         )}
       </div>

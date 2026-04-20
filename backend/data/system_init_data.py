@@ -57,6 +57,8 @@ SYSTEM_CONFIGS = [
     {"system": "inventory", "key": "manual_adjustment", "value": "Manual Adjustment", "category": "inventory_movements_movement_type", "description": "Manual stock adjustment"},
     {"system": "inventory", "key": "borrow_release", "value": "Borrow Release", "category": "inventory_movements_movement_type", "description": "Unit released for borrowing"},
     {"system": "inventory", "key": "borrow_return", "value": "Borrow Return", "category": "inventory_movements_movement_type", "description": "Unit returned from borrowing"},
+    {"system": "inventory", "key": "entrusted_assign", "value": "Entrusted Assignment", "category": "inventory_movements_movement_type", "description": "Unit assigned to an employee permanently"},
+    {"system": "inventory", "key": "entrusted_revoke", "value": "Entrusted Revoke", "category": "inventory_movements_movement_type", "description": "Unit returned from entrusted assignment"},
     {"system": "inventory", "key": "procurement", "value": "Procurement", "category": "inventory_movements_movement_type", "description": "New unit procured"},
     {"system": "inventory", "key": "reversal", "value": "Reversal", "category": "inventory_movements_movement_type", "description": "Reversal of previous movement"},
     {"system": "inventory", "key": "maintenance", "value": "Maintenance", "category": "inventory_movements_movement_type", "description": "Unit is under maintenance"},

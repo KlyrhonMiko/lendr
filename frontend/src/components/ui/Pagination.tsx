@@ -6,8 +6,6 @@ import type { PaginationMeta } from '@/lib/api';
 interface PaginationProps {
   meta: PaginationMeta;
   onPageChange: (page: number) => void;
-  onPerPageChange?: (perPage: number) => void;
-  perPageOptions?: number[];
   className?: string;
 }
 
@@ -16,8 +14,6 @@ const DEFAULT_PER_PAGE_OPTIONS = [10, 20, 50, 100];
 export function Pagination({
   meta,
   onPageChange,
-  onPerPageChange,
-  perPageOptions = DEFAULT_PER_PAGE_OPTIONS,
   className = '',
 }: PaginationProps) {
   const currentPage = meta.page ?? Math.floor(meta.offset / meta.limit) + 1;
@@ -39,19 +35,6 @@ export function Pagination({
       </p>
 
       <div className="flex items-center gap-2">
-        {onPerPageChange && (
-          <select
-            value={perPage}
-            onChange={(event) => onPerPageChange(Number(event.target.value))}
-            className="h-8 rounded-lg border border-border bg-background px-2 text-xs text-muted-foreground focus:outline-none"
-          >
-            {perPageOptions.map((option) => (
-              <option key={option} value={option}>
-                {option}/page
-              </option>
-            ))}
-          </select>
-        )}
 
         <button
           onClick={() => onPageChange(currentPage - 1)}

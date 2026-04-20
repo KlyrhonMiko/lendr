@@ -45,7 +45,7 @@ export default function MovementLedgerPage() {
   );
 
   const { data: anomaliesResponse, isLoading: anomaliesLoading } = useLedgerAnomalies(activeTab === 'anomalies');
-  
+
   const { data: reasonCodesResponse } = useReasonCodes();
   const { reverseMovement } = useLedgerMutations();
 
@@ -65,7 +65,7 @@ export default function MovementLedgerPage() {
   const handleReverseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedMovement || !selectedMovement.movement_id || !reversalReason) return;
-    
+
     setIsSubmitting(true);
     try {
       await reverseMovement.mutateAsync({ id: selectedMovement.movement_id, reason: reversalReason, reasonCode: reversalReasonCode });
@@ -119,7 +119,7 @@ export default function MovementLedgerPage() {
         />
 
         {meta && activeTab === 'ledger' && (
-          <Pagination meta={meta} onPageChange={setPage} onPerPageChange={setPerPage} />
+          <Pagination meta={meta} onPageChange={setPage} />
         )}
       </section>
 

@@ -13,6 +13,7 @@ from .borrow_request_unit import BorrowRequestUnit
 from .borrow_request_batch import BorrowRequestBatch
 from .settings import InventoryConfig, BorrowerConfig 
 from .import_history import ImportHistory
+from .entrusted_item import EntrustedItem
 
 __all__ = [
     "InventoryItem",
@@ -29,4 +30,5 @@ __all__ = [
     "InventoryConfig",
     "BorrowerConfig",
     "ImportHistory",
+    "EntrustedItem",
 ]

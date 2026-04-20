@@ -18,6 +18,7 @@ from systems.inventory.schemas.import_export_schemas import (
     ImportResponse,
     LedgerMovementsExportFilters,
     LedgerRequestsExportFilters,
+    EntrustedExportFilters,
 )
 from systems.inventory.services.import_service import ImportService
 from systems.inventory.services.export_service import ExportService
@@ -215,6 +216,25 @@ async def export_catalog(
         )
     except ValueError as exc:
         logger.exception("Catalog export validation failed: %s", exc)
+        raise HTTPException(status_code=400, detail=EXPORT_VALIDATION_ERROR_DETAIL) from exc
+
+@router.get("/export/entrusted")
+async def export_entrusted_items(
+    filters: EntrustedExportFilters = Depends(),
+    session: Session = Depends(get_session),
+    _: None = Depends(require_permission("inventory:config:manage")),
+):
+    try:
+        return export_service.export_entrusted(
+            session,
+            format=filters.format,
+            search=filters.search,
+            status=filters.status,
+            category=filters.category,
+            classification=filters.classification,
+        )
+    except ValueError as exc:
+        logger.exception("Entrusted items export validation failed: %s", exc)
         raise HTTPException(status_code=400, detail=EXPORT_VALIDATION_ERROR_DETAIL) from exc
 
 @router.get("/import/template")

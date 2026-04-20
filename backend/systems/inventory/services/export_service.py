@@ -905,6 +905,57 @@ class ExportService:
         
         return self._create_response(headers, data, format, "inventory_movements")
 
+    def export_entrusted(
+        self,
+        session: Session,
+        format: str,
+        search: Optional[str] = None,
+        status: Optional[str] = None,
+        category: Optional[str] = None,
+        classification: Optional[str] = None,
+    ) -> StreamingResponse:
+        from systems.inventory.services.entrusted_item_service import EntrustedItemService
+        
+        service = EntrustedItemService()
+        assignments, _ = service.get_all_entrusted(
+            session=session,
+            skip=0,
+            limit=self._MAX_EXPORT_ROWS,
+            search=search,
+            status=status,
+            category=category,
+            classification=classification
+        )
+
+        headers = [
+            "Assignment ID",
+            "Item Name",
+            "Serial Number",
+            "Assigned To Name",
+            "Assigned To ID",
+            "Assigned At",
+            "Returned At",
+            "Status",
+            "Notes"
+        ]
+
+        data = [
+            [
+                ass.assignment_id,
+                ass.item_name or "N/A",
+                ass.serial_number or "",
+                ass.assigned_to_name or "Unknown User",
+                ass.assigned_to_user_id,
+                ass.assigned_at,
+                ass.returned_at if ass.returned_at else "N/A",
+                "Returned" if ass.returned_at else "Assigned",
+                ass.notes or ""
+            ]
+            for ass in assignments
+        ]
+
+        return self._create_response(headers, data, format, "entrusted_items")
+
     def _create_response(self, headers: List[str], data: List[List[Any]], format: str, prefix: str) -> StreamingResponse:
         filename = f"{prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         sanitized_headers = [self._sanitize_export_cell(header) for header in headers]

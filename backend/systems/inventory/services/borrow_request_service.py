@@ -324,6 +324,7 @@ class BorrowService(
         limit: int = 100,
         status: str | None = None,
         is_emergency: bool | None = None,
+        search: str | None = None,
         date_from: datetime | None = None,
         date_to: datetime | None = None,
     ) -> tuple[list[BorrowRequest], int]:
@@ -345,6 +346,13 @@ class BorrowService(
             statement = statement.where(BorrowRequest.request_date >= date_from)
         if date_to is not None:
             statement = statement.where(BorrowRequest.request_date <= date_to)
+        if search is not None:
+            term = f"%{search}%"
+            statement = statement.where(
+                BorrowRequest.request_id.ilike(term)
+                | BorrowRequest.customer_name.ilike(term)
+                | BorrowRequest.location_name.ilike(term)
+            )
 
         total_statement = select(func.count()).select_from(statement.subquery())
 

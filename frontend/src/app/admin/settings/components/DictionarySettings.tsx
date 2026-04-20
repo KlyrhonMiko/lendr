@@ -19,7 +19,6 @@ interface DictionarySettingsProps {
   systemFilter: string;
   onSystemFilterChange: (val: string) => void;
   onPageChange: (page: number) => void;
-  onPerPageChange: (perPage: number) => void;
   onEdit: (setting: SystemSetting) => void;
   onDelete: (key: string, category: string) => void;
   onOpenRestore: () => void;
@@ -39,7 +38,6 @@ export function DictionarySettings({
   systemFilter,
   onSystemFilterChange,
   onPageChange,
-  onPerPageChange,
   onEdit,
   onDelete,
   onOpenRestore,
@@ -69,10 +67,9 @@ export function DictionarySettings({
       />
 
       {meta && (
-        <Pagination 
-          meta={meta} 
-          onPageChange={onPageChange} 
-          onPerPageChange={onPerPageChange} 
+        <Pagination
+          meta={meta}
+          onPageChange={onPageChange}
         />
       )}
     </div>

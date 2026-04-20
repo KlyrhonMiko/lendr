@@ -58,11 +58,11 @@ export default function InventorySettingsPage() {
 
       <div className="min-h-[600px]">
         {activeTab === 'system' && <AlertSettings />}
-        
+
         {activeTab === 'import-export' && <ImportExportSettings />}
-        
+
         {activeTab === 'dictionary' && (
-          <DictionarySettings 
+          <DictionarySettings
             settings={settings}
             loading={loading}
             meta={meta}
@@ -79,16 +79,15 @@ export default function InventorySettingsPage() {
             categoryFilter={categoryFilter}
             onCategoryFilterChange={setCategoryFilter}
             onPageChange={setPage}
-            onPerPageChange={setPerPage}
             onDelete={handleDelete}
             onAdd={async (data) => {
-               try {
-                 await createSetting.mutateAsync(data);
-                 toast.success('Added new dictionary entry');
-               } catch (err: unknown) {
-                 const message = err instanceof Error ? err.message : 'Failed to add entry';
-                 toast.error(message);
-               }
+              try {
+                await createSetting.mutateAsync(data);
+                toast.success('Added new dictionary entry');
+              } catch (err: unknown) {
+                const message = err instanceof Error ? err.message : 'Failed to add entry';
+                toast.error(message);
+              }
             }}
           />
         )}

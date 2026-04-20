@@ -252,7 +252,6 @@ export default function RequestHistoryPage() {
           <Pagination
             meta={meta}
             onPageChange={setPage}
-            onPerPageChange={setPerPage}
           />
         )}
       </div>

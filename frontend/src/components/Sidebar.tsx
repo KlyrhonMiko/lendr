@@ -23,6 +23,7 @@ const navigation: Record<string, { section: string; items: { name: string; href:
       items: [
         { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
         { name: 'User Management', href: '/admin/users', icon: Users },
+        { name: 'Entrusted Items', href: '/admin/entrusted-items', icon: Package },
       ]
     },
     {
@@ -68,8 +69,13 @@ const navigation: Record<string, { section: string; items: { name: string; href:
     }
   ],
   borrower: [
-    { name: 'Request History', href: '/borrower/history', icon: ClipboardList },
-    { name: 'Profile', href: '/borrower/profile', icon: Users },
+    {
+      section: 'Account',
+      items: [
+        { name: 'Request History', href: '/borrower/history', icon: ClipboardList },
+        { name: 'Profile', href: '/borrower/profile', icon: Users },
+      ]
+    }
   ],
   borrow_portal: [
     {
