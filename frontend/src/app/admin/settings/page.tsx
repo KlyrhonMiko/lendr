@@ -80,7 +80,6 @@ export default function SettingsPage() {
             systemFilter={systemFilter}
             onSystemFilterChange={setSystemFilter}
             onPageChange={setPage}
-            onPerPageChange={setPerPage}
             onDelete={handleDelete}
             onEdit={openEditModal}
             onOpenRestore={openRestoreModal}

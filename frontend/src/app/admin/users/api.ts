@@ -94,6 +94,31 @@ export interface SecuritySettingsSummary {
   password_rules: SecurityPasswordRules;
 }
 
+export interface EntrustedItem {
+  assignment_id: string;
+  unit_id: string;
+  serial_number: string | null;
+  item_name: string | null;
+  item_category: string | null;
+  assigned_to_user_id: string;
+  assigned_to_name?: string;
+  assigned_by_user_id: string | null;
+  assigned_at: string;
+  returned_by_user_id: string | null;
+  returned_at: string | null;
+  notes: string | null;
+}
+
+export interface EntrustedItemCreate {
+  unit_id: string;
+  user_id: string;
+  notes?: string;
+}
+
+export interface EntrustedItemRevoke {
+  notes?: string;
+}
+
 export const userApi = {
   list: (params: UserListParams = {}) =>
     api.get<User[]>(`/admin/users${buildQueryString(params as Record<string, unknown>)}`),
@@ -136,4 +161,22 @@ export const userApi = {
 
   getSecuritySettings: () =>
     api.get<SecuritySettingsSummary>('/admin/settings/security'),
+
+  getAllEntrustedItems: (params: { page?: number; per_page?: number; search?: string, status?: string, category?: string, classification?: string } = {}) =>
+    api.get<EntrustedItem[]>(`/admin/users/entrusted-items/all${buildQueryString(params as Record<string, unknown>)}`),
+
+  getEntrustedItems: (userId: string) =>
+    api.get<EntrustedItem[]>(`/admin/users/entrusted-items/${userId}`),
+
+  getEntrustedCategories: () =>
+    api.get<{ categories: string[], classifications: string[] }>('/admin/users/entrusted-items/categories'),
+
+  assignEntrustedItem: (userId: string, data: EntrustedItemCreate) =>
+    api.post<EntrustedItem>(`/admin/users/${userId}/entrusted-items`, data),
+
+  revokeEntrustedItem: (userId: string, assignmentId: string, data: EntrustedItemRevoke) =>
+    api.post<EntrustedItem>(`/admin/users/${userId}/entrusted-items/${assignmentId}/revoke`, data),
+
+  exportEntrustedItems: (params: { format: string; search?: string, status?: string, category?: string, classification?: string }) =>
+    api.getRaw(`/inventory/data/export/entrusted${buildQueryString(params as Record<string, unknown>)}`),
 };

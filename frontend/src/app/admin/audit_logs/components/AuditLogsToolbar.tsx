@@ -39,16 +39,16 @@ export function AuditLogsToolbar({
   const hasActiveFilters = entityFilter || timeframe;
 
   return (
-    <div className="flex flex-col gap-3 p-4 border-b border-border">
+    <div className="flex flex-col lg:flex-row lg:items-center gap-4 p-4 border-b border-border">
       {/* Search */}
-      <div className="relative">
+      <div className="relative flex-1 max-w-md">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
         <input
           type="text"
           placeholder="Type actor ID or search..."
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="w-full h-11 pl-12 pr-4 rounded-lg bg-muted/50 border border-border text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
+          className="w-full h-11 pl-12 pr-4 rounded-lg bg-muted/50 border border-border text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all font-medium"
         />
         {search && (
           <button
@@ -63,24 +63,26 @@ export function AuditLogsToolbar({
       </div>
 
       {/* Filters row */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <span className="text-xs font-medium text-muted-foreground mr-1">Filter by:</span>
+      <div className="flex items-center gap-3 flex-wrap lg:flex-nowrap">
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/70 whitespace-nowrap">Filters:</span>
 
-        <FilterSelect
-          value={entityFilter}
-          onChange={onEntityFilterChange}
-          options={ENTITY_OPTIONS.map(o => ({ key: o.key, label: o.value }))}
-          placeholder="All Systems"
-          align="start"
-        />
+          <FilterSelect
+            value={entityFilter}
+            onChange={onEntityFilterChange}
+            options={ENTITY_OPTIONS.map(o => ({ key: o.key, label: o.value }))}
+            placeholder="All Systems"
+            align="end"
+          />
 
-        <FilterSelect
-          value={timeframe}
-          onChange={onTimeframeChange}
-          options={TIMEFRAME_OPTIONS.map(o => ({ key: o.key, label: o.value }))}
-          placeholder="All Time"
-          align="start"
-        />
+          <FilterSelect
+            value={timeframe}
+            onChange={onTimeframeChange}
+            options={TIMEFRAME_OPTIONS.map(o => ({ key: o.key, label: o.value }))}
+            placeholder="All Time"
+            align="end"
+          />
+        </div>
 
         {hasActiveFilters && (
           <button
@@ -89,10 +91,10 @@ export function AuditLogsToolbar({
               onEntityFilterChange('');
               onTimeframeChange('');
             }}
-            className="h-10 px-4 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-border transition-colors flex items-center gap-2"
+            className="h-10 px-3 rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-border transition-colors flex items-center gap-2 whitespace-nowrap"
           >
-            <X className="w-4 h-4" />
-            Clear Filters
+            <X className="w-3.5 h-3.5" />
+            Clear
           </button>
         )}
       </div>

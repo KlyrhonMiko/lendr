@@ -37,6 +37,7 @@ export interface BorrowerRequestHistoryParams {
   page?: number;
   per_page?: number;
   status?: string;
+  search?: string;
   date_from?: string;
   date_to?: string;
 }

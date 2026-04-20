@@ -32,7 +32,6 @@ interface DictionarySettingsProps {
   categoryFilter: string;
   onCategoryFilterChange: (val: string) => void;
   onPageChange: (page: number) => void;
-  onPerPageChange: (perPage: number) => void;
   onDelete: (key: string, category: string) => void;
   onAdd: (data: SystemSettingCreate) => Promise<void>;
 }
@@ -47,7 +46,6 @@ export function DictionarySettings({
   categoryFilter,
   onCategoryFilterChange,
   onPageChange,
-  onPerPageChange,
   onDelete,
   onAdd
 }: DictionarySettingsProps) {
@@ -353,7 +351,6 @@ export function DictionarySettings({
           <Pagination
             meta={meta}
             onPageChange={onPageChange}
-            onPerPageChange={onPerPageChange}
           />
         )}
       </div>

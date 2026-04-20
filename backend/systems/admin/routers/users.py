@@ -25,9 +25,12 @@ from systems.auth.schemas.auth_schemas import (
 )
 from systems.admin.services.user_service import UserService
 from systems.auth.services.auth_service import auth_service
+from systems.inventory.services.entrusted_item_service import EntrustedItemService
+from systems.inventory.schemas.entrusted_item_schemas import EntrustedItemCreate, EntrustedItemRead, EntrustedItemRevoke
 
 router = APIRouter()
 user_service = UserService()
+entrusted_service = EntrustedItemService()
 
 TWO_FACTOR_BORROWER_FORBIDDEN_DETAIL = (
     "Borrower accounts are not eligible for two-factor enrollment or disable actions."
@@ -473,3 +476,102 @@ async def restore_user(
     return create_success_response(
         data=restored_user, message="User restored successfully", request=request
     )
+
+
+@router.get("/entrusted-items/categories", response_model=dict[str, list[str]])
+async def list_entrusted_categories(
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("admin:users:manage")),
+):
+    return entrusted_service.get_entrusted_categories(session)
+
+
+@router.get(
+    "/entrusted-items/all",
+    response_model=GenericResponse[list[EntrustedItemRead]],
+)
+async def list_all_entrusted_items(
+    request: Request,
+    page: int = Query(default=1, ge=1, description="Page number"),
+    per_page: int = Query(default=20, ge=1, le=500, description="Records per page"),
+    search: Optional[str] = Query(default=None, description="Search by employee name, unit ID, serial number, or item name"),
+    status: Optional[str] = Query(default=None, description="Filter by status (active, returned)"),
+    category: Optional[str] = Query(default=None, description="Filter by category"),
+    classification: Optional[str] = Query(default=None, description="Filter by classification"),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("admin:users:manage")),
+):
+    skip = (page - 1) * per_page
+    items, total = entrusted_service.get_all_entrusted(
+        session, 
+        skip=skip, 
+        limit=per_page, 
+        search=search,
+        status=status,
+        category=category,
+        classification=classification
+    )
+    return create_success_response(
+        data=items,
+        request=request,
+        meta=make_pagination_meta(total=total, skip=skip, limit=per_page, page=page, per_page=per_page)
+    )
+
+@router.get(
+    "/{user_id}/entrusted-items",
+    response_model=GenericResponse[list[EntrustedItemRead]],
+)
+async def list_entrusted_items(
+    user_id: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("admin:users:manage")),
+):
+    items = entrusted_service.get_for_user(session, user_id)
+    return create_success_response(data=items, request=request)
+
+@router.post(
+    "/{user_id}/entrusted-items",
+    response_model=GenericResponse[EntrustedItemRead],
+)
+async def assign_entrusted_item(
+    user_id: str,
+    create_data: EntrustedItemCreate,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("admin:users:manage")),
+):
+    try:
+        # verify the user_id in path matches the body, or just override
+        if create_data.user_id != user_id:
+            create_data.user_id = user_id
+            
+        item = entrusted_service.assign_item(session, create_data, actor_id=current_user.id)
+        return create_success_response(data=item, message="Item entrusted successfully.", request=request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post(
+    "/{user_id}/entrusted-items/{assignment_id}/revoke",
+    response_model=GenericResponse[EntrustedItemRead],
+)
+async def revoke_entrusted_item(
+    user_id: str,
+    assignment_id: str,
+    revoke_data: EntrustedItemRevoke,
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_permission("admin:users:manage")),
+):
+    try:
+        item = entrusted_service.revoke_item(session, assignment_id, revoke_data, actor_id=current_user.id)
+        return create_success_response(data=item, message="Assignment revoked successfully.", request=request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+

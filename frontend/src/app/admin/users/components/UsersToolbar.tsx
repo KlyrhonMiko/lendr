@@ -34,16 +34,16 @@ export function UsersToolbar({
   const hasActiveFilters = roleFilter || shiftFilter || statusFilter !== 'all';
 
   return (
-    <div className="flex flex-col gap-3 p-4 border-b border-border">
+    <div className="flex flex-col lg:flex-row lg:items-center gap-4 p-4 border-b border-border">
       {/* Search */}
-      <div className="relative">
+      <div className="relative flex-1 min-[400px]:">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
         <input
           type="text"
           placeholder="Type a name, email, or employee ID to search..."
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="w-full h-11 pl-12 pr-4 rounded-lg bg-muted/50 border border-border text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
+          className="w-full h-11 pl-12 pr-4 rounded-lg bg-muted/50 border border-border text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all font-medium"
         />
         {search && (
           <button
@@ -58,32 +58,34 @@ export function UsersToolbar({
       </div>
 
       {/* Filters row */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <span className="text-xs font-medium text-muted-foreground mr-1">Filter by:</span>
+      <div className="flex items-center gap-3 flex-wrap lg:flex-nowrap">
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/70 whitespace-nowrap">Filters:</span>
 
-        <FilterSelect
-          value={roleFilter}
-          onChange={onRoleFilterChange}
-          options={roles.map(r => ({ key: r.key, label: r.value }))}
-          placeholder="All Roles"
-          align="start"
-        />
+          <FilterSelect
+            value={roleFilter}
+            onChange={onRoleFilterChange}
+            options={roles.map(r => ({ key: r.key, label: r.value }))}
+            placeholder="All Roles"
+            align="end"
+          />
 
-        <FilterSelect
-          value={shiftFilter}
-          onChange={onShiftFilterChange}
-          options={shifts.map(s => ({ key: s.key, label: s.value }))}
-          placeholder="All Shifts"
-          align="start"
-        />
+          <FilterSelect
+            value={shiftFilter}
+            onChange={onShiftFilterChange}
+            options={shifts.map(s => ({ key: s.key, label: s.value }))}
+            placeholder="All Shifts"
+            align="end"
+          />
+        </div>
 
-        <div className="flex bg-muted/50 rounded-lg border border-border p-1">
+        <div className="flex bg-muted/50 rounded-lg border border-border p-1 h-10 items-center">
           {(['all', 'active', 'inactive'] as const).map((s) => (
             <button
               key={s}
               type="button"
               onClick={() => onStatusFilterChange(s)}
-              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all capitalize ${statusFilter === s
+              className={`px-3 h-8 text-[13px] font-semibold rounded-md transition-all capitalize whitespace-nowrap ${statusFilter === s
                 ? 'bg-background text-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground'
                 }`}
@@ -101,10 +103,10 @@ export function UsersToolbar({
               onShiftFilterChange('');
               onStatusFilterChange('all');
             }}
-            className="h-10 px-4 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-border transition-colors flex items-center gap-2"
+            className="h-10 px-3 rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-border transition-colors flex items-center gap-2 whitespace-nowrap"
           >
-            <X className="w-4 h-4" />
-            Clear Filters
+            <X className="w-3.5 h-3.5" />
+            Clear
           </button>
         )}
       </div>

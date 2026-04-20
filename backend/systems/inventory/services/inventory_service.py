@@ -31,10 +31,10 @@ from systems.inventory.schemas.inventory_batch_schemas import (
     InventoryBatchUpdate,
 )
 
-
 VALID_UNIT_STATUSES = {
     "available",
     "borrowed",
+    "entrusted",
     "maintenance",
     "retired",
     "consumed",
@@ -43,8 +43,9 @@ VALID_UNIT_STATUSES = {
 }
 
 ALLOWED_STATUS_TRANSITIONS = {
-    "available": {"borrowed", "maintenance", "retired", "consumed", "expired", "discarded"},
+    "available": {"borrowed", "entrusted", "maintenance", "retired", "consumed", "expired", "discarded"},
     "borrowed": {"available", "maintenance", "retired", "discarded"},
+    "entrusted": {"available", "maintenance", "retired", "discarded"},
     "maintenance": {"available", "retired", "discarded"},
     "retired": set(),
     "consumed": set(),
@@ -54,6 +55,7 @@ ALLOWED_STATUS_TRANSITIONS = {
 
 VALID_MOVEMENT_REFERENCE_TYPES = {
     "borrow_request",
+    "entrusted_item",
     "inventory_movement",
     "external_reference",
 }
@@ -61,6 +63,8 @@ VALID_MOVEMENT_REFERENCE_TYPES = {
 REFERENCE_TYPE_BY_MOVEMENT = {
     "borrow_release": "borrow_request",
     "borrow_return": "borrow_request",
+    "entrusted_assign": "entrusted_item",
+    "entrusted_revoke": "entrusted_item",
     "reversal": "inventory_movement",
 }
 

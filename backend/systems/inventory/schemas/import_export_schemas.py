@@ -53,6 +53,13 @@ class CatalogExportFilters(ExportReportFilterBase):
     pass
 
 
+class EntrustedExportFilters(ExportReportFilterBase):
+    search: str | None = None
+    status: str | None = None
+    category: str | None = None
+    classification: str | None = None
+
+
 class LedgerRequestsExportFilters(ExportReportFilterBase):
     status: str | None = None
     item_id: str | None = None

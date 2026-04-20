@@ -7,6 +7,7 @@ from sqlmodel import Relationship
 
 if TYPE_CHECKING:
     from .borrow_request_unit import BorrowRequestUnit
+    from .entrusted_item import EntrustedItem
 
 class InventoryUnit(BaseModel, table=True):
     __tablename__ = "inventory_units"
@@ -27,4 +28,8 @@ class InventoryUnit(BaseModel, table=True):
     borrow_assignments: list["BorrowRequestUnit"] = Relationship(
         back_populates="inventory_unit",
         sa_relationship_kwargs={"foreign_keys": "[BorrowRequestUnit.unit_uuid]"},
+    )
+    entrusted_assignments: list["EntrustedItem"] = Relationship(
+        back_populates="inventory_unit",
+        sa_relationship_kwargs={"foreign_keys": "[EntrustedItem.unit_uuid]"},
     )

@@ -222,7 +222,6 @@ export default function InventoryPage() {
           <Pagination
             meta={meta}
             onPageChange={setPage}
-            onPerPageChange={setPerPage}
           />
         )}
       </div>

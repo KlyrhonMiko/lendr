@@ -182,7 +182,7 @@ export default function BorrowsPage() {
         />
 
         {meta && (
-          <Pagination meta={meta} onPageChange={setPage} onPerPageChange={setPerPage} />
+          <Pagination meta={meta} onPageChange={setPage} />
         )}
       </div>
 

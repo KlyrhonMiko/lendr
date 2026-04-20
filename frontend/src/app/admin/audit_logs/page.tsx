@@ -48,7 +48,7 @@ export default function AdminAuditLogsPage() {
 
         <AuditLogsTable logs={logs} loading={loading} expandedAuditId={expandedAuditId} toggleExpand={toggleExpand} />
 
-        {meta && <Pagination meta={meta} onPageChange={setPage} onPerPageChange={setPerPage} />}
+        {meta && <Pagination meta={meta} onPageChange={setPage} />}
       </div>
     </div>
   );
