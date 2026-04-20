@@ -4,6 +4,21 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Scale compensation for high-DPI / OS-scaled displays (e.g. 125%, 150%) */
+@media (-webkit-min-device-pixel-ratio: 1.25),
+(min-resolution: 120dpi) {
+  html {
+    font-size: 14px;
+  }
+}
+
+@media (-webkit-min-device-pixel-ratio: 1.5),
+(min-resolution: 144dpi) {
+  html {
+    font-size: 12.8px;
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
