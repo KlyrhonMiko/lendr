@@ -1,4 +1,6 @@
 import json
+import threading
+from typing import Any
 from sqlmodel import Session, select
 from systems.inventory.services.configuration_service import InventoryConfigService
 from systems.admin.models.user import User
@@ -63,9 +65,18 @@ class AlertService:
             )
 
         if alert_type:
-            self.trigger_notifications(session, channels, recipient_roles, alert_type, message, specific_recipients)
+            # Prepare context for HTML template
+            context = {
+                "item_name": item.name,
+                "item_id": item.item_id,
+                "available_qty": balances["available_qty"],
+                "total_qty": balances["total_qty"],
+                "threshold_pct": low_stock_pct if alert_type == "LOW_STOCK" else overstock_pct,
+                "current_pct": current_pct
+            }
+            self.trigger_notifications(session, channels, recipient_roles, alert_type, message, specific_recipients, context)
 
-    def trigger_notifications(self, session: Session, channels: list[str], roles: list[str], alert_type: str, message: str, specific_recipients: list[dict] = None):
+    def trigger_notifications(self, session: Session, channels: list[str], roles: list[str], alert_type: str, message: str, specific_recipients: list[dict] = None, context: dict[str, Any] = None):
         """
         Trigger multi-channel notifications.
         """
@@ -96,14 +107,38 @@ class AlertService:
 
         # 3. Handle Email Channel
         if "email" in channels:
-            subject = f"Inventory Alert: {alert_type}"
+            from utils.email_templates import get_inventory_alert_html
+            
+            # Use specific subject for alerts
+            subject = f"PowerGold [{alert_type.replace('_', ' ')}] - {context.get('item_name') if context else 'Inventory Alert'}"
+            
+            # Generate HTML body if context is provided
+            html_body = None
+            if context:
+                html_body = get_inventory_alert_html(
+                    alert_type=alert_type,
+                    **context
+                )
+            
             # Deduplicate emails
             unique_emails = list(set(recipient_emails))
-            for email in unique_emails:
-                send_email(
-                    to_email=email,
-                    subject=subject,
-                    body=message
-                )
+            
+            # Send emails in background threads to avoid hanging the API
+            def send_emails_task(emails, subject, message, html_body):
+                for email in emails:
+                    send_email(
+                        to_email=email,
+                        subject=subject,
+                        body=message,
+                        html_body=html_body
+                    )
+            
+            thread = threading.Thread(
+                target=send_emails_task, 
+                args=(unique_emails, subject, message, html_body),
+                daemon=True
+            )
+            thread.start()
+            logger.info("Email delivery started in a background thread for %d recipients", len(unique_emails))
 
 alert_service = AlertService()

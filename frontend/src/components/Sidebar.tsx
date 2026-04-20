@@ -10,10 +10,10 @@ import {
 import { usePublicBranding } from '@/lib/publicBranding';
 
 const systemMeta: Record<string, string> = {
-  admin: 'Administration',
-  inventory: 'Inventory',
-  borrower: 'Borrower',
-  borrow_portal: 'Borrow Portal',
+  admin: '',
+  inventory: '',
+  borrower: '',
+  borrow_portal: '',
 };
 
 const navigation: Record<string, { section: string; items: { name: string; href: string; icon: any }[] }[]> = {
