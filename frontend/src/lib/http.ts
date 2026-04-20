@@ -48,8 +48,8 @@ export class MaintenanceError extends Error {
   }
 }
 
-const MAINTENANCE_ACTIVE_KEY = 'lendr:maintenance:active';
-const MAINTENANCE_MESSAGE_KEY = 'lendr:maintenance:message';
+const MAINTENANCE_ACTIVE_KEY = 'powergold:maintenance:active';
+const MAINTENANCE_MESSAGE_KEY = 'powergold:maintenance:message';
 
 function setMaintenanceState(message: string): void {
   if (typeof window === 'undefined') return;
@@ -76,7 +76,7 @@ let fpPromise: Promise<string> | null = null;
 export async function getDeviceId(): Promise<string> {
   if (typeof window === 'undefined') return 'server';
 
-  const cachedId = window.sessionStorage.getItem('lendr_fp_id');
+  const cachedId = window.sessionStorage.getItem('powergold_fp_id');
   if (cachedId) return cachedId;
 
   if (!fpPromise) {
@@ -85,14 +85,14 @@ export async function getDeviceId(): Promise<string> {
         const fp = await FingerprintJS.load();
         const result = await fp.get();
         const visitorId = `FP-${result.visitorId}`;
-        window.sessionStorage.setItem('lendr_fp_id', visitorId);
+        window.sessionStorage.setItem('powergold_fp_id', visitorId);
         return visitorId;
       } catch (error) {
         logger.error('Fingerprint failed, falling back to UUID', { error });
-        let fallbackId = window.sessionStorage.getItem('lendr_device_id');
+        let fallbackId = window.sessionStorage.getItem('powergold_device_id');
         if (!fallbackId) {
           fallbackId = `DEV-${crypto.randomUUID()}`;
-          window.sessionStorage.setItem('lendr_device_id', fallbackId);
+          window.sessionStorage.setItem('powergold_device_id', fallbackId);
         }
         return fallbackId;
       }
@@ -141,7 +141,7 @@ export const http = {
     if (response.ok && isMaintenanceStateActive()) {
       clearMaintenanceState();
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('lendr:maintenance-ended'));
+        window.dispatchEvent(new CustomEvent('powergold:maintenance-ended'));
       }
     }
 
@@ -157,7 +157,7 @@ export const http = {
         if (typeof window !== 'undefined') {
           const message = errorPayload.message || 'System under maintenance';
           setMaintenanceState(message);
-          window.dispatchEvent(new CustomEvent('lendr:maintenance-started', { detail: message }));
+          window.dispatchEvent(new CustomEvent('powergold:maintenance-started', { detail: message }));
         }
         throw new MaintenanceError(errorPayload.message || 'System under maintenance');
       }

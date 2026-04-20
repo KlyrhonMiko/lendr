@@ -4,7 +4,7 @@ LAN_COMPOSE := docker compose -f docker-compose.lan.yml
 
 .PHONY: help
 help:
-	@echo "Lendr LAN helpers"
+	@echo "PowerGold LAN helpers"
 	@echo ""
 	@echo "Targets:"
 	@echo "  make lan-up           # Build/start LAN stack (includes bootstrap init)"

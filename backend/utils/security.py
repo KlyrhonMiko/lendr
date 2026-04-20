@@ -141,7 +141,7 @@ def verify_totp_code(
     return False
 
 
-def build_totp_provisioning_uri(secret: str, account_name: str, issuer: str = "Lendr") -> str:
+def build_totp_provisioning_uri(secret: str, account_name: str, issuer: str = "PowerGold") -> str:
     label = quote(f"{issuer}:{account_name}")
     query = urlencode(
         {

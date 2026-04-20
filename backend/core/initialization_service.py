@@ -111,7 +111,7 @@ class InitializationService:
                 id=uuid4(),
                 user_id="ADMIN-001",
                 username=bootstrap_username,
-                email="admin@lendr.system",
+                email="admin@powergold.system",
                 hashed_password=get_password_hash(bootstrap_password),
                 first_name="System",
                 last_name="Administrator",
