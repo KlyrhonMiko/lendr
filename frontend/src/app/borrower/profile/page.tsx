@@ -137,10 +137,10 @@ export default function BorrowerProfilePage() {
         new_password: '',
         confirm_password: '',
       });
-      toast.success('Password updated successfully.');
+      toast.success('Password/PIN updated successfully.');
     },
     onError: (error) => {
-      const message = error instanceof Error ? error.message : 'Failed to update password.';
+      const message = error instanceof Error ? error.message : 'Failed to update password/PIN.';
       toast.error(message);
     },
   });
@@ -396,7 +396,7 @@ export default function BorrowerProfilePage() {
                   onClick={() => setIsEditingPassword(true)}
                   className="rounded-lg h-9 border-border/80 px-4 text-xs font-bold"
                 >
-                  Change Password
+                  Change Password/PIN
                 </Button>
               ) : (
                 <div className="flex items-center gap-2 animate-in slide-in-from-right-2">

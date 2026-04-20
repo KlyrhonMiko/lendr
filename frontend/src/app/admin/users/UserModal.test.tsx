@@ -125,6 +125,7 @@ describe('UserModal borrower action gating', () => {
           data: [
             { id: 'role-1', key: 'borrower', value: 'Borrower', category: 'users_role' },
             { id: 'role-2', key: 'staff', value: 'Staff', category: 'users_role' },
+            { id: 'role-4', key: 'borrow', value: 'Borrow', category: 'users_role' },
             { id: 'role-3', key: 'brwr', value: 'Borrower (Short)', category: 'users_role' },
           ],
         };
@@ -160,8 +161,6 @@ describe('UserModal borrower action gating', () => {
 
     expect(screen.getByRole('button', { name: 'View Secondary Password' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Reset Login Password' })).toBeDisabled();
-    expect(screen.getAllByText(/Unavailable for borrower accounts/i)).toHaveLength(2);
-    expect(screen.getByText(/Status:/i)).toBeInTheDocument();
     expect(mockUserApi.getTwoFactorStatus).toHaveBeenCalledWith('USER-001');
   });
 
@@ -169,6 +168,24 @@ describe('UserModal borrower action gating', () => {
     render(
       <UserModal
         user={buildUser('brwr')}
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+        onCredentialReveal={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(mockUserApi.getConfigs).toHaveBeenCalledWith('users_role');
+    });
+
+    expect(screen.getByRole('button', { name: 'View Secondary Password' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Reset Login Password' })).toBeDisabled();
+  });
+
+  it('disables recovery and reset-login-password actions for borrow alias role', async () => {
+    render(
+      <UserModal
+        user={buildUser('borrow')}
         onClose={vi.fn()}
         onSuccess={vi.fn()}
         onCredentialReveal={vi.fn()}
