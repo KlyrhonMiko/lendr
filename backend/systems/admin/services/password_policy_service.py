@@ -17,7 +17,7 @@ KEY_PASSWORD_REQUIRE_LOWERCASE = "password_require_lowercase"
 KEY_PASSWORD_REQUIRE_NUMBER = "password_require_number"
 KEY_PASSWORD_REQUIRE_SPECIAL = "password_require_special"
 
-PASSWORD_POLICY_EXEMPT_ROLES = frozenset({"borrower", "dispatch"})
+PASSWORD_POLICY_EXEMPT_ROLES = frozenset({"borrower", "borrow", "dispatch"})
 
 
 @dataclass(frozen=True)

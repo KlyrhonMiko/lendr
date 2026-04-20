@@ -1671,6 +1671,9 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             if self._is_consumable_item(item) and unit.status == "borrowed":
                 raise ValueError("Consumable/perishable units cannot be set to borrowed")
 
+            session.add(unit)
+            created_units.append(unit)
+
             # Log audit event for each unit
             audit_service.log_action(
                 db=session,

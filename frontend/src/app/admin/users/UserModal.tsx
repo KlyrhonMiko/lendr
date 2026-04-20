@@ -59,8 +59,8 @@ export function UserModal({
   const [twoFactorEnrollmentCode, setTwoFactorEnrollmentCode] = useState('');
 
   const pinValidationMessage = `PIN must be at least ${pinLength} characters`;
-  const BORROWER_ROLE_KEYS = new Set(['borrower', 'brwr']);
-  const PASSWORD_POLICY_EXEMPT_ROLES = new Set(['borrower', 'brwr', 'dispatch']);
+  const BORROWER_ROLE_KEYS = new Set(['borrower', 'brwr', 'borrow']);
+  const PASSWORD_POLICY_EXEMPT_ROLES = new Set(['borrower', 'brwr', 'borrow', 'dispatch']);
 
   const normalizeRole = (role: string | undefined): string => (role || '').trim().toLowerCase();
   

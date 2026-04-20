@@ -431,12 +431,18 @@ async def public_liveness(request: Request):
 
 @app.websocket("/api/ws/borrower")
 async def websocket_borrower_endpoint(websocket: WebSocket):
+    # Intentionally public for borrower portal live updates; payloads contain only
+    # non-sensitive catalog invalidation signals.
     await manager.connect(websocket)
     try:
         while True:
             # We mostly broadcast to clients, but we receive to keep the connection alive
             await websocket.receive_text()
     except WebSocketDisconnect:
+        logger.info("Borrower WebSocket disconnected")
+    except Exception:
+        logger.warning("Borrower WebSocket terminated unexpectedly", exc_info=True)
+    finally:
         manager.disconnect(websocket)
 
 @app.get("/")

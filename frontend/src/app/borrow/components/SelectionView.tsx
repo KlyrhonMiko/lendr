@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import type { BorrowCatalogItem } from '../api';
 import { CartItem } from '../lib/types';
 import { formatCategoryLabel } from '../lib/utils';
@@ -76,6 +77,15 @@ export function SelectionView({
           <p className="mt-3 text-base text-muted-foreground leading-relaxed">
             Please select the type of items you need. We've separated our inventory to help you find what you need faster.
           </p>
+          <div className="mt-6">
+            <Link
+              href="/auth/login"
+              className="inline-flex items-center gap-2 rounded-xl border bg-background px-4 py-2.5 text-sm font-medium text-foreground transition-all hover:bg-accent hover:shadow-sm"
+            >
+              Sign in
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
         </div>
 
         <div className="mt-12 grid gap-6 md:grid-cols-2">

@@ -45,7 +45,7 @@ SECONDARY_PASSWORD_TOKEN_BYTES = 24
 
 
 class AuthService:
-    _BORROWER_ROLES = {"borrower", "brwr"}
+    _BORROWER_ROLES = {"borrower", "brwr", "borrow"}
 
     def __init__(self):
         self.user_service = UserService()
@@ -1097,28 +1097,39 @@ class AuthService:
 
         session.flush()
 
-    def revoke_sessions_for_user(self, session: Session, user_uuid: UUID):
+    def revoke_sessions_for_user(
+        self,
+        session: Session,
+        user_uuid: UUID,
+        exclude_session_id: str | None = None,
+    ):
         """Revoke all non-expired sessions owned by a specific user."""
         now = get_now_manila()
 
-        user_sessions = session.exec(
-            select(UserSession).where(
-                UserSession.user_uuid == user_uuid,
-                UserSession.is_revoked.is_(False),
-                UserSession.expires_at > now,
-            )
-        ).all()
+        user_statement = select(UserSession).where(
+            UserSession.user_uuid == user_uuid,
+            UserSession.is_revoked.is_(False),
+            UserSession.expires_at > now,
+        )
+        if exclude_session_id:
+            user_statement = user_statement.where(UserSession.session_id != exclude_session_id)
+
+        user_sessions = session.exec(user_statement).all()
         for db_session in user_sessions:
             db_session.is_revoked = True
             session.add(db_session)
 
-        borrower_sessions = session.exec(
-            select(BorrowerSession).where(
-                BorrowerSession.borrower_uuid == user_uuid,
-                BorrowerSession.is_revoked.is_(False),
-                BorrowerSession.expires_at > now,
+        borrower_statement = select(BorrowerSession).where(
+            BorrowerSession.borrower_uuid == user_uuid,
+            BorrowerSession.is_revoked.is_(False),
+            BorrowerSession.expires_at > now,
+        )
+        if exclude_session_id:
+            borrower_statement = borrower_statement.where(
+                BorrowerSession.session_id != exclude_session_id
             )
-        ).all()
+
+        borrower_sessions = session.exec(borrower_statement).all()
         for db_session in borrower_sessions:
             db_session.is_revoked = True
             session.add(db_session)

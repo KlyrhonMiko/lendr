@@ -1,6 +1,6 @@
 from datetime import datetime
 from sqlmodel import Session, select, func, and_
-from typing import Optional
+from typing import TYPE_CHECKING, Any, Optional
 from uuid import UUID
 
 from core.base_service import BaseService
@@ -30,7 +30,10 @@ from systems.inventory.services.configuration_service import (
 from systems.admin.services.user_service import UserService
 from systems.admin.services.audit_service import audit_service
 from utils.id_generator import get_next_sequence
-from utils.time_utils import get_now_manila
+from utils.time_utils import get_now_manila, normalize_datetime_to_manila
+
+if TYPE_CHECKING:
+    from systems.inventory.schemas.borrow_request_schemas import ReleaseReceiptRead
 
 _DEFAULT_STATUSES = [
     "pending",
@@ -427,9 +430,85 @@ class BorrowService(
         ]
         return BorrowRequestRead.model_validate(payload)
 
+    @staticmethod
+    def _parse_receipt_datetime(value: object) -> datetime | None:
+        if value in (None, ""):
+            return None
+
+        if isinstance(value, datetime):
+            return normalize_datetime_to_manila(value)
+
+        if isinstance(value, str):
+            candidate = value.strip()
+            if not candidate:
+                return None
+
+            try:
+                iso_candidate = candidate.replace("Z", "+00:00")
+                return normalize_datetime_to_manila(datetime.fromisoformat(iso_candidate))
+            except ValueError:
+                pass
+
+            for pattern in (
+                "%m/%d/%Y - %I:%M:%S %p",
+                "%m/%d/%Y - %H:%M:%S",
+                "%d/%m/%Y - %I:%M:%S %p",
+                "%d/%m/%Y - %H:%M:%S",
+                "%Y-%m-%d - %I:%M:%S %p",
+                "%Y-%m-%d - %H:%M:%S",
+            ):
+                try:
+                    return normalize_datetime_to_manila(datetime.strptime(candidate, pattern))
+                except ValueError:
+                    continue
+
+        return None
+
+    def _hydrate_release_receipt_snapshot(
+        self,
+        snapshot: dict[str, Any],
+        db_request: BorrowRequest,
+    ) -> "ReleaseReceiptRead":
+        from systems.inventory.schemas.borrow_request_schemas import ReleaseReceiptRead
+
+        normalized_snapshot = {**snapshot}
+
+        raw_released_at = normalized_snapshot.get("released_at")
+        parsed_released_at = self._parse_receipt_datetime(raw_released_at)
+        if parsed_released_at is not None:
+            normalized_snapshot["released_at"] = parsed_released_at
+        elif raw_released_at in (None, ""):
+            normalized_snapshot["released_at"] = None
+        else:
+            normalized_snapshot["released_at"] = db_request.released_at
+
+        raw_expected_return_at = normalized_snapshot.get("expected_return_at")
+        parsed_expected_return_at = self._parse_receipt_datetime(raw_expected_return_at)
+        if parsed_expected_return_at is not None:
+            normalized_snapshot["expected_return_at"] = parsed_expected_return_at
+        elif raw_expected_return_at in (None, ""):
+            normalized_snapshot["expected_return_at"] = None
+        else:
+            normalized_snapshot["expected_return_at"] = db_request.return_at
+
+        normalized_snapshot["items"] = normalized_snapshot.get("items") or []
+
+        return ReleaseReceiptRead.model_validate(normalized_snapshot)
+
+    @staticmethod
+    def _build_release_receipt_snapshot(receipt: "ReleaseReceiptRead") -> dict[str, Any]:
+        snapshot = receipt.model_dump(mode="json")
+        snapshot["released_at"] = (
+            receipt.released_at.isoformat() if receipt.released_at else None
+        )
+        snapshot["expected_return_at"] = (
+            receipt.expected_return_at.isoformat() if receipt.expected_return_at else None
+        )
+        return snapshot
+
     def generate_release_receipt(
         self, session: Session, request_id: str
-    ) -> dict:
+    ) -> "ReleaseReceiptRead":
         from systems.inventory.schemas.borrow_request_schemas import (
             ReleaseReceiptRead,
             ReleaseReceiptItemRead,
@@ -438,9 +517,12 @@ class BorrowService(
         db_request = self.get(session, request_id)
         if not db_request:
             raise ValueError("Request not found")
-            
+
         if db_request.receipt_snapshot:
-            return db_request.receipt_snapshot
+            return self._hydrate_release_receipt_snapshot(
+                db_request.receipt_snapshot,
+                db_request,
+            )
 
         if db_request.status not in ("released", "returned", "closed"):
             raise ValueError("Receipt is only available for released requests")
@@ -518,13 +600,10 @@ class BorrowService(
             raise ValueError("Request not found")
 
         db_request.borrower_signature = signature_data
-        
+
         # Capture snapshot of the receipt with the signature
         receipt = self.generate_release_receipt(session, request_id)
-        if hasattr(receipt, "model_dump"):
-            db_request.receipt_snapshot = receipt.model_dump(mode="json")
-        else:
-            db_request.receipt_snapshot = receipt
+        db_request.receipt_snapshot = self._build_release_receipt_snapshot(receipt)
 
         session.add(db_request)
         return db_request

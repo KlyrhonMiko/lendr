@@ -17,7 +17,7 @@ from utils.time_utils import get_now_manila
 
 
 class UserService(BaseService[User, UserCreate, UserUpdate]):
-    _BORROWER_ROLES = {"borrower", "brwr"}
+    _BORROWER_ROLES = {"borrower", "brwr", "borrow"}
     _SECURITY_SETTINGS_CATEGORY = "security_settings"
     _SECONDARY_PASSWORD_ROTATION_INTERVAL_KEY = "secondary_password_rotation_interval_days"
     _DEFAULT_SECONDARY_PASSWORD_ROTATION_DAYS = 30
