@@ -16,6 +16,32 @@ export interface User {
   updated_at: string;
 }
 
+export interface GeneratedUserCredentials {
+  one_time_login_password: string;
+  secondary_password?: string | null;
+}
+
+export interface UserCreateResult {
+  user: User;
+  generated_credentials: GeneratedUserCredentials | null;
+}
+
+export interface UserSecondaryPasswordResult {
+  user_id: string;
+  secondary_password: string;
+  rotated_at: string | null;
+}
+
+export interface UserLoginPasswordResetResult {
+  user_id: string;
+  generated_credentials: GeneratedUserCredentials;
+  must_change_password: boolean;
+}
+
+export interface UserLoginPasswordResetRequest {
+  secondary_password: string;
+}
+
 export interface UserCreate {
   username: string;
   email: string;
@@ -70,7 +96,7 @@ export const userApi = {
     api.get<User>(`/admin/users/${userId}`),
 
   register: (data: UserCreate) =>
-    api.post<User>('/admin/users/register', data),
+    api.post<UserCreateResult>('/admin/users/register', data),
 
   update: (userId: string, data: UserUpdate) =>
     api.patch<User>(`/admin/users/${userId}`, data),
@@ -83,6 +109,15 @@ export const userApi = {
 
   resetTwoFactor: (userId: string) =>
     api.post<UserTwoFactorStatus>(`/admin/users/${userId}/2fa/reset`),
+
+  getTwoFactorStatus: (userId: string) =>
+    api.get<UserTwoFactorStatus>(`/admin/users/${userId}/2fa/status`),
+
+  getSecondaryPassword: (userId: string) =>
+    api.get<UserSecondaryPasswordResult>(`/admin/users/${userId}/secondary-password`),
+
+  resetLoginPassword: (userId: string, payload: UserLoginPasswordResetRequest) =>
+    api.post<UserLoginPasswordResetResult>(`/admin/users/${userId}/reset-login-password`, payload),
 
   getConfigs: (category: string) =>
     api.get<AuthConfig[]>(`/auth/config?category=${category}`),

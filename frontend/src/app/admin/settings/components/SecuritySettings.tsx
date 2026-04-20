@@ -116,6 +116,9 @@ function normalizeSecurityPayload(payload: SecuritySettingsData): SecuritySettin
         Math.min(payload.session_timeout.warning_minutes, payload.session_timeout.inactive_minutes - 1),
       ),
     },
+    secondary_password: {
+      rotation_interval_days: Math.max(1, Math.min(payload.secondary_password?.rotation_interval_days ?? 30, 365)),
+    },
     shift_definitions: {
       ...payload.shift_definitions,
       values: shiftDefinitions.map((definition) => definition.key),
@@ -538,6 +541,47 @@ export function SecuritySettings() {
             }}
             disabled={isSaving}
           />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-4">
+          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+            <Key className="w-5 h-5" />
+          </div>
+          <div className="flex-1">
+            <CardTitle>Secondary Password Rotation</CardTitle>
+            <CardDescription>
+              Configure how frequently secondary passwords rotate automatically across non-borrower accounts.
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <Input
+            label="Rotate Every (days)"
+            type="number"
+            min={1}
+            max={365}
+            value={draft.secondary_password.rotation_interval_days}
+            onChange={(event) => {
+              const rotationDays = Math.min(
+                365,
+                Math.max(1, parsePositiveInt(event.target.value, draft.secondary_password.rotation_interval_days)),
+              );
+
+              updateDraft((current) => ({
+                ...current,
+                secondary_password: {
+                  ...current.secondary_password,
+                  rotation_interval_days: rotationDays,
+                },
+              }));
+            }}
+            disabled={isSaving}
+          />
+          <div className="rounded-lg border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
+            Secondary passwords also rotate immediately whenever used for password recovery actions.
+          </div>
         </CardContent>
       </Card>
 

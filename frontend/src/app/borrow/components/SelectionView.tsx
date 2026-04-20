@@ -7,6 +7,7 @@ import { formatCategoryLabel } from '../lib/utils';
 import {
   Search,
   ShoppingCart,
+  Undo2,
   Plus,
   Minus,
   Trash2,
@@ -25,6 +26,9 @@ interface SelectionViewProps {
   categories: string[];
   categoryLabels: Record<string, string>;
   classificationLabels: Record<string, string>;
+  selectedItemKind: 'trackable' | 'untrackable' | null;
+  onSelectItemKind: (kind: 'trackable' | 'untrackable') => void;
+  onBackToItemKindSelection: () => void;
   selectedCategory: string;
   onCategoryChange: (v: string) => void;
   totalItems: number;
@@ -45,6 +49,9 @@ export function SelectionView({
   categories,
   categoryLabels,
   classificationLabels,
+  selectedItemKind,
+  onSelectItemKind,
+  onBackToItemKindSelection,
   selectedCategory,
   onCategoryChange,
   totalItems,
@@ -58,6 +65,50 @@ export function SelectionView({
 }: SelectionViewProps) {
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
 
+  if (!selectedItemKind) {
+    return (
+      <div className="mx-auto w-full max-w-4xl rounded-3xl border bg-card p-8 md:p-14 shadow-xl animate-in zoom-in-95 duration-500">
+        <div className="text-center max-w-xl mx-auto">
+          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
+            <Package2 className="w-8 h-8 text-primary" />
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Borrowing Module</h1>
+          <p className="mt-3 text-base text-muted-foreground leading-relaxed">
+            Please select the type of items you need. We've separated our inventory to help you find what you need faster.
+          </p>
+        </div>
+
+        <div className="mt-12 grid gap-6 md:grid-cols-2">
+          <button
+            onClick={() => onSelectItemKind('trackable')}
+            className="group relative flex flex-col items-center text-center rounded-3xl border bg-background p-8 transition-all hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg hover:bg-primary/5 active:scale-[0.98]"
+          >
+            <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+              <Package2 className="w-7 h-7" />
+            </div>
+            <h3 className="text-xl font-bold text-foreground">Equipments</h3>
+            <p className="mt-2 text-sm text-muted-foreground">Trackable assets that require return (e.g., Tools, Electronics, Gear)</p>
+            <div className="mt-6 text-xs font-bold text-primary uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Select Equipments</div>
+          </button>
+
+          <button
+            onClick={() => onSelectItemKind('untrackable')}
+            className="group relative flex flex-col items-center text-center rounded-3xl border bg-background p-8 transition-all hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg hover:bg-primary/5 active:scale-[0.98]"
+          >
+            <div className="w-14 h-14 rounded-2xl bg-orange-500/10 text-orange-500 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+              <Package2 className="w-7 h-7" />
+            </div>
+            <h3 className="text-xl font-bold text-foreground">Materials</h3>
+            <p className="mt-2 text-sm text-muted-foreground">Untrackable or consumable items (e.g., Supplies, Components, Parts)</p>
+            <div className="mt-6 text-xs font-bold text-orange-600 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Select Materials</div>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const selectedKindLabel = selectedItemKind === 'trackable' ? 'Equipments' : 'Materials';
+
   return (
     <>
       <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 lg:h-[calc(100vh-2rem)] animate-in fade-in duration-500">
@@ -69,11 +120,25 @@ export function SelectionView({
               <div>
                 <h1 className="text-xl lg:text-2xl font-semibold tracking-tight">Select Items</h1>
                 <p className="text-xs lg:text-sm text-muted-foreground mt-0.5 lg:mt-1">
-                  Browse and add items to your request
+                  Browse and add {selectedKindLabel.toLowerCase()} to your request
                   <span className="ml-1.5 text-[11px] font-medium text-muted-foreground/70">
                     ({totalItems} total)
                   </span>
                 </p>
+              </div>
+
+              <div className="flex w-full sm:w-auto items-center gap-2">
+                <span className="hidden sm:inline-flex rounded-full border bg-muted/50 px-3 py-1 text-xs font-medium text-muted-foreground">
+                  {selectedKindLabel}
+                </span>
+                <button
+                  onClick={onBackToItemKindSelection}
+                  className="inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  title="Back to item type selection (this will reset your current borrow request)"
+                >
+                  <Undo2 className="h-3.5 w-3.5" />
+                  Back
+                </button>
               </div>
 
               <div className="relative w-full sm:w-72 lg:w-80">

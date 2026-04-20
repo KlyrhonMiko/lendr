@@ -12,6 +12,7 @@ import { usePublicBranding } from '@/lib/publicBranding';
 const systemMeta: Record<string, string> = {
   admin: 'Administration',
   inventory: 'Inventory',
+  borrower: 'Borrower',
   borrow_portal: 'Borrow Portal',
 };
 
@@ -66,6 +67,10 @@ const navigation: Record<string, { section: string; items: { name: string; href:
       ]
     }
   ],
+  borrower: [
+    { name: 'Request History', href: '/borrower/history', icon: ClipboardList },
+    { name: 'Profile', href: '/borrower/profile', icon: Users },
+  ],
   borrow_portal: [
     {
       section: 'Borrowing',
@@ -88,6 +93,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const getSystem = () => {
     if (pathname.startsWith('/inventory')) return 'inventory';
     if (pathname.startsWith('/admin')) return 'admin';
+    if (pathname.startsWith('/borrower')) return 'borrower';
     if (pathname.startsWith('/borrow')) return 'borrow_portal';
     return null;
   };
@@ -138,8 +144,13 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             )}
             <div className="flex flex-col min-w-0">
               <span className="text-[13px] font-bold font-heading tracking-tight text-sidebar-foreground uppercase leading-[1.15] break-words">
-                {brandName}
+                {brandName.replace(/\s+enterprise$/i, '')}
               </span>
+              {/enterprise/i.test(brandName) && (
+                <span className="text-[10px] font-medium font-heading text-sidebar-foreground/60 uppercase tracking-wider">
+                  Enterprise
+                </span>
+              )}
             </div>
           </div>
           <button

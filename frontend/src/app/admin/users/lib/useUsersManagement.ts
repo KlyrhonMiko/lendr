@@ -27,7 +27,12 @@ export function useUsersManagement() {
   };
 
   // Queries
-  const { data: usersRes, isLoading: loading, error: userError } = useAdminUsers(params);
+  const {
+    data: usersRes,
+    isLoading: loading,
+    error: userError,
+    refetch: refetchUsers,
+  } = useAdminUsers(params);
   const { data: rolesRes } = useAdminUserConfigs('users_role');
   const { data: shiftsRes } = useAdminUserConfigs('users_shift_type');
 
@@ -105,6 +110,8 @@ export function useUsersManagement() {
     handleAdd,
     handleConfirmAction,
     // Refetch (proxy to trigger refresh if needed)
-    fetchUsers: () => {}, 
+    fetchUsers: () => {
+      void refetchUsers();
+    },
   };
 }

@@ -4,10 +4,8 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlmodel import Session, select
 
-from core.base_model import ConfigurationBase
 from systems.admin.models.user import User
 from systems.admin.schemas.security_settings import ShiftDefinition, ShiftDefinitionsSettings
-from systems.admin.services.configuration_service import ConfigurationService
 from systems.auth.services.configuration_service import AuthConfigService
 
 
@@ -32,31 +30,16 @@ def _default_shift_definition(key: str, label: str | None = None) -> ShiftDefini
 
 
 class ShiftDefinitionsService:
-    def __init__(
-        self,
-        admin_config_service: ConfigurationService,
-        auth_config_service: AuthConfigService,
-    ) -> None:
-        self.admin_config_service = admin_config_service
+    def __init__(self, auth_config_service: AuthConfigService) -> None:
         self.auth_config_service = auth_config_service
 
-    def _get_compat_category_settings(self, session: Session, category: str):
-        auth_settings = self.auth_config_service.get_by_category(session, category)
-        admin_settings = self.admin_config_service.get_by_category(session, category)
-        by_key: dict[str, ConfigurationBase] = {}
-        for setting in admin_settings:
-            by_key[str(setting.key).strip().lower()] = setting
-        for setting in auth_settings:
-            by_key[str(setting.key).strip().lower()] = setting
-        return [by_key[key] for key in sorted(by_key.keys())]
+    def _get_category_settings(self, session: Session, category: str):
+        return self.auth_config_service.get_by_category(session, category)
 
-    def _get_compat_setting_by_key(self, session: Session, key: str, category: str):
-        return (
-            self.auth_config_service.get_by_key(session, key, category=category),
-            self.admin_config_service.get_by_key(session, key, category=category),
-        )
+    def _get_setting_by_key(self, session: Session, key: str, category: str):
+        return self.auth_config_service.get_by_key(session, key, category=category)
 
-    def _set_compat_value(
+    def _set_value(
         self,
         session: Session,
         *,
@@ -66,7 +49,6 @@ class ShiftDefinitionsService:
         description: str,
         actor_id: UUID | None,
     ) -> None:
-        auth_setting, admin_setting = self._get_compat_setting_by_key(session, key, category)
         self.auth_config_service.set_value(
             session,
             key=key,
@@ -75,17 +57,8 @@ class ShiftDefinitionsService:
             description=description,
             actor_id=actor_id,
         )
-        if admin_setting:
-            self.admin_config_service.set_value(
-                session,
-                key=key,
-                value=value,
-                category=category,
-                description=description,
-                actor_id=actor_id,
-            )
 
-    def _delete_compat_key(
+    def _delete_key(
         self,
         session: Session,
         *,
@@ -93,20 +66,18 @@ class ShiftDefinitionsService:
         category: str,
         actor_id: UUID | None,
     ) -> None:
-        auth_setting, admin_setting = self._get_compat_setting_by_key(session, key, category)
-        if auth_setting and not auth_setting.is_deleted:
-            self.auth_config_service.delete(session, auth_setting, actor_id=actor_id)
-        if admin_setting and not admin_setting.is_deleted:
-            self.admin_config_service.delete(session, admin_setting, actor_id=actor_id)
+        setting = self._get_setting_by_key(session, key, category)
+        if setting and not setting.is_deleted:
+            self.auth_config_service.delete(session, setting, actor_id=actor_id)
 
     def build(self, session: Session) -> ShiftDefinitionsSettings:
         baseline: dict[str, str] = {
             str(setting.key).strip().lower(): str(setting.value).strip() or str(setting.key).strip().title()
-            for setting in self._get_compat_category_settings(session, SHIFT_TYPE_CATEGORY)
+            for setting in self._get_category_settings(session, SHIFT_TYPE_CATEGORY)
             if str(setting.key).strip()
         }
         rich: dict[str, ShiftDefinition] = {}
-        for setting in self._get_compat_category_settings(session, SHIFT_DEFINITIONS_CATEGORY):
+        for setting in self._get_category_settings(session, SHIFT_DEFINITIONS_CATEGORY):
             key = str(setting.key).strip().lower()
             if not key:
                 continue
@@ -179,8 +150,8 @@ class ShiftDefinitionsService:
                     detail=f"Cannot remove shift definitions still assigned to users: {', '.join(sorted(removed))}",
                 )
             for key in removed:
-                self._delete_compat_key(session, key=key, category=SHIFT_TYPE_CATEGORY, actor_id=actor_id)
-                self._delete_compat_key(
+                self._delete_key(session, key=key, category=SHIFT_TYPE_CATEGORY, actor_id=actor_id)
+                self._delete_key(
                     session,
                     key=key,
                     category=SHIFT_DEFINITIONS_CATEGORY,
@@ -188,7 +159,7 @@ class ShiftDefinitionsService:
                 )
 
         for definition in requested:
-            self._set_compat_value(
+            self._set_value(
                 session,
                 key=definition.key,
                 value=definition.label,
@@ -196,7 +167,7 @@ class ShiftDefinitionsService:
                 description="User-facing shift type labels for account assignment.",
                 actor_id=actor_id,
             )
-            self._set_compat_value(
+            self._set_value(
                 session,
                 key=definition.key,
                 value=json.dumps(

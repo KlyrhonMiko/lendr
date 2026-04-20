@@ -4,19 +4,15 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { KeyRound, User, Loader2, ArrowRight, ShieldCheck, Package, ScanLine } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
 import { auth } from '@/lib/auth';
 import { useAuth } from '@/contexts/AuthContext';
 import { loginApi } from './api';
 import { toast } from "sonner";
 import {
   AuthApiError,
+  FirstLoginPasswordChangeRequiredResponse,
   TwoFactorChallengeResponse,
-  TwoFactorEnrollmentInitiateResponse,
 } from '@/lib/api';
-
-const BOOTSTRAP_ROTATION_REQUIRED_TEXT =
-  'bootstrap admin password rotation required';
 
 interface LoginCredentials {
   username: string;
@@ -49,14 +45,9 @@ export default function LoginPage() {
   const [showTwoFactorChallengeModal, setShowTwoFactorChallengeModal] = useState(false);
   const [twoFactorChallengeCode, setTwoFactorChallengeCode] = useState('');
   const [isVerifyingTwoFactorChallenge, setIsVerifyingTwoFactorChallenge] = useState(false);
-  const [pendingRedirectPath, setPendingRedirectPath] = useState<string | null>(null);
-  const [twoFactorEnrollment, setTwoFactorEnrollment] =
-    useState<TwoFactorEnrollmentInitiateResponse | null>(null);
-  const [showTwoFactorEnrollmentModal, setShowTwoFactorEnrollmentModal] = useState(false);
-  const [twoFactorEnrollmentCode, setTwoFactorEnrollmentCode] = useState('');
-  const [isVerifyingTwoFactorEnrollment, setIsVerifyingTwoFactorEnrollment] = useState(false);
   const [showRotationModal, setShowRotationModal] = useState(false);
   const [isRotating, setIsRotating] = useState(false);
+  const [rotationEndpoint, setRotationEndpoint] = useState<string | null>(null);
   const [rotationForm, setRotationForm] = useState({
     currentPassword: '',
     newPassword: '',
@@ -69,42 +60,9 @@ export default function LoginPage() {
     setTwoFactorChallengeCode('');
   };
 
-  const closeTwoFactorEnrollmentModal = () => {
-    setShowTwoFactorEnrollmentModal(false);
-    setTwoFactorEnrollment(null);
-    setTwoFactorEnrollmentCode('');
-    setPendingRedirectPath(null);
-  };
-
   const redirectToApp = (redirectPath: string) => {
     toast.success('Welcome back! Logging you in...');
     router.push(redirectPath);
-  };
-
-  const finalizeEnrollmentAndRedirect = () => {
-    const redirectPath = pendingRedirectPath;
-    closeTwoFactorEnrollmentModal();
-
-    if (redirectPath) {
-      redirectToApp(redirectPath);
-    }
-  };
-
-  const maybeOpenTwoFactorEnrollment = async (redirectPath: string): Promise<boolean> => {
-    try {
-      const enrollment = await loginApi.initiateTwoFactorEnrollment();
-      setPendingRedirectPath(redirectPath);
-      setTwoFactorEnrollment(enrollment);
-      setTwoFactorEnrollmentCode('');
-      setShowTwoFactorEnrollmentModal(true);
-      toast.info('Set up 2FA now to protect this account.');
-      return true;
-    } catch (error: unknown) {
-      if (error instanceof AuthApiError && error.status >= 500) {
-        toast.error('Signed in, but 2FA setup is temporarily unavailable.');
-      }
-      return false;
-    }
   };
 
   const handleTokenLogin = async (accessToken: string) => {
@@ -113,11 +71,6 @@ export default function LoginPage() {
     const user = await auth.getUser();
     hydrateUser(user);
     const redirectPath = auth.getRedirectPath(user?.role);
-
-    const openedEnrollmentModal = await maybeOpenTwoFactorEnrollment(redirectPath);
-    if (openedEnrollmentModal) {
-      return;
-    }
 
     redirectToApp(redirectPath);
   };
@@ -133,8 +86,27 @@ export default function LoginPage() {
     toast.info('Two-factor authentication is required. Enter your authenticator code.');
   };
 
+  const openRotationModal = (
+    branch: FirstLoginPasswordChangeRequiredResponse,
+    currentPassword: string,
+  ) => {
+    setRotationEndpoint(loginApi.getRotationEndpoint(branch));
+    setRotationForm({
+      currentPassword,
+      newPassword: '',
+      confirmPassword: '',
+    });
+    setShowRotationModal(true);
+    toast.info('This account must rotate password before first sign-in.');
+  };
+
   const completeLogin = async (credentials: LoginCredentials) => {
     const data = await loginApi.login(credentials);
+
+    if (loginApi.isPasswordChangeRequired(data)) {
+      openRotationModal(data, credentials.password);
+      return;
+    }
 
     if (loginApi.isTwoFactorChallenge(data)) {
       openTwoFactorChallengeModal(data);
@@ -149,17 +121,18 @@ export default function LoginPage() {
       return false;
     }
 
-    if (!error.message.toLowerCase().includes(BOOTSTRAP_ROTATION_REQUIRED_TEXT)) {
+    if (error.code !== 'AUTH.FIRST_LOGIN_PASSWORD_CHANGE_REQUIRED') {
       return false;
     }
 
+    setRotationEndpoint('/auth/first-login/rotate-password');
     setRotationForm({
       currentPassword: formData.password,
       newPassword: '',
       confirmPassword: '',
     });
     setShowRotationModal(true);
-    toast.info('Bootstrap admin must rotate password before first sign-in.');
+    toast.info('This account must rotate password before first sign-in.');
     return true;
   };
 
@@ -210,39 +183,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleSkipTwoFactorEnrollment = () => {
-    toast.info('You can enable 2FA later from your account settings.');
-    finalizeEnrollmentAndRedirect();
-  };
-
-  const handleVerifyTwoFactorEnrollment = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!twoFactorEnrollment) {
-      toast.error('No active 2FA enrollment found. Continuing sign-in.');
-      finalizeEnrollmentAndRedirect();
-      return;
-    }
-
-    const code = twoFactorEnrollmentCode.trim();
-    if (code.length < MIN_TWO_FACTOR_CODE_LENGTH) {
-      toast.error('Enter a valid authenticator code.');
-      return;
-    }
-
-    setIsVerifyingTwoFactorEnrollment(true);
-    try {
-      await loginApi.verifyTwoFactorEnrollment(code);
-      toast.success('Two-factor authentication enabled.');
-      finalizeEnrollmentAndRedirect();
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : 'Failed to enable two-factor authentication';
-      toast.error(msg);
-    } finally {
-      setIsVerifyingTwoFactorEnrollment(false);
-    }
-  };
-
   const handleRotatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -265,14 +205,15 @@ export default function LoginPage() {
 
     setIsRotating(true);
     try {
-      await loginApi.rotateBootstrapPassword({
+      await loginApi.rotateFirstLoginPassword({
         username: formData.username,
         current_password: rotationForm.currentPassword,
         new_password: rotationForm.newPassword,
-      });
+      }, rotationEndpoint ?? undefined);
 
       toast.success('Password rotated. Signing you in...');
       setShowRotationModal(false);
+      setRotationEndpoint(null);
 
       const nextCredentials = {
         username: formData.username,
@@ -401,11 +342,11 @@ export default function LoginPage() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
           role="dialog"
           aria-modal="true"
-          aria-labelledby="bootstrap-rotate-title"
+          aria-labelledby="first-login-rotate-title"
         >
           <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl">
-            <h2 id="bootstrap-rotate-title" className="text-lg font-semibold text-foreground">
-              Change bootstrap password
+            <h2 id="first-login-rotate-title" className="text-lg font-semibold text-foreground">
+              Change first-login password
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               This account must rotate its initial password before first sign-in.
@@ -466,7 +407,10 @@ export default function LoginPage() {
                 <button
                   type="button"
                   className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
-                  onClick={() => setShowRotationModal(false)}
+                  onClick={() => {
+                    setShowRotationModal(false);
+                    setRotationEndpoint(null);
+                  }}
                   disabled={isRotating}
                 >
                   Cancel
@@ -536,111 +480,6 @@ export default function LoginPage() {
                   disabled={isVerifyingTwoFactorChallenge}
                 >
                   {isVerifyingTwoFactorChallenge ? 'Verifying...' : 'Verify code'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {showTwoFactorEnrollmentModal && twoFactorEnrollment && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="two-factor-enrollment-title"
-        >
-          <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl">
-            <h2 id="two-factor-enrollment-title" className="text-lg font-semibold text-foreground">
-              Set up two-factor authentication
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Add this account to your authenticator app, then enter the generated code.
-            </p>
-
-            {twoFactorEnrollment.provisioning_uri && (
-              <div className="mt-4 rounded-xl border border-border bg-muted/20 p-4">
-                <p className="text-xs font-medium text-muted-foreground mb-3 text-center">
-                  Scan this QR code in your authenticator app
-                </p>
-                <div className="flex justify-center">
-                  <div className="rounded-lg bg-white p-3">
-                    <QRCodeSVG
-                      value={twoFactorEnrollment.provisioning_uri}
-                      size={180}
-                      bgColor="#FFFFFF"
-                      fgColor="#111827"
-                      level="M"
-                      includeMargin
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="mt-5 space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-foreground" htmlFor="two-factor-enrollment-secret">
-                  Secret key
-                </label>
-                <input
-                  id="two-factor-enrollment-secret"
-                  type="text"
-                  readOnly
-                  value={twoFactorEnrollment.secret}
-                  onFocus={(e) => e.currentTarget.select()}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-mono text-foreground outline-none"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-foreground" htmlFor="two-factor-enrollment-uri">
-                  Provisioning URI
-                </label>
-                <textarea
-                  id="two-factor-enrollment-uri"
-                  readOnly
-                  value={twoFactorEnrollment.provisioning_uri}
-                  rows={3}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-xs text-foreground outline-none"
-                />
-              </div>
-            </div>
-
-            <form onSubmit={handleVerifyTwoFactorEnrollment} className="mt-5 space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-foreground" htmlFor="two-factor-enrollment-code">
-                  Authenticator code
-                </label>
-                <input
-                  id="two-factor-enrollment-code"
-                  type="text"
-                  required
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  minLength={MIN_TWO_FACTOR_CODE_LENGTH}
-                  maxLength={12}
-                  value={twoFactorEnrollmentCode}
-                  onChange={(e) => setTwoFactorEnrollmentCode(e.target.value)}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-yellow-500/50 focus:ring-[3px] focus:ring-yellow-500/10"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
-                  onClick={handleSkipTwoFactorEnrollment}
-                  disabled={isVerifyingTwoFactorEnrollment}
-                >
-                  Do this later
-                </button>
-                <button
-                  type="submit"
-                  className="rounded-xl bg-yellow-500 px-4 py-2 text-sm font-semibold text-yellow-950 hover:bg-yellow-600 disabled:opacity-60"
-                  disabled={isVerifyingTwoFactorEnrollment}
-                >
-                  {isVerifyingTwoFactorEnrollment ? 'Enabling...' : 'Enable 2FA'}
                 </button>
               </div>
             </form>

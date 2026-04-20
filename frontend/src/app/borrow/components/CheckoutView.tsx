@@ -116,7 +116,7 @@ export function CheckoutView({
               <div className="text-left">
                 <h2 className="text-sm font-semibold">Items Requested</h2>
                 <p className="text-[11px] text-muted-foreground">
-                  {cart.length} item{cart.length !== 1 ? 's' : ''} · {totalCartItems} total qty
+                  {cart.length} {cart[0]?.is_trackable ? 'equipment' : 'material'}{cart.length !== 1 ? 's' : ''} · {totalCartItems} total qty
                 </p>
               </div>
             </div>
