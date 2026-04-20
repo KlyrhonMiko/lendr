@@ -551,6 +551,10 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         item = session.exec(select(InventoryItem).where(InventoryItem.id == batch.inventory_uuid)).first()
         if item:
             self._sync_item_quantities(session, item.item_id)
+            
+            # Trigger alert evaluation
+            from systems.inventory.services.alert_service import alert_service
+            alert_service.evaluate_stock_alerts(session, item.item_id)
         
         return batch
 
@@ -1568,6 +1572,10 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         session.add(unit)
         self._sync_item_quantities(session, item_id)
 
+        # Trigger alert evaluation
+        from systems.inventory.services.alert_service import alert_service
+        alert_service.evaluate_stock_alerts(session, item_id)
+
         # Record procurement movement for the new unit
         movement = InventoryMovement(
             movement_id=get_next_sequence(session, InventoryMovement, "movement_id", "MOV"),
@@ -1677,10 +1685,11 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
                 actor_id=actor_id,
             )
 
-            session.add(unit)
-            created_units.append(unit)
-
         self._sync_item_quantities(session, item_id)
+
+        # Trigger alert evaluation
+        from systems.inventory.services.alert_service import alert_service
+        alert_service.evaluate_stock_alerts(session, item_id)
 
         # Record procurement movement for the entire batch
         if created_units:
@@ -1791,6 +1800,10 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         session.add(unit)
         if item:
             self._sync_item_quantities(session, item.item_id)
+            
+            # Trigger alert evaluation
+            from systems.inventory.services.alert_service import alert_service
+            alert_service.evaluate_stock_alerts(session, item.item_id)
             
             # Record movement if status changed
             if after_state["status"] != before_state["status"]:
