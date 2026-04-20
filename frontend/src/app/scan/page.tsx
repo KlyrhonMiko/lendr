@@ -274,7 +274,7 @@ export default function ScanPage() {
                 )}
                 <div className="flex-1">
                     <h1 className="text-lg font-bold font-heading leading-tight">QR Scanner</h1>
-                    <p className="text-xs text-muted-foreground">Lendr Equipment Lookup</p>
+                    <p className="text-xs text-muted-foreground">PowerGold Equipment Lookup</p>
                 </div>
 
                 <div className="flex items-center gap-2">

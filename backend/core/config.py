@@ -86,8 +86,8 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 587
     SMTP_USER: str | None = None
     SMTP_PASSWORD: str | None = None
-    SMTP_FROM_EMAIL: str = "noreply@lendr.app"
-    SMTP_FROM_NAME: str = "Lendr System"
+    SMTP_FROM_EMAIL: str = "noreply@powergold.app"
+    SMTP_FROM_NAME: str = "PowerGold System"
     SMTP_TLS: bool = True
     SMTP_SSL: bool = False
     SMTP_TIMEOUT: int = 10

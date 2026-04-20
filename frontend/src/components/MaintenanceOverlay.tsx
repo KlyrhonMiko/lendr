@@ -5,7 +5,7 @@ import { Wrench, RefreshCw, LogOut } from 'lucide-react';
 import { auth } from '@/lib/auth';
 
 const DEFAULT_MAINTENANCE_MESSAGE = "We're currently performing scheduled maintenance to improve your experience. Most features are temporarily unavailable.";
-const DEFAULT_BRAND_NAME = 'Lendr';
+const DEFAULT_BRAND_NAME = 'PowerGold';
 
 export function MaintenanceOverlay({ message }: { message?: string | null }) {
   const handleRefresh = () => {

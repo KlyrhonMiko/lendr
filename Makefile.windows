@@ -6,7 +6,7 @@ GET_LAN_IP := Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $$_.IPAddres
 
 .PHONY: help
 help:
-	@Write-Host "Lendr LAN helpers (Windows)"
+	@Write-Host "PowerGold LAN helpers (Windows)"
 	@Write-Host ""
 	@Write-Host "Targets:"
 	@Write-Host "  make -f Makefile.windows lan-up           # Build/start LAN stack (includes bootstrap init)"

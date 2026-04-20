@@ -1,7 +1,7 @@
 type LogContext = Record<string, unknown>;
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
-const CORRELATION_ID_KEY = 'lendr_last_correlation_id';
+const CORRELATION_ID_KEY = 'powergold_last_correlation_id';
 
 export function setCorrelationId(correlationId: string | null | undefined): void {
   if (typeof window === 'undefined') {
@@ -40,7 +40,7 @@ function writeLog(level: 'debug' | 'info' | 'warn' | 'error', message: string, c
     return;
   }
 
-  const prefix = `[lendr] ${message}`;
+  const prefix = `[powergold] ${message}`;
   const logContext = withCorrelationContext(context);
 
   if (level === 'debug') {

@@ -8,8 +8,8 @@ export function MaintenanceWrapper({ children }: { children: React.ReactNode }) 
   const [maintenanceMessage, setMaintenanceMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    const active = window.sessionStorage.getItem('lendr:maintenance:active') === 'true';
-    const storedMessage = window.sessionStorage.getItem('lendr:maintenance:message');
+    const active = window.sessionStorage.getItem('powergold:maintenance:active') === 'true';
+    const storedMessage = window.sessionStorage.getItem('powergold:maintenance:message');
     if (active) {
       setIsMaintenance(true);
       setMaintenanceMessage(storedMessage);
@@ -28,12 +28,12 @@ export function MaintenanceWrapper({ children }: { children: React.ReactNode }) 
       setMaintenanceMessage(null);
     };
 
-    window.addEventListener('lendr:maintenance-started', handleMaintenance as EventListener);
-    window.addEventListener('lendr:maintenance-ended', handleMaintenanceEnded);
+    window.addEventListener('powergold:maintenance-started', handleMaintenance as EventListener);
+    window.addEventListener('powergold:maintenance-ended', handleMaintenanceEnded);
 
     return () => {
-      window.removeEventListener('lendr:maintenance-started', handleMaintenance as EventListener);
-      window.removeEventListener('lendr:maintenance-ended', handleMaintenanceEnded);
+      window.removeEventListener('powergold:maintenance-started', handleMaintenance as EventListener);
+      window.removeEventListener('powergold:maintenance-ended', handleMaintenanceEnded);
     };
   }, []);
 
