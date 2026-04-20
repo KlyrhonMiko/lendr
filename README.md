@@ -1,4 +1,4 @@
-# Lendr
+# PowerGold
 
 An inventory and borrowing management system built with **FastAPI** (backend) and **Next.js** (frontend), backed by **PostgreSQL**.
 
@@ -31,7 +31,7 @@ An inventory and borrowing management system built with **FastAPI** (backend) an
 
 ## Overview
 
-Lendr tracks equipment/items and manages borrow requests through a full lifecycle: **request → approve → release → return**. It provides:
+PowerGold tracks equipment/items and manages borrow requests through a full lifecycle: **request → approve → release → return**. It provides:
 
 - JWT-based authentication with session persistence via `localStorage`
 - Role-based user management (admin, dispatch, inventory manager, accountant, finance manager, viewer)
@@ -245,7 +245,7 @@ This spins up all services (database, backend, frontend, Adminer) in containers.
 
 ```bash
 git clone <repository-url>
-cd lendr
+cd PowerGold
 ```
 
 **2. Create the environment file**
@@ -256,10 +256,10 @@ Create `.env.local` in the project root:
 # Database
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=your_secure_password
-POSTGRES_DB=lendr
+POSTGRES_DB=PowerGold
 
 # Backend
-DATABASE_URL=postgresql+psycopg2://postgres:your_secure_password@postgres:5432/lendr
+DATABASE_URL=postgresql+psycopg2://postgres:your_secure_password@postgres:5432/PowerGold
 SECRET_KEY=your_super_secret_jwt_key_change_this_in_production
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
@@ -406,7 +406,7 @@ If this machine gets a different IP after reboot, run `make lan-url` again.
 
 | Service | URL |
 |---|---|
-| Lendr | http://SERVER_LAN_IP |
+| PowerGold | http://SERVER_LAN_IP |
 | Swagger UI | http://SERVER_LAN_IP/docs |
 
 Notes:
@@ -427,7 +427,7 @@ Create a database for the project:
 
 ```bash
 psql -U postgres
-CREATE DATABASE lendr;
+CREATE DATABASE PowerGold;
 \q
 ```
 
@@ -458,7 +458,7 @@ pip install -r requirements.txt
 Create `.env.local` inside the `backend/` directory (or in the project root — the app auto-discovers it):
 
 ```env
-DATABASE_URL=postgresql+psycopg2://postgres:your_password@localhost:5432/lendr
+DATABASE_URL=postgresql+psycopg2://postgres:your_password@localhost:5432/PowerGold
 SECRET_KEY=your_super_secret_jwt_key_change_this_in_production
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
@@ -498,7 +498,7 @@ The API will be available at http://localhost:8000 and interactive docs at http:
 Open a new terminal and navigate to the project root:
 
 ```bash
-cd lendr   # project root (not backend/)
+cd PowerGold   # project root (not backend/)
 ```
 
 **Install dependencies:**
@@ -595,7 +595,7 @@ Use this guide for LAN-host workflows via `docker-compose.lan.yml`.
 | `APP_PORT`                    | No       | `5000`       | Port the backend listens on (Docker only)        |
 | `POSTGRES_USER`               | Docker   | `postgres`   | PostgreSQL username (Docker Compose only)        |
 | `POSTGRES_PASSWORD`           | Docker   | `password`   | PostgreSQL password (Docker Compose only)        |
-| `POSTGRES_DB`                 | Docker   | `lendr`      | PostgreSQL database name (Docker Compose only)   |
+| `POSTGRES_DB`                 | Docker   | `PowerGold`      | PostgreSQL database name (Docker Compose only)   |
 | `NEXT_PUBLIC_API_URL`         | No       | `http://localhost:8000` | Backend base URL used by the frontend |
 
 The backend resolves environment variables from `.env.local` first, then `.env`, then the system environment. For Docker, a single `.env.local` in the project root is used by all services.
@@ -912,7 +912,7 @@ All dashboard pages are protected by `AuthGuard` and require a valid JWT session
 ## Project Structure
 
 ```
-lendr/
+PowerGold/
 ├── docker-compose.yml              # Orchestrates database, backend, frontend, adminer
 ├── .env.local                      # Shared environment values (Docker + local)
 ├── README.md

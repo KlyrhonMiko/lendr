@@ -212,7 +212,7 @@ redoc_url = "/redoc" if settings.SWAGGER_UI_ENABLED else None
 openapi_url = "/openapi.json" if settings.SWAGGER_UI_ENABLED else None
 
 app = FastAPI(
-    title="Lendr Unified API",
+    title="PowerGold Unified API",
     lifespan=lifespan,
     docs_url=docs_url,
     redoc_url=redoc_url,
@@ -441,4 +441,4 @@ async def websocket_borrower_endpoint(websocket: WebSocket):
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to the Lendr API"}
+    return {"message": "Welcome to the PowerGold API"}

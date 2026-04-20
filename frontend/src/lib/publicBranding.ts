@@ -12,7 +12,7 @@ export interface PublicBrandingData {
   };
 }
 
-const DEFAULT_BRAND_NAME = 'Lendr';
+const DEFAULT_BRAND_NAME = 'PowerGold';
 const BRANDING_QUERY_KEY = ['public', 'branding'] as const;
 
 function normalizeBrandName(value: string | null | undefined): string {

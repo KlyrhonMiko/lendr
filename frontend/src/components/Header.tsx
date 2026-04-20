@@ -31,16 +31,16 @@ export function Header({ onMenuToggle }: HeaderProps) {
           <Menu className="w-5 h-5" />
         </button>
 
-        <nav className="hidden sm:flex items-center gap-1 text-xs font-semibold min-w-0">
+        <nav className="hidden sm:flex items-center gap-1.5 text-[11px] font-bold min-w-0">
           {breadcrumbs.map((crumb, i) => (
-            <span key={i} className="flex items-center gap-1 min-w-0">
+            <span key={i} className="flex items-center gap-1.5 min-w-0">
               {i > 0 && (
-                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30 shrink-0" />
+                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/20 shrink-0" />
               )}
               <span
-                className={`truncate tracking-wide ${i === breadcrumbs.length - 1
-                  ? 'text-primary px-2 py-0.5 bg-primary/10 rounded-md shadow-sm'
-                  : 'text-muted-foreground/60 hover:text-foreground transition-colors'
+                className={`truncate tracking-tight ${i === breadcrumbs.length - 1
+                  ? 'text-primary px-2.5 py-1 bg-primary/5 rounded-lg border border-primary/10 shadow-sm'
+                  : 'text-muted-foreground/40 hover:text-foreground transition-all duration-200'
                   }`}
               >
                 {crumb}
@@ -51,31 +51,30 @@ export function Header({ onMenuToggle }: HeaderProps) {
       </div>
 
       {/* Right: user info + sign out */}
-      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+      <div className="flex items-center gap-4 shrink-0">
         <div className="hidden md:flex flex-col text-right">
-          <span className="text-xs font-bold text-foreground leading-tight tracking-tight">
+          <span className="text-[12px] font-extrabold text-foreground leading-tight tracking-tight">
             {loading
               ? 'Loading...'
               : user
                 ? `${user.first_name} ${user.last_name}`
                 : 'Guest'}
           </span>
-          <span className="text-[10px] font-bold text-primary uppercase tracking-[0.1em] leading-tight mt-0.5">
+          <span className="text-[9px] font-black text-primary/80 uppercase tracking-[0.15em] leading-tight mt-0.5">
             {loading ? 'Loading...' : user?.role.replace('_', ' ') || 'User'}
           </span>
-
         </div>
 
-        <div className="w-px h-6 bg-border mx-1 hidden sm:block" />
+        <div className="w-px h-8 bg-border/50 mx-1 hidden sm:block" />
 
         <button
           onClick={() => void logout()}
           aria-label="Sign out"
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-muted-foreground/60 hover:text-destructive hover:bg-destructive/5 border border-transparent hover:border-destructive/10 transition-all active:scale-95"
+          className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl text-muted-foreground/40 hover:text-destructive hover:bg-destructive/5 border border-transparent hover:border-destructive/10 transition-all active:scale-95 group"
           title="Sign out"
         >
-          <LogOut className="w-4 h-4" />
-          <span className="hidden sm:inline text-[11px] font-bold uppercase tracking-wider">Logout</span>
+          <LogOut className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" />
+          <span className="hidden sm:inline text-[10px] font-extrabold uppercase tracking-widest">Logout</span>
         </button>
       </div>
     </header>

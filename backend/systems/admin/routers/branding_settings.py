@@ -33,7 +33,7 @@ ALLOWED_IMAGE_CONTENT_TYPES = {
 def _default_branding_settings() -> BrandingSettingsPayload:
     return BrandingSettingsPayload(
         visual_identity=VisualIdentitySettings(
-            brand_name="Lendr",
+            brand_name="PowerGold",
             system_theme="system",
             logo_url=None,
             favicon_url=None,

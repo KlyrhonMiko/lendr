@@ -1,6 +1,6 @@
 'use client';
 
-const TOKEN_KEY = 'lendr_auth_token';
+const TOKEN_KEY = 'powergold_auth_token';
 
 let inMemoryToken: string | null = null;
 const tokenListeners = new Set<() => void>();

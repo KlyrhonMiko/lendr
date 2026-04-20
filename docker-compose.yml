@@ -7,11 +7,11 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
-      POSTGRES_DB: ${POSTGRES_DB:-lendr}
+      POSTGRES_DB: ${POSTGRES_DB:-powergold}
     ports:
       - "5433:5432"
     volumes:
-      - lendr_pgdata:/var/lib/postgresql/data
+      - powergold_pgdata:/var/lib/postgresql/data
 
   adminer:
     image: adminer:latest
@@ -28,7 +28,7 @@ services:
     env_file:
       - .env.local
     environment:
-      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-lendr}
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-powergold}
       TZ: Asia/Manila
     volumes:
       - ./backend:/app
@@ -57,4 +57,4 @@ services:
 
 
 volumes:
-  lendr_pgdata:
+  powergold_pgdata:

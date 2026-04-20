@@ -18,8 +18,8 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Inventory Management Platform",
-  description: "Web application for inventory and borrowing workflows",
+  title: "Powergold Engineering Enterprise",
+  description: "Web application for Powergold Engineering Enterprise",
 };
 
 export default function RootLayout({

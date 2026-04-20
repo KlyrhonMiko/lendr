@@ -1,1 +1,1 @@
-"""Lendr systems package."""
+"""PowerGold systems package."""

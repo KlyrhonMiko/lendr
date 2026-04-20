@@ -50,10 +50,10 @@ async def send_test_email(
 
     success = send_email(
         to_email=current_user.email,
-        subject="Lendr - SMTP Test Connection",
+        subject="PowerGold - SMTP Test Connection",
         body=(
             f"Hello {current_user.first_name},\n\n"
-            "This is a test email from the Lendr inventory system to verify that your "
+            "This is a test email from the PowerGold inventory system to verify that your "
             "SMTP configuration is working correctly.\n\n"
             "If you received this, your email alerts are ready to go!"
         )
