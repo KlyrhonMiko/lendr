@@ -245,6 +245,14 @@ export default function BorrowPage() {
       throw new Error(BORROW_KIOSK_TWO_FACTOR_ERROR);
     }
 
+    if ('auth_state' in loginRes && loginRes.auth_state === 'password_change_required') {
+      throw new Error('Initial password rotation required. Please sign in to the standard portal first to update your PIN.');
+    }
+
+    if (!('access_token' in loginRes)) {
+      throw new Error('Invalid login response');
+    }
+
     auth.setToken(loginRes.access_token);
 
     let borrowerUser = null;

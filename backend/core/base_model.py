@@ -1,6 +1,6 @@
-from sqlalchemy import Text, JSON
+from sqlalchemy import JSON, Text
 from datetime import datetime
-from uuid import UUID, uuid4
+from uuid import UUID, uuid7
 
 from sqlmodel import Field, SQLModel
 
@@ -9,7 +9,7 @@ from utils.time_utils import get_now_manila
 
 class BaseModel(SQLModel):
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    id: UUID = Field(default_factory=uuid7, primary_key=True)
     created_at: datetime = Field(default_factory=get_now_manila, nullable=False)
     updated_at: datetime = Field(default_factory=get_now_manila, nullable=False)
     is_deleted: bool = Field(default=False, nullable=False)

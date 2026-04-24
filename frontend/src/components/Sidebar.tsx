@@ -87,8 +87,13 @@ const navigation: Record<string, { section: string; items: { name: string; href:
     }
   ],
   borrowers: [
-    { name: 'History', href: '/borrowers/history', icon: History },
-    { name: 'Account', href: '/borrowers/account', icon: UserCircle },
+    {
+      section: 'Account',
+      items: [
+        { name: 'History', href: '/borrowers/history', icon: History },
+        { name: 'Account', href: '/borrowers/account', icon: UserCircle },
+      ]
+    }
   ],
 };
 

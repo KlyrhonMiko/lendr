@@ -136,3 +136,9 @@ memories/
 CLAUDE.md
 .claudesignore
 CODEBASE.md
+
+# Codex-local migration docs and instruction files
+/docs/
+AGENTS.md
+**/AGENTS.md
+.codex

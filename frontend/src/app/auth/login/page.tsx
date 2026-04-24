@@ -68,6 +68,7 @@ export default function LoginPage() {
   const handleTokenLogin = async (accessToken: string) => {
     auth.setToken(accessToken);
 
+    const user = await auth.getUser();
     const redirectPath = auth.getRedirectPath(user?.role);
     redirectToApp(redirectPath);
   };

@@ -8,7 +8,7 @@ Create Date: 2026-04-17 00:00:00.000000
 from __future__ import annotations
 
 from typing import Sequence, Union
-from uuid import uuid4
+from uuid import uuid7
 
 from alembic import op
 import sqlalchemy as sa
@@ -57,7 +57,7 @@ def _copy_missing_rows(
             continue
 
         payload = dict(row)
-        payload["id"] = uuid4()
+        payload["id"] = uuid7()
         bind.execute(sa.insert(target).values(**payload))
 
 

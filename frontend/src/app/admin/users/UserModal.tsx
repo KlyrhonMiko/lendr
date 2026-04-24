@@ -375,8 +375,8 @@ export function UserModal({
                     System Role
                   </h3>
                   <div className="grid grid-cols-2 gap-4 p-5 rounded-2xl border border-border/60 bg-muted/20">
-                    <FormSelect label="Role" value={formData.role} onChange={(v) => setFormData(p => ({ ...p, role: v }))} options={roles.map(r => ({ key: r.key, label: r.value }))} triggerClassName="h-11 rounded-xl" labelClassName="text-[11px] font-bold text-muted-foreground uppercase mb-1.5 ml-1" />
-                    <FormSelect label="Shift" value={formData.shift_type} onChange={(v) => setFormData(p => ({ ...p, shift_type: v }))} options={shifts.map(s => ({ key: s.key, label: s.value }))} triggerClassName="h-11 rounded-xl" labelClassName="text-[11px] font-bold text-muted-foreground uppercase mb-1.5 ml-1" />
+                    <FormSelect label="Role" value={formData.role} onChange={(v) => setFormData(p => ({ ...p, role: v }))} options={roles.map(r => ({ key: r.key, label: r.value }))} triggerClassName="h-11 rounded-xl" labelClassName="text-[11px] font-bold text-muted-foreground uppercase mb-1.5 ml-1" placeholder="Select role..." />
+                    <FormSelect label="Shift" value={formData.shift_type} onChange={(v) => setFormData(p => ({ ...p, shift_type: v }))} options={shifts.map(s => ({ key: s.key, label: s.value }))} triggerClassName="h-11 rounded-xl" labelClassName="text-[11px] font-bold text-muted-foreground uppercase mb-1.5 ml-1" placeholder="Select shift..." />
                   </div>
                 </section>
               </div>
