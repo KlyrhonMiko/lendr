@@ -80,7 +80,7 @@ describe('borrower profile password rules', () => {
   it('rejects non-numeric or non-6-digit password before API call', async () => {
     const { container } = renderWithQueryClient(<BorrowerProfilePage />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Change password' }));
+    fireEvent.click(screen.getByRole('button', { name: /change password/i }));
 
     const currentPasswordInput = container.querySelector(
       'input[name="current_password"]',
@@ -106,7 +106,7 @@ describe('borrower profile password rules', () => {
       target: { value: '12ab56' },
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Update password' }));
+    fireEvent.click(screen.getByRole('button', { name: /update/i }));
 
     expect(mocks.toastError).toHaveBeenCalledWith('Borrower password must be exactly 6 digits.');
     expect(mocks.updateMe).not.toHaveBeenCalled();
