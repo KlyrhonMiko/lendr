@@ -13,11 +13,14 @@ from fastapi.responses import StreamingResponse
 
 from core.models.audit_log import AuditLog
 from systems.inventory.models.borrow_request import BorrowRequest
+from systems.inventory.models.borrow_request_event import BorrowRequestEvent
 from systems.inventory.models.borrow_request_item import BorrowRequestItem
 from systems.inventory.models.borrow_request_unit import BorrowRequestUnit
+from systems.inventory.models.borrow_request_batch import BorrowRequestBatch
 from systems.inventory.models.inventory import InventoryItem
 from systems.inventory.models.inventory_unit import InventoryUnit
 from systems.inventory.models.inventory_batch import InventoryBatch
+from systems.inventory.models.inventory_movement import InventoryMovement
 from systems.inventory.schemas.import_export_schemas import TimelineMode
 from utils.time_utils import normalize_time_window
 
@@ -304,6 +307,97 @@ class ExportService:
             return "N/A"
         return value.strftime("%Y-%m-%d %H:%M:%S")
 
+    def _format_optional_timestamp(self, value: datetime | None) -> str:
+        if value is None:
+            return ""
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+
+    def _format_bool(self, value: bool | None) -> str:
+        if value is None:
+            return ""
+        return "Yes" if value else "No"
+
+    def _build_user_map(self, session: Session, actor_ids: set[Any]) -> dict[Any, str]:
+        from systems.admin.models.user import User
+
+        normalized_ids = {actor_id for actor_id in actor_ids if actor_id is not None}
+        if not normalized_ids:
+            return {}
+
+        users = session.exec(select(User).where(User.id.in_(normalized_ids))).all()
+        return {
+            user.id: f"{user.first_name} {user.last_name} ({user.employee_id or user.user_id})"
+            for user in users
+        }
+
+    def _format_actor_from_map(self, user_map: dict[Any, str], actor_id: Any) -> str:
+        if actor_id is None:
+            return ""
+        return user_map.get(actor_id, str(actor_id))
+
+    def _days_between(self, start: datetime | None, end: datetime | None) -> str:
+        if start is None or end is None:
+            return ""
+        return str(max((end - start).days, 0))
+
+    def _build_filter_summary_rows(
+        self,
+        export_name: str,
+        format: str,
+        timeline_mode: TimelineMode | None,
+        anchor_date: date | None,
+        date_from: datetime | None,
+        date_to: datetime | None,
+        include_deleted: bool,
+        include_archived: bool,
+        extra_filters: dict[str, Any] | None = None,
+    ) -> list[list[Any]]:
+        rows: list[list[Any]] = [
+            ["Report", export_name],
+            ["Generated At", self._format_optional_timestamp(datetime.now())],
+            ["Format", format],
+            ["Timeline Mode", getattr(timeline_mode, "value", timeline_mode) or ""],
+            ["Anchor Date", anchor_date.isoformat() if anchor_date else ""],
+            ["Date From", self._format_optional_timestamp(date_from)],
+            ["Date To", self._format_optional_timestamp(date_to)],
+            ["Include Deleted", self._format_bool(include_deleted)],
+            ["Include Archived", self._format_bool(include_archived)],
+        ]
+        if extra_filters:
+            rows.extend([[key, value if value is not None else ""] for key, value in extra_filters.items()])
+        return rows
+
+    def _create_multi_sheet_response(
+        self,
+        sheets: list[tuple[str, list[str], list[list[Any]]]],
+        filename_prefix: str,
+    ) -> StreamingResponse:
+        filename = f"{filename_prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        wb = Workbook()
+        default_sheet = wb.active
+        wb.remove(default_sheet)
+
+        for sheet_name, headers, rows in sheets:
+            ws = wb.create_sheet(title=sheet_name[:31])
+            sanitized_headers = [self._sanitize_export_cell(header) for header in headers]
+            sanitized_rows = self._sanitize_export_rows(rows)
+            for col, header in enumerate(sanitized_headers, 1):
+                cell = ws.cell(row=1, column=col, value=header)
+                cell.font = Font(bold=True)
+                cell.alignment = Alignment(horizontal="center")
+            for row_idx, row_data in enumerate(sanitized_rows, 2):
+                for col_idx, value in enumerate(row_data, 1):
+                    ws.cell(row=row_idx, column=col_idx, value=value)
+
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}.xlsx"},
+        )
+
     def _build_receipt_export_payload(self, receipt_payload: dict[str, Any]) -> dict[str, Any]:
         export_payload: dict[str, Any] = {
             key: receipt_payload.get(key)
@@ -343,6 +437,7 @@ class ExportService:
         self, 
         session: Session, 
         format: str, 
+        report_version: str = "v1",
         from_date: Optional[datetime] = None, 
         to_date: Optional[datetime] = None,
         timeline_mode: TimelineMode | None = None,
@@ -360,6 +455,18 @@ class ExportService:
             date_from=effective_from_date,
             date_to=effective_to_date,
         )
+
+        if report_version == "v2":
+            return self._export_audit_logs_v2(
+                session=session,
+                format=format,
+                timeline_mode=timeline_mode,
+                anchor_date=anchor_date,
+                date_from=normalized_from_date,
+                date_to=normalized_to_date,
+                include_deleted=include_deleted,
+                include_archived=include_archived,
+            )
 
         statement = select(AuditLog)
         statement = self._apply_visibility_filters(
@@ -402,6 +509,7 @@ class ExportService:
         self, 
         session: Session, 
         format: str,
+        report_version: str = "v1",
         timeline_mode: TimelineMode | None = None,
         anchor_date: date | None = None,
         date_from: datetime | None = None,
@@ -415,6 +523,18 @@ class ExportService:
             date_from=date_from,
             date_to=date_to,
         )
+
+        if report_version == "v2":
+            return self._export_inventory_v2(
+                session=session,
+                format=format,
+                timeline_mode=timeline_mode,
+                anchor_date=anchor_date,
+                date_from=normalized_from_date,
+                date_to=normalized_to_date,
+                include_deleted=include_deleted,
+                include_archived=include_archived,
+            )
 
         headers = ["name", "category", "classification", "item_type", "is_trackable", "description", "condition", "quantity", "serial_number", "expiration_date"]
         
@@ -546,6 +666,7 @@ class ExportService:
         self, 
         session: Session, 
         format: str, 
+        report_version: str = "v1",
         status: Optional[str] = None,
         item_id: Optional[str] = None,
         borrower_id: Optional[str] = None,
@@ -564,6 +685,22 @@ class ExportService:
             date_from=date_from,
             date_to=date_to,
         )
+
+        if report_version == "v2":
+            return self._export_borrow_history_v2(
+                session=session,
+                format=format,
+                status=status,
+                item_id=item_id,
+                borrower_id=borrower_id,
+                serial_number=serial_number,
+                timeline_mode=timeline_mode,
+                anchor_date=anchor_date,
+                date_from=normalized_from_date,
+                date_to=normalized_to_date,
+                include_deleted=include_deleted,
+                include_archived=include_archived,
+            )
 
         from systems.admin.models.user import User
         headers = [
@@ -740,6 +877,7 @@ class ExportService:
         self, 
         session: Session, 
         format: str, 
+        report_version: str = "v1",
         movement_type: Optional[str] = None,
         item_id: Optional[str] = None,
         serial_number: Optional[str] = None,
@@ -756,6 +894,21 @@ class ExportService:
             date_from=date_from,
             date_to=date_to,
         )
+
+        if report_version == "v2":
+            return self._export_movements_v2(
+                session=session,
+                format=format,
+                movement_type=movement_type,
+                item_id=item_id,
+                serial_number=serial_number,
+                timeline_mode=timeline_mode,
+                anchor_date=anchor_date,
+                date_from=normalized_from_date,
+                date_to=normalized_to_date,
+                include_deleted=include_deleted,
+                include_archived=include_archived,
+            )
 
         headers = [
             "Serial Number",
@@ -904,6 +1057,1019 @@ class ExportService:
         ]
         
         return self._create_response(headers, data, format, "inventory_movements")
+
+    def _export_audit_logs_v2(
+        self,
+        session: Session,
+        format: str,
+        timeline_mode: TimelineMode | None,
+        anchor_date: date | None,
+        date_from: datetime | None,
+        date_to: datetime | None,
+        include_deleted: bool,
+        include_archived: bool,
+    ) -> StreamingResponse:
+        statement = select(AuditLog)
+        statement = self._apply_visibility_filters(
+            statement,
+            AuditLog,
+            include_deleted,
+            include_archived,
+        )
+        statement = self._apply_datetime_window(statement, AuditLog.created_at, date_from, date_to)
+        logs = self._execute_bounded_query(session, statement, self._MAX_QUERY_ROWS, "audit logs")
+
+        user_map = self._build_user_map(session, {log.actor_id for log in logs})
+        headers = [
+            "ID",
+            "Audit ID",
+            "Action",
+            "Entity ID",
+            "Entity Type",
+            "Actor UUID",
+            "Actor",
+            "Timestamp",
+            "Reason",
+        ]
+        rows = [
+            [
+                str(log.id),
+                log.audit_id,
+                log.action,
+                log.entity_id,
+                log.entity_type,
+                str(log.actor_id) if log.actor_id else "",
+                self._format_actor_from_map(user_map, log.actor_id),
+                self._format_optional_timestamp(log.created_at),
+                log.reason_code or "",
+            ]
+            for log in logs
+        ]
+
+        if format == "csv":
+            return self._create_response(headers, rows, format, "audit_logs_report")
+
+        summary_rows = self._build_filter_summary_rows(
+            "Audit Logs",
+            format,
+            timeline_mode,
+            anchor_date,
+            date_from,
+            date_to,
+            include_deleted,
+            include_archived,
+            {"Total Logs": len(logs)},
+        )
+        for label, values in (
+            ("Action", [log.action for log in logs]),
+            ("Entity Type", [log.entity_type for log in logs]),
+            ("Reason", [log.reason_code or "None" for log in logs]),
+        ):
+            counts: dict[str, int] = defaultdict(int)
+            for value in values:
+                counts[value] += 1
+            for value, count in sorted(counts.items()):
+                summary_rows.append([f"{label}: {value}", count])
+
+        return self._create_multi_sheet_response(
+            [
+                ("Summary", ["Metric", "Value"], summary_rows),
+                ("Audit Logs", headers, rows),
+            ],
+            "audit_logs_report",
+        )
+
+    def _export_inventory_v2(
+        self,
+        session: Session,
+        format: str,
+        timeline_mode: TimelineMode | None,
+        anchor_date: date | None,
+        date_from: datetime | None,
+        date_to: datetime | None,
+        include_deleted: bool,
+        include_archived: bool,
+    ) -> StreamingResponse:
+        item_statement = self._apply_visibility_filters(
+            select(InventoryItem),
+            InventoryItem,
+            include_deleted,
+            include_archived,
+        )
+        item_statement = self._apply_datetime_window(
+            item_statement,
+            InventoryItem.created_at,
+            date_from,
+            date_to,
+        )
+        items = self._execute_bounded_query(
+            session,
+            item_statement,
+            self._MAX_EXPORT_ITEMS,
+            "inventory items",
+        )
+        item_ids = [item.id for item in items]
+
+        units_by_item_id: dict[Any, list[InventoryUnit]] = defaultdict(list)
+        batches_by_item_id: dict[Any, list[InventoryBatch]] = defaultdict(list)
+        if item_ids:
+            units_statement = self._apply_visibility_filters(
+                select(InventoryUnit).where(InventoryUnit.inventory_uuid.in_(item_ids)),
+                InventoryUnit,
+                include_deleted,
+                include_archived,
+            )
+            for unit in self._execute_bounded_query(
+                session,
+                units_statement,
+                self._MAX_EXPORT_ROWS,
+                "inventory units",
+            ):
+                units_by_item_id[unit.inventory_uuid].append(unit)
+
+            batches_statement = self._apply_visibility_filters(
+                select(InventoryBatch).where(InventoryBatch.inventory_uuid.in_(item_ids)),
+                InventoryBatch,
+                include_deleted,
+                include_archived,
+            )
+            for batch in self._execute_bounded_query(
+                session,
+                batches_statement,
+                self._MAX_EXPORT_ROWS,
+                "inventory batches",
+            ):
+                batches_by_item_id[batch.inventory_uuid].append(batch)
+
+        headers = [
+            "name",
+            "category",
+            "classification",
+            "item_type",
+            "is_trackable",
+            "description",
+            "condition",
+            "quantity",
+            "serial_number",
+            "expiration_date",
+        ]
+        rows: list[list[Any]] = []
+        for item in items:
+            if item.is_trackable:
+                units = units_by_item_id.get(item.id, [])
+                if not units:
+                    self._append_inventory_row(rows, [item.name, item.category or "", item.classification or "", item.item_type or "", "true", "", "", "0", "", ""])
+                for unit in units:
+                    self._append_inventory_row(rows, [
+                        item.name,
+                        item.category or "",
+                        item.classification or "",
+                        item.item_type or "",
+                        "true",
+                        unit.description or "",
+                        unit.condition or "",
+                        "1",
+                        unit.serial_number or "",
+                        unit.expiration_date.isoformat() if unit.expiration_date else "",
+                    ])
+            else:
+                batches = batches_by_item_id.get(item.id, [])
+                if not batches:
+                    self._append_inventory_row(rows, [item.name, item.category or "", item.classification or "", item.item_type or "", "false", "", "", "0", "", ""])
+                for batch in batches:
+                    self._append_inventory_row(rows, [
+                        item.name,
+                        item.category or "",
+                        item.classification or "",
+                        item.item_type or "",
+                        "false",
+                        batch.description or "",
+                        "",
+                        str(batch.total_qty),
+                        "",
+                        batch.expiration_date.isoformat() if batch.expiration_date else "",
+                    ])
+
+        if format == "csv":
+            return self._create_response(headers, rows, format, "inventory_export_report")
+
+        summary_rows = self._build_filter_summary_rows(
+            "Inventory Catalog",
+            format,
+            timeline_mode,
+            anchor_date,
+            date_from,
+            date_to,
+            include_deleted,
+            include_archived,
+            {
+                "Total Items": len(items),
+                "Trackable Items": sum(1 for item in items if item.is_trackable),
+                "Non-Trackable Items": sum(1 for item in items if not item.is_trackable),
+                "Unit Rows": sum(len(units) for units in units_by_item_id.values()),
+                "Batch Rows": sum(len(batches) for batches in batches_by_item_id.values()),
+            },
+        )
+        for label, values in (
+            ("Category", [item.category or "None" for item in items]),
+            ("Classification", [item.classification or "None" for item in items]),
+            ("Item Type", [item.item_type or "None" for item in items]),
+        ):
+            counts: dict[str, int] = defaultdict(int)
+            for value in values:
+                counts[value] += 1
+            for value, count in sorted(counts.items()):
+                summary_rows.append([f"{label}: {value}", count])
+
+        return self._create_multi_sheet_response(
+            [
+                ("Summary", ["Metric", "Value"], summary_rows),
+                ("Catalog", headers, rows),
+            ],
+            "inventory_export_report",
+        )
+
+    def _export_borrow_history_v2(
+        self,
+        session: Session,
+        format: str,
+        status: Optional[str],
+        item_id: Optional[str],
+        borrower_id: Optional[str],
+        serial_number: Optional[str],
+        timeline_mode: TimelineMode | None,
+        anchor_date: date | None,
+        date_from: datetime | None,
+        date_to: datetime | None,
+        include_deleted: bool,
+        include_archived: bool,
+    ) -> StreamingResponse:
+        from systems.admin.models.user import User
+
+        borrower_user = aliased(User)
+        requested_item = aliased(InventoryItem)
+        serial_unit = aliased(InventoryUnit)
+        normalized_serial_number = serial_number.strip() if serial_number else None
+
+        statement = select(BorrowRequest.id, BorrowRequest.request_date).outerjoin(
+            borrower_user,
+            BorrowRequest.borrower_uuid == borrower_user.id,
+        )
+        statement = self._apply_visibility_filters(
+            statement,
+            BorrowRequest,
+            include_deleted,
+            include_archived,
+        )
+        statement = self._apply_datetime_window(
+            statement,
+            BorrowRequest.request_date,
+            date_from,
+            date_to,
+        )
+        if status and status != "all":
+            statement = statement.where(BorrowRequest.status == status)
+        if borrower_id:
+            statement = statement.where(borrower_user.user_id == borrower_id)
+        if item_id:
+            statement = statement.join(
+                BorrowRequestItem,
+                BorrowRequestItem.borrow_uuid == BorrowRequest.id,
+            ).join(
+                requested_item,
+                BorrowRequestItem.item_uuid == requested_item.id,
+            )
+            statement = self._apply_visibility_filters(
+                statement,
+                BorrowRequestItem,
+                include_deleted,
+                include_archived,
+            )
+            statement = self._apply_visibility_filters(
+                statement,
+                requested_item,
+                include_deleted,
+                include_archived,
+            )
+            statement = statement.where(requested_item.item_id == item_id)
+        if normalized_serial_number:
+            statement = statement.join(
+                BorrowRequestUnit,
+                BorrowRequestUnit.borrow_uuid == BorrowRequest.id,
+            ).join(
+                serial_unit,
+                BorrowRequestUnit.unit_uuid == serial_unit.id,
+            )
+            statement = self._apply_visibility_filters(
+                statement,
+                BorrowRequestUnit,
+                include_deleted,
+                include_archived,
+            )
+            statement = self._apply_visibility_filters(
+                statement,
+                serial_unit,
+                include_deleted,
+                include_archived,
+            )
+            statement = statement.where(serial_unit.serial_number == normalized_serial_number)
+
+        request_keys = self._execute_bounded_query(
+            session,
+            statement.distinct().order_by(BorrowRequest.request_date.desc()),
+            self._MAX_QUERY_ROWS,
+            "borrow history requests",
+        )
+        request_ids = [request_id for request_id, _ in request_keys if request_id is not None]
+        requests: list[BorrowRequest] = []
+        if request_ids:
+            request_statement = self._apply_visibility_filters(
+                select(BorrowRequest).where(BorrowRequest.id.in_(request_ids)),
+                BorrowRequest,
+                include_deleted,
+                include_archived,
+            )
+            request_map = {
+                request.id: request
+                for request in self._execute_bounded_query(
+                    session,
+                    request_statement,
+                    self._MAX_QUERY_ROWS,
+                    "borrow history request records",
+                )
+            }
+            requests = [
+                request_map[request_id]
+                for request_id in request_ids
+                if request_id in request_map
+            ]
+
+        request_items_by_request_id: dict[Any, list[BorrowRequestItem]] = defaultdict(list)
+        item_by_id: dict[Any, InventoryItem] = {}
+        unit_rows_by_request_id: dict[Any, list[tuple[BorrowRequestUnit, InventoryUnit | None, InventoryItem | None]]] = defaultdict(list)
+        batch_rows_by_request_id: dict[Any, list[tuple[BorrowRequestBatch, InventoryBatch | None, InventoryItem | None]]] = defaultdict(list)
+        events_by_request_id: dict[Any, list[BorrowRequestEvent]] = defaultdict(list)
+
+        if request_ids:
+            item_statement = self._apply_visibility_filters(
+                select(BorrowRequestItem).where(BorrowRequestItem.borrow_uuid.in_(request_ids)),
+                BorrowRequestItem,
+                include_deleted,
+                include_archived,
+            )
+            request_items = self._execute_bounded_query(
+                session,
+                item_statement.order_by(BorrowRequestItem.created_at.asc()),
+                self._MAX_EXPORT_ROWS,
+                "borrow request items",
+            )
+            item_uuids = {row.item_uuid for row in request_items if row.item_uuid is not None}
+            if item_uuids:
+                inventory_statement = self._apply_visibility_filters(
+                    select(InventoryItem).where(InventoryItem.id.in_(item_uuids)),
+                    InventoryItem,
+                    include_deleted,
+                    include_archived,
+                )
+                item_by_id = {
+                    item.id: item
+                    for item in self._execute_bounded_query(
+                        session,
+                        inventory_statement,
+                        self._MAX_EXPORT_ITEMS,
+                        "borrow request item details",
+                    )
+                }
+            for request_item in request_items:
+                request_items_by_request_id[request_item.borrow_uuid].append(request_item)
+
+            unit_statement = (
+                select(BorrowRequestUnit, InventoryUnit, InventoryItem)
+                .outerjoin(InventoryUnit, BorrowRequestUnit.unit_uuid == InventoryUnit.id)
+                .outerjoin(InventoryItem, InventoryUnit.inventory_uuid == InventoryItem.id)
+                .where(BorrowRequestUnit.borrow_uuid.in_(request_ids))
+            )
+            unit_statement = self._apply_visibility_filters(unit_statement, BorrowRequestUnit, include_deleted, include_archived)
+            unit_statement = self._apply_visibility_filters(unit_statement, InventoryUnit, include_deleted, include_archived)
+            unit_statement = self._apply_visibility_filters(unit_statement, InventoryItem, include_deleted, include_archived)
+            unit_rows = self._execute_bounded_query(
+                session,
+                unit_statement,
+                self._MAX_EXPORT_ROWS,
+                "borrow request unit assignments",
+            )
+            for assignment, unit, inventory_item in unit_rows:
+                unit_rows_by_request_id[assignment.borrow_uuid].append((assignment, unit, inventory_item))
+
+            batch_statement = (
+                select(BorrowRequestBatch, InventoryBatch, InventoryItem)
+                .outerjoin(InventoryBatch, BorrowRequestBatch.batch_uuid == InventoryBatch.id)
+                .outerjoin(InventoryItem, InventoryBatch.inventory_uuid == InventoryItem.id)
+                .where(BorrowRequestBatch.borrow_uuid.in_(request_ids))
+            )
+            batch_statement = self._apply_visibility_filters(batch_statement, BorrowRequestBatch, include_deleted, include_archived)
+            batch_statement = self._apply_visibility_filters(batch_statement, InventoryBatch, include_deleted, include_archived)
+            batch_statement = self._apply_visibility_filters(batch_statement, InventoryItem, include_deleted, include_archived)
+            batch_rows = self._execute_bounded_query(
+                session,
+                batch_statement,
+                self._MAX_EXPORT_ROWS,
+                "borrow request batch assignments",
+            )
+            for assignment, batch, inventory_item in batch_rows:
+                batch_rows_by_request_id[assignment.borrow_uuid].append((assignment, batch, inventory_item))
+
+            event_statement = self._apply_visibility_filters(
+                select(BorrowRequestEvent).where(BorrowRequestEvent.borrow_uuid.in_(request_ids)),
+                BorrowRequestEvent,
+                include_deleted,
+                include_archived,
+            )
+            events = self._execute_bounded_query(
+                session,
+                event_statement.order_by(BorrowRequestEvent.occurred_at.asc()),
+                self._MAX_EXPORT_ROWS,
+                "borrow request events",
+            )
+            for event in events:
+                events_by_request_id[event.borrow_uuid].append(event)
+
+        actor_ids: set[Any] = set()
+        for request in requests:
+            actor_ids.update(
+                {
+                    request.borrower_uuid,
+                    request.approved_by,
+                    request.released_by,
+                    request.returned_by,
+                    request.received_by,
+                    request.closed_by,
+                }
+            )
+        for rows in unit_rows_by_request_id.values():
+            for assignment, _, _ in rows:
+                actor_ids.update(
+                    {
+                        assignment.requested_by,
+                        assignment.approved_by,
+                        assignment.assigned_by,
+                        assignment.released_by,
+                        assignment.returned_by,
+                    }
+                )
+        for rows in batch_rows_by_request_id.values():
+            for assignment, _, _ in rows:
+                actor_ids.add(assignment.assigned_by)
+        for events in events_by_request_id.values():
+            actor_ids.update(event.actor_id for event in events)
+        user_map = self._build_user_map(session, actor_ids)
+
+        request_headers = [
+            "Request ID",
+            "Transaction Ref",
+            "Status",
+            "Requested At",
+            "Expected Return At",
+            "Borrower",
+            "Customer Name",
+            "Location Name",
+            "Request Channel",
+            "Approval Channel",
+            "Emergency",
+            "Approved By",
+            "Approved At",
+            "Released By",
+            "Released At",
+            "Returned By",
+            "Returned At",
+            "Received By",
+            "Closed By",
+            "Closed At",
+            "Close Reason",
+            "Returned On Time",
+            "Days Borrowed",
+            "Item Count",
+            "Unit Count",
+            "Batch Count",
+            "Notes",
+            "Compliance Follow-up Required",
+            "Compliance Follow-up Notes",
+        ]
+        request_rows = [
+            [
+                request.request_id,
+                request.transaction_ref,
+                request.status,
+                self._format_optional_timestamp(request.request_date),
+                self._format_optional_timestamp(request.return_at),
+                self._format_actor_from_map(user_map, request.borrower_uuid) or (request.customer_name or ""),
+                request.customer_name or "",
+                request.location_name or "",
+                request.request_channel,
+                request.approval_channel,
+                self._format_bool(request.is_emergency),
+                self._format_actor_from_map(user_map, request.approved_by),
+                self._format_optional_timestamp(request.approved_at),
+                self._format_actor_from_map(user_map, request.released_by),
+                self._format_optional_timestamp(request.released_at),
+                self._format_actor_from_map(user_map, request.returned_by),
+                self._format_optional_timestamp(request.returned_at),
+                self._format_actor_from_map(user_map, request.received_by),
+                self._format_actor_from_map(user_map, request.closed_by),
+                self._format_optional_timestamp(request.closed_at),
+                request.close_reason or "",
+                self._format_bool(request.returned_on_time),
+                self._days_between(request.released_at, request.returned_at),
+                len(request_items_by_request_id.get(request.id, [])),
+                len(unit_rows_by_request_id.get(request.id, [])),
+                len(batch_rows_by_request_id.get(request.id, [])),
+                request.notes or "",
+                self._format_bool(request.compliance_followup_required),
+                request.compliance_followup_notes or "",
+            ]
+            for request in requests
+        ]
+
+        line_headers = [
+            "Request ID",
+            "Transaction Ref",
+            "Status",
+            "Requested At",
+            "Borrower",
+            "Item ID",
+            "Item Name",
+            "Category",
+            "Classification",
+            "Item Type",
+            "Is Trackable",
+            "Qty Requested",
+            "Qty Assigned/Released",
+            "Unit ID",
+            "Serial Number",
+            "Batch ID",
+            "Assigned By",
+            "Assigned At",
+            "Released By",
+            "Released At",
+            "Condition On Release",
+            "Returned By",
+            "Returned At",
+            "Received By",
+            "Condition On Return",
+            "Return Notes",
+            "Request Notes",
+        ]
+        line_rows: list[list[Any]] = []
+        for request in requests:
+            request_items = request_items_by_request_id.get(request.id, [])
+            request_unit_rows = unit_rows_by_request_id.get(request.id, [])
+            request_batch_rows = batch_rows_by_request_id.get(request.id, [])
+            for request_item in request_items:
+                inventory_item = item_by_id.get(request_item.item_uuid)
+                matching_units = [
+                    row for row in request_unit_rows
+                    if row[1] is not None and row[1].inventory_uuid == request_item.item_uuid
+                ]
+                matching_batches = [
+                    row for row in request_batch_rows
+                    if row[1] is not None and row[1].inventory_uuid == request_item.item_uuid
+                ]
+                if matching_units:
+                    for assignment, unit, unit_item in matching_units:
+                        resolved_item = unit_item or inventory_item
+                        self._append_inventory_row(line_rows, [
+                            request.request_id,
+                            request.transaction_ref,
+                            request.status,
+                            self._format_optional_timestamp(request.request_date),
+                            self._format_actor_from_map(user_map, request.borrower_uuid) or (request.customer_name or ""),
+                            resolved_item.item_id if resolved_item else "",
+                            resolved_item.name if resolved_item else "Deleted Inventory Item",
+                            resolved_item.category if resolved_item else "",
+                            resolved_item.classification if resolved_item else "",
+                            resolved_item.item_type if resolved_item else "",
+                            "true",
+                            request_item.qty_requested,
+                            1 if assignment.released_at else 0,
+                            unit.unit_id if unit else "",
+                            unit.serial_number if unit and unit.serial_number else "",
+                            "",
+                            self._format_actor_from_map(user_map, assignment.assigned_by),
+                            self._format_optional_timestamp(assignment.assigned_at),
+                            self._format_actor_from_map(user_map, assignment.released_by or request.released_by),
+                            self._format_optional_timestamp(assignment.released_at or request.released_at),
+                            assignment.condition_on_release or (unit.condition if unit else "") or "",
+                            self._format_actor_from_map(user_map, assignment.returned_by or request.returned_by),
+                            self._format_optional_timestamp(assignment.returned_at or request.returned_at),
+                            self._format_actor_from_map(user_map, request.received_by),
+                            assignment.condition_on_return or "",
+                            assignment.return_notes or "",
+                            request.notes or "",
+                        ])
+                elif matching_batches:
+                    for assignment, batch, batch_item in matching_batches:
+                        resolved_item = batch_item or inventory_item
+                        self._append_inventory_row(line_rows, [
+                            request.request_id,
+                            request.transaction_ref,
+                            request.status,
+                            self._format_optional_timestamp(request.request_date),
+                            self._format_actor_from_map(user_map, request.borrower_uuid) or (request.customer_name or ""),
+                            resolved_item.item_id if resolved_item else "",
+                            resolved_item.name if resolved_item else "Deleted Inventory Item",
+                            resolved_item.category if resolved_item else "",
+                            resolved_item.classification if resolved_item else "",
+                            resolved_item.item_type if resolved_item else "",
+                            "false",
+                            request_item.qty_requested,
+                            assignment.qty_assigned,
+                            "",
+                            "",
+                            batch.batch_id if batch else "",
+                            self._format_actor_from_map(user_map, assignment.assigned_by),
+                            self._format_optional_timestamp(assignment.assigned_at),
+                            self._format_actor_from_map(user_map, request.released_by),
+                            self._format_optional_timestamp(assignment.released_at or request.released_at),
+                            "",
+                            self._format_actor_from_map(user_map, request.returned_by),
+                            self._format_optional_timestamp(assignment.returned_at or request.returned_at),
+                            self._format_actor_from_map(user_map, request.received_by),
+                            "",
+                            "",
+                            request.notes or "",
+                        ])
+                else:
+                    self._append_inventory_row(line_rows, [
+                        request.request_id,
+                        request.transaction_ref,
+                        request.status,
+                        self._format_optional_timestamp(request.request_date),
+                        self._format_actor_from_map(user_map, request.borrower_uuid) or (request.customer_name or ""),
+                        inventory_item.item_id if inventory_item else "",
+                        inventory_item.name if inventory_item else "Deleted Inventory Item",
+                        inventory_item.category if inventory_item else "",
+                        inventory_item.classification if inventory_item else "",
+                        inventory_item.item_type if inventory_item else "",
+                        self._format_bool(inventory_item.is_trackable) if inventory_item else "",
+                        request_item.qty_requested,
+                        0,
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        request.notes or "",
+                    ])
+
+        event_headers = ["Request ID", "Event ID", "Event Type", "Actor", "Occurred At", "Note"]
+        event_rows = [
+            [
+                request.request_id,
+                event.event_id,
+                event.event_type,
+                self._format_actor_from_map(user_map, event.actor_id),
+                self._format_optional_timestamp(event.occurred_at),
+                event.note or "",
+            ]
+            for request in requests
+            for event in events_by_request_id.get(request.id, [])
+        ]
+
+        if format == "csv":
+            return self._create_response(line_headers, line_rows, format, "borrow_history_report")
+
+        status_counts: dict[str, int] = defaultdict(int)
+        for request in requests:
+            status_counts[request.status] += 1
+        summary_rows = self._build_filter_summary_rows(
+            "Borrow Request History",
+            format,
+            timeline_mode,
+            anchor_date,
+            date_from,
+            date_to,
+            include_deleted,
+            include_archived,
+            {
+                "Status Filter": status or "",
+                "Borrower Filter": borrower_id or "",
+                "Item Filter": item_id or "",
+                "Serial Filter": normalized_serial_number or "",
+                "Total Requests": len(requests),
+                "Total Requested Quantity": sum(item.qty_requested for rows in request_items_by_request_id.values() for item in rows),
+                "Total Line Rows": len(line_rows),
+                "Emergency Requests": sum(1 for request in requests if request.is_emergency),
+                "Returned On Time": sum(1 for request in requests if request.returned_on_time is True),
+                "Returned Late": sum(1 for request in requests if request.returned_on_time is False),
+            },
+        )
+        for status_value, count in sorted(status_counts.items()):
+            summary_rows.append([f"Status: {status_value}", count])
+
+        return self._create_multi_sheet_response(
+            [
+                ("Summary", ["Metric", "Value"], summary_rows),
+                ("Requests", request_headers, request_rows),
+                ("Line Items", line_headers, line_rows),
+                ("Events", event_headers, event_rows),
+            ],
+            "borrow_history_report",
+        )
+
+    def _export_movements_v2(
+        self,
+        session: Session,
+        format: str,
+        movement_type: Optional[str],
+        item_id: Optional[str],
+        serial_number: Optional[str],
+        timeline_mode: TimelineMode | None,
+        anchor_date: date | None,
+        date_from: datetime | None,
+        date_to: datetime | None,
+        include_deleted: bool,
+        include_archived: bool,
+    ) -> StreamingResponse:
+        from systems.admin.models.user import User
+
+        normalized_serial_number = serial_number.strip() if serial_number else None
+        normalized_movement_type = (movement_type or "all").strip().lower()
+        if normalized_movement_type not in {"all", "out", "in"}:
+            raise ValueError("movement_type must be one of: all, out, in")
+
+        actor_name_expr = func.concat(User.first_name, " ", User.last_name).label("actor_name")
+        statement = (
+            select(
+                InventoryMovement,
+                InventoryUnit,
+                InventoryItem,
+                User.user_id,
+                actor_name_expr,
+            )
+            .join(InventoryUnit, InventoryMovement.unit_uuid == InventoryUnit.id)
+            .outerjoin(InventoryItem, InventoryMovement.inventory_uuid == InventoryItem.id)
+            .outerjoin(User, InventoryMovement.actor_id == User.id)
+        )
+        statement = self._apply_visibility_filters(statement, InventoryMovement, include_deleted, include_archived)
+        statement = self._apply_visibility_filters(statement, InventoryUnit, include_deleted, include_archived)
+        statement = self._apply_visibility_filters(statement, InventoryItem, include_deleted, include_archived)
+        statement = self._apply_datetime_window(statement, InventoryMovement.occurred_at, date_from, date_to)
+
+        if normalized_movement_type == "out":
+            statement = statement.where(InventoryMovement.movement_type == "borrow_release")
+        elif normalized_movement_type == "in":
+            statement = statement.where(InventoryMovement.movement_type == "borrow_return")
+        if item_id:
+            statement = statement.where(InventoryItem.item_id == item_id)
+        if normalized_serial_number:
+            statement = statement.where(InventoryUnit.serial_number == normalized_serial_number)
+
+        movement_rows = self._execute_bounded_query(
+            session,
+            statement.order_by(InventoryUnit.serial_number.asc(), InventoryMovement.occurred_at.asc()),
+            self._MAX_QUERY_ROWS,
+            "equipment history lifecycle events",
+        )
+
+        borrow_ref_ids = {
+            movement.reference_id
+            for movement, _, _, _, _ in movement_rows
+            if movement.reference_id
+            and movement.movement_type in {"borrow_release", "borrow_return"}
+            and movement.reference_type in (None, "borrow_request")
+        }
+        borrow_context: dict[str, tuple[BorrowRequest, str]] = {}
+        if borrow_ref_ids:
+            borrower_user = aliased(User)
+            borrow_statement = (
+                select(BorrowRequest, borrower_user)
+                .outerjoin(borrower_user, BorrowRequest.borrower_uuid == borrower_user.id)
+                .where(BorrowRequest.request_id.in_(borrow_ref_ids))
+            )
+            borrow_statement = self._apply_visibility_filters(
+                borrow_statement,
+                BorrowRequest,
+                include_deleted,
+                include_archived,
+            )
+            for request, borrower in self._execute_bounded_query(
+                session,
+                borrow_statement,
+                self._MAX_QUERY_ROWS,
+                "equipment history borrow context",
+            ):
+                borrower_name = (
+                    f"{borrower.first_name} {borrower.last_name} ({borrower.employee_id or borrower.user_id})"
+                    if borrower
+                    else (request.customer_name or "")
+                )
+                borrow_context[request.request_id] = (request, borrower_name)
+
+        request_ids = [request.id for request, _ in borrow_context.values() if request.id is not None]
+        assignment_context: dict[tuple[Any, Any], BorrowRequestUnit] = {}
+        if request_ids:
+            assignment_statement = self._apply_visibility_filters(
+                select(BorrowRequestUnit).where(BorrowRequestUnit.borrow_uuid.in_(request_ids)),
+                BorrowRequestUnit,
+                include_deleted,
+                include_archived,
+            )
+            assignments = self._execute_bounded_query(
+                session,
+                assignment_statement,
+                self._MAX_EXPORT_ROWS,
+                "equipment history request assignments",
+            )
+            for assignment in assignments:
+                assignment_context[(assignment.borrow_uuid, assignment.unit_uuid)] = assignment
+
+        event_headers = [
+            "Serial Number",
+            "Unit ID",
+            "Item ID",
+            "Item Name",
+            "Movement ID",
+            "Event Time",
+            "Lifecycle Event Type",
+            "Quantity Change",
+            "Reason Code",
+            "Note",
+            "Actor",
+            "Reference Type",
+            "Reference ID",
+            "Request ID",
+            "Borrower",
+            "Customer Name",
+            "Location Name",
+            "Released At",
+            "Returned At",
+            "Condition On Release",
+            "Condition On Return",
+            "Reversed",
+        ]
+
+        moved_ids = [movement.movement_id for movement, _, _, _, _ in movement_rows]
+        reversed_ids = set()
+        if moved_ids:
+            reversed_ids = set(
+                self._execute_bounded_query(
+                    session,
+                    select(InventoryMovement.reference_id).where(
+                        InventoryMovement.movement_type == "reversal",
+                        InventoryMovement.reference_id.in_(moved_ids),
+                    ),
+                    self._MAX_QUERY_ROWS,
+                    "equipment history reversals",
+                )
+            )
+
+        lifecycle_rows: list[list[Any]] = []
+        equipment_stats: dict[Any, dict[str, Any]] = {}
+        for movement, unit, inventory_item, actor_user_id, actor_name in movement_rows:
+            request_context = borrow_context.get(movement.reference_id or "")
+            request = request_context[0] if request_context else None
+            borrower_name = request_context[1] if request_context else ""
+            assignment = assignment_context.get((request.id, unit.id)) if request and unit else None
+
+            lifecycle_rows.append([
+                unit.serial_number or "",
+                unit.unit_id,
+                inventory_item.item_id if inventory_item else "",
+                inventory_item.name if inventory_item else "Deleted Inventory Item",
+                movement.movement_id,
+                self._format_optional_timestamp(movement.occurred_at),
+                movement.movement_type,
+                movement.qty_change,
+                movement.reason_code or "",
+                movement.note or "",
+                actor_name or actor_user_id or "",
+                movement.reference_type or "",
+                movement.reference_id or "",
+                request.request_id if request else "",
+                borrower_name,
+                request.customer_name if request else "",
+                request.location_name if request else "",
+                self._format_optional_timestamp(assignment.released_at if assignment else (request.released_at if request else None)),
+                self._format_optional_timestamp(assignment.returned_at if assignment else (request.returned_at if request else None)),
+                assignment.condition_on_release if assignment else "",
+                assignment.condition_on_return if assignment else "",
+                self._format_bool(movement.movement_id in reversed_ids),
+            ])
+
+            stats = equipment_stats.setdefault(
+                unit.id,
+                {
+                    "unit": unit,
+                    "item": inventory_item,
+                    "event_count": 0,
+                    "borrow_count": 0,
+                    "last_borrowed_at": None,
+                    "last_returned_at": None,
+                    "last_movement_type": "",
+                    "last_movement_at": None,
+                },
+            )
+            stats["event_count"] += 1
+            stats["last_movement_type"] = movement.movement_type
+            stats["last_movement_at"] = movement.occurred_at
+            if movement.movement_type == "borrow_release":
+                stats["borrow_count"] += 1
+                stats["last_borrowed_at"] = movement.occurred_at
+            if movement.movement_type == "borrow_return":
+                stats["last_returned_at"] = movement.occurred_at
+
+        equipment_headers = [
+            "Item ID",
+            "Item Name",
+            "Category",
+            "Classification",
+            "Item Type",
+            "Unit ID",
+            "Serial Number",
+            "Current Status",
+            "Current Condition",
+            "Expiration Date",
+            "Created At",
+            "Total Lifecycle Events",
+            "Total Borrows",
+            "Last Borrowed At",
+            "Last Returned At",
+            "Last Movement Type",
+            "Last Movement At",
+            "Deleted",
+            "Archived",
+        ]
+        equipment_rows = [
+            [
+                stats["item"].item_id if stats["item"] else "",
+                stats["item"].name if stats["item"] else "Deleted Inventory Item",
+                stats["item"].category if stats["item"] else "",
+                stats["item"].classification if stats["item"] else "",
+                stats["item"].item_type if stats["item"] else "",
+                stats["unit"].unit_id,
+                stats["unit"].serial_number or "",
+                stats["unit"].status,
+                stats["unit"].condition or "",
+                stats["unit"].expiration_date.isoformat() if stats["unit"].expiration_date else "",
+                self._format_optional_timestamp(stats["unit"].created_at),
+                stats["event_count"],
+                stats["borrow_count"],
+                self._format_optional_timestamp(stats["last_borrowed_at"]),
+                self._format_optional_timestamp(stats["last_returned_at"]),
+                stats["last_movement_type"],
+                self._format_optional_timestamp(stats["last_movement_at"]),
+                self._format_bool(stats["unit"].is_deleted),
+                self._format_bool(stats["unit"].is_archived),
+            ]
+            for stats in equipment_stats.values()
+        ]
+
+        if format == "csv":
+            return self._create_response(event_headers, lifecycle_rows, format, "equipment_history_report")
+
+        movement_type_counts: dict[str, int] = defaultdict(int)
+        status_counts: dict[str, int] = defaultdict(int)
+        for movement, unit, _, _, _ in movement_rows:
+            movement_type_counts[movement.movement_type] += 1
+            status_counts[unit.status] += 1
+        summary_rows = self._build_filter_summary_rows(
+            "Equipment History",
+            format,
+            timeline_mode,
+            anchor_date,
+            date_from,
+            date_to,
+            include_deleted,
+            include_archived,
+            {
+                "Movement Type Filter": movement_type or "",
+                "Item Filter": item_id or "",
+                "Serial Filter": normalized_serial_number or "",
+                "Unique Serials": len(equipment_rows),
+                "Lifecycle Events": len(lifecycle_rows),
+            },
+        )
+        for value, count in sorted(movement_type_counts.items()):
+            summary_rows.append([f"Movement Type: {value}", count])
+        for value, count in sorted(status_counts.items()):
+            summary_rows.append([f"Current Status: {value}", count])
+
+        return self._create_multi_sheet_response(
+            [
+                ("Summary", ["Metric", "Value"], summary_rows),
+                ("Equipment", equipment_headers, equipment_rows),
+                ("Lifecycle Events", event_headers, lifecycle_rows),
+            ],
+            "equipment_history_report",
+        )
 
     def export_entrusted(
         self,

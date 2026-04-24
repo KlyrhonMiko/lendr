@@ -108,9 +108,26 @@ describe('ImportExportSettings', () => {
 
     const call = mockExportData.mock.calls[0];
     const exportParams = call[1] as Record<string, unknown>;
+    expect(exportParams.report_version).toBe('v2');
     expect(exportParams.timeline_mode).toBeUndefined();
     expect(exportParams.anchor_date).toBeUndefined();
     expect(exportParams.serial_number).toBeUndefined();
+  });
+
+  it('allows borrower history legacy export mode', () => {
+    render(<ImportExportSettings />);
+
+    const borrowCard = screen.getByText('Borrow Request History').closest('div');
+    expect(borrowCard).toBeTruthy();
+
+    const borrowerSection = borrowCard as HTMLElement;
+
+    fireEvent.click(within(borrowerSection).getByRole('button', { name: 'Summary Report' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Legacy Export' }));
+    fireEvent.click(within(borrowerSection).getByRole('button', { name: 'Export Borrow Request History' }));
+
+    const exportParams = mockExportData.mock.calls[0][1] as Record<string, unknown>;
+    expect(exportParams.report_version).toBe('v1');
   });
 
   it('keeps equipment serial selection disabled until an item is chosen', () => {
@@ -142,6 +159,21 @@ describe('ImportExportSettings', () => {
 
     fireEvent.click(within(section).getByRole('button', { name: 'All Serials' }));
     expect(screen.getByRole('button', { name: /SN-101/ })).toBeInTheDocument();
+  });
+
+  it('exports equipment history as a v2 summary report by default', () => {
+    render(<ImportExportSettings />);
+
+    const movementCard = screen.getByText('Equipment History').closest('div');
+    expect(movementCard).toBeTruthy();
+
+    const section = movementCard as HTMLElement;
+    expect(within(section).getByRole('button', { name: 'Summary Report' })).toBeInTheDocument();
+
+    fireEvent.click(within(section).getByRole('button', { name: 'Export Equipment History' }));
+
+    const exportParams = mockExportData.mock.calls[0][1] as Record<string, unknown>;
+    expect(exportParams.report_version).toBe('v2');
   });
 
   it('requires anchor date for rolling 7 day borrower export mode', () => {

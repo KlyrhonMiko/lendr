@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
-import { BellRing, Save, ShieldCheck, Mail, MessageSquare, Monitor, AlertTriangle, Users, X, Plus } from 'lucide-react';
+import { BellRing, Save, ShieldCheck, Mail, Monitor, AlertTriangle, Users, X, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -26,6 +25,11 @@ interface AlertSettingsData {
   notification_channels: string[];
   alert_recipient_roles: string[];
   specific_recipients: SpecificRecipient[];
+}
+
+interface TestEmailResponse {
+  success?: boolean;
+  message?: string;
 }
 
 function AddRecipientDialog({
@@ -146,14 +150,14 @@ export function AlertSettings() {
   const testEmailMutation = useMutation({
     mutationFn: () => api.post('/inventory/settings/test-email'),
     onSuccess: (response) => {
-      const data = response.data as any;
+      const data = response.data as TestEmailResponse;
       if (data && data.success) {
         toast.success('Test email sent! Please check your inbox.');
       } else {
         toast.error(data?.message || 'Failed to send test email. Check SMTP settings.');
       }
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast.error(`Test email failed: ${error.message}`);
     }
   });

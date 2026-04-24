@@ -5,7 +5,7 @@ import { Checkbox as CheckboxPrimitive } from "@base-ui/react/checkbox";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export interface CheckboxProps extends CheckboxPrimitive.Root.Props { }
+export type CheckboxProps = CheckboxPrimitive.Root.Props;
 
 /**
  * Standardized Checkbox component using @base-ui/react.

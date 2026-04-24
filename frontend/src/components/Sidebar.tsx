@@ -7,6 +7,7 @@ import {
   LayoutDashboard, Package, Settings, Activity,
   Users, ScrollText, ClipboardList, Box, X, History, UserCircle
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { usePublicBranding } from '@/lib/publicBranding';
 
 const systemMeta: Record<string, string> = {
@@ -17,7 +18,7 @@ const systemMeta: Record<string, string> = {
   borrowers: 'Borrowers',
 };
 
-const navigation: Record<string, { section: string; items: { name: string; href: string; icon: any }[] }[]> = {
+const navigation: Record<string, { section: string; items: { name: string; href: string; icon: LucideIcon }[] }[]> = {
   admin: [
     {
       section: 'Overview',

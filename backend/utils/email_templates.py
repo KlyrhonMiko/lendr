@@ -1,5 +1,3 @@
-from typing import Any
-
 def get_inventory_alert_html(
     alert_type: str,
     item_name: str,

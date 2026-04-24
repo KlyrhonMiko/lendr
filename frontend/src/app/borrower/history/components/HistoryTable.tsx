@@ -15,11 +15,12 @@ import {
     MapPin,
     User
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { BorrowerRequestHistoryRecord, BorrowerRequestHistoryItem, BorrowerRequestHistoryEvent } from '../../api';
 
 function StatusBadge({ status }: { status: string }) {
-    const config: Record<string, { bg: string; text: string; icon: any }> = {
+    const config: Record<string, { bg: string; text: string; icon: LucideIcon }> = {
         pending: { bg: 'bg-primary/5 border-primary/20', text: 'text-primary font-bold', icon: Clock },
         approved: { bg: 'bg-primary/10 border-primary/20', text: 'text-primary', icon: CheckCircle2 },
         released: { bg: 'bg-primary/5 border-primary/10', text: 'text-primary/80', icon: PackageOpen },

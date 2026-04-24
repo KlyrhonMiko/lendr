@@ -20,6 +20,7 @@ class ExportReportFilterBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     format: str = Field(..., pattern="^(csv|xlsx)$")
+    report_version: str = Field(default="v1", pattern="^(v1|v2)$")
     timeline_mode: TimelineMode | None = None
     anchor_date: date | None = None
     date_from: datetime | None = Field(

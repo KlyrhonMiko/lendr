@@ -100,8 +100,6 @@ class ImportService:
 
                     # 1. Validation & Parsing
                     name = row.get("name") or ""
-                    classification = row.get("classification") or ""
-                    
                     is_trackable = self._parse_bool(row.get("is_trackable", "false"))
                     
                     if not name:

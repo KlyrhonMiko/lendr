@@ -9,6 +9,7 @@ import type { ConfigRead } from '../inventory/items/api';
 import { toast } from 'sonner';
 import { auth } from '@/lib/auth';
 import { api } from '@/lib/api';
+import type { LoginResponse, TwoFactorChallengeResponse } from '@/lib/api';
 import { CartItem } from './lib/types';
 import { validateBorrowSubmission, validatePinVerificationInput } from './lib/validation';
 import {
@@ -27,6 +28,21 @@ interface BorrowerTaxonomyData {
 }
 
 type BorrowItemKind = 'trackable' | 'untrackable';
+
+const BORROW_KIOSK_TWO_FACTOR_ERROR =
+  'Two-factor authentication is not supported in the borrow kiosk flow. Use the standard portal instead.';
+const BORROW_KIOSK_ROLE_ERROR =
+  'This account is not allowed to submit kiosk borrow requests.';
+
+function isTwoFactorChallengeResponse(
+  response: LoginResponse,
+): response is TwoFactorChallengeResponse {
+  return 'two_factor_required' in response && response.two_factor_required === true;
+}
+
+function isBorrowerRole(role: string | null | undefined): boolean {
+  return ['borrower', 'brwr', 'borrow'].includes((role || '').trim().toLowerCase());
+}
 
 export default function BorrowPage() {
   const queryClient = useQueryClient();

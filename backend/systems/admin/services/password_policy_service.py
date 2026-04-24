@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from sqlmodel import Session
 
 if TYPE_CHECKING:
-    from systems.auth.services.configuration_service import AuthConfigService
+    pass
 
 
 SECURITY_SETTINGS_CATEGORY = "security_settings"

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { buildWebSocketUrl } from '@/lib/apiPath';
 import { logger } from '@/lib/logger';
@@ -17,117 +17,112 @@ export function useInventoryWebSocket() {
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const isActiveRef = useRef(false);
 
-    const connect = useCallback(() => {
-        if (!isActiveRef.current) {
-            return;
-        }
+    useEffect(() => {
+        isActiveRef.current = true;
 
-        // Prevent duplicate connections
-        if (
-            socketRef.current &&
-            (socketRef.current.readyState === WebSocket.OPEN ||
-                socketRef.current.readyState === WebSocket.CONNECTING)
-        ) {
-            return;
-        }
-
-        const wsUrl = buildWebSocketUrl('/ws/borrower');
-        logger.info('Connecting to Inventory WebSocket...', { url: wsUrl, attempt: attemptRef.current });
-
-        const socket = new WebSocket(wsUrl);
-        socketRef.current = socket;
-
-        socket.onopen = () => {
-            logger.info('Inventory WebSocket connected');
-            attemptRef.current = 0; // Reset on successful connection
-        };
-
-        socket.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                logger.info('Received WebSocket message:', data);
-
-                if (data.type === 'catalog_update') {
-                    logger.info('Invalidating inventory-related queries...');
-
-                    // Invalidate catalog (Borrower Portal)
-                    queryClient.invalidateQueries({ queryKey: ['borrow', 'catalog'] });
-
-                    // Invalidate requests (Inventory Manager)
-                    queryClient.invalidateQueries({ queryKey: ['inventory', 'requests'] });
-                }
-            } catch (error) {
-                logger.error('Failed to parse WebSocket message', { error });
-            }
-        };
-
-        socket.onclose = (event) => {
-            const shouldReconnect = isActiveRef.current;
-
-            logger.info('Inventory WebSocket closed', {
-                code: event.code,
-                reason: event.reason,
-                shouldReconnect,
-            });
-
-            if (socketRef.current === socket) {
-                socketRef.current = null;
-            }
-
-            if (shouldReconnect) {
-                scheduleReconnect();
-            }
-        };
-
-        socket.onerror = () => {
+        const scheduleReconnect = () => {
             if (!isActiveRef.current) {
                 return;
             }
 
-            // Browser WebSocket error events carry no useful info; onclose handles reconnect.
-            logger.warn('Inventory WebSocket error (details unavailable in browser)');
-        };
-    }, [queryClient]);
+            if (timerRef.current) {
+                clearTimeout(timerRef.current);
+                timerRef.current = null;
+            }
 
-    const scheduleReconnect = useCallback(() => {
-        if (!isActiveRef.current) {
-            return;
-        }
+            if (attemptRef.current >= RECONNECT_MAX_ATTEMPTS) {
+                logger.warn('Inventory WebSocket max reconnect attempts reached, entering cooldown retry', {
+                    delayMs: RECONNECT_COOLDOWN_DELAY_MS,
+                });
 
-        if (timerRef.current) {
-            clearTimeout(timerRef.current);
-            timerRef.current = null;
-        }
+                timerRef.current = setTimeout(() => {
+                    timerRef.current = null;
+                    connect();
+                }, RECONNECT_COOLDOWN_DELAY_MS);
 
-        if (attemptRef.current >= RECONNECT_MAX_ATTEMPTS) {
-            logger.warn('Inventory WebSocket max reconnect attempts reached, entering cooldown retry', {
-                delayMs: RECONNECT_COOLDOWN_DELAY_MS,
-            });
+                return;
+            }
+
+            const delay = Math.min(
+                RECONNECT_BASE_DELAY_MS * Math.pow(2, attemptRef.current),
+                RECONNECT_MAX_DELAY_MS,
+            );
+            attemptRef.current += 1;
+
+            logger.info(`Inventory WebSocket reconnecting in ${delay}ms (attempt ${attemptRef.current}/${RECONNECT_MAX_ATTEMPTS})`);
 
             timerRef.current = setTimeout(() => {
                 timerRef.current = null;
                 connect();
-            }, RECONNECT_COOLDOWN_DELAY_MS);
+            }, delay);
+        };
 
-            return;
-        }
+        const connect = () => {
+            if (!isActiveRef.current) {
+                return;
+            }
 
-        const delay = Math.min(
-            RECONNECT_BASE_DELAY_MS * Math.pow(2, attemptRef.current),
-            RECONNECT_MAX_DELAY_MS,
-        );
-        attemptRef.current += 1;
+            if (
+                socketRef.current &&
+                (socketRef.current.readyState === WebSocket.OPEN ||
+                    socketRef.current.readyState === WebSocket.CONNECTING)
+            ) {
+                return;
+            }
 
-        logger.info(`Inventory WebSocket reconnecting in ${delay}ms (attempt ${attemptRef.current}/${RECONNECT_MAX_ATTEMPTS})`);
+            const wsUrl = buildWebSocketUrl('/ws/borrower');
+            logger.info('Connecting to Inventory WebSocket...', { url: wsUrl, attempt: attemptRef.current });
 
-        timerRef.current = setTimeout(() => {
-            timerRef.current = null;
-            connect();
-        }, delay);
-    }, [connect]);
+            const socket = new WebSocket(wsUrl);
+            socketRef.current = socket;
 
-    useEffect(() => {
-        isActiveRef.current = true;
+            socket.onopen = () => {
+                logger.info('Inventory WebSocket connected');
+                attemptRef.current = 0;
+            };
+
+            socket.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    logger.info('Received WebSocket message:', data);
+
+                    if (data.type === 'catalog_update') {
+                        logger.info('Invalidating inventory-related queries...');
+                        queryClient.invalidateQueries({ queryKey: ['borrow', 'catalog'] });
+                        queryClient.invalidateQueries({ queryKey: ['inventory', 'requests'] });
+                    }
+                } catch (error) {
+                    logger.error('Failed to parse WebSocket message', { error });
+                }
+            };
+
+            socket.onclose = (event) => {
+                const shouldReconnect = isActiveRef.current;
+
+                logger.info('Inventory WebSocket closed', {
+                    code: event.code,
+                    reason: event.reason,
+                    shouldReconnect,
+                });
+
+                if (socketRef.current === socket) {
+                    socketRef.current = null;
+                }
+
+                if (shouldReconnect) {
+                    scheduleReconnect();
+                }
+            };
+
+            socket.onerror = () => {
+                if (!isActiveRef.current) {
+                    return;
+                }
+
+                logger.warn('Inventory WebSocket error (details unavailable in browser)');
+            };
+        };
+
         connect();
 
         return () => {
@@ -158,7 +153,5 @@ export function useInventoryWebSocket() {
                 socketRef.current = null;
             }
         };
-    }, [connect]);
-
-    return socketRef.current;
+    }, [queryClient]);
 }

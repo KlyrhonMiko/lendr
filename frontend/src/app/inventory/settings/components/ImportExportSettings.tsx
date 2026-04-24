@@ -2,12 +2,10 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
 import { FormSelect } from '@/components/ui/form-select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Checkbox } from '@/components/ui/checkbox';
-import { format as formatDateFns, parseISO } from 'date-fns';
+import { format as formatDateFns } from 'date-fns';
 import {
   Download,
   Upload,
@@ -17,7 +15,6 @@ import {
   XCircle,
   RefreshCcw,
   ArrowRight,
-  Database,
   FileSpreadsheet,
   FilePieChart,
   ShieldCheck,
@@ -89,6 +86,7 @@ export function ImportExportSettings() {
 
   // Ledger Export State
   const [borrowParams, setBorrowParams] = useState({
+    report_version: 'v2' as 'v1' | 'v2',
     timeline_mode: '' as '' | 'daily' | 'rolling_7_day' | 'monthly' | 'yearly',
     anchor_date: undefined as Date | undefined,
     status: 'all',
@@ -100,6 +98,7 @@ export function ImportExportSettings() {
   });
 
   const [movementParams, setMovementParams] = useState({
+    report_version: 'v2' as 'v1' | 'v2',
     timeline_mode: '' as '' | 'daily' | 'rolling_7_day' | 'monthly' | 'yearly',
     anchor_date: undefined as Date | undefined,
     movement_type: 'all',
@@ -337,6 +336,16 @@ export function ImportExportSettings() {
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1 mb-4">Borrow Request History</p>
               <div className="space-y-4 flex-1 mb-4">
                 <FormSelect
+                  label="Report Type"
+                  value={borrowParams.report_version}
+                  onChange={(v) => setBorrowParams({ ...borrowParams, report_version: v as typeof borrowParams.report_version })}
+                  options={[
+                    { label: 'Summary Report', key: 'v2' },
+                    { label: 'Legacy Export', key: 'v1' },
+                  ]}
+                  placeholder="Select report type"
+                />
+                <FormSelect
                   label="Timeline Mode"
                   value={borrowParams.timeline_mode}
                   onChange={(v) => setBorrowParams({ ...borrowParams, timeline_mode: v as typeof borrowParams.timeline_mode, anchor_date: v === 'rolling_7_day' ? borrowParams.anchor_date : undefined })}
@@ -435,6 +444,16 @@ export function ImportExportSettings() {
             <div className="flex flex-col p-4 rounded-2xl border border-border bg-muted/5">
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1 mb-4">Equipment History</p>
               <div className="space-y-4 flex-1 mb-4">
+                <FormSelect
+                  label="Report Type"
+                  value={movementParams.report_version}
+                  onChange={(v) => setMovementParams({ ...movementParams, report_version: v as typeof movementParams.report_version })}
+                  options={[
+                    { label: 'Summary Report', key: 'v2' },
+                    { label: 'Legacy Export', key: 'v1' },
+                  ]}
+                  placeholder="Select report type"
+                />
                 <FormSelect
                   label="Timeline Mode"
                   value={movementParams.timeline_mode}

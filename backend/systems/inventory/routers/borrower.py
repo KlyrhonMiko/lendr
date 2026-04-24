@@ -12,7 +12,7 @@ from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestCreate,
     BorrowRequestRead,
 )
-from core.schemas import ConfigRead, GenericResponse, create_success_response, make_pagination_meta
+from core.schemas import ConfigRead
 from systems.inventory.schemas.inventory_schemas import InventoryCatalogItemRead
 from systems.inventory.services.inventory_service import InventoryService
 from systems.inventory.services.borrow_request_service import BorrowService
@@ -149,4 +149,3 @@ async def borrower_submit_request(
     except ValueError as e:
         session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
-

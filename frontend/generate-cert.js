@@ -1,5 +1,5 @@
-const selfsigned = require('selfsigned');
-const fs = require('fs');
+import selfsigned from 'selfsigned';
+import fs from 'fs';
 
 async function main() {
     const host = process.env.HOST || '192.168.100.104';

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Package, Plus, Loader2, RefreshCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { userApi, EntrustedItem } from '../api';
@@ -18,7 +18,7 @@ export function EntrustedItems({ userId }: EntrustedItemsProps) {
     const [newUnitId, setNewUnitId] = useState('');
     const [revoking, setRevoking] = useState<string | null>(null);
 
-    const fetchItems = async () => {
+    const fetchItems = useCallback(async () => {
         try {
             const res = await userApi.getEntrustedItems(userId);
             setItems(res.data);
@@ -27,14 +27,13 @@ export function EntrustedItems({ userId }: EntrustedItemsProps) {
         } finally {
             setLoading(false);
         }
-    };
-
-    useEffect(() => {
-        fetchItems();
     }, [userId]);
 
-    const handleAssign = async (e: React.FormEvent) => {
-        e.preventDefault();
+    useEffect(() => {
+        void fetchItems();
+    }, [fetchItems]);
+
+    const handleAssign = async () => {
         if (!newUnitId.trim()) return;
         setAssigning(true);
         try {
@@ -44,9 +43,9 @@ export function EntrustedItems({ userId }: EntrustedItemsProps) {
             });
             toast.success('Item assigned successfully');
             setNewUnitId('');
-            fetchItems();
-        } catch (err: any) {
-            toast.error(err.response?.data?.detail || 'Failed to assign item');
+            await fetchItems();
+        } catch (error: unknown) {
+            toast.error(error instanceof Error ? error.message : 'Failed to assign item');
         } finally {
             setAssigning(false);
         }
@@ -59,9 +58,9 @@ export function EntrustedItems({ userId }: EntrustedItemsProps) {
         try {
             await userApi.revokeEntrustedItem(userId, assignmentId, { notes: 'Revoked from dashboard' });
             toast.success('Item revoked successfully');
-            fetchItems();
-        } catch (err: any) {
-            toast.error(err.response?.data?.detail || 'Failed to revoke item');
+            await fetchItems();
+        } catch (error: unknown) {
+            toast.error(error instanceof Error ? error.message : 'Failed to revoke item');
         } finally {
             setRevoking(null);
         }
@@ -90,7 +89,7 @@ export function EntrustedItems({ userId }: EntrustedItemsProps) {
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
                                     e.preventDefault();
-                                    handleAssign(e as any);
+                                    void handleAssign();
                                 }
                             }}
                             className="w-full h-11 px-4 rounded-lg bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/25 placeholder:text-muted-foreground/40"
@@ -99,7 +98,7 @@ export function EntrustedItems({ userId }: EntrustedItemsProps) {
                     </div>
                     <button
                         type="button"
-                        onClick={(e) => handleAssign(e as any)}
+                        onClick={() => void handleAssign()}
                         disabled={assigning || !newUnitId.trim()}
                         className="h-11 px-6 rounded-lg bg-emerald-500 text-white text-sm font-bold shadow-lg hover:bg-emerald-600 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:translate-y-0 transition-all flex items-center gap-2"
                     >

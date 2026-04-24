@@ -12,7 +12,7 @@ export interface PublicBrandingData {
   };
 }
 
-const DEFAULT_BRAND_NAME = 'PowerGold';
+const DEFAULT_BRAND_NAME = 'Lendr';
 const BRANDING_QUERY_KEY = ['public', 'branding'] as const;
 
 function normalizeBrandName(value: string | null | undefined): string {
@@ -25,12 +25,17 @@ export function resolveBrandAssetUrl(path: string | null | undefined): string | 
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
 
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+
+  if (normalizedPath.startsWith('/api/')) {
+    return baseUrl ? `${baseUrl}${normalizedPath}` : normalizedPath;
+  }
+
   if (typeof window !== 'undefined') {
     return normalizedPath;
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-  return `${baseUrl}${normalizedPath}`;
+  return `${baseUrl || 'http://localhost:8000'}${normalizedPath}`;
 }
 
 export function usePublicBranding() {

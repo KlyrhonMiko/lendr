@@ -18,7 +18,6 @@ import {
     User as UserIcon,
     Edit3,
     Save,
-    Lock,
     Shield,
     Key,
     Smartphone,
@@ -27,14 +26,6 @@ import {
 } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import { cn } from '@/lib/utils';
-
-const MIN_TWO_FACTOR_CODE_LENGTH = 6;
-
-function formatTwoFactorDate(value: string | null): string {
-    if (!value) return 'N/A';
-    const date = new Date(value);
-    return isNaN(date.getTime()) ? value : date.toLocaleString();
-}
 
 const MIN_TWO_FACTOR_CODE_LENGTH = 6;
 

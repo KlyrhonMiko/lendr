@@ -128,6 +128,7 @@ async def export_audit_logs(
         return export_service.export_audit_logs(
             session,
             format=filters.format,
+            report_version=filters.report_version,
             timeline_mode=filters.timeline_mode,
             anchor_date=filters.anchor_date,
             date_from=effective_date_from,
@@ -153,6 +154,7 @@ async def export_borrow_history(
         return export_service.export_borrow_history(
             session,
             format=filters.format,
+            report_version=filters.report_version,
             status=filters.status,
             item_id=filters.item_id,
             borrower_id=filters.borrower_id,
@@ -179,6 +181,7 @@ async def export_movements(
         return export_service.export_movements(
             session,
             format=filters.format,
+            report_version=filters.report_version,
             movement_type=filters.movement_type,
             item_id=filters.item_id,
             serial_number=filters.serial_number,
@@ -207,6 +210,7 @@ async def export_catalog(
         return export_service.export_inventory(
             session,
             format=filters.format,
+            report_version=filters.report_version,
             timeline_mode=filters.timeline_mode,
             anchor_date=filters.anchor_date,
             date_from=effective_date_from,
