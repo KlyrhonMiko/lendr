@@ -67,6 +67,9 @@ export function UserModal({
   const isBorrowerRoleKey = (role: string | undefined): boolean =>
     BORROWER_ROLE_KEYS.has(normalizeRole(role));
 
+  const isBorrowerRoleKey = (role: string | undefined): boolean =>
+    BORROWER_ROLE_KEYS.has(normalizeRole(role));
+
   const isRolePasswordPolicyExempt = (role: string | undefined): boolean =>
     PASSWORD_POLICY_EXEMPT_ROLES.has(normalizeRole(role));
 
@@ -313,6 +316,18 @@ export function UserModal({
 
   const inputClassName = 'w-full h-11 px-4 rounded-xl bg-muted/40 border border-border text-sm focus:ring-2 focus:ring-primary/20 transition-all outline-none';
   const inputWithIconClassName = 'w-full h-11 pl-10 pr-4 rounded-xl bg-muted/40 border border-border text-sm focus:ring-2 focus:ring-primary/20 transition-all outline-none';
+
+  const twoFactorStatusLabel = loadingTwoFactorStatus
+    ? 'Checking 2FA status...'
+    : twoFactorStatus?.enabled
+      ? '2FA Enabled'
+      : '2FA Not Enabled';
+
+  const twoFactorStatusClassName = loadingTwoFactorStatus
+    ? 'bg-muted text-muted-foreground border-border'
+    : twoFactorStatus?.enabled
+      ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20'
+      : 'bg-amber-500/10 text-amber-700 border-amber-500/20';
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-300">

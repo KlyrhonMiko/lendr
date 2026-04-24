@@ -36,6 +36,8 @@ function formatTwoFactorDate(value: string | null): string {
     return isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
+const MIN_TWO_FACTOR_CODE_LENGTH = 6;
+
 export default function ProfilePage() {
     const { user, refreshUser } = useAuth();
     const [isEditing, setIsEditing] = useState(false);

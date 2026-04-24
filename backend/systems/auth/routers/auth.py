@@ -691,6 +691,11 @@ async def _rotate_first_login_password(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials for first-login password rotation",
         )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
 
     user, credential_mode = auth_result
 
