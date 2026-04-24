@@ -14,8 +14,8 @@ An inventory and borrowing management system built with **FastAPI** (backend) an
   - [Authentication & Authorization](#authentication--authorization)
 - [Prerequisites](#prerequisites)
 - [Setup](#setup)
-  - [Option A — Docker (Recommended)](#option-a--docker-recommended)
-  - [Option A.1 — Docker LAN Host (Caddy)](#option-a1--docker-lan-host-caddy)
+  - [Option A — Docker LAN Deployment](#option-a--docker-lan-deployment)
+  - [Option A.1 — Docker Development Override](#option-a1--docker-development-override)
   - [Option B — Local Development](#option-b--local-development)
 - [Makefile Command Guide](#makefile-command-guide)
 - [Environment Variables](#environment-variables)
@@ -237,9 +237,9 @@ The system uses **JWT + Session-based hybrid authentication**:
 
 ## Setup
 
-### Option A — Docker (Recommended)
+### Option A — Docker LAN Deployment
 
-This spins up all services (database, backend, frontend, Adminer) in containers.
+This is the deployable single-host LAN stack. It builds immutable backend/frontend images, runs migrations + initialization through a one-shot bootstrap container, and exposes the app through Caddy over HTTPS.
 
 **1. Clone the repository**
 
@@ -248,159 +248,117 @@ git clone <repository-url>
 cd PowerGold
 ```
 
-**2. Create the environment file**
+**2. Create the deployment environment file**
 
-Create `.env.local` in the project root:
+Copy `.env.deploy.example` to `.env.deploy` in the project root:
 
 ```env
 # Database
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=your_secure_password
-POSTGRES_DB=PowerGold
+POSTGRES_DB=powergold
 
 # Backend
-DATABASE_URL=postgresql+psycopg2://postgres:your_secure_password@postgres:5432/PowerGold
+DATABASE_URL=postgresql+psycopg2://postgres:your_secure_password@postgres:5432/powergold
 SECRET_KEY=your_super_secret_jwt_key_change_this_in_production
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-DEBUG=false
+INITIAL_ADMIN_USERNAME=admin
+INITIAL_ADMIN_PASSWORD=change_this
+
+# Frontend / Proxy
+NEXT_PUBLIC_API_URL=http://backend:8000
+TZ=Asia/Manila
+LAN_HOSTNAME=powergold.home.arpa
+SWAGGER_UI_ENABLED=false
 ```
 
 > Generate a strong `SECRET_KEY` with: `python -c "import secrets; print(secrets.token_hex(32))"`
 
-**3. Build and start all services**
+**3. Generate LAN certificates**
+
+Linux/macOS:
 
 ```bash
-docker compose up --build
+make lan-cert
 ```
 
-**4. Run database migrations and seed configuration**
+Windows:
 
-In a separate terminal, after the containers are up:
+```powershell
+make -f Makefile.windows lan-cert
+```
+
+**4. Build and start the deploy stack**
 
 ```bash
-docker compose exec backend alembic upgrade head
-docker compose exec backend python data/seed_configuration.py
+make lan-go
+```
+
+Windows:
+
+```powershell
+make -f Makefile.windows lan-go
+```
+
+Equivalent raw Compose command:
+
+```bash
+ENV_FILE=.env.deploy docker compose --env-file .env.deploy -f docker-compose.deploy.yml up --build -d
 ```
 
 **5. Access the services**
 
 | Service        | URL                          | Login              |
 |----------------|------------------------------|--------------------|
-| Frontend       | http://localhost:3000        | Set via INITIAL_ADMIN_USERNAME/INITIAL_ADMIN_PASSWORD |
-| Backend API    | http://localhost:8000        | —                  |
-| API Docs       | http://localhost:8000/docs   | —                  |
-| Adminer (DB)   | http://localhost:8080        | —                  |
+| App via Caddy  | https://powergold.home.arpa  | Set via INITIAL_ADMIN_USERNAME/INITIAL_ADMIN_PASSWORD |
+| Adminer (DB)   | http://localhost:8080        | Host machine only |
 
 ---
 
-### Option A.1 — Docker LAN Host (Caddy)
+### Option A.1 — Docker Development
 
-Use this profile when one machine hosts the app for other devices on the same network.
-This adds Caddy as a reverse proxy and exposes only port 80.
-
-This mode is intentionally bare-bones:
-
-1. No router DNS changes
-2. No custom domain setup
-3. One command to start, then use server IP from any LAN device
-
-**1. Ensure `.env.local` is set**
-
-Use the same variables from Option A. Keep `DATABASE_URL` pointed to the internal postgres service host `postgres`.
-
-**2. Start the LAN stack (includes one-shot bootstrap init)**
+The default [docker-compose.yml](/mnt/sdb4/Programming/Python/Web Projects/lendr/docker-compose.yml:1) is now the development stack. Use this when you want bind mounts, hot reload, and direct service ports on the local workstation.
 
 Linux/macOS:
 
 ```bash
-make lan-go
+make dev-up
 ```
 
-Windows (PowerShell + GNU Make):
+Windows:
 
 ```powershell
-make -f Makefile.windows lan-go
+make -f Makefile.windows dev-up
 ```
 
-How this target is wired:
-
-1. `lan-go` is defined as `lan-go: lan-up lan-url` in both Makefiles.
-2. `lan-up` runs `python data/bootstrap_system.py` before bringing up the full stack.
-
-What this does:
-
-1. Starts `postgres` if needed
-2. Runs Alembic migrations
-3. Runs initialization/seed reconciliation
-4. Builds and starts the full LAN stack
-5. Prints the LAN URL to open from other devices
-
-Optional bootstrap-only command (without starting the full stack):
-
-Linux/macOS:
+Equivalent raw Compose command:
 
 ```bash
-make lan-bootstrap
+docker compose -f docker-compose.yml up --build -d
 ```
 
-Windows (PowerShell + GNU Make):
+Development mode behavior:
 
-```powershell
-make -f Makefile.windows lan-bootstrap
-```
+1. `backend` runs with `uvicorn --reload`.
+2. Backend startup automatically runs pending Alembic migrations and the initialization service, so plain `uvicorn main:app --reload` bootstraps schema, system configs, and the bootstrap admin on a fresh dev database.
+3. `frontend` runs `npm run dev` with bind mounts and `WATCHPACK_POLLING=true`.
+4. `caddy` is not part of the default dev stack.
+5. Backend and frontend publish their own ports directly for local iteration.
+6. Scheduler startup is disabled in dev.
+7. Adminer is included by default but bound to `127.0.0.1:8080`, so only the host machine can reach it.
 
-Equivalent manual command:
+**4. DNS requirement**
 
-```bash
-docker compose -f docker-compose.lan.yml up -d postgres
-docker compose -f docker-compose.lan.yml run --rm backend python data/bootstrap_system.py
-```
+Create a local DNS record on the router or internal DNS server:
 
-**3. Additional helpers**
+- `powergold.home.arpa` -> the reserved IP of the PowerGold server
 
-```bash
-make lan-ps
-make lan-logs
-```
-
-Windows helper equivalents:
-
-```powershell
-make -f Makefile.windows lan-ps
-make -f Makefile.windows lan-logs
-```
-
-Optional DB UI (host machine only):
-
-```bash
-make lan-adminer-up
-make lan-adminer-url
-```
-
-Windows equivalent:
-
-```powershell
-make -f Makefile.windows lan-adminer-up
-make -f Makefile.windows lan-adminer-url
-```
-
-Important startup behavior in LAN mode:
-
-1. Backend startup does not automatically run Alembic migrations.
-2. Backend startup does not automatically run initialization/seed reconciliation.
-3. Scheduler startup is fail-fast by default if required DB/config state is missing.
-4. Run bootstrap commands explicitly when needed.
-
-**4. Open from other devices on the same network**
-
-Use the URL printed by `make lan-url`, for example:
+Then client devices should open:
 
 ```text
-http://192.168.1.50
+https://powergold.home.arpa
 ```
 
-If this machine gets a different IP after reboot, run `make lan-url` again.
+`make lan-url` prints the hostname first and the raw IP as a fallback while DNS is still being set up.
 
 **5. Access the app**
 
@@ -531,7 +489,7 @@ The frontend will be available at http://localhost:3000.
 
 ## Makefile Command Guide
 
-Use this guide for LAN-host workflows via `docker-compose.lan.yml`.
+Use this guide for single-host LAN deployment via `docker-compose.deploy.yml` and local development via `docker-compose.yml`.
 
 ### Prerequisites
 
@@ -543,19 +501,21 @@ Use this guide for LAN-host workflows via `docker-compose.lan.yml`.
 | Purpose | Linux/macOS | Windows (PowerShell) |
 |---|---|---|
 | Show available targets | `make help` | `make -f Makefile.windows help` |
-| Build/start LAN stack (includes bootstrap init) | `make lan-up` | `make -f Makefile.windows lan-up` |
+| Build/start deploy stack | `make lan-up` | `make -f Makefile.windows lan-up` |
 | Build/start + print LAN URL (alias: `lan-up` then `lan-url`) | `make lan-go` | `make -f Makefile.windows lan-go` |
-| Initialize DB bootstrap only | `make lan-init` | `make -f Makefile.windows lan-init` |
-| Bootstrap (postgres + migrate + init) | `make lan-bootstrap` | `make -f Makefile.windows lan-bootstrap` |
+| Initialize bootstrap only | `make lan-init` | `make -f Makefile.windows lan-init` |
+| Run one-shot bootstrap service | `make lan-bootstrap` | `make -f Makefile.windows lan-bootstrap` |
 | Show running services | `make lan-ps` | `make -f Makefile.windows lan-ps` |
 | Tail stack logs | `make lan-logs` | `make -f Makefile.windows lan-logs` |
 | Run Alembic migrations | `make lan-migrate` | `make -f Makefile.windows lan-migrate` |
 | Seed configuration | `make lan-seed` | `make -f Makefile.windows lan-seed` |
 | Print LAN URL only | `make lan-url` | `make -f Makefile.windows lan-url` |
-| Start optional Adminer | `make lan-adminer-up` | `make -f Makefile.windows lan-adminer-up` |
+| Start Adminer | `make lan-adminer-up` | `make -f Makefile.windows lan-adminer-up` |
 | Show Adminer URL | `make lan-adminer-url` | `make -f Makefile.windows lan-adminer-url` |
-| Stop optional Adminer | `make lan-adminer-down` | `make -f Makefile.windows lan-adminer-down` |
+| Stop Adminer | `make lan-adminer-down` | `make -f Makefile.windows lan-adminer-down` |
 | Stop LAN stack | `make lan-down` | `make -f Makefile.windows lan-down` |
+| Start dev override stack | `make dev-up` | `make -f Makefile.windows dev-up` |
+| Stop dev override stack | `make dev-down` | `make -f Makefile.windows dev-down` |
 
 ### Common Workflows
 

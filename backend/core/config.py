@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     SQL_ECHO: bool = False
     LOG_LEVEL: str = "INFO"
     LOG_DIR: str = ".logs"
+    LOG_FILE_ENABLED: bool = True
     SKIP_INIT: bool = False
     STARTUP_RUN_INITIALIZATION: bool = True
     STARTUP_ENABLE_SCHEDULER: bool = False

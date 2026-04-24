@@ -1,36 +1,39 @@
 SHELL := /bin/bash
 
-LAN_COMPOSE := docker compose -f docker-compose.lan.yml
+ENV_FILE ?= .env.deploy
+DEV_ENV_FILE ?= .env.local
+LAN_HOSTNAME ?= powergold.home.arpa
+LAN_COMPOSE := ENV_FILE=$(ENV_FILE) docker compose --env-file $(ENV_FILE) -f docker-compose.deploy.yml
+DEV_COMPOSE := docker compose -f docker-compose.yml
 
 .PHONY: help
 help:
-	@echo "PowerGold LAN helpers"
+	@echo "PowerGold Docker helpers"
 	@echo ""
 	@echo "Targets:"
-	@echo "  make lan-up           # Build/start LAN stack (includes bootstrap init)"
+	@echo "  make lan-up           # Build/start deploy stack"
 	@echo "  make lan-go           # lan-up + print access URL"
 	@echo "  make lan-ps           # Show LAN stack services"
 	@echo "  make lan-logs         # Tail LAN stack logs"
 	@echo "  make lan-migrate      # Run alembic upgrade head"
 	@echo "  make lan-seed         # Seed configuration"
-	@echo "  make lan-bootstrap    # One-shot bootstrap only (postgres + migrate + init)"
-	@echo "  make lan-cert         # Generate self-signed certificates for LAN IP"
-	@echo "  make lan-url          # Print access URL for other devices"
-	@echo "  make lan-adminer-up   # Start Adminer on localhost:8080 (optional)"
-	@echo "  make lan-adminer-down # Stop optional Adminer"
+	@echo "  make lan-bootstrap    # Run one-shot bootstrap service"
+	@echo "  make lan-cert         # Generate self-signed certificates for $(LAN_HOSTNAME)"
+	@echo "  make lan-url          # Print hostname and fallback IP URL"
+	@echo "  make lan-adminer-up   # Start Adminer on localhost:8080"
+	@echo "  make lan-adminer-down # Stop Adminer"
 	@echo "  make lan-adminer-url  # Print Adminer access URL"
 	@echo "  make lan-down         # Stop LAN stack"
+	@echo "  make dev-up           # Start local dev stack"
+	@echo "  make dev-down         # Stop local dev stack"
 
 .PHONY: lan-up
 lan-up: lan-cert
-	$(LAN_COMPOSE) up -d postgres
-	$(LAN_COMPOSE) run --rm --build backend python data/bootstrap_system.py
 	$(LAN_COMPOSE) up --build -d --remove-orphans
 
 .PHONY: lan-init
 lan-init:
-	$(LAN_COMPOSE) up -d postgres
-	$(LAN_COMPOSE) run --rm --build backend python data/bootstrap_system.py
+	$(LAN_COMPOSE) run --rm --build bootstrap
 
 .PHONY: lan-go
 lan-go: lan-up lan-url
@@ -53,12 +56,11 @@ lan-seed:
 
 .PHONY: lan-bootstrap
 lan-bootstrap: lan-cert
-	$(LAN_COMPOSE) up -d postgres
-	$(LAN_COMPOSE) run --rm --build backend python data/bootstrap_system.py
+	$(LAN_COMPOSE) run --rm --build bootstrap
 
 .PHONY: lan-cert
 lan-cert:
-	@if [ ! -f frontend/certificates/localhost.pem ]; then \
+	@if [ ! -f frontend/certificates/localhost.pem ] || [ ! -f frontend/certificates/localhost-key.pem ]; then \
 		LAN_IP=$$(ip -4 route get 1.1.1.1 2>/dev/null | awk '/src/ {for (i=1; i<=NF; i++) if ($$i=="src") {print $$(i+1); exit}}'); \
 		if [ -z "$$LAN_IP" ] || [[ "$$LAN_IP" =~ ^169\.254\. ]] || [ "$$LAN_IP" = "127.0.0.1" ]; then \
 			LAN_IP=$$(ip -4 addr show scope global 2>/dev/null | awk '/inet / {sub("/.*", "", $$2); if ($$2 !~ /^169\.254\./ && $$2 != "127.0.0.1") {print $$2; exit}}'); \
@@ -67,9 +69,9 @@ lan-cert:
 			echo "Could not determine a usable LAN IPv4 address automatically."; \
 			exit 1; \
 		fi; \
-		echo "Generating certificates for $$LAN_IP..."; \
+		echo "Generating certificates for $(LAN_HOSTNAME) and $$LAN_IP..."; \
 		mkdir -p frontend/certificates; \
-		openssl req -x509 -newkey rsa:2048 -keyout frontend/certificates/localhost.key -out frontend/certificates/localhost.pem -days 365 -nodes -subj "/CN=$$LAN_IP" -addext "subjectAltName=IP:$$LAN_IP"; \
+		openssl req -x509 -newkey rsa:2048 -keyout frontend/certificates/localhost-key.pem -out frontend/certificates/localhost.pem -days 365 -nodes -subj "/CN=$(LAN_HOSTNAME)" -addext "subjectAltName=DNS:$(LAN_HOSTNAME),DNS:localhost,IP:127.0.0.1,IP:$$LAN_IP"; \
 	else \
 		echo "Certificates already exist in frontend/certificates/"; \
 	fi
@@ -86,15 +88,17 @@ lan-url:
 		exit 1; \
 	fi; \
 	echo "Open from other devices on the same network:"; \
+	echo "  https://$(LAN_HOSTNAME)"; \
+	echo "Fallback while DNS is not configured:"; \
 	echo "  https://$$LAN_IP"
 
 .PHONY: lan-adminer-up
 lan-adminer-up:
-	$(LAN_COMPOSE) --profile adminer up -d adminer
+	$(LAN_COMPOSE) up -d adminer
 
 .PHONY: lan-adminer-down
 lan-adminer-down:
-	$(LAN_COMPOSE) --profile adminer stop adminer
+	$(LAN_COMPOSE) stop adminer
 
 .PHONY: lan-adminer-url
 lan-adminer-url:
@@ -103,4 +107,12 @@ lan-adminer-url:
 
 .PHONY: lan-down
 lan-down:
-	$(LAN_COMPOSE) --profile adminer down --remove-orphans
+	$(LAN_COMPOSE) down --remove-orphans
+
+.PHONY: dev-up
+dev-up:
+	$(DEV_COMPOSE) up --build -d --remove-orphans
+
+.PHONY: dev-down
+dev-down:
+	$(DEV_COMPOSE) down --remove-orphans

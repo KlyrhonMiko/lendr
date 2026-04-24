@@ -1,38 +1,41 @@
 SHELL := powershell.exe
 .SHELLFLAGS := -NoProfile -ExecutionPolicy Bypass -Command
 
-LAN_COMPOSE := docker compose -f docker-compose.lan.yml
+ENV_FILE ?= .env.deploy
+DEV_ENV_FILE ?= .env.local
+LAN_HOSTNAME ?= powergold.home.arpa
+LAN_COMPOSE := $$env:ENV_FILE='$(ENV_FILE)'; docker compose --env-file $(ENV_FILE) -f docker-compose.deploy.yml
+DEV_COMPOSE := docker compose -f docker-compose.yml
 GET_LAN_IP := Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $$_.IPAddress -match '^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)' -and $$_.IPAddress -ne '127.0.0.1' -and $$_.InterfaceAlias -notmatch 'vEthernet|WSL|Loopback|Docker|VirtualBox|VMware' } | Sort-Object InterfaceMetric | Select-Object -First 1 -ExpandProperty IPAddress
 
 .PHONY: help
 help:
-	@Write-Host "PowerGold LAN helpers (Windows)"
+	@Write-Host "PowerGold Docker helpers (Windows)"
 	@Write-Host ""
 	@Write-Host "Targets:"
-	@Write-Host "  make -f Makefile.windows lan-up           # Build/start LAN stack (includes bootstrap init)"
+	@Write-Host "  make -f Makefile.windows lan-up           # Build/start deploy stack"
 	@Write-Host "  make -f Makefile.windows lan-go           # lan-up + print access URL"
 	@Write-Host "  make -f Makefile.windows lan-ps           # Show LAN stack services"
 	@Write-Host "  make -f Makefile.windows lan-logs         # Tail LAN stack logs"
 	@Write-Host "  make -f Makefile.windows lan-migrate      # Run alembic upgrade head"
 	@Write-Host "  make -f Makefile.windows lan-seed         # Seed configuration"
-	@Write-Host "  make -f Makefile.windows lan-bootstrap    # One-shot bootstrap only"
-	@Write-Host "  make -f Makefile.windows lan-cert         # Generate self-signed certificates for LAN IP"
-	@Write-Host "  make -f Makefile.windows lan-url          # Print access URL for other devices"
-	@Write-Host "  make -f Makefile.windows lan-adminer-up   # Start Adminer on localhost:8080 (optional)"
-	@Write-Host "  make -f Makefile.windows lan-adminer-down # Stop optional Adminer"
+	@Write-Host "  make -f Makefile.windows lan-bootstrap    # Run one-shot bootstrap service"
+	@Write-Host "  make -f Makefile.windows lan-cert         # Generate self-signed certificates for $(LAN_HOSTNAME)"
+	@Write-Host "  make -f Makefile.windows lan-url          # Print hostname and fallback IP URL"
+	@Write-Host "  make -f Makefile.windows lan-adminer-up   # Start Adminer on localhost:8080"
+	@Write-Host "  make -f Makefile.windows lan-adminer-down # Stop Adminer"
 	@Write-Host "  make -f Makefile.windows lan-adminer-url  # Print Adminer access URL"
 	@Write-Host "  make -f Makefile.windows lan-down         # Stop LAN stack"
+	@Write-Host "  make -f Makefile.windows dev-up           # Start local dev stack"
+	@Write-Host "  make -f Makefile.windows dev-down         # Stop local dev stack"
 
 .PHONY: lan-up
 lan-up: lan-cert
-	$(LAN_COMPOSE) up -d postgres
-	$(LAN_COMPOSE) run --rm --build backend python data/bootstrap_system.py
 	$(LAN_COMPOSE) up --build -d --remove-orphans
 
 .PHONY: lan-init
 lan-init:
-	$(LAN_COMPOSE) up -d postgres
-	$(LAN_COMPOSE) run --rm --build backend python data/bootstrap_system.py
+	$(LAN_COMPOSE) run --rm --build bootstrap
 
 .PHONY: lan-go
 lan-go: lan-up lan-url
@@ -55,24 +58,23 @@ lan-seed:
 
 .PHONY: lan-bootstrap
 lan-bootstrap: lan-cert
-	$(LAN_COMPOSE) up -d postgres
-	$(LAN_COMPOSE) run --rm --build backend python data/bootstrap_system.py
+	$(LAN_COMPOSE) run --rm --build bootstrap
 
 .PHONY: lan-cert
 lan-cert:
-	@$$ip = $(GET_LAN_IP); if (-not $$ip) { Write-Host 'Could not determine a usable LAN IPv4 address automatically.'; exit 1 }; if (-not (Test-Path frontend/certificates/localhost.pem)) { Write-Host "Generating certificates for $$ip..."; Push-Location frontend; $$env:HOST="$$ip"; npm run cert; Pop-Location } else { Write-Host "Certificates already exist in frontend/certificates/" }
+	@$$ip = $(GET_LAN_IP); if (-not $$ip) { Write-Host 'Could not determine a usable LAN IPv4 address automatically.'; exit 1 }; if (-not (Test-Path frontend/certificates/localhost.pem) -or -not (Test-Path frontend/certificates/localhost-key.pem)) { Write-Host "Generating certificates for $(LAN_HOSTNAME) and $$ip..."; Push-Location frontend; $$env:HOST='$(LAN_HOSTNAME)'; $$env:LAN_IP="$$ip"; npm run cert; Pop-Location } else { Write-Host "Certificates already exist in frontend/certificates/" }
 
 .PHONY: lan-url
 lan-url:
-	@$$ip = $(GET_LAN_IP); if (-not $$ip) { Write-Host 'Could not determine a usable LAN IPv4 address automatically.'; Write-Host 'Run: ipconfig'; exit 1 }; Write-Host 'Open from other devices on the same network:'; Write-Host ('  https://{0}' -f $$ip)
+	@$$ip = $(GET_LAN_IP); if (-not $$ip) { Write-Host 'Could not determine a usable LAN IPv4 address automatically.'; Write-Host 'Run: ipconfig'; exit 1 }; Write-Host 'Open from other devices on the same network:'; Write-Host ('  https://{0}' -f '$(LAN_HOSTNAME)'); Write-Host 'Fallback while DNS is not configured:'; Write-Host ('  https://{0}' -f $$ip)
 
 .PHONY: lan-adminer-up
 lan-adminer-up:
-	$(LAN_COMPOSE) --profile adminer up -d adminer
+	$(LAN_COMPOSE) up -d adminer
 
 .PHONY: lan-adminer-down
 lan-adminer-down:
-	$(LAN_COMPOSE) --profile adminer stop adminer
+	$(LAN_COMPOSE) stop adminer
 
 .PHONY: lan-adminer-url
 lan-adminer-url:
@@ -81,4 +83,12 @@ lan-adminer-url:
 
 .PHONY: lan-down
 lan-down:
-	$(LAN_COMPOSE) --profile adminer down --remove-orphans
+	$(LAN_COMPOSE) down --remove-orphans
+
+.PHONY: dev-up
+dev-up:
+	$(DEV_COMPOSE) up --build -d --remove-orphans
+
+.PHONY: dev-down
+dev-down:
+	$(DEV_COMPOSE) down --remove-orphans

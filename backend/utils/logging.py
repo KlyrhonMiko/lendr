@@ -48,15 +48,9 @@ class ColoredFormatter(logging.Formatter):
         )
         return log_fmt
 
-def setup_logging(log_level: str = "INFO", log_dir: str = ".logs"):
+def setup_logging(log_level: str = "INFO", log_dir: str = ".logs", log_file_enabled: bool = True):
     """Initialize system-wide logging with Console and File handlers."""
-    
-    # Ensure log directory exists
-    log_path = Path(log_dir)
-    log_path.mkdir(parents=True, exist_ok=True)
-    
-    app_log_file = log_path / "backend.log"
-    
+
     # Root Logger
     logger = logging.getLogger()
     logger.setLevel(log_level)
@@ -73,19 +67,24 @@ def setup_logging(log_level: str = "INFO", log_dir: str = ".logs"):
     console_handler.setFormatter(ColoredFormatter("%(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
     console_handler.addFilter(correlation_filter)
     logger.addHandler(console_handler)
-    
-    # 2. File Handler (Rotating)
-    # Categorizes all backend events with timestamps, levels, and origins.
-    file_handler = TimedRotatingFileHandler(
-        app_log_file, when="midnight", interval=1, backupCount=30, encoding="utf-8"
-    )
-    file_formatter = logging.Formatter(
-        "[%(asctime)s] [%(levelname)-8s] [%(name)s] [cid=%(correlation_id)s] %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
-    )
-    file_handler.setFormatter(file_formatter)
-    file_handler.addFilter(correlation_filter)
-    logger.addHandler(file_handler)
+
+    if log_file_enabled:
+        log_path = Path(log_dir)
+        log_path.mkdir(parents=True, exist_ok=True)
+
+        app_log_file = log_path / "backend.log"
+
+        # Mirror backend logs to a rotating file only when explicitly enabled.
+        file_handler = TimedRotatingFileHandler(
+            app_log_file, when="midnight", interval=1, backupCount=30, encoding="utf-8"
+        )
+        file_formatter = logging.Formatter(
+            "[%(asctime)s] [%(levelname)-8s] [%(name)s] [cid=%(correlation_id)s] %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S"
+        )
+        file_handler.setFormatter(file_formatter)
+        file_handler.addFilter(correlation_filter)
+        logger.addHandler(file_handler)
     
     # Suppress noisy third-party loggers if needed
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)

@@ -1,53 +1,73 @@
+name: powergold-dev
+
 services:
   postgres:
-    image: postgres:15
+    image: postgres:15-alpine
     restart: unless-stopped
     env_file:
       - .env.local
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
-      POSTGRES_DB: ${POSTGRES_DB:-powergold}
+      TZ: ${TZ:-Asia/Manila}
     ports:
       - "5433:5432"
     volumes:
-      - powergold_pgdata:/var/lib/postgresql/data
+      - powergold_dev_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   adminer:
-    image: adminer:latest
+    image: adminer:4.8.1-standalone
     restart: unless-stopped
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile.backend
+    restart: unless-stopped
     env_file:
       - .env.local
     environment:
-      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-powergold}
-      TZ: Asia/Manila
+      TZ: ${TZ:-Asia/Manila}
+      LOG_FILE_ENABLED: "true"
+      STARTUP_RUN_INITIALIZATION: "true"
+      STARTUP_ENABLE_SCHEDULER: "false"
+      AUTH_TRUST_PROXY_HEADERS: "false"
+      APP_HOST: 0.0.0.0
+      APP_PORT: 8000
     volumes:
       - ./backend:/app
     ports:
       - "8000:8000"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile.frontend
-    env_file:
-      - .env.local
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_URL: http://backend:8000
+      NODE_ENV: development
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_API_URL: http://localhost:8000
       WATCHPACK_POLLING: "true"
-      NEXT_TELEMETRY_DISABLED: 1
     volumes:
       - ./frontend:/usr/src/app
       - /usr/src/app/node_modules
@@ -55,7 +75,7 @@ services:
       - "3000:3000"
     depends_on:
       - backend
-
+    command: npm run dev
 
 volumes:
-  powergold_pgdata:
+  powergold_dev_pgdata:

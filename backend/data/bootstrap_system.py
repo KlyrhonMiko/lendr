@@ -25,7 +25,11 @@ from utils.migrations import run_migrations
 
 
 def bootstrap_system() -> None:
-    setup_logging(log_level=settings.LOG_LEVEL, log_dir=settings.LOG_DIR)
+    setup_logging(
+        log_level=settings.LOG_LEVEL,
+        log_dir=settings.LOG_DIR,
+        log_file_enabled=settings.LOG_FILE_ENABLED,
+    )
     logger = get_logger("bootstrap")
 
     max_attempts = 30

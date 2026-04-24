@@ -100,7 +100,7 @@ describe('inventory profile two-factor enrollment', () => {
     mocks.initiateTwoFactorEnrollment.mockResolvedValue({
       method: 'authenticator_app',
       secret: 'ABCDEF123456',
-      provisioning_uri: 'otpauth://totp/Lendr:staff@example.com?secret=ABCDEF123456',
+      provisioning_uri: 'otpauth://totp/PowerGold:staff@example.com?secret=ABCDEF123456',
     });
 
     render(<ProfilePage />);

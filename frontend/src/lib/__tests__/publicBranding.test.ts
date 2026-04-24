@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 
 import { resolveBrandAssetUrl, usePublicBranding } from '@/lib/publicBranding';
@@ -14,19 +14,30 @@ describe('publicBranding', () => {
     vi.clearAllMocks();
   });
 
-  it('resolveBrandAssetUrl returns absolute URL and keeps remote URLs', () => {
-    vi.stubEnv('NEXT_PUBLIC_API_URL', 'https://api.example.com');
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
 
-    expect(resolveBrandAssetUrl('/api/assets/branding/logo.png')).toBe(
-      'https://api.example.com/api/assets/branding/logo.png',
-    );
-    expect(resolveBrandAssetUrl('api/assets/branding/logo.png')).toBe(
-      'https://api.example.com/api/assets/branding/logo.png',
-    );
+  it('resolveBrandAssetUrl keeps API asset paths same-origin in the browser', () => {
+    vi.stubEnv('NEXT_PUBLIC_API_URL', 'https://api.example.com');
+    vi.stubGlobal('window', { location: { protocol: 'https:', host: 'powergold.home.arpa' } });
+
+    expect(resolveBrandAssetUrl('/api/assets/branding/logo.png')).toBe('/api/assets/branding/logo.png');
+    expect(resolveBrandAssetUrl('api/assets/branding/logo.png')).toBe('/api/assets/branding/logo.png');
     expect(resolveBrandAssetUrl('https://cdn.example.com/logo.png')).toBe(
       'https://cdn.example.com/logo.png',
     );
     expect(resolveBrandAssetUrl(null)).toBeNull();
+  });
+
+  it('resolveBrandAssetUrl keeps absolute API URLs on the server', () => {
+    vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://backend:8000');
+    vi.stubGlobal('window', undefined);
+
+    expect(resolveBrandAssetUrl('/api/assets/branding/logo.png')).toBe(
+      'http://backend:8000/api/assets/branding/logo.png',
+    );
   });
 
   it('usePublicBranding falls back to default brand name when API name is blank', () => {
@@ -47,7 +58,7 @@ describe('publicBranding', () => {
 
     const { result } = renderHook(() => usePublicBranding());
 
-    expect(result.current.brandName).toBe('Lendr');
+    expect(result.current.brandName).toBe('PowerGold');
     expect(result.current.logoUrl).toBeNull();
     expect(result.current.faviconUrl).toBeNull();
   });
