@@ -1,6 +1,5 @@
 import json
 from datetime import datetime, timezone
-from uuid import uuid4
 from typing import Type
 
 from sqlmodel import Session, select
@@ -114,7 +113,6 @@ class InitializationService:
             bootstrap_username, bootstrap_password = resolve_bootstrap_admin_credentials()
 
             admin_user = User(
-                id=uuid4(),
                 user_id="ADMIN-001",
                 username=bootstrap_username,
                 email="admin@powergold.system",

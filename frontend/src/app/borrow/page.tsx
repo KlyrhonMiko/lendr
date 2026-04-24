@@ -219,6 +219,52 @@ export default function BorrowPage() {
     setTimeout(() => pinInputRefs.current[focusIdx]?.focus(), 0);
   }, []);
 
+  const revokeBorrowerSession = useCallback(async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      // Keep flow usable even if logout request fails.
+    } finally {
+      auth.clearToken();
+    }
+  }, []);
+
+  const loginAsBorrower = useCallback(async (username: string, password: string) => {
+    const loginRes = await api.login({
+      username,
+      password,
+    });
+
+    if (isTwoFactorChallengeResponse(loginRes)) {
+      throw new Error(BORROW_KIOSK_TWO_FACTOR_ERROR);
+    }
+
+    if ('auth_state' in loginRes && loginRes.auth_state === 'password_change_required') {
+      throw new Error('Initial password rotation required. Please sign in to the standard portal first to update your PIN.');
+    }
+
+    if (!('access_token' in loginRes)) {
+      throw new Error('Invalid login response');
+    }
+
+    auth.setToken(loginRes.access_token);
+
+    let borrowerUser = null;
+    try {
+      borrowerUser = await auth.getUser();
+    } catch (error) {
+      await revokeBorrowerSession();
+      throw error;
+    }
+
+    if (!isBorrowerRole(borrowerUser?.role)) {
+      await revokeBorrowerSession();
+      throw new Error(BORROW_KIOSK_ROLE_ERROR);
+    }
+
+    return borrowerUser;
+  }, [revokeBorrowerSession]);
+
   const handleConfirmPin = async () => {
     const pinValidationError = validatePinVerificationInput(employeeId, pinDraft);
     if (pinValidationError) {
