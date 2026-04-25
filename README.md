@@ -15,7 +15,7 @@ An inventory and borrowing management system built with **FastAPI** (backend) an
 - [Prerequisites](#prerequisites)
 - [Setup](#setup)
   - [Option A — Docker LAN Deployment](#option-a--docker-lan-deployment)
-  - [Option A.1 — Docker Development Override](#option-a1--docker-development-override)
+  - [Option A.1 — Docker App Development Override](#option-a1--docker-app-development-override)
   - [Option B — Local Development](#option-b--local-development)
 - [Makefile Command Guide](#makefile-command-guide)
 - [Environment Variables](#environment-variables)
@@ -48,12 +48,13 @@ PowerGold tracks equipment/items and manages borrow requests through a full life
 
 ## Architecture
 
-| Layer     | Technology                                               | Port  |
-|-----------|----------------------------------------------------------|-------|
-| Frontend  | Next.js 16, React 19, TypeScript, Tailwind CSS 4         | 3000  |
-| Backend   | FastAPI, SQLModel, Uvicorn                               | 8000  |
-| Database  | PostgreSQL 15                                            | 5432  |
-| DB Admin  | Adminer (optional)                                       | 8080  |
+| Layer         | Technology                                               | Port                  |
+|---------------|----------------------------------------------------------|-----------------------|
+| Frontend      | Next.js 16, React 19, TypeScript, Tailwind CSS 4         | 3000                  |
+| Backend       | FastAPI, SQLModel, Uvicorn                               | 8000                  |
+| Database      | PostgreSQL 15                                            | 5433 (host), 5432 (container) |
+| Reverse Proxy | Caddy (LAN deployment only)                              | 80 / 443              |
+| DB Admin      | Adminer (optional, host-only)                            | 8080                  |
 
 > **Note:** The backend defaults to port **8000** when run locally with `uvicorn main:app --reload`. The Docker Compose service also exposes port 8000. The frontend `NEXT_PUBLIC_API_URL` should point to the backend accordingly.
 
@@ -218,19 +219,22 @@ The system uses **JWT + Session-based hybrid authentication**:
 ### For LAN Host Profile (before starting any containers)
 
 1. Docker Engine/Desktop is running.
-2. `.env.local` exists in project root and has valid values for `POSTGRES_*`, `DATABASE_URL`, `SECRET_KEY`, and admin bootstrap credentials.
-3. Host ports are available:
+2. `.env.local` exists in project root for host-run development and shared DB settings.
+3. `.env.deploy` exists in project root for the LAN app stack.
+4. Host ports are available:
   1. `80` for app access via Caddy
-  2. `8080` only if using optional Adminer
-4. Host firewall allows inbound TCP `80` from your local network.
-5. Server machine has a stable LAN IP (recommended via router DHCP reservation).
-6. GNU Make is installed if you want to use Makefile helpers on Windows.
+  2. `443` for HTTPS app access via Caddy
+  3. `5433` for the shared machine-local PostgreSQL container
+  4. `8080` only if using optional Adminer
+5. Host firewall allows inbound TCP `80` and `443` from your local network.
+6. Server machine has a stable LAN IP (recommended via router DHCP reservation).
+7. GNU Make is installed if you want to use Makefile helpers on Windows.
 
 ### For local setup
 
 - [Python](https://www.python.org/downloads/) 3.11+
 - [Node.js](https://nodejs.org/) 18+
-- [PostgreSQL](https://www.postgresql.org/download/) 15+
+- [PostgreSQL](https://www.postgresql.org/download/) 15+ (only if you do not use the shared Docker DB)
 - `pip` and `npm` (bundled with Python and Node.js respectively)
 
 ---
@@ -239,7 +243,7 @@ The system uses **JWT + Session-based hybrid authentication**:
 
 ### Option A — Docker LAN Deployment
 
-This is the deployable single-host LAN stack. It builds immutable backend/frontend images, runs migrations + initialization through a one-shot bootstrap container, and exposes the app through Caddy over HTTPS.
+This is the LAN-facing app stack. It reuses the machine-local PostgreSQL container from `docker-compose.yml`, builds immutable backend/frontend images, runs migrations + initialization through a one-shot bootstrap container, and exposes the app through Caddy over HTTPS.
 
 **1. Clone the repository**
 
@@ -259,7 +263,7 @@ POSTGRES_PASSWORD=your_secure_password
 POSTGRES_DB=powergold
 
 # Backend
-DATABASE_URL=postgresql+psycopg2://postgres:your_secure_password@postgres:5432/powergold
+DATABASE_URL=postgresql+psycopg2://postgres:your_secure_password@powergold-db:5432/powergold
 SECRET_KEY=your_super_secret_jwt_key_change_this_in_production
 INITIAL_ADMIN_USERNAME=admin
 INITIAL_ADMIN_PASSWORD=change_this
@@ -273,7 +277,45 @@ SWAGGER_UI_ENABLED=false
 
 > Generate a strong `SECRET_KEY` with: `python -c "import secrets; print(secrets.token_hex(32))"`
 
-**3. Generate LAN certificates**
+**3. Start the shared database infrastructure**
+
+Linux/macOS:
+
+```bash
+make db-up
+```
+
+Windows:
+
+```powershell
+make -f Makefile.windows db-up
+```
+
+Equivalent raw Compose command:
+
+```bash
+docker compose -f docker-compose.yml up -d
+```
+
+This starts:
+- PostgreSQL on `localhost:5433`
+- Adminer on `http://localhost:8080` (host machine only)
+
+**4. Configure router-managed local DNS**
+
+Create a local DNS / host override on your router:
+
+- `powergold.home.arpa` -> the reserved/static LAN IP of this machine
+
+Then ensure LAN clients use the router for DNS via DHCP, reconnect or renew DHCP leases on clients, and verify from another device:
+
+```bash
+nslookup powergold.home.arpa
+```
+
+Expected result: the hostname resolves to this machine's static LAN IP.
+
+**5. Generate LAN certificates**
 
 Linux/macOS:
 
@@ -287,7 +329,7 @@ Windows:
 make -f Makefile.windows lan-cert
 ```
 
-**4. Build and start the deploy stack**
+**6. Build and start the LAN app stack**
 
 ```bash
 make lan-go
@@ -302,10 +344,13 @@ make -f Makefile.windows lan-go
 Equivalent raw Compose command:
 
 ```bash
+docker compose -f docker-compose.yml up -d
 ENV_FILE=.env.deploy docker compose --env-file .env.deploy -f docker-compose.deploy.yml up --build -d
 ```
 
-**5. Access the services**
+`make lan-go` already ensures the shared DB stack is running before the LAN app containers start.
+
+**7. Access the services**
 
 | Service        | URL                          | Login              |
 |----------------|------------------------------|--------------------|
@@ -314,80 +359,68 @@ ENV_FILE=.env.deploy docker compose --env-file .env.deploy -f docker-compose.dep
 
 ---
 
-### Option A.1 — Docker Development
+### Option A.1 — Docker App Development Override
 
-The default [docker-compose.yml](/mnt/sdb4/Programming/Python/Web Projects/lendr/docker-compose.yml:1) is now the development stack. Use this when you want bind mounts, hot reload, and direct service ports on the local workstation.
+The default [docker-compose.yml](/mnt/sdb4/Programming/Python/Web Projects/lendr/docker-compose.yml:1) is now the shared infrastructure stack only. It owns the machine-local PostgreSQL container and the localhost-bound Adminer instance. For the rare case where you want backend and frontend inside Docker too, use the optional [docker-compose.dev.yml](/mnt/sdb4/Programming/Python/Web Projects/lendr/docker-compose.dev.yml:1) overlay.
+
+**Shared infrastructure only**
 
 Linux/macOS:
 
 ```bash
-make dev-up
+make db-up
 ```
 
 Windows:
 
 ```powershell
-make -f Makefile.windows dev-up
+make -f Makefile.windows db-up
 ```
 
 Equivalent raw Compose command:
 
 ```bash
-docker compose -f docker-compose.yml up --build -d
+docker compose -f docker-compose.yml up -d
 ```
 
-Development mode behavior:
+Behavior:
 
-1. `backend` runs with `uvicorn --reload`.
-2. Backend startup automatically runs pending Alembic migrations and the initialization service, so plain `uvicorn main:app --reload` bootstraps schema, system configs, and the bootstrap admin on a fresh dev database.
-3. `frontend` runs `npm run dev` with bind mounts and `WATCHPACK_POLLING=true`.
-4. `caddy` is not part of the default dev stack.
-5. Backend and frontend publish their own ports directly for local iteration.
-6. Scheduler startup is disabled in dev.
-7. Adminer is included by default but bound to `127.0.0.1:8080`, so only the host machine can reach it.
+1. PostgreSQL listens on `localhost:5433` for host-run backend processes.
+2. The database is also reachable inside Docker on the shared network alias `powergold-db`.
+3. Adminer is included and bound to `127.0.0.1:8080`, so only the host machine can reach it.
+4. No backend/frontend containers are started by default.
 
-**4. DNS requirement**
+**Optional full-Docker app override**
 
-Create a local DNS record on the router or internal DNS server:
-
-- `powergold.home.arpa` -> the reserved IP of the PowerGold server
-
-Then client devices should open:
-
-```text
-https://powergold.home.arpa
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
 ```
 
-`make lan-url` prints the hostname first and the raw IP as a fallback while DNS is still being set up.
+This overlay:
+1. Reuses the same Postgres container and `powergold_pgdata` volume.
+2. Adds backend/frontend containers onto the shared `powergold-shared` network.
+3. Does not create a second database.
+4. Is intended for occasional full-container debugging, not the primary development workflow.
 
-**5. Access the app**
+Stop the overlay and shared infrastructure together with:
 
-| Service | URL |
-|---|---|
-| PowerGold | http://SERVER_LAN_IP |
-| Swagger UI | http://SERVER_LAN_IP/docs |
-
-Notes:
-
-1. Backend and database are internal in this profile.
-2. Adminer is disabled by default in this profile.
-3. Optional Adminer binds to `localhost:8080` on the host machine only (not exposed to LAN clients).
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml down --remove-orphans
+```
 
 ---
 
 ### Option B — Local Development
 
-Run each service directly on your machine without Docker.
+Run backend and frontend directly on this machine while reusing the shared Docker PostgreSQL container. This is the primary development workflow.
 
-#### Step 1 — Set up PostgreSQL
-
-Create a database for the project:
+#### Step 1 — Start the shared PostgreSQL container
 
 ```bash
-psql -U postgres
-CREATE DATABASE PowerGold;
-\q
+make db-up
 ```
+
+If you prefer a self-managed PostgreSQL installation instead, keep using the same `.env.local` format and point `DATABASE_URL` at your own host database.
 
 #### Step 2 — Set up the Backend
 
@@ -413,10 +446,13 @@ pip install -r requirements.txt
 
 **Create the environment file:**
 
-Create `.env.local` inside the `backend/` directory (or in the project root — the app auto-discovers it):
+Create `.env.local` in the project root (recommended) or inside `backend/`:
 
 ```env
-DATABASE_URL=postgresql+psycopg2://postgres:your_password@localhost:5432/PowerGold
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=your_password
+POSTGRES_DB=powergold
+DATABASE_URL=postgresql+psycopg2://postgres:your_password@localhost:5433/powergold
 SECRET_KEY=your_super_secret_jwt_key_change_this_in_production
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
@@ -425,27 +461,15 @@ INITIAL_ADMIN_USERNAME=admin
 INITIAL_ADMIN_PASSWORD=change_me_now
 ```
 
-**Run database migrations:**
-
-```bash
-alembic upgrade head
-```
-
-**Seed configuration and create admin user:**
-
-```bash
-python data/seed_configuration.py
-```
-
-This creates (or verifies) the bootstrap admin user and seeds all system configuration settings.
-
 **Start the backend server:**
 
 ```bash
 uvicorn main:app --reload
 ```
 
-The API will be available at http://localhost:8000 and interactive docs at http://localhost:8000/docs.
+Backend startup automatically runs pending Alembic migrations and the initialization service against the shared DB when `STARTUP_RUN_INITIALIZATION=true`, so a fresh shared database is bootstrapped by normal `uvicorn` startup.
+
+The API will be available at `http://127.0.0.1:8000` and interactive docs at `http://127.0.0.1:8000/docs`.
 
 **Bootstrap login credentials:**
 - **Username:** value of `INITIAL_ADMIN_USERNAME` (default: `admin`)
@@ -481,15 +505,15 @@ npm run cert
 npm run dev
 ```
 
-The frontend will be available at http://localhost:3000.
+The frontend will be available at `https://localhost:3000`.
 
-> The frontend reads `NEXT_PUBLIC_API_URL` (defaults to `http://localhost:8000`) to reach the backend. You can set this in a `.env.local` at the project root if needed.
+> The frontend reads `NEXT_PUBLIC_API_URL` (defaults to `http://localhost:8000`) to reach the backend. In the browser, requests stay same-origin through Next.js rewrites while the dev server proxies to the backend origin.
 
 ---
 
 ## Makefile Command Guide
 
-Use this guide for single-host LAN deployment via `docker-compose.deploy.yml` and local development via `docker-compose.yml`.
+Use this guide for the shared machine-local DB stack in `docker-compose.yml` and the LAN app stack in `docker-compose.deploy.yml`.
 
 ### Prerequisites
 
@@ -501,7 +525,12 @@ Use this guide for single-host LAN deployment via `docker-compose.deploy.yml` an
 | Purpose | Linux/macOS | Windows (PowerShell) |
 |---|---|---|
 | Show available targets | `make help` | `make -f Makefile.windows help` |
-| Build/start deploy stack | `make lan-up` | `make -f Makefile.windows lan-up` |
+| Start shared Postgres + Adminer | `make db-up` | `make -f Makefile.windows db-up` |
+| Show shared DB stack services | `make db-ps` | `make -f Makefile.windows db-ps` |
+| Tail shared DB stack logs | `make db-logs` | `make -f Makefile.windows db-logs` |
+| Show Adminer URL | `make db-adminer-url` | `make -f Makefile.windows db-adminer-url` |
+| Stop shared DB stack | `make db-down` | `make -f Makefile.windows db-down` |
+| Build/start LAN app stack | `make lan-up` | `make -f Makefile.windows lan-up` |
 | Build/start + print LAN URL (alias: `lan-up` then `lan-url`) | `make lan-go` | `make -f Makefile.windows lan-go` |
 | Initialize bootstrap only | `make lan-init` | `make -f Makefile.windows lan-init` |
 | Run one-shot bootstrap service | `make lan-bootstrap` | `make -f Makefile.windows lan-bootstrap` |
@@ -510,35 +539,45 @@ Use this guide for single-host LAN deployment via `docker-compose.deploy.yml` an
 | Run Alembic migrations | `make lan-migrate` | `make -f Makefile.windows lan-migrate` |
 | Seed configuration | `make lan-seed` | `make -f Makefile.windows lan-seed` |
 | Print LAN URL only | `make lan-url` | `make -f Makefile.windows lan-url` |
-| Start Adminer | `make lan-adminer-up` | `make -f Makefile.windows lan-adminer-up` |
-| Show Adminer URL | `make lan-adminer-url` | `make -f Makefile.windows lan-adminer-url` |
-| Stop Adminer | `make lan-adminer-down` | `make -f Makefile.windows lan-adminer-down` |
 | Stop LAN stack | `make lan-down` | `make -f Makefile.windows lan-down` |
-| Start dev override stack | `make dev-up` | `make -f Makefile.windows dev-up` |
-| Stop dev override stack | `make dev-down` | `make -f Makefile.windows dev-down` |
+| Alias for starting shared DB stack | `make dev-up` | `make -f Makefile.windows dev-up` |
+| Alias for stopping shared DB stack | `make dev-down` | `make -f Makefile.windows dev-down` |
 
 ### Common Workflows
 
-1. First-time LAN setup
+1. Primary local development setup
+  - Linux/macOS: `make db-up`
+  - Windows: `make -f Makefile.windows db-up`
+  - Then run backend/frontend directly on the machine.
+
+2. First-time LAN setup
   - Linux/macOS: `make lan-go`
   - Windows: `make -f Makefile.windows lan-go`
 
-2. Run bootstrap only (without starting full stack)
+3. Run bootstrap only (without starting full stack)
   - Linux/macOS: `make lan-bootstrap`
   - Windows: `make -f Makefile.windows lan-bootstrap`
 
-3. Apply code changes to containers
+4. Apply code changes to LAN containers
   - Linux/macOS: `make lan-up`
   - Windows: `make -f Makefile.windows lan-up`
-  - Note: `lan-up` already runs bootstrap + rebuilds images (`--build`), so `lan-down` first is optional.
+  - Note: `lan-up` reuses the existing shared DB stack and rebuilds the LAN app images.
 
-4. Stop everything
+5. Stop only the LAN app stack
   - Linux/macOS: `make lan-down`
   - Windows: `make -f Makefile.windows lan-down`
 
-5. Check health/troubleshoot
-  - Linux/macOS: `make lan-ps` and `make lan-logs`
-  - Windows: `make -f Makefile.windows lan-ps` and `make -f Makefile.windows lan-logs`
+6. Stop the shared DB stack too
+  - Linux/macOS: `make db-down`
+  - Windows: `make -f Makefile.windows db-down`
+
+7. Check health/troubleshoot
+  - Linux/macOS: `make db-ps`, `make db-logs`, `make lan-ps`, `make lan-logs`
+  - Windows: `make -f Makefile.windows db-ps`, `make -f Makefile.windows db-logs`, `make -f Makefile.windows lan-ps`, `make -f Makefile.windows lan-logs`
+
+8. Optional full-Docker app override
+  - Linux/macOS / Windows: `docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d`
+  - Stop it with: `docker compose -f docker-compose.yml -f docker-compose.dev.yml down --remove-orphans`
 
 ---
 
@@ -555,16 +594,16 @@ Use this guide for single-host LAN deployment via `docker-compose.deploy.yml` an
 | `APP_PORT`                    | No       | `5000`       | Port the backend listens on (Docker only)        |
 | `POSTGRES_USER`               | Docker   | `postgres`   | PostgreSQL username (Docker Compose only)        |
 | `POSTGRES_PASSWORD`           | Docker   | `password`   | PostgreSQL password (Docker Compose only)        |
-| `POSTGRES_DB`                 | Docker   | `PowerGold`      | PostgreSQL database name (Docker Compose only)   |
+| `POSTGRES_DB`                 | Docker   | `powergold`      | PostgreSQL database name (Docker Compose only)   |
 | `NEXT_PUBLIC_API_URL`         | No       | `http://localhost:8000` | Backend base URL used by the frontend |
 
-The backend resolves environment variables from `.env.local` first, then `.env`, then the system environment. For Docker, a single `.env.local` in the project root is used by all services.
+The backend resolves environment variables from `.env.local` first, then `.env`, then the system environment. The shared DB stack (`docker-compose.yml`) reads `${DEV_ENV_FILE:-.env.local}`, while the LAN app stack (`docker-compose.deploy.yml`) reads `${ENV_FILE:-.env.deploy}`.
 
 ---
 
 ## Database Migrations
 
-Migrations are managed with **Alembic**. All commands run from inside the `backend/` directory (or via `docker compose exec backend`).
+Migrations are managed with **Alembic**. For the primary local workflow, run commands from inside the `backend/` directory while the shared DB container is up (`make db-up`).
 
 ```bash
 # Apply all pending migrations
@@ -580,11 +619,11 @@ alembic revision --autogenerate -m "describe your change"
 alembic history
 ```
 
-**With Docker:**
+**With the LAN app stack:**
 
 ```bash
-docker compose exec backend alembic upgrade head
-docker compose exec backend alembic revision --autogenerate -m "describe your change"
+ENV_FILE=.env.deploy docker compose --env-file .env.deploy -f docker-compose.deploy.yml exec backend alembic upgrade head
+ENV_FILE=.env.deploy docker compose --env-file .env.deploy -f docker-compose.deploy.yml exec backend alembic revision --autogenerate -m "describe your change"
 ```
 
 ### System Configuration Seeding (Post-Migration)
@@ -599,10 +638,10 @@ cd backend
 python data/seed_configuration.py
 ```
 
-**With Docker:**
+**With the LAN app stack:**
 
 ```bash
-docker compose exec backend python data/seed_configuration.py
+ENV_FILE=.env.deploy docker compose --env-file .env.deploy -f docker-compose.deploy.yml exec backend python data/seed_configuration.py
 ```
 
 This script:
@@ -614,16 +653,13 @@ This script:
 **Complete initialization workflow:**
 
 ```bash
-# Local development
+# Shared DB + host-run backend (recommended)
+make db-up
 cd backend
-alembic upgrade head
-python data/seed_configuration.py
 uvicorn main:app --reload
 
-# Docker
-docker compose up -d
-docker compose exec backend alembic upgrade head
-docker compose exec backend python data/seed_configuration.py
+# LAN app stack
+make lan-go
 ```
 
 **Access the API:**
@@ -631,7 +667,7 @@ docker compose exec backend python data/seed_configuration.py
 Once seeded, login with bootstrap credentials:
 - **Username:** value of `INITIAL_ADMIN_USERNAME` (default: `admin`)
 - **Password:** value of `INITIAL_ADMIN_PASSWORD`
-- **Endpoint:** http://localhost:8000/api/auth/login
+- **Endpoint:** http://127.0.0.1:8000/api/auth/login
 
 ---
 
@@ -873,8 +909,10 @@ All dashboard pages are protected by `AuthGuard` and require a valid JWT session
 
 ```
 PowerGold/
-├── docker-compose.yml              # Orchestrates database, backend, frontend, adminer
-├── .env.local                      # Shared environment values (Docker + local)
+├── docker-compose.yml              # Shared Postgres + Adminer infrastructure stack
+├── docker-compose.dev.yml          # Optional backend/frontend Docker dev overlay
+├── docker-compose.deploy.yml       # LAN app stack (bootstrap, backend, frontend, caddy)
+├── .env.local                      # Host-run development settings + shared DB credentials
 ├── README.md
 │
 ├── backend/
@@ -1074,11 +1112,11 @@ alembic revision --autogenerate -m "descriptive message"
 alembic upgrade head
 ```
 
-**For Docker:**
+**For the LAN app stack:**
 
 ```bash
-docker compose exec backend alembic revision --autogenerate -m "description"
-docker compose exec backend alembic upgrade head
+ENV_FILE=.env.deploy docker compose --env-file .env.deploy -f docker-compose.deploy.yml exec backend alembic revision --autogenerate -m "description"
+ENV_FILE=.env.deploy docker compose --env-file .env.deploy -f docker-compose.deploy.yml exec backend alembic upgrade head
 ```
 
 ### Role-Based Permission System

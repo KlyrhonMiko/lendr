@@ -1,24 +1,6 @@
 name: powergold
 
 services:
-  postgres:
-    image: postgres:15-alpine
-    restart: unless-stopped
-    env_file:
-      - ${ENV_FILE:-.env.deploy}
-    environment:
-      TZ: ${TZ:-Asia/Manila}
-    volumes:
-      - powergold_pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
-
   bootstrap:
     build:
       context: ./backend
@@ -30,10 +12,9 @@ services:
       LOG_FILE_ENABLED: "false"
       STARTUP_RUN_INITIALIZATION: "false"
       STARTUP_ENABLE_SCHEDULER: "false"
-    depends_on:
-      postgres:
-        condition: service_healthy
     restart: "no"
+    networks:
+      - shared
     command: ["python", "data/bootstrap_system.py"]
 
   backend:
@@ -58,9 +39,9 @@ services:
     volumes:
       - powergold_backend_assets:/app/assets
       - powergold_backend_uploads:/app/uploads
+    networks:
+      - shared
     depends_on:
-      postgres:
-        condition: service_healthy
       bootstrap:
         condition: service_completed_successfully
     healthcheck:
@@ -95,6 +76,8 @@ services:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://backend:8000}
     expose:
       - "3000"
+    networks:
+      - shared
     depends_on:
       backend:
         condition: service_healthy
@@ -123,27 +106,20 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    networks:
+      - shared
     volumes:
       - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - ./frontend/certificates:/etc/caddy/certificates:ro
       - powergold_caddy_data:/data
       - powergold_caddy_config:/config
 
-  adminer:
-    image: adminer:4.8.1-standalone
-    restart: unless-stopped
-    env_file:
-      - ${ENV_FILE:-.env.deploy}
-    environment:
-      ADMINER_DEFAULT_SERVER: postgres
-    ports:
-      - "127.0.0.1:8080:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
+networks:
+  shared:
+    external: true
+    name: powergold-shared
 
 volumes:
-  powergold_pgdata:
   powergold_backend_assets:
   powergold_backend_uploads:
   powergold_caddy_data:

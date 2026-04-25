@@ -3,15 +3,20 @@ SHELL := /bin/bash
 ENV_FILE ?= .env.deploy
 DEV_ENV_FILE ?= .env.local
 LAN_HOSTNAME ?= powergold.home.arpa
+DB_COMPOSE := DEV_ENV_FILE=$(DEV_ENV_FILE) docker compose -f docker-compose.yml
 LAN_COMPOSE := ENV_FILE=$(ENV_FILE) docker compose --env-file $(ENV_FILE) -f docker-compose.deploy.yml
-DEV_COMPOSE := docker compose -f docker-compose.yml
 
 .PHONY: help
 help:
 	@echo "PowerGold Docker helpers"
 	@echo ""
 	@echo "Targets:"
-	@echo "  make lan-up           # Build/start deploy stack"
+	@echo "  make db-up            # Start shared Postgres + Adminer"
+	@echo "  make db-ps            # Show shared DB stack services"
+	@echo "  make db-logs          # Tail shared DB stack logs"
+	@echo "  make db-adminer-url   # Print Adminer access URL"
+	@echo "  make db-down          # Stop shared DB stack"
+	@echo "  make lan-up           # Build/start LAN app stack"
 	@echo "  make lan-go           # lan-up + print access URL"
 	@echo "  make lan-ps           # Show LAN stack services"
 	@echo "  make lan-logs         # Tail LAN stack logs"
@@ -20,19 +25,37 @@ help:
 	@echo "  make lan-bootstrap    # Run one-shot bootstrap service"
 	@echo "  make lan-cert         # Generate self-signed certificates for $(LAN_HOSTNAME)"
 	@echo "  make lan-url          # Print hostname and fallback IP URL"
-	@echo "  make lan-adminer-up   # Start Adminer on localhost:8080"
-	@echo "  make lan-adminer-down # Stop Adminer"
-	@echo "  make lan-adminer-url  # Print Adminer access URL"
 	@echo "  make lan-down         # Stop LAN stack"
-	@echo "  make dev-up           # Start local dev stack"
-	@echo "  make dev-down         # Stop local dev stack"
+	@echo "  make dev-up           # Alias for db-up"
+	@echo "  make dev-down         # Alias for db-down"
+
+.PHONY: db-up
+db-up:
+	$(DB_COMPOSE) up -d --remove-orphans
+
+.PHONY: db-ps
+db-ps:
+	$(DB_COMPOSE) ps
+
+.PHONY: db-logs
+db-logs:
+	$(DB_COMPOSE) logs -f --tail=200
+
+.PHONY: db-adminer-url
+db-adminer-url:
+	@echo "Adminer (host machine only):"
+	@echo "  http://localhost:8080"
+
+.PHONY: db-down
+db-down:
+	$(DB_COMPOSE) down --remove-orphans
 
 .PHONY: lan-up
-lan-up: lan-cert
+lan-up: db-up lan-cert
 	$(LAN_COMPOSE) up --build -d --remove-orphans
 
 .PHONY: lan-init
-lan-init:
+lan-init: db-up
 	$(LAN_COMPOSE) run --rm --build bootstrap
 
 .PHONY: lan-go
@@ -55,7 +78,7 @@ lan-seed:
 	$(LAN_COMPOSE) exec backend python data/seed_configuration.py
 
 .PHONY: lan-bootstrap
-lan-bootstrap: lan-cert
+lan-bootstrap: db-up lan-cert
 	$(LAN_COMPOSE) run --rm --build bootstrap
 
 .PHONY: lan-cert
@@ -92,27 +115,14 @@ lan-url:
 	echo "Fallback while DNS is not configured:"; \
 	echo "  https://$$LAN_IP"
 
-.PHONY: lan-adminer-up
-lan-adminer-up:
-	$(LAN_COMPOSE) up -d adminer
-
-.PHONY: lan-adminer-down
-lan-adminer-down:
-	$(LAN_COMPOSE) stop adminer
-
-.PHONY: lan-adminer-url
-lan-adminer-url:
-	@echo "Adminer (host machine only):"
-	@echo "  http://localhost:8080"
-
 .PHONY: lan-down
 lan-down:
 	$(LAN_COMPOSE) down --remove-orphans
 
 .PHONY: dev-up
 dev-up:
-	$(DEV_COMPOSE) up --build -d --remove-orphans
+	$(MAKE) db-up
 
 .PHONY: dev-down
 dev-down:
-	$(DEV_COMPOSE) down --remove-orphans
+	$(MAKE) db-down
