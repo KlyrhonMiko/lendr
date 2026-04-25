@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile.backend
     restart: unless-stopped
     env_file:
-      - ${DEV_ENV_FILE:-.env.local}
+      - .env.local
     environment:
       TZ: ${TZ:-Asia/Manila}
       LOG_FILE_ENABLED: "true"

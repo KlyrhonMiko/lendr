@@ -345,7 +345,7 @@ Equivalent raw Compose command:
 
 ```bash
 docker compose -f docker-compose.yml up -d
-ENV_FILE=.env.deploy docker compose --env-file .env.deploy -f docker-compose.deploy.yml up --build -d
+docker compose --env-file .env.deploy -f docker-compose.deploy.yml up --build -d
 ```
 
 `make lan-go` already ensures the shared DB stack is running before the LAN app containers start.
@@ -597,7 +597,7 @@ Use this guide for the shared machine-local DB stack in `docker-compose.yml` and
 | `POSTGRES_DB`                 | Docker   | `powergold`      | PostgreSQL database name (Docker Compose only)   |
 | `NEXT_PUBLIC_API_URL`         | No       | `http://localhost:8000` | Backend base URL used by the frontend |
 
-The backend resolves environment variables from `.env.local` first, then `.env`, then the system environment. The shared DB stack (`docker-compose.yml`) reads `${DEV_ENV_FILE:-.env.local}`, while the LAN app stack (`docker-compose.deploy.yml`) reads `${ENV_FILE:-.env.deploy}`.
+The backend auto-discovers only `.env.local` for host-run development. The shared DB stack reads `.env.local`, and the LAN app stack is invoked with `--env-file .env.deploy` and uses `.env.deploy` for its service env files. The repository no longer relies on a `.env` fallback path.
 
 ---
 
@@ -622,8 +622,8 @@ alembic history
 **With the LAN app stack:**
 
 ```bash
-ENV_FILE=.env.deploy docker compose --env-file .env.deploy -f docker-compose.deploy.yml exec backend alembic upgrade head
-ENV_FILE=.env.deploy docker compose --env-file .env.deploy -f docker-compose.deploy.yml exec backend alembic revision --autogenerate -m "describe your change"
+docker compose --env-file .env.deploy -f docker-compose.deploy.yml exec backend alembic upgrade head
+docker compose --env-file .env.deploy -f docker-compose.deploy.yml exec backend alembic revision --autogenerate -m "describe your change"
 ```
 
 ### System Configuration Seeding (Post-Migration)
@@ -641,7 +641,7 @@ python data/seed_configuration.py
 **With the LAN app stack:**
 
 ```bash
-ENV_FILE=.env.deploy docker compose --env-file .env.deploy -f docker-compose.deploy.yml exec backend python data/seed_configuration.py
+docker compose --env-file .env.deploy -f docker-compose.deploy.yml exec backend python data/seed_configuration.py
 ```
 
 This script:
@@ -1115,8 +1115,8 @@ alembic upgrade head
 **For the LAN app stack:**
 
 ```bash
-ENV_FILE=.env.deploy docker compose --env-file .env.deploy -f docker-compose.deploy.yml exec backend alembic revision --autogenerate -m "description"
-ENV_FILE=.env.deploy docker compose --env-file .env.deploy -f docker-compose.deploy.yml exec backend alembic upgrade head
+docker compose --env-file .env.deploy -f docker-compose.deploy.yml exec backend alembic revision --autogenerate -m "description"
+docker compose --env-file .env.deploy -f docker-compose.deploy.yml exec backend alembic upgrade head
 ```
 
 ### Role-Based Permission System

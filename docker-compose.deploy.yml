@@ -6,7 +6,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile.backend
     env_file:
-      - ${ENV_FILE:-.env.deploy}
+      - .env.deploy
     environment:
       TZ: ${TZ:-Asia/Manila}
       LOG_FILE_ENABLED: "false"
@@ -23,7 +23,7 @@ services:
       dockerfile: Dockerfile.backend
     restart: unless-stopped
     env_file:
-      - ${ENV_FILE:-.env.deploy}
+      - .env.deploy
     environment:
       TZ: ${TZ:-Asia/Manila}
       LOG_FILE_ENABLED: "false"
@@ -69,7 +69,7 @@ services:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://backend:8000}
     restart: unless-stopped
     env_file:
-      - ${ENV_FILE:-.env.deploy}
+      - .env.deploy
     environment:
       NODE_ENV: production
       NEXT_TELEMETRY_DISABLED: "1"

@@ -1,10 +1,8 @@
 SHELL := /bin/bash
 
-ENV_FILE ?= .env.deploy
-DEV_ENV_FILE ?= .env.local
 LAN_HOSTNAME ?= powergold.home.arpa
-DB_COMPOSE := DEV_ENV_FILE=$(DEV_ENV_FILE) docker compose -f docker-compose.yml
-LAN_COMPOSE := ENV_FILE=$(ENV_FILE) docker compose --env-file $(ENV_FILE) -f docker-compose.deploy.yml
+DB_COMPOSE := docker compose -f docker-compose.yml
+LAN_COMPOSE := docker compose --env-file .env.deploy -f docker-compose.deploy.yml
 
 .PHONY: help
 help:

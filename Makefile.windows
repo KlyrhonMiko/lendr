@@ -1,11 +1,9 @@
 SHELL := powershell.exe
 .SHELLFLAGS := -NoProfile -ExecutionPolicy Bypass -Command
 
-ENV_FILE ?= .env.deploy
-DEV_ENV_FILE ?= .env.local
 LAN_HOSTNAME ?= powergold.home.arpa
-DB_COMPOSE := $$env:DEV_ENV_FILE='$(DEV_ENV_FILE)'; docker compose -f docker-compose.yml
-LAN_COMPOSE := $$env:ENV_FILE='$(ENV_FILE)'; docker compose --env-file $(ENV_FILE) -f docker-compose.deploy.yml
+DB_COMPOSE := docker compose -f docker-compose.yml
+LAN_COMPOSE := docker compose --env-file .env.deploy -f docker-compose.deploy.yml
 GET_LAN_IP := Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $$_.IPAddress -match '^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)' -and $$_.IPAddress -ne '127.0.0.1' -and $$_.InterfaceAlias -notmatch 'vEthernet|WSL|Loopback|Docker|VirtualBox|VMware' } | Sort-Object InterfaceMetric | Select-Object -First 1 -ExpandProperty IPAddress
 
 .PHONY: help
