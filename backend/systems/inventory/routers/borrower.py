@@ -12,7 +12,7 @@ from systems.inventory.schemas.borrow_request_schemas import (
     BorrowRequestCreate,
     BorrowRequestRead,
 )
-from core.schemas import ConfigRead, GenericResponse, create_success_response, make_pagination_meta
+from core.schemas import ConfigRead
 from systems.inventory.schemas.inventory_schemas import InventoryCatalogItemRead
 from systems.inventory.services.inventory_service import InventoryService
 from systems.inventory.services.borrow_request_service import BorrowService
@@ -110,14 +110,15 @@ async def borrower_get_requests(
             date_from=date_from,
             date_to=date_to,
         )
+        # TODO: Consider eager-loading related data in service serialization to reduce N+1 queries.
         serialized = borrow_service.serialize_borrow_requests(session, requests)
         return create_success_response(
             data=serialized,
             meta=make_pagination_meta(total=total, skip=skip, limit=per_page, page=page, per_page=per_page),
             request=request,
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Unable to fetch borrower requests at this time.")
 
 
 
@@ -148,4 +149,3 @@ async def borrower_submit_request(
     except ValueError as e:
         session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
-

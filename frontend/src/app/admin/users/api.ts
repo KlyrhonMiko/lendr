@@ -55,7 +55,9 @@ export interface UserCreate {
   shift_type: string;
 }
 
-export type UserUpdate = Partial<UserCreate>;
+export type UserUpdate = Partial<UserCreate> & {
+  change_password?: boolean;
+};
 
 export interface UserListParams {
   page?: number;
@@ -78,6 +80,12 @@ export interface UserTwoFactorStatus {
   enabled: boolean;
   method: string;
   enrolled_at: string | null;
+}
+
+export interface UserTwoFactorEnrollmentInitiateResponse {
+  method: string;
+  secret: string;
+  provisioning_uri: string;
 }
 
 export interface SecurityPasswordRules {
@@ -137,6 +145,12 @@ export const userApi = {
 
   getTwoFactorStatus: (userId: string) =>
     api.get<UserTwoFactorStatus>(`/admin/users/${userId}/2fa/status`),
+
+  initiateTwoFactorEnrollment: (userId: string) =>
+    api.post<UserTwoFactorEnrollmentInitiateResponse>(`/admin/users/${userId}/2fa/enroll/initiate`),
+
+  verifyTwoFactorEnrollment: (userId: string, code: string) =>
+    api.post<UserTwoFactorStatus>(`/admin/users/${userId}/2fa/enroll/verify`, { code }),
 
   getSecondaryPassword: (userId: string) =>
     api.get<UserSecondaryPasswordResult>(`/admin/users/${userId}/secondary-password`),

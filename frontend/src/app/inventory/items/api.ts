@@ -40,7 +40,7 @@ export interface InventoryItemCreate {
   description?: string;
 }
 
-export interface InventoryItemUpdate extends Partial<InventoryItemCreate> {}
+export type InventoryItemUpdate = Partial<InventoryItemCreate>;
 
 export interface InventoryListParams {
   page?: number;

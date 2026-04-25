@@ -7,23 +7,25 @@ import {
     Loader2,
     RefreshCcw,
     Search,
-    ChevronLeft,
-    ChevronRight,
     UserCircle,
     History,
-    MoreVertical,
     Download,
-    Archive,
-    PackageOpen
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { userApi, EntrustedItem } from '../users/api';
 import { cn } from '@/lib/utils';
 import { format, isValid } from 'date-fns';
 import { AssignEntrustedItemModal } from './AssignEntrustedItemModal';
-import { FilterSelect } from '@/components/ui/filter-select';
 import { Pagination } from '@/components/ui/Pagination';
 import type { PaginationMeta } from '@/lib/api';
+
+function getErrorMessage(error: unknown): string {
+    if (error instanceof Error) {
+        return error.message;
+    }
+
+    return 'Failed to revoke item';
+}
 
 export default function EntrustedItemsPage() {
     const [items, setItems] = useState<EntrustedItem[]>([]);
@@ -81,8 +83,8 @@ export default function EntrustedItemsPage() {
             await userApi.revokeEntrustedItem(userId, assignmentId, { notes: '' });
             toast.success('Item revoked successfully');
             fetchItems();
-        } catch (err: any) {
-            toast.error(err.response?.data?.detail || 'Failed to revoke item');
+        } catch (error: unknown) {
+            toast.error(getErrorMessage(error));
         } finally {
             setRevoking(null);
         }

@@ -1,4 +1,3 @@
-from datetime import datetime
 from sqlmodel import Session, select, func
 from typing import Optional
 from uuid import UUID
@@ -260,9 +259,9 @@ class EntrustedItemService(
             
         if status:
             if status == "active":
-                statement = statement.where(EntrustedItem.returned_at == None)
+                statement = statement.where(EntrustedItem.returned_at.is_(None))
             elif status == "returned":
-                statement = statement.where(EntrustedItem.returned_at != None)
+                statement = statement.where(EntrustedItem.returned_at.is_not(None))
                 
         if category:
             if not needs_joins:
@@ -302,9 +301,9 @@ class EntrustedItemService(
             
         if status:
             if status == "active":
-                count_statement = count_statement.where(EntrustedItem.returned_at == None)
+                count_statement = count_statement.where(EntrustedItem.returned_at.is_(None))
             elif status == "returned":
-                count_statement = count_statement.where(EntrustedItem.returned_at != None)
+                count_statement = count_statement.where(EntrustedItem.returned_at.is_not(None))
                 
         if category:
             count_statement = count_statement.where(InventoryItem.category.ilike(category))

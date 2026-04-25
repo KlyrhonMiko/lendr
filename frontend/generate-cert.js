@@ -2,7 +2,9 @@ const selfsigned = require('selfsigned');
 const fs = require('fs');
 
 async function main() {
-    const host = process.env.HOST || '192.168.100.104';
+    const host = process.env.HOST || 'powergold.home.arpa';
+    const lanIp = process.env.LAN_IP?.trim();
+    const isIpv4Host = /^\d+\.\d+\.\d+\.\d+$/.test(host);
     const attrs = [
         { name: 'commonName', value: host }
     ];
@@ -16,9 +18,11 @@ async function main() {
                 name: 'subjectAltName',
                 altNames: [
                     { type: 2, value: 'localhost' },
+                    { type: 2, value: isIpv4Host ? undefined : host },
                     { type: 7, ip: '127.0.0.1' },
-                    { type: 7, ip: host.match(/^\d+\.\d+\.\d+\.\d+$/) ? host : undefined }
-                ].filter(name => name.ip !== undefined || name.type === 2)
+                    { type: 7, ip: isIpv4Host ? host : undefined },
+                    { type: 7, ip: lanIp && /^\d+\.\d+\.\d+\.\d+$/.test(lanIp) ? lanIp : undefined }
+                ].filter((name) => name.value !== undefined || name.ip !== undefined)
             }]
         });
 

@@ -16,6 +16,7 @@ from core.request_context import reset_correlation_id, set_correlation_id
 from core.schemas import GenericResponse, create_error_response, create_success_response
 from utils.logging import setup_logging, get_logger, setup_health_logging, log_operation
 from core.websockets import manager
+from utils.migrations import run_migrations
 
 # Routers
 from systems.admin.routers.backup import router as backup
@@ -46,7 +47,11 @@ from systems.inventory.routers.data import router as data
 from systems.inventory.routers.public import router as public_router
 
 # Initialize System-wide Logging
-setup_logging(log_level=settings.LOG_LEVEL, log_dir=settings.LOG_DIR)
+setup_logging(
+    log_level=settings.LOG_LEVEL,
+    log_dir=settings.LOG_DIR,
+    log_file_enabled=settings.LOG_FILE_ENABLED,
+)
 setup_health_logging()
 logger = get_logger("app")
 health_logger = get_logger("health")
@@ -141,10 +146,12 @@ async def lifespan(app: FastAPI):
     run_startup_initialization = settings.STARTUP_RUN_INITIALIZATION and not settings.SKIP_INIT
 
     if run_startup_initialization:
+        run_migrations()
         with Session(engine) as session:
             init_service = InitializationService()
             init_service.run(session)
 
+        log_operation("DB-MIGRATE", "Database schema migrated to Alembic head")
         log_operation("INIT-DONE", "System Initialization COMPLETED")
         log_operation("DB-CONNECT", "PostgreSQL connectivity established")
     else:

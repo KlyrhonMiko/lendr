@@ -1,17 +1,16 @@
-import os
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-def _find_env_file(names=(".env.local", ".env")) -> str | None:
+def _find_env_file(names=(".env.local",)) -> str | None:
     start = Path(__file__).resolve()
     for parent in (start.parent, *start.parents):
         for name in names:
             candidate = parent / name
             if candidate.exists():
                 return str(candidate)
-    return os.getenv("ENV_FILE")
+    return None
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -27,6 +26,7 @@ class Settings(BaseSettings):
     SQL_ECHO: bool = False
     LOG_LEVEL: str = "INFO"
     LOG_DIR: str = ".logs"
+    LOG_FILE_ENABLED: bool = True
     SKIP_INIT: bool = False
     STARTUP_RUN_INITIALIZATION: bool = True
     STARTUP_ENABLE_SCHEDULER: bool = False
@@ -94,4 +94,4 @@ class Settings(BaseSettings):
 
 settings = Settings()
 if not settings.DATABASE_URL:
-    raise RuntimeError("DATABASE_URL is required — set it in the environment or .env(.local) file.")
+    raise RuntimeError("DATABASE_URL is required — set it in the environment or .env.local.")

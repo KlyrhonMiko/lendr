@@ -22,6 +22,7 @@ from systems.auth.schemas.auth_schemas import (
     FirstLoginPasswordRotateRequest,
     ForcedPasswordChangeRequiredRead,
     RolePolicyRead,
+    SelfProfileUpdate,
     SessionPolicyRead,
     Token,
     TwoFactorChallengeRead,
@@ -50,6 +51,30 @@ TWO_FACTOR_ENROLLMENT_REQUIRED_DETAIL = (
     "Sign in to an existing session and complete authenticator setup first."
 )
 TWO_FACTOR_VERIFY_FAILED_DETAIL = "Invalid or expired two-factor challenge or authenticator code."
+TWO_FACTOR_BORROWER_FORBIDDEN_DETAIL = (
+    "Borrower accounts are not eligible for two-factor enrollment or disable actions."
+)
+
+# Restrict /api/auth/me to non-privileged self-service fields only.
+SELF_UPDATE_ALLOWED_FIELDS = {
+    "first_name",
+    "last_name",
+    "middle_name",
+    "email",
+    "contact_number",
+    "username",
+    "password",
+    "current_password",
+}
+
+
+def _ensure_two_factor_account_management_allowed(user: User) -> None:
+    normalized_role = (user.role or "").strip().lower()
+    if normalized_role in ("borrower", "brwr"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=TWO_FACTOR_BORROWER_FORBIDDEN_DETAIL,
+        )
 
 
 @dataclass(frozen=True)
@@ -289,7 +314,10 @@ async def login_for_access_token(
     if credential_mode == "primary" and auth_service.should_force_first_login_password_rotation(user):
         return _build_forced_password_change_response()
 
-    if auth_service.is_two_factor_required_for_user(session, user):
+    normalized_role = (user.role or "").strip().lower()
+    if normalized_role not in ("borrower", "brwr") and auth_service.is_two_factor_required_for_user(
+        session, user
+    ):
         if not auth_service.has_active_two_factor_enrollment(session, user.id):
             audit_service.log_action(
                 db=session,
@@ -388,6 +416,8 @@ async def initiate_two_factor_enrollment(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
+    _ensure_two_factor_account_management_allowed(current_user)
+
     try:
         enrollment = auth_service.begin_two_factor_enrollment(session, current_user)
     except ValueError as exc:
@@ -411,6 +441,8 @@ async def verify_two_factor_enrollment(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
+    _ensure_two_factor_account_management_allowed(current_user)
+
     try:
         verified, enrolled_at = auth_service.verify_two_factor_enrollment(
             session,
@@ -435,6 +467,26 @@ async def verify_two_factor_enrollment(
     )
 
 
+@router.get(
+    "/2fa/status",
+    response_model=GenericResponse[TwoFactorStatusRead],
+)
+async def get_current_user_two_factor_status(
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    enabled, enrolled_at = auth_service.get_two_factor_status(session, current_user.id)
+    return create_success_response(
+        data=TwoFactorStatusRead(
+            enabled=enabled,
+            method="authenticator_app",
+            enrolled_at=enrolled_at,
+        ),
+        request=request,
+    )
+
+
 @router.post("/2fa/disable", response_model=GenericResponse[TwoFactorStatusRead])
 async def disable_two_factor_enrollment(
     payload: TwoFactorDisableRequest,
@@ -442,6 +494,8 @@ async def disable_two_factor_enrollment(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
+    _ensure_two_factor_account_management_allowed(current_user)
+
     try:
         disabled, _ = auth_service.disable_two_factor_enrollment(session, current_user, payload.code)
     except ValueError as exc:
@@ -627,11 +681,17 @@ async def _rotate_first_login_password(
             detail="New password must be different from current password",
         )
 
-    auth_result = auth_service.authenticate_first_login_rotation_user_with_mode(
-        session,
-        payload.username,
-        payload.current_password,
-    )
+    try:
+        auth_result = auth_service.authenticate_first_login_rotation_user_with_mode(
+            session,
+            payload.username,
+            payload.current_password,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
     if not auth_result:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -698,31 +758,59 @@ async def read_users_me(
 
 @router.patch("/me", response_model=GenericResponse[UserRead], responses={401: {"model": GenericResponse}})
 async def update_users_me(
-    user_data: UserUpdate,
+    user_data: SelfProfileUpdate,
     request: Request,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
+    token: str = Depends(reusable_oauth2),
     _: None = Depends(require_permission("auth:session:manage")),
 ):
     from systems.admin.services.user_service import UserService
     user_service = UserService()
 
-    if user_data.password:
-        if auth_service.is_borrower_role(current_user.role) and not re.fullmatch(r"\d{6}", user_data.password):
+    incoming_updates = user_data.model_dump(exclude_unset=True)
+    disallowed_fields = sorted(set(incoming_updates) - SELF_UPDATE_ALLOWED_FIELDS)
+    if disallowed_fields:
+        blocked_fields = ", ".join(disallowed_fields)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Self-service profile update cannot modify: {blocked_fields}",
+        )
+
+    sanitized_user_data = UserUpdate(**incoming_updates)
+
+    sensitive_fields_changed = bool(sanitized_user_data.password)
+    if sanitized_user_data.email is not None and sanitized_user_data.email != current_user.email:
+        sensitive_fields_changed = True
+    if sanitized_user_data.username is not None and sanitized_user_data.username != current_user.username:
+        sensitive_fields_changed = True
+
+    if sensitive_fields_changed and not sanitized_user_data.current_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is required to change password, email, or username",
+        )
+
+    if sanitized_user_data.password:
+        sanitized_user_data = sanitized_user_data.model_copy(update={"change_password": True})
+        if auth_service.is_borrower_role(current_user.role) and not re.fullmatch(r"\d{6}", sanitized_user_data.password):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Borrower password must be exactly 6 numeric digits",
             )
 
-        if not user_data.current_password:
+    if sensitive_fields_changed:
+        from utils.security import verify_and_update_password
+
+        current_password = sanitized_user_data.current_password
+        if current_password is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Current password is required to change password",
+                detail="Current password is required to change password, email, or username",
             )
-        
-        from utils.security import verify_and_update_password
+
         verified, _upgraded_hash = verify_and_update_password(
-            user_data.current_password,
+            current_password,
             current_user.hashed_password,
         )
         if not verified:
@@ -731,18 +819,37 @@ async def update_users_me(
                 detail="Incorrect current password",
             )
 
-    should_revoke_sessions = user_service.requires_session_revocation(current_user, user_data)
+    try:
+        token_payload = decode_access_token(token)
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Could not validate credentials",
+        )
+
+    current_session_id = token_payload.get("session_id")
+    if not current_session_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Could not validate credentials",
+        )
+
+    should_revoke_sessions = user_service.requires_session_revocation(current_user, sanitized_user_data)
     updated_user = user_service.update(
         session,
         current_user,
-        user_data,
+        sanitized_user_data,
         actor_id=current_user.id,
     )
 
     message = "Profile updated successfully"
     if should_revoke_sessions:
-        auth_service.revoke_sessions_for_user(session, updated_user.id)
-        message = "Profile updated successfully. Active sessions were revoked for security."
+        auth_service.revoke_other_sessions_for_user(
+            session,
+            updated_user.id,
+            keep_session_id=current_session_id,
+        )
+        message = "Profile updated successfully. Other active sessions were revoked for security."
 
     session.commit()
     session.refresh(updated_user)
@@ -815,7 +922,10 @@ async def refresh_token(
             
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         
-        if auth_service.is_borrower_role(user.role):
+        # Session source is determined by the issued session id prefix,
+        # so borrower-role users can refresh both standard (USE-*) and
+        # borrower-portal (BSE-*) login tokens.
+        if str(session_id).startswith("BSE-"):
             if not auth_service.is_borrower_session_valid(session, session_id):
                 raise HTTPException(status_code=401, detail="Session expired or invalid")
             auth_service.extend_borrower_session(session, session_id, access_token_expires)

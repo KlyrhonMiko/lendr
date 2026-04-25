@@ -36,7 +36,6 @@ const contentSecurityPolicy = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
-  // @ts-ignore - explicitly required by Next.js dev server for cross-origin LAN access
   allowedDevOrigins: ["192.168.100.104"],
   async headers() {
     return [

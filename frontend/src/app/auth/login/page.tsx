@@ -69,9 +69,7 @@ export default function LoginPage() {
     auth.setToken(accessToken);
 
     const user = await auth.getUser();
-    hydrateUser(user);
     const redirectPath = auth.getRedirectPath(user?.role);
-
     redirectToApp(redirectPath);
   };
 

@@ -64,6 +64,7 @@ export const REPORT_TIMELINE_MODE_OPTIONS: Array<{ key: ReportTimelineMode; labe
 export type ExportQueryValue = string | number | boolean | Date | null | undefined;
 
 export interface ReportExportFilterContract {
+  report_version?: 'v1' | 'v2';
   timeline_mode?: ReportTimelineSelection;
   anchor_date?: string | Date;
   date_from?: string | Date;
@@ -122,6 +123,7 @@ export function composeBorrowHistoryExportParams(params: BorrowHistoryExportForm
 
   return {
     format: params.format,
+    report_version: params.report_version,
     status: normalizeSelectAll(params.status),
     ...(timelineMode ? { timeline_mode: timelineMode } : {}),
     ...(isRolling7DayTimelineMode(timelineMode) ? { anchor_date: params.anchor_date } : {}),
@@ -137,6 +139,7 @@ export function composeMovementExportParams(params: MovementExportFormValues): E
 
   return {
     format: params.format,
+    report_version: params.report_version,
     movement_type: normalizeSelectAll(params.movement_type),
     item_id: normalizeOptionalText(params.item_id),
     ...(timelineMode ? { timeline_mode: timelineMode } : {}),

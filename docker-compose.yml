@@ -1,60 +1,47 @@
+name: powergold-infra
+
 services:
   postgres:
-    image: postgres:15
+    image: postgres:15-alpine
     restart: unless-stopped
     env_file:
       - .env.local
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
-      POSTGRES_DB: ${POSTGRES_DB:-powergold}
+      TZ: ${TZ:-Asia/Manila}
     ports:
       - "5433:5432"
     volumes:
       - powergold_pgdata:/var/lib/postgresql/data
+    networks:
+      shared:
+        aliases:
+          - powergold-db
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   adminer:
-    image: adminer:latest
+    image: adminer:4.8.1-standalone
     restart: unless-stopped
-    ports:
-      - "8080:8080"
-    depends_on:
-      - postgres
-
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile.backend
-    env_file:
-      - .env.local
     environment:
-      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-powergold}
-      TZ: Asia/Manila
-    volumes:
-      - ./backend:/app
+      ADMINER_DEFAULT_SERVER: powergold-db
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8080:8080"
+    networks:
+      - shared
     depends_on:
-      - postgres
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+      postgres:
+        condition: service_healthy
 
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile.frontend
-    env_file:
-      - .env.local
-    environment:
-      WATCHPACK_POLLING: "true"
-      NEXT_TELEMETRY_DISABLED: 1
-    volumes:
-      - ./frontend:/usr/src/app
-      - /usr/src/app/node_modules
-    ports:
-      - "3000:3000"
-    depends_on:
-      - backend
-
+networks:
+  shared:
+    name: powergold-shared
 
 volumes:
   powergold_pgdata:
+    name: powergold_pgdata

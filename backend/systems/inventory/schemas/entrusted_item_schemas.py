@@ -1,7 +1,6 @@
 from typing import Optional
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
-from utils.time_utils import format_datetime
 
 class EntrustedItemBase(BaseModel):
     notes: Optional[str] = Field(default=None, max_length=1000)

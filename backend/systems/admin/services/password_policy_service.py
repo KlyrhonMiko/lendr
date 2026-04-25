@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from sqlmodel import Session
 
 if TYPE_CHECKING:
-    from systems.auth.services.configuration_service import AuthConfigService
+    pass
 
 
 SECURITY_SETTINGS_CATEGORY = "security_settings"
@@ -58,6 +58,14 @@ class PasswordPolicyService:
     @staticmethod
     def _normalize_role(role: str | None) -> str:
         return (role or "").strip().lower()
+
+    @staticmethod
+    def _validate_borrower_pin(password: str) -> None:
+        if len(password) != 6 or not password.isdigit():
+            raise HTTPException(
+                status_code=400,
+                detail="Borrower PIN must be exactly 6 numeric digits.",
+            )
 
     def get_policy(self, session: Session) -> PasswordPolicy:
         min_length = self._parse_int(
@@ -112,6 +120,10 @@ class PasswordPolicyService:
 
     def validate_for_role(self, session: Session, password: str, role: str | None) -> None:
         normalized_role = self._normalize_role(role)
+        if normalized_role in {"borrower", "brwr"}:
+            self._validate_borrower_pin(password)
+            return
+
         if normalized_role in PASSWORD_POLICY_EXEMPT_ROLES:
             return
 

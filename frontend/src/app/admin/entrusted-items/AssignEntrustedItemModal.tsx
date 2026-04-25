@@ -1,13 +1,21 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Loader2, Package, Tag, Building2, UserCircle } from 'lucide-react';
+import { X, Loader2, Tag, UserCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { FormSelect } from '@/components/ui/form-select';
 import { userApi, User } from '../users/api';
 import { inventoryApi, InventoryItem, InventoryUnit } from '../../inventory/items/api';
 
 import { SearchableSelect } from '@/components/ui/searchable-select';
+
+function getErrorMessage(error: unknown): string {
+    if (error instanceof Error) {
+        return error.message;
+    }
+
+    return 'Failed to assign item';
+}
 
 interface AssignEntrustedItemModalProps {
     onClose: () => void;
@@ -91,8 +99,8 @@ export function AssignEntrustedItemModal({
             });
             toast.success('Entrusted item assigned successfully');
             onSuccess();
-        } catch (err: any) {
-            toast.error(err.response?.data?.detail || 'Failed to assign item');
+        } catch (error: unknown) {
+            toast.error(getErrorMessage(error));
         } finally {
             setLoading(false);
         }

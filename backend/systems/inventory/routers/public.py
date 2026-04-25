@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlmodel import Session, select, and_
+from sqlmodel import Session, select
 from typing import Optional, List
 from pydantic import BaseModel
 from datetime import datetime

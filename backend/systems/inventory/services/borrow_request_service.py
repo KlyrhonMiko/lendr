@@ -375,7 +375,8 @@ class BorrowService(
         }
         actor_ids.add(borrow_req.borrower_uuid)
         user_id_map = self._build_user_id_map(session, actor_ids)
-        user_name_map = self._build_user_name_map(session, {borrow_req.borrower_uuid})
+        borrower_name_map = self._build_user_name_map(session, {borrow_req.borrower_uuid})
+        actor_name_map = self._build_user_name_map(session, actor_ids)
 
         # Get all items for this request
         request_items = []
@@ -395,7 +396,7 @@ class BorrowService(
 
         payload = borrow_req.model_dump(mode="json")
         payload["borrower_user_id"] = user_id_map.get(borrow_req.borrower_uuid)
-        payload["borrower_name"] = user_name_map.get(borrow_req.borrower_uuid)
+        payload["borrower_name"] = borrower_name_map.get(borrow_req.borrower_uuid)
         payload["closed_by_user_id"] = user_id_map.get(borrow_req.closed_by)
 
         # Populate items list
@@ -423,6 +424,7 @@ class BorrowService(
             {
                 **event.model_dump(mode="json"),
                 "actor_user_id": user_id_map.get(event.actor_id),
+                "actor_name": actor_name_map.get(event.actor_id, "System"),
             }
             for event in (borrow_req.events or [])
         ]

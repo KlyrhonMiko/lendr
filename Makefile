@@ -1,36 +1,60 @@
 SHELL := /bin/bash
 
-LAN_COMPOSE := docker compose -f docker-compose.lan.yml
+LAN_HOSTNAME ?= powergold.home.arpa
+DB_COMPOSE := docker compose -f docker-compose.yml
+LAN_COMPOSE := docker compose --env-file .env.deploy -f docker-compose.deploy.yml
 
 .PHONY: help
 help:
-	@echo "PowerGold LAN helpers"
+	@echo "PowerGold Docker helpers"
 	@echo ""
 	@echo "Targets:"
-	@echo "  make lan-up           # Build/start LAN stack (includes bootstrap init)"
+	@echo "  make db-up            # Start shared Postgres + Adminer"
+	@echo "  make db-ps            # Show shared DB stack services"
+	@echo "  make db-logs          # Tail shared DB stack logs"
+	@echo "  make db-adminer-url   # Print Adminer access URL"
+	@echo "  make db-down          # Stop shared DB stack"
+	@echo "  make lan-up           # Build/start LAN app stack"
 	@echo "  make lan-go           # lan-up + print access URL"
 	@echo "  make lan-ps           # Show LAN stack services"
 	@echo "  make lan-logs         # Tail LAN stack logs"
 	@echo "  make lan-migrate      # Run alembic upgrade head"
 	@echo "  make lan-seed         # Seed configuration"
-	@echo "  make lan-bootstrap    # One-shot bootstrap only (postgres + migrate + init)"
-	@echo "  make lan-cert         # Generate self-signed certificates for LAN IP"
-	@echo "  make lan-url          # Print access URL for other devices"
-	@echo "  make lan-adminer-up   # Start Adminer on localhost:8080 (optional)"
-	@echo "  make lan-adminer-down # Stop optional Adminer"
-	@echo "  make lan-adminer-url  # Print Adminer access URL"
+	@echo "  make lan-bootstrap    # Run one-shot bootstrap service"
+	@echo "  make lan-cert         # Generate self-signed certificates for $(LAN_HOSTNAME)"
+	@echo "  make lan-url          # Print hostname and fallback IP URL"
 	@echo "  make lan-down         # Stop LAN stack"
+	@echo "  make dev-up           # Alias for db-up"
+	@echo "  make dev-down         # Alias for db-down"
+
+.PHONY: db-up
+db-up:
+	$(DB_COMPOSE) up -d --remove-orphans
+
+.PHONY: db-ps
+db-ps:
+	$(DB_COMPOSE) ps
+
+.PHONY: db-logs
+db-logs:
+	$(DB_COMPOSE) logs -f --tail=200
+
+.PHONY: db-adminer-url
+db-adminer-url:
+	@echo "Adminer (host machine only):"
+	@echo "  http://localhost:8080"
+
+.PHONY: db-down
+db-down:
+	$(DB_COMPOSE) down --remove-orphans
 
 .PHONY: lan-up
-lan-up: lan-cert
-	$(LAN_COMPOSE) up -d postgres
-	$(LAN_COMPOSE) run --rm --build backend python data/bootstrap_system.py
+lan-up: db-up lan-cert
 	$(LAN_COMPOSE) up --build -d --remove-orphans
 
 .PHONY: lan-init
-lan-init:
-	$(LAN_COMPOSE) up -d postgres
-	$(LAN_COMPOSE) run --rm --build backend python data/bootstrap_system.py
+lan-init: db-up
+	$(LAN_COMPOSE) run --rm --build bootstrap
 
 .PHONY: lan-go
 lan-go: lan-up lan-url
@@ -52,13 +76,12 @@ lan-seed:
 	$(LAN_COMPOSE) exec backend python data/seed_configuration.py
 
 .PHONY: lan-bootstrap
-lan-bootstrap: lan-cert
-	$(LAN_COMPOSE) up -d postgres
-	$(LAN_COMPOSE) run --rm --build backend python data/bootstrap_system.py
+lan-bootstrap: db-up lan-cert
+	$(LAN_COMPOSE) run --rm --build bootstrap
 
 .PHONY: lan-cert
 lan-cert:
-	@if [ ! -f frontend/certificates/localhost.pem ]; then \
+	@if [ ! -f frontend/certificates/localhost.pem ] || [ ! -f frontend/certificates/localhost-key.pem ]; then \
 		LAN_IP=$$(ip -4 route get 1.1.1.1 2>/dev/null | awk '/src/ {for (i=1; i<=NF; i++) if ($$i=="src") {print $$(i+1); exit}}'); \
 		if [ -z "$$LAN_IP" ] || [[ "$$LAN_IP" =~ ^169\.254\. ]] || [ "$$LAN_IP" = "127.0.0.1" ]; then \
 			LAN_IP=$$(ip -4 addr show scope global 2>/dev/null | awk '/inet / {sub("/.*", "", $$2); if ($$2 !~ /^169\.254\./ && $$2 != "127.0.0.1") {print $$2; exit}}'); \
@@ -67,9 +90,9 @@ lan-cert:
 			echo "Could not determine a usable LAN IPv4 address automatically."; \
 			exit 1; \
 		fi; \
-		echo "Generating certificates for $$LAN_IP..."; \
+		echo "Generating certificates for $(LAN_HOSTNAME) and $$LAN_IP..."; \
 		mkdir -p frontend/certificates; \
-		openssl req -x509 -newkey rsa:2048 -keyout frontend/certificates/localhost.key -out frontend/certificates/localhost.pem -days 365 -nodes -subj "/CN=$$LAN_IP" -addext "subjectAltName=IP:$$LAN_IP"; \
+		openssl req -x509 -newkey rsa:2048 -keyout frontend/certificates/localhost-key.pem -out frontend/certificates/localhost.pem -days 365 -nodes -subj "/CN=$(LAN_HOSTNAME)" -addext "subjectAltName=DNS:$(LAN_HOSTNAME),DNS:localhost,IP:127.0.0.1,IP:$$LAN_IP"; \
 	else \
 		echo "Certificates already exist in frontend/certificates/"; \
 	fi
@@ -86,21 +109,18 @@ lan-url:
 		exit 1; \
 	fi; \
 	echo "Open from other devices on the same network:"; \
+	echo "  https://$(LAN_HOSTNAME)"; \
+	echo "Fallback while DNS is not configured:"; \
 	echo "  https://$$LAN_IP"
-
-.PHONY: lan-adminer-up
-lan-adminer-up:
-	$(LAN_COMPOSE) --profile adminer up -d adminer
-
-.PHONY: lan-adminer-down
-lan-adminer-down:
-	$(LAN_COMPOSE) --profile adminer stop adminer
-
-.PHONY: lan-adminer-url
-lan-adminer-url:
-	@echo "Adminer (host machine only):"
-	@echo "  http://localhost:8080"
 
 .PHONY: lan-down
 lan-down:
-	$(LAN_COMPOSE) --profile adminer down --remove-orphans
+	$(LAN_COMPOSE) down --remove-orphans
+
+.PHONY: dev-up
+dev-up:
+	$(MAKE) db-up
+
+.PHONY: dev-down
+dev-down:
+	$(MAKE) db-down

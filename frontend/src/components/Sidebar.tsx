@@ -5,18 +5,20 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Package, Settings, Activity,
-  Users, ScrollText, ClipboardList, Box, X
+  Users, ScrollText, ClipboardList, Box, X, History, UserCircle
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { usePublicBranding } from '@/lib/publicBranding';
 
 const systemMeta: Record<string, string> = {
-  admin: '',
-  inventory: '',
-  borrower: '',
-  borrow_portal: '',
+  admin: 'Administration',
+  inventory: 'Inventory',
+  borrower: 'Borrower',
+  borrow_portal: 'Borrow Portal',
+  borrowers: 'Borrowers',
 };
 
-const navigation: Record<string, { section: string; items: { name: string; href: string; icon: any }[] }[]> = {
+const navigation: Record<string, { section: string; items: { name: string; href: string; icon: LucideIcon }[] }[]> = {
   admin: [
     {
       section: 'Overview',
@@ -85,6 +87,15 @@ const navigation: Record<string, { section: string; items: { name: string; href:
       ]
     }
   ],
+  borrowers: [
+    {
+      section: 'Account',
+      items: [
+        { name: 'History', href: '/borrowers/history', icon: History },
+        { name: 'Account', href: '/borrowers/account', icon: UserCircle },
+      ]
+    }
+  ],
 };
 
 interface SidebarProps {
@@ -99,6 +110,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const getSystem = () => {
     if (pathname.startsWith('/inventory')) return 'inventory';
     if (pathname.startsWith('/admin')) return 'admin';
+    if (pathname.startsWith('/borrowers')) return 'borrowers';
     if (pathname.startsWith('/borrower')) return 'borrower';
     if (pathname.startsWith('/borrow')) return 'borrow_portal';
     return null;

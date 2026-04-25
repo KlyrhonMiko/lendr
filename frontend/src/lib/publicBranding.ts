@@ -25,12 +25,18 @@ export function resolveBrandAssetUrl(path: string | null | undefined): string | 
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
 
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  if (typeof window !== 'undefined') {
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+  const isBrowser = typeof window !== 'undefined';
+
+  if (normalizedPath.startsWith('/api/')) {
+    return isBrowser ? normalizedPath : `${baseUrl || 'http://localhost:8000'}${normalizedPath}`;
+  }
+
+  if (isBrowser) {
     return normalizedPath;
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-  return `${baseUrl}${normalizedPath}`;
+  return `${baseUrl || 'http://localhost:8000'}${normalizedPath}`;
 }
 
 export function usePublicBranding() {
