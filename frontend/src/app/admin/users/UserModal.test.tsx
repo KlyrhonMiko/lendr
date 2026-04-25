@@ -15,6 +15,7 @@ vi.mock('lucide-react', () => {
     UserCircle: Icon,
     KeyRound: Icon,
     RotateCcwKey: Icon,
+    Smartphone: Icon,
   };
 });
 
@@ -244,6 +245,38 @@ describe('UserModal borrower action gating', () => {
 
     const [, payload] = mockUserApi.update.mock.calls[0];
     expect(payload.password).toBeUndefined();
+    expect(payload.change_password).toBeUndefined();
     expect(onSuccess).toHaveBeenCalledTimes(1);
+  });
+
+  it('only sends password changes after explicit enablement in edit mode', async () => {
+    mockUserApi.update.mockResolvedValue({ data: buildUser('staff') });
+
+    render(
+      <UserModal
+        user={buildUser('staff')}
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+        onCredentialReveal={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(mockUserApi.getConfigs).toHaveBeenCalledWith('users_role');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enable Password Change' }));
+    fireEvent.change(screen.getByPlaceholderText('Enter new password'), {
+      target: { value: 'UpdatedPass!123' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+    await waitFor(() => {
+      expect(mockUserApi.update).toHaveBeenCalledTimes(1);
+    });
+
+    const [, payload] = mockUserApi.update.mock.calls[0];
+    expect(payload.password).toBe('UpdatedPass!123');
+    expect(payload.change_password).toBe(true);
   });
 });

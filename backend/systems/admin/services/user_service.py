@@ -214,7 +214,7 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
         if not updates:
             return False
 
-        if updates.get("password"):
+        if updates.get("change_password") and updates.get("password"):
             return True
 
         for field_name in ("email", "username", "role"):
@@ -387,12 +387,27 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
     ) -> User:
         before = db_obj.model_dump(mode="json")
         obj_data = schema.model_dump(exclude_unset=True)
+        change_password_requested = obj_data.pop("change_password", False)
 
         if "role" in obj_data:
             obj_data["role"] = self._normalize_role(obj_data.get("role"))
 
         if "password" in obj_data:
             password = obj_data.pop("password")
+
+            if not change_password_requested:
+                password = None
+
+            if change_password_requested and not password:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Password is required when change_password is true.",
+                )
+
+        else:
+            password = None
+
+        if password:
             target_role = obj_data.get("role") or db_obj.role
             self.password_policy_service.validate_for_role(session, password, target_role)
             obj_data["hashed_password"] = get_password_hash(password)

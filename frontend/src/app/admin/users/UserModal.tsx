@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Loader2, Mail, Shield, Clock, Hash, Phone, UserCircle, Check, ChevronDown, KeyRound, RotateCcwKey, Smartphone } from 'lucide-react';
+import { X, Loader2, Mail, Shield, Hash, Phone, UserCircle, KeyRound, RotateCcwKey, Smartphone } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   userApi,
@@ -52,20 +52,17 @@ export function UserModal({
   const [roles, setRoles] = useState<AuthConfig[]>([]);
   const [shifts, setShifts] = useState<AuthConfig[]>([]);
   const [pinLength, setPinLength] = useState(DEFAULT_PIN_LENGTH);
-  
   const [isInitiatingTwoFactorEnrollment, setIsInitiatingTwoFactorEnrollment] = useState(false);
   const [isVerifyingTwoFactorEnrollment, setIsVerifyingTwoFactorEnrollment] = useState(false);
   const [twoFactorEnrollment, setTwoFactorEnrollment] = useState<UserTwoFactorEnrollmentInitiateResponse | null>(null);
   const [twoFactorEnrollmentCode, setTwoFactorEnrollmentCode] = useState('');
+  const [isPasswordChangeEnabled, setIsPasswordChangeEnabled] = useState(false);
 
   const pinValidationMessage = `PIN must be at least ${pinLength} characters`;
   const BORROWER_ROLE_KEYS = new Set(['borrower', 'brwr', 'borrow']);
   const PASSWORD_POLICY_EXEMPT_ROLES = new Set(['borrower', 'brwr', 'borrow', 'dispatch']);
 
   const normalizeRole = (role: string | undefined): string => (role || '').trim().toLowerCase();
-  
-  const isBorrowerRoleKey = (role: string | undefined): boolean =>
-    BORROWER_ROLE_KEYS.has(normalizeRole(role));
 
   const isBorrowerRoleKey = (role: string | undefined): boolean =>
     BORROWER_ROLE_KEYS.has(normalizeRole(role));
@@ -144,6 +141,109 @@ export function UserModal({
     void fetchTwoFactorStatus();
   }, [isEdit, user]);
 
+  const toOptionalText = (value: string): string | undefined => {
+    const trimmed = value.trim();
+    return trimmed ? trimmed : undefined;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const employeeId = (formData.employee_id || '').trim();
+      const pin = (formData.password || '').trim();
+      const effectiveRole = formData.role || user?.role;
+      const enforcePasswordRules = !isRolePasswordPolicyExempt(effectiveRole);
+
+      const effectiveUsername = employeeId || (formData.username || '').trim();
+
+      if (isEdit) {
+        if (isPasswordChangeEnabled && !pin) {
+          toast.error(`${isBorrowerRole ? 'PIN' : 'Password'} is required when changing credentials`);
+          return;
+        }
+
+        if (isPasswordChangeEnabled && pin.length < SCHEMA_PASSWORD_MIN_LENGTH) {
+          toast.error(`PIN must be at least ${SCHEMA_PASSWORD_MIN_LENGTH} characters`);
+          return;
+        }
+
+        if (isPasswordChangeEnabled && enforcePasswordRules && pin.length < pinLength) {
+          toast.error(pinValidationMessage);
+          return;
+        }
+
+        const formDataWithoutPassword = { ...formData };
+        delete formDataWithoutPassword.password;
+        const updateData: EditableUserUpdate = {
+          ...formDataWithoutPassword,
+          username: employeeId || effectiveUsername,
+          ...(employeeId ? { employee_id: employeeId } : {}),
+          ...(isPasswordChangeEnabled ? { password: pin, change_password: true } : {}),
+        };
+        await userApi.update(user.user_id, updateData);
+        toast.success('User updated successfully');
+      } else {
+        if (!employeeId) {
+          toast.error('Employee ID is required');
+          return;
+        }
+
+        if (isBorrowerRole) {
+          if (!pin) {
+            toast.error('PIN is required for borrower accounts');
+            return;
+          }
+
+          if (pin.length < SCHEMA_PASSWORD_MIN_LENGTH) {
+            toast.error(`PIN must be at least ${SCHEMA_PASSWORD_MIN_LENGTH} characters`);
+            return;
+          }
+
+          if (enforcePasswordRules && pin.length < pinLength) {
+            toast.error(pinValidationMessage);
+            return;
+          }
+        }
+
+        const middleName = toOptionalText(formData.middle_name);
+        const contactNumber = toOptionalText(formData.contact_number);
+
+        const createPayload: UserCreate = {
+          username: employeeId,
+          email: formData.email,
+          first_name: formData.first_name,
+          last_name: formData.last_name,
+          role: formData.role,
+          shift_type: formData.shift_type,
+          employee_id: employeeId,
+          ...(middleName ? { middle_name: middleName } : {}),
+          ...(contactNumber ? { contact_number: contactNumber } : {}),
+          ...(isBorrowerRole ? { password: pin } : {}),
+        };
+
+        const created = await userApi.register(createPayload);
+
+        if (created.data.generated_credentials) {
+          onCredentialReveal({
+            source: 'create',
+            userId: created.data.user.user_id,
+            userName: `${created.data.user.first_name} ${created.data.user.last_name}`,
+            oneTimeLoginPassword: created.data.generated_credentials.one_time_login_password,
+            secondaryPassword: created.data.generated_credentials.secondary_password ?? undefined,
+          });
+        }
+
+        toast.success('User registered successfully');
+      }
+      onSuccess();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to save user';
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  };
   const handleResetTwoFactor = async () => {
     if (!user) return;
     const confirmed = window.confirm(`Reset 2FA for ${user.first_name}?`);
@@ -242,88 +342,32 @@ export function UserModal({
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const employeeId = (formData.employee_id || '').trim();
-      const pin = (formData.password || '').trim();
-      const effectiveRole = formData.role || user?.role;
-      const enforcePasswordRules = !isRolePasswordPolicyExempt(effectiveRole);
-      const effectiveUsername = employeeId || (formData.username || '').trim();
-
-      if (isEdit) {
-        if (pin && (pin.length < SCHEMA_PASSWORD_MIN_LENGTH || (enforcePasswordRules && pin.length < pinLength))) {
-          toast.error('PIN does not meet requirements');
-          return;
-        }
-
-        const { password: _, ...rest } = formData;
-        const updateData: EditableUserUpdate = {
-          ...rest,
-          username: effectiveUsername,
-          ...(employeeId ? { employee_id: employeeId } : {}),
-          ...(pin ? { password: pin } : {}),
-        };
-        await userApi.update(user!.user_id, updateData);
-        toast.success('Updated');
-      } else {
-        if (!employeeId) {
-          toast.error('Employee ID required');
-          return;
-        }
-        if (isBorrowerRole && !pin) {
-          toast.error('PIN required for borrowers');
-          return;
-        }
-
-        const createPayload: UserCreate = {
-          username: employeeId,
-          email: formData.email,
-          first_name: formData.first_name,
-          last_name: formData.last_name,
-          role: formData.role,
-          shift_type: formData.shift_type,
-          employee_id: employeeId,
-          middle_name: formData.middle_name.trim() || undefined,
-          contact_number: formData.contact_number.trim() || undefined,
-          ...(isBorrowerRole ? { password: pin } : {}),
-        };
-
-        const created = await userApi.register(createPayload);
-        if (created.data.generated_credentials) {
-          onCredentialReveal({
-            source: 'create',
-            userId: created.data.user.user_id,
-            userName: `${created.data.user.first_name} ${created.data.user.last_name}`,
-            oneTimeLoginPassword: created.data.generated_credentials.one_time_login_password,
-            secondaryPassword: created.data.generated_credentials.secondary_password ?? undefined,
-          });
-        }
-        toast.success('Registered');
-      }
-      onSuccess();
-    } catch (err) {
-      toast.error('Failed to save');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const inputClassName = 'w-full h-11 px-4 rounded-xl bg-muted/40 border border-border text-sm focus:ring-2 focus:ring-primary/20 transition-all outline-none';
+  const togglePasswordChange = () => {
+    setIsPasswordChangeEnabled((prev) => {
+      if (prev) {
+        setFormData((current) => ({ ...current, password: '' }));
+      }
+
+      return !prev;
+    });
+  };
+
+  const inputClassName =
+    'w-full h-11 px-4 rounded-lg bg-muted/40 border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/40 transition-all placeholder:text-muted-foreground/40';
   const inputWithIconClassName = 'w-full h-11 pl-10 pr-4 rounded-xl bg-muted/40 border border-border text-sm focus:ring-2 focus:ring-primary/20 transition-all outline-none';
 
-  const twoFactorStatusLabel = loadingTwoFactorStatus
+  const twoFactorStatusLabel = twoFactorStatusLoading
     ? 'Checking 2FA status...'
     : twoFactorStatus?.enabled
       ? '2FA Enabled'
       : '2FA Not Enabled';
 
-  const twoFactorStatusClassName = loadingTwoFactorStatus
+  const twoFactorStatusClassName = twoFactorStatusLoading
     ? 'bg-muted text-muted-foreground border-border'
     : twoFactorStatus?.enabled
       ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20'
@@ -419,11 +463,66 @@ export function UserModal({
                       </div>
                     </div>
                     <div>
-                      <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1.5 ml-1">{isBorrowerRole ? 'Security PIN' : 'Password'}</label>
-                      {isEdit || isBorrowerRole ? (
+                      <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1.5 ml-1">
+                        {isBorrowerRole ? 'Security PIN' : 'Password'}
+                      </label>
+                      {isEdit ? (
+                        <div className="space-y-3 rounded-xl border border-border/60 bg-background/70 p-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-semibold text-foreground">
+                                {isBorrowerRole ? 'Change PIN' : 'Change Password'}
+                              </p>
+                              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                                Enable this only when you intend to rotate credentials during this edit.
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={togglePasswordChange}
+                              className={cn(
+                                'rounded-md border px-3 py-2 text-xs font-semibold transition-colors',
+                                isPasswordChangeEnabled
+                                  ? 'border-amber-500/30 bg-amber-500/10 text-amber-700'
+                                  : 'border-border bg-muted/50 text-foreground hover:bg-muted',
+                              )}
+                            >
+                              {isPasswordChangeEnabled ? 'Cancel Credential Change' : `Enable ${isBorrowerRole ? 'PIN' : 'Password'} Change`}
+                            </button>
+                          </div>
+                          {isPasswordChangeEnabled ? (
+                            <div className="relative">
+                              <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/40 pointer-events-none" />
+                              <input
+                                type="password"
+                                name="password"
+                                value={formData.password}
+                                onChange={handleChange}
+                                autoComplete="new-password"
+                                className={inputWithIconClassName}
+                                placeholder={isBorrowerRole ? 'Enter new PIN' : 'Enter new password'}
+                              />
+                            </div>
+                          ) : (
+                            <p className="text-[11px] leading-relaxed text-muted-foreground">
+                              {isBorrowerRole
+                                ? 'Leave this disabled to keep the current PIN unchanged.'
+                                : 'Leave this disabled to keep the current login password unchanged. Use the reset action below when you need a generated one-time password instead.'}
+                            </p>
+                          )}
+                        </div>
+                      ) : isBorrowerRole ? (
                         <div className="relative">
-                           <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/40" />
-                           <input type="password" name="password" value={formData.password} onChange={handleChange} className={inputWithIconClassName} placeholder={isEdit ? 'Keep current if blank' : 'Enter PIN'} />
+                          <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/40 pointer-events-none" />
+                          <input
+                            type="password"
+                            name="password"
+                            value={formData.password}
+                            onChange={handleChange}
+                            autoComplete="new-password"
+                            className={inputWithIconClassName}
+                            placeholder={isBorrowerRole ? 'Enter PIN' : 'Enter new password'}
+                          />
                         </div>
                       ) : (
                         <div className="h-11 flex items-center px-4 rounded-xl border border-amber-500/20 bg-amber-500/5 text-amber-700 text-xs font-medium">
@@ -450,14 +549,20 @@ export function UserModal({
                               </div>
                               <div>
                                 <p className="text-sm font-bold">2FA Status</p>
-                                <p className="text-[11px] text-muted-foreground">{twoFactorStatus?.enabled ? 'Protected' : 'Not setup'}</p>
+                                <p className={cn('text-[11px]', twoFactorStatusClassName)}>{twoFactorStatusLabel}</p>
                               </div>
                            </div>
                            {isTwoFactorEligibleUser && (
                               twoFactorStatus?.enabled ? (
-                                <button type="button" onClick={handleResetTwoFactor} className="text-xs font-bold text-amber-600 hover:underline">Reset</button>
+                                <button type="button" onClick={handleResetTwoFactor} disabled={resettingTwoFactor} className="text-xs font-bold text-amber-600 hover:underline disabled:opacity-50">
+                                  {resettingTwoFactor ? 'Resetting...' : 'Reset'}
+                                </button>
                               ) : (
-                                !twoFactorEnrollment && <button type="button" onClick={handleStartTwoFactorEnrollment} className="text-xs font-bold text-primary hover:underline">Setup</button>
+                                !twoFactorEnrollment && (
+                                  <button type="button" onClick={handleStartTwoFactorEnrollment} disabled={isInitiatingTwoFactorEnrollment} className="text-xs font-bold text-primary hover:underline disabled:opacity-50">
+                                    {isInitiatingTwoFactorEnrollment ? 'Preparing...' : 'Setup'}
+                                  </button>
+                                )
                               )
                            )}
                         </div>
@@ -479,15 +584,32 @@ export function UserModal({
                       </div>
 
                       {/* Other Actions */}
-                      {!isBorrowerRole && (
-                        <div className="grid grid-cols-2 gap-3">
-                          <button type="button" onClick={handleRetrieveSecondaryPassword} className="flex items-center justify-center gap-2 h-12 rounded-2xl border border-blue-500/20 bg-blue-500/5 text-blue-700 text-xs font-bold hover:bg-blue-500/10 transition-colors">
-                            <KeyRound className="w-4 h-4" /> View Recovery
-                          </button>
-                          <button type="button" onClick={handleResetLoginPassword} className="flex items-center justify-center gap-2 h-12 rounded-2xl border border-red-500/20 bg-red-500/5 text-red-600 text-xs font-bold hover:bg-red-500/10 transition-colors">
-                            <RotateCcwKey className="w-4 h-4" /> Reset Login
-                          </button>
-                        </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          aria-label="View Secondary Password"
+                          onClick={handleRetrieveSecondaryPassword}
+                          disabled={isBorrowerRole || retrievingRecoveryCredential || loading}
+                          className="flex items-center justify-center gap-2 h-12 rounded-2xl border border-blue-500/20 bg-blue-500/5 text-blue-700 text-xs font-bold hover:bg-blue-500/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {retrievingRecoveryCredential ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
+                          View Secondary Password
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Reset Login Password"
+                          onClick={handleResetLoginPassword}
+                          disabled={isBorrowerRole || resettingLoginPassword || loading}
+                          className="flex items-center justify-center gap-2 h-12 rounded-2xl border border-red-500/20 bg-red-500/5 text-red-600 text-xs font-bold hover:bg-red-500/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {resettingLoginPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcwKey className="w-4 h-4" />}
+                          Reset Login Password
+                        </button>
+                      </div>
+                      {isBorrowerRole && (
+                        <p className="text-[11px] text-muted-foreground">
+                          {borrowerActionDisabledReason}
+                        </p>
                       )}
                     </div>
                   </section>
@@ -499,7 +621,7 @@ export function UserModal({
           {/* Footer */}
           <div className="px-8 py-6 border-t border-border bg-muted/30 flex gap-4">
             <button type="button" onClick={onClose} className="flex-1 h-12 rounded-xl border border-border bg-background text-sm font-bold text-muted-foreground hover:text-foreground hover:bg-muted transition-all">Cancel</button>
-            <button type="submit" disabled={loading} className="flex-[2] h-12 rounded-xl bg-primary text-primary-foreground text-sm font-bold shadow-lg shadow-primary/25 hover:bg-primary/90 hover:scale-[1.02] active:scale-100 transition-all flex items-center justify-center gap-2">
+            <button type="submit" disabled={loading || configsLoading} className="flex-[2] h-12 rounded-xl bg-primary text-primary-foreground text-sm font-bold shadow-lg shadow-primary/25 hover:bg-primary/90 hover:scale-[1.02] active:scale-100 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:hover:scale-100">
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (isEdit ? 'Save Changes' : 'Create Member')}
             </button>
           </div>

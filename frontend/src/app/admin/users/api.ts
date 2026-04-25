@@ -55,7 +55,9 @@ export interface UserCreate {
   shift_type: string;
 }
 
-export type UserUpdate = Partial<UserCreate>;
+export type UserUpdate = Partial<UserCreate> & {
+  change_password?: boolean;
+};
 
 export interface UserListParams {
   page?: number;

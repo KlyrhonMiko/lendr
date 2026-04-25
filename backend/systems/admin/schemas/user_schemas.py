@@ -34,6 +34,7 @@ class UserCreate(UserBase):
 class UserUpdate(UserBase):
     password: Optional[str] = Field(default=None, min_length=6, max_length=255)
     current_password: Optional[str] = Field(default=None)
+    change_password: bool = Field(default=False)
 
 
 class UserRead(UserBase):
