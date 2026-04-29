@@ -138,6 +138,16 @@ CLAUDE.md
 .claudesignore
 CODEBASE.md
 
+# Build output
+.build/
+
+# Deployment generated files
+deployment/certificates/
+deployment/backups/
+deployment/images/
+deployment/env/.env.local
+deployment/env/.env.deploy
+
 # Codex-local migration docs and instruction files
 /docs/
 AGENTS.md

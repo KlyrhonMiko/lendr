@@ -173,8 +173,7 @@ export function UserModal({
           return;
         }
 
-        const formDataWithoutPassword = { ...formData };
-        delete formDataWithoutPassword.password;
+        const { password: _password, ...formDataWithoutPassword } = formData;
         const updateData: EditableUserUpdate = {
           ...formDataWithoutPassword,
           username: employeeId || effectiveUsername,

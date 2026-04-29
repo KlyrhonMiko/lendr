@@ -3,6 +3,7 @@ SHELL := /bin/bash
 LAN_HOSTNAME ?= powergold.home.arpa
 DB_COMPOSE := docker compose -f docker-compose.yml
 LAN_COMPOSE := docker compose --env-file .env.deploy -f docker-compose.deploy.yml
+LAN_BUILD_SERVICES := bootstrap backend frontend
 
 .PHONY: help
 help:
@@ -16,6 +17,8 @@ help:
 	@echo "  make db-down          # Stop shared DB stack"
 	@echo "  make lan-up           # Build/start LAN app stack"
 	@echo "  make lan-go           # lan-up + print access URL"
+	@echo "  make lan-validate     # Validate LAN compose config"
+	@echo "  make lan-build        # Build LAN app images"
 	@echo "  make lan-ps           # Show LAN stack services"
 	@echo "  make lan-logs         # Tail LAN stack logs"
 	@echo "  make lan-migrate      # Run alembic upgrade head"
@@ -49,15 +52,23 @@ db-down:
 	$(DB_COMPOSE) down --remove-orphans
 
 .PHONY: lan-up
-lan-up: db-up lan-cert
-	$(LAN_COMPOSE) up --build -d --remove-orphans
+lan-up: db-up lan-cert lan-build
+	$(LAN_COMPOSE) up -d --remove-orphans --wait
 
 .PHONY: lan-init
-lan-init: db-up
-	$(LAN_COMPOSE) run --rm --build bootstrap
+lan-init: db-up lan-build
+	$(LAN_COMPOSE) run --rm bootstrap
 
 .PHONY: lan-go
 lan-go: lan-up lan-url
+
+.PHONY: lan-validate
+lan-validate:
+	@$(LAN_COMPOSE) config >/dev/null
+
+.PHONY: lan-build
+lan-build: lan-validate
+	$(LAN_COMPOSE) build $(LAN_BUILD_SERVICES)
 
 .PHONY: lan-ps
 lan-ps:
@@ -76,8 +87,8 @@ lan-seed:
 	$(LAN_COMPOSE) exec backend python data/seed_configuration.py
 
 .PHONY: lan-bootstrap
-lan-bootstrap: db-up lan-cert
-	$(LAN_COMPOSE) run --rm --build bootstrap
+lan-bootstrap: db-up lan-cert lan-build
+	$(LAN_COMPOSE) run --rm bootstrap
 
 .PHONY: lan-cert
 lan-cert:

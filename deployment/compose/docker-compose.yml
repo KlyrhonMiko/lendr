@@ -1,0 +1,47 @@
+name: powergold-deployment-infra
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    env_file:
+      - ../env/.env.local
+    environment:
+      TZ: ${TZ:-Asia/Manila}
+    ports:
+      - "5433:5432"
+    volumes:
+      - powergold_pgdata:/var/lib/postgresql/data
+    networks:
+      shared:
+        aliases:
+          - powergold-db
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  adminer:
+    image: adminer:4.8.1-standalone
+    restart: unless-stopped
+    environment:
+      ADMINER_DEFAULT_SERVER: powergold-db
+    ports:
+      - "127.0.0.1:8080:8080"
+    networks:
+      - shared
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+networks:
+  shared:
+    name: powergold-deployment-shared
+
+volumes:
+  powergold_pgdata:
+    name: powergold_deployment_pgdata

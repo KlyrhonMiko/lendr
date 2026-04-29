@@ -1,0 +1,122 @@
+name: powergold-deployment
+
+services:
+  bootstrap:
+    image: powergold-bootstrap:${POWERGOLD_VERSION:-1.0.0}
+    env_file:
+      - ../env/.env.deploy
+    environment:
+      TZ: ${TZ:-Asia/Manila}
+      LOG_FILE_ENABLED: "false"
+      STARTUP_RUN_INITIALIZATION: "false"
+      STARTUP_ENABLE_SCHEDULER: "false"
+    restart: "no"
+    networks:
+      - shared
+    command: ["python", "data/bootstrap_system.py"]
+
+  backend:
+    image: powergold-backend:${POWERGOLD_VERSION:-1.0.0}
+    restart: unless-stopped
+    env_file:
+      - ../env/.env.deploy
+    environment:
+      TZ: ${TZ:-Asia/Manila}
+      LOG_FILE_ENABLED: "false"
+      AUTH_TRUST_PROXY_HEADERS: "true"
+      AUTH_TRUSTED_PROXY_HOPS: "1"
+      STARTUP_RUN_INITIALIZATION: "false"
+      STARTUP_ENABLE_SCHEDULER: "true"
+      STARTUP_FAIL_FAST_ON_SCHEDULER_ERROR: "true"
+      APP_HOST: 0.0.0.0
+      APP_PORT: 8000
+    expose:
+      - "8000"
+    volumes:
+      - powergold_backend_assets:/app/assets
+      - powergold_backend_uploads:/app/uploads
+    networks:
+      - shared
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import sys, urllib.request
+          try:
+              with urllib.request.urlopen("http://127.0.0.1:8000/api/health/live", timeout=5) as response:
+                  sys.exit(0 if response.status < 500 else 1)
+          except Exception:
+              sys.exit(1)
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  frontend:
+    image: powergold-frontend:${POWERGOLD_VERSION:-1.0.0}
+    restart: unless-stopped
+    env_file:
+      - ../env/.env.deploy
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://backend:8000}
+    expose:
+      - "3000"
+    networks:
+      - shared
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - >
+          const http=require('http');
+          const req=http.get('http://127.0.0.1:3000',res=>process.exit(res.statusCode<500?0:1));
+          req.on('error',()=>process.exit(1));
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - shared
+    volumes:
+      - ../infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../certificates:/etc/caddy/certificates:ro
+      - powergold_caddy_data:/data
+      - powergold_caddy_config:/config
+
+networks:
+  shared:
+    external: true
+    name: powergold-deployment-shared
+
+volumes:
+  powergold_backend_assets:
+    name: powergold_deployment_backend_assets
+  powergold_backend_uploads:
+    name: powergold_deployment_backend_uploads
+  powergold_caddy_data:
+    name: powergold_deployment_caddy_data
+  powergold_caddy_config:
+    name: powergold_deployment_caddy_config

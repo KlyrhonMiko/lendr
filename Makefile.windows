@@ -4,6 +4,7 @@ SHELL := powershell.exe
 LAN_HOSTNAME ?= powergold.home.arpa
 DB_COMPOSE := docker compose -f docker-compose.yml
 LAN_COMPOSE := docker compose --env-file .env.deploy -f docker-compose.deploy.yml
+LAN_BUILD_SERVICES := bootstrap backend frontend
 GET_LAN_IP := Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $$_.IPAddress -match '^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)' -and $$_.IPAddress -ne '127.0.0.1' -and $$_.InterfaceAlias -notmatch 'vEthernet|WSL|Loopback|Docker|VirtualBox|VMware' } | Sort-Object InterfaceMetric | Select-Object -First 1 -ExpandProperty IPAddress
 
 .PHONY: help
@@ -18,6 +19,8 @@ help:
 	@Write-Host "  make -f Makefile.windows db-down          # Stop shared DB stack"
 	@Write-Host "  make -f Makefile.windows lan-up           # Build/start LAN app stack"
 	@Write-Host "  make -f Makefile.windows lan-go           # lan-up + print access URL"
+	@Write-Host "  make -f Makefile.windows lan-validate     # Validate LAN compose config"
+	@Write-Host "  make -f Makefile.windows lan-build        # Build LAN app images"
 	@Write-Host "  make -f Makefile.windows lan-ps           # Show LAN stack services"
 	@Write-Host "  make -f Makefile.windows lan-logs         # Tail LAN stack logs"
 	@Write-Host "  make -f Makefile.windows lan-migrate      # Run alembic upgrade head"
@@ -51,15 +54,23 @@ db-down:
 	$(DB_COMPOSE) down --remove-orphans
 
 .PHONY: lan-up
-lan-up: db-up lan-cert
-	$(LAN_COMPOSE) up --build -d --remove-orphans
+lan-up: db-up lan-cert lan-build
+	$(LAN_COMPOSE) up -d --remove-orphans --wait
 
 .PHONY: lan-init
-lan-init: db-up
-	$(LAN_COMPOSE) run --rm --build bootstrap
+lan-init: db-up lan-build
+	$(LAN_COMPOSE) run --rm bootstrap
 
 .PHONY: lan-go
 lan-go: lan-up lan-url
+
+.PHONY: lan-validate
+lan-validate:
+	@$(LAN_COMPOSE) config | Out-Null
+
+.PHONY: lan-build
+lan-build: lan-validate
+	$(LAN_COMPOSE) build $(LAN_BUILD_SERVICES)
 
 .PHONY: lan-ps
 lan-ps:
@@ -77,13 +88,14 @@ lan-migrate:
 lan-seed:
 	$(LAN_COMPOSE) exec backend python data/seed_configuration.py
 
+
 .PHONY: lan-bootstrap
-lan-bootstrap: db-up lan-cert
-	$(LAN_COMPOSE) run --rm --build bootstrap
+lan-bootstrap: db-up lan-cert lan-build
+	$(LAN_COMPOSE) run --rm bootstrap
 
 .PHONY: lan-cert
 lan-cert:
-	@$$ip = $(GET_LAN_IP); if (-not $$ip) { Write-Host 'Could not determine a usable LAN IPv4 address automatically.'; exit 1 }; if (-not (Test-Path frontend/certificates/localhost.pem) -or -not (Test-Path frontend/certificates/localhost-key.pem)) { Write-Host "Generating certificates for $(LAN_HOSTNAME) and $$ip..."; Push-Location frontend; $$env:HOST='$(LAN_HOSTNAME)'; $$env:LAN_IP="$$ip"; npm run cert; Pop-Location } else { Write-Host "Certificates already exist in frontend/certificates/" }
+	@$$ip = $(GET_LAN_IP); if (-not $$ip) { Write-Host 'Could not determine a usable LAN IPv4 address automatically.'; exit 1 }; if (-not (Test-Path frontend/certificates/localhost.pem) -or -not (Test-Path frontend/certificates/localhost-key.pem)) { Write-Host "Generating certificates for $(LAN_HOSTNAME) and $$ip..."; New-Item -ItemType Directory -Force -Path frontend/certificates | Out-Null; $$certDir = (Resolve-Path 'frontend/certificates').Path; $$san = "subjectAltName=DNS:$(LAN_HOSTNAME),DNS:localhost,IP:127.0.0.1,IP:$$ip"; if (Get-Command openssl -ErrorAction SilentlyContinue) { & openssl req -x509 -newkey rsa:2048 -keyout "$$certDir/localhost-key.pem" -out "$$certDir/localhost.pem" -days 365 -nodes -subj "/CN=$(LAN_HOSTNAME)" -addext $$san } else { docker run --rm -v "$${certDir}:/certs" alpine:3.20 sh -lc "apk add --no-cache openssl >/dev/null && openssl req -x509 -newkey rsa:2048 -keyout /certs/localhost-key.pem -out /certs/localhost.pem -days 365 -nodes -subj '/CN=$(LAN_HOSTNAME)' -addext '$$san'" }; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE } } else { Write-Host "Certificates already exist in frontend/certificates/" }
 
 .PHONY: lan-url
 lan-url:

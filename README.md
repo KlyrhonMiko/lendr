@@ -329,6 +329,8 @@ Windows:
 make -f Makefile.windows lan-cert
 ```
 
+On Windows, the Makefile now generates the certificate with the same OpenSSL arguments used on Linux/macOS, using host `openssl` when available and a Dockerized OpenSSL fallback otherwise. Like Linux/macOS, `make -f Makefile.windows lan-go` and `make -f Makefile.windows lan-up` generate the LAN certificate automatically when it is missing.
+
 **6. Build and start the LAN app stack**
 
 ```bash
@@ -520,6 +522,10 @@ Use this guide for the shared machine-local DB stack in `docker-compose.yml` and
 - Linux/macOS: `make` + Docker Compose v2
 - Windows: GNU Make + PowerShell + Docker Compose v2
 
+Optional launcher shortcuts:
+- Linux/macOS: `./powergold.sh`
+- Windows bundle: `powergold.bat`
+
 ### Command Map (Linux/macOS vs Windows)
 
 | Purpose | Linux/macOS | Windows (PowerShell) |
@@ -530,6 +536,8 @@ Use this guide for the shared machine-local DB stack in `docker-compose.yml` and
 | Tail shared DB stack logs | `make db-logs` | `make -f Makefile.windows db-logs` |
 | Show Adminer URL | `make db-adminer-url` | `make -f Makefile.windows db-adminer-url` |
 | Stop shared DB stack | `make db-down` | `make -f Makefile.windows db-down` |
+| Validate LAN compose config | `make lan-validate` | `make -f Makefile.windows lan-validate` |
+| Build LAN app images | `make lan-build` | `make -f Makefile.windows lan-build` |
 | Build/start LAN app stack | `make lan-up` | `make -f Makefile.windows lan-up` |
 | Build/start + print LAN URL (alias: `lan-up` then `lan-url`) | `make lan-go` | `make -f Makefile.windows lan-go` |
 | Initialize bootstrap only | `make lan-init` | `make -f Makefile.windows lan-init` |
@@ -561,7 +569,7 @@ Use this guide for the shared machine-local DB stack in `docker-compose.yml` and
 4. Apply code changes to LAN containers
   - Linux/macOS: `make lan-up`
   - Windows: `make -f Makefile.windows lan-up`
-  - Note: `lan-up` reuses the existing shared DB stack and rebuilds the LAN app images.
+  - Note: `lan-up` reuses the existing shared DB stack, validates the deploy compose config, builds the app images, then starts the LAN stack and waits for container health checks.
 
 5. Stop only the LAN app stack
   - Linux/macOS: `make lan-down`
