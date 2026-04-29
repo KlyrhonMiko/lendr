@@ -44,6 +44,8 @@ _DEFAULT_STATUSES = [
     "closed",
 ]
 
+_ACTIVE_BORROW_STATUSES = {"pending", "approved", "released"}
+
 
 class BorrowService(
     BaseService[BorrowRequest, BorrowRequestCreate, BorrowRequestUpdate]
@@ -99,7 +101,7 @@ class BorrowService(
 
     def _active_statuses(self, session: Session) -> list[str]:
         workflow = self._get_workflow(session)
-        return workflow[:-1]
+        return [status for status in workflow if status in _ACTIVE_BORROW_STATUSES]
 
     def _has_identical_active_request(
         self,
@@ -393,6 +395,36 @@ class BorrowService(
             item_uuids = {item.item_uuid for item in request_items if item.item_uuid}
 
         item_details_map = self._build_item_details_map(session, item_uuids)
+        assigned_units = self._get_borrow_assignments(session, borrow_req)
+        assigned_batches: list[BorrowRequestBatch] = []
+        participants: list[BorrowParticipant] = []
+        if borrow_req.id:
+            assigned_batches = list(
+                session.exec(
+                    select(BorrowRequestBatch)
+                    .where(
+                        BorrowRequestBatch.borrow_uuid == borrow_req.id,
+                        BorrowRequestBatch.is_deleted.is_(False),
+                    )
+                    .order_by(BorrowRequestBatch.created_at.asc())
+                ).all()
+            )
+            participants = list(
+                session.exec(
+                    select(BorrowParticipant)
+                    .where(
+                        BorrowParticipant.borrow_uuid == borrow_req.id,
+                        BorrowParticipant.is_deleted.is_(False),
+                    )
+                    .order_by(BorrowParticipant.created_at.asc())
+                ).all()
+            )
+
+        participant_user_ids = {
+            participant.user_uuid for participant in participants if participant.user_uuid is not None
+        }
+        participant_user_id_map = self._build_user_id_map(session, participant_user_ids)
+        participant_name_map = self._build_user_name_map(session, participant_user_ids)
 
         payload = borrow_req.model_dump(mode="json")
         payload["borrower_user_id"] = user_id_map.get(borrow_req.borrower_uuid)
@@ -428,6 +460,30 @@ class BorrowService(
             }
             for event in (borrow_req.events or [])
         ]
+        payload["assigned_units"] = [
+            {
+                **assignment.model_dump(mode="json"),
+                "unit_id": assignment.unit_id,
+                "serial_number": assignment.serial_number,
+            }
+            for assignment in assigned_units
+        ]
+        payload["assigned_batches"] = [
+            {
+                **assignment.model_dump(mode="json"),
+                "batch_id": assignment.batch_id,
+            }
+            for assignment in assigned_batches
+        ]
+        payload["involved_people"] = [
+            {
+                "user_id": participant_user_id_map.get(participant.user_uuid),
+                "name": participant.name,
+                "fullname": participant_name_map.get(participant.user_uuid) or participant.name,
+                "role": participant.role_in_request,
+            }
+            for participant in participants
+        ] or None
         return BorrowRequestRead.model_validate(payload)
 
     @staticmethod
@@ -547,20 +603,24 @@ class BorrowService(
         item_details_map = self._build_item_details_map(session, item_uuids)
 
         receipt_items = []
+        request_units = []
+        if any(details.get("is_trackable") for details in item_details_map.values()):
+            request_units = session.exec(
+                select(BorrowRequestUnit).where(
+                    BorrowRequestUnit.borrow_uuid == db_request.id,
+                    BorrowRequestUnit.is_deleted.is_(False),
+                )
+            ).all()
+
         for borrow_item in request_items:
             details = item_details_map.get(borrow_item.item_uuid, {})
             serial_numbers = []
             if details.get("is_trackable"):
-                units = session.exec(
-                    select(BorrowRequestUnit).where(
-                        BorrowRequestUnit.borrow_uuid == db_request.id,
-                        BorrowRequestUnit.is_deleted.is_(False),
-                    )
-                ).all()
                 serial_numbers = [
                     u.inventory_unit.serial_number
-                    for u in units
-                    if u.inventory_unit and u.inventory_unit.serial_number
+                    for u in request_units
+                    if u.inventory_unit and u.inventory_unit.inventory_uuid == borrow_item.item_uuid
+                    and u.inventory_unit.serial_number
                 ]
 
             receipt_items.append(
@@ -973,11 +1033,39 @@ class BorrowService(
         if item_obj.is_trackable:
             raise ValueError("Batch assignment is only applicable to non-trackable items")
 
-        total_to_assign = sum(ba.qty for ba in batch_assignments)
+        aggregated_assignments: dict[str, int] = {}
+        for assignment in batch_assignments:
+            aggregated_assignments[assignment.batch_id] = (
+                aggregated_assignments.get(assignment.batch_id, 0) + assignment.qty
+            )
+
+        if len(aggregated_assignments) != len(batch_assignments):
+            raise ValueError("batch_id values must be unique within a single assignment request")
+
+        total_to_assign = sum(aggregated_assignments.values())
         if total_to_assign != borrow_item.qty_requested:
             raise ValueError(
                 f"Expected to assign {borrow_item.qty_requested} units, but got assignments for {total_to_assign}"
             )
+
+        from systems.inventory.models import InventoryBatch
+
+        validated_batches: list[tuple[InventoryBatch, int]] = []
+        for batch_id, qty in aggregated_assignments.items():
+            batch = session.exec(
+                select(InventoryBatch).where(
+                    InventoryBatch.batch_id == batch_id,
+                    InventoryBatch.inventory_uuid == item_obj.id,
+                )
+            ).first()
+
+            if not batch:
+                raise ValueError(f"Batch {batch_id} not found for item {item_id}")
+
+            if batch.available_qty < qty:
+                raise ValueError(f"Batch {batch_id} only has {batch.available_qty} available")
+
+            validated_batches.append((batch, qty))
 
         # Clear existing assignments for this item
         existing_assignments = [
@@ -990,28 +1078,15 @@ class BorrowService(
         now = get_now_manila()
         created_assignments: list[BorrowRequestBatch] = []
 
-        from systems.inventory.models import InventoryBatch
-        for ba_data in batch_assignments:
-            batch = session.exec(
-                select(InventoryBatch).where(
-                    InventoryBatch.batch_id == ba_data.batch_id,
-                    InventoryBatch.inventory_uuid == item_obj.id
-                )
-            ).first()
-
-            if not batch:
-                raise ValueError(f"Batch {ba_data.batch_id} not found for item {item_id}")
-
-            if batch.available_qty < ba_data.qty:
-                raise ValueError(f"Batch {ba_data.batch_id} only has {batch.available_qty} available")
-
+        for batch, qty in validated_batches:
             assignment = BorrowRequestBatch(
                 borrow_batch_id=get_next_sequence(
                     session, BorrowRequestBatch, "borrow_batch_id", "BRB"
                 ),
                 borrow_uuid=db_request.id,
                 batch_uuid=batch.id,
-                qty_assigned=ba_data.qty,
+                qty_assigned=qty,
+                assigned_by=actor_id,
                 assigned_at=now,
             )
             session.add(assignment)
@@ -1506,11 +1581,17 @@ class BorrowService(
                     session.add(unit)
                     session.add(assignment)
 
+                    movement_type = "borrow_return"
+                    qty_change = 1
+                    if status_on_return == "maintenance":
+                        movement_type = "maintenance"
+                        qty_change = 0
+
                     self.inventory_service.adjust_stock(
                         session,
                         item.item_id,
-                        1,
-                        movement_type="borrow_return",
+                        qty_change,
+                        movement_type=movement_type,
                         reference_id=db_request.request_id,
                         reference_type="borrow_request",
                         actor_id=actor_id,
@@ -1540,15 +1621,8 @@ class BorrowService(
                             batch_id=ba.inventory_batch.batch_id,
                         )
                 else:
-                    # Fallback to general stock adjustment
-                    self.inventory_service.adjust_stock(
-                        session,
-                        item.item_id,
-                        borrow_item.qty_requested,
-                        movement_type="borrow_return",
-                        reference_id=db_request.request_id,
-                        reference_type="borrow_request",
-                        actor_id=actor_id,
+                    raise ValueError(
+                        f"Released non-trackable item {item.item_id} has no batch assignments to return"
                     )
 
         now = get_now_manila()

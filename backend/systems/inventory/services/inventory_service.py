@@ -75,6 +75,10 @@ UNIT_RETIRED_NOTE_PATTERN = re.compile(
     r"^Unit retired: (?P<unit_id>[A-Za-z0-9\-]+) \(Previous status: (?P<from_status>[a-z_]+)\)$"
 )
 
+
+def _movement_increases_batch_total(movement_type: str, qty_change: int) -> bool:
+    return qty_change > 0 and movement_type != "borrow_return"
+
 class InventoryService(BaseService[InventoryItem, InventoryItemCreate, InventoryItemUpdate]):
     def __init__(self):
         super().__init__(InventoryItem, lookup_field="item_id")
@@ -655,6 +659,11 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         if not db_obj:
             raise ValueError(f"Item {item_id} not found")
 
+        if not db_obj.is_trackable and qty_change != 0 and batch_id is None:
+            raise ValueError(
+                f"Non-trackable item {item_id} requires a batch_id for quantity-changing movements"
+            )
+
         current_balances = self.get_item_balances(session, db_obj)
         old_qty = current_balances["available_qty"]
 
@@ -714,6 +723,8 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
 
             batch.status = self.recalculate_batch_status(session, batch)
             session.add(batch)
+
+        db_obj = self._sync_item_quantities(session, item_id)
 
         # LOG THE MOVEMENT (The Ledger)
         movement = InventoryMovement(
@@ -940,15 +951,22 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         if not item:
             raise ValueError(f"Item {item_id} not found")
 
-        movements, _ = self.get_history(session, item_id)
-        ledger_balance = sum(movement["qty_change"] for movement in movements)
-        latest_movement_at = movements[0]["occurred_at"] if movements else None
+        movement_aggregate = session.exec(
+            select(
+                func.count(InventoryMovement.id),
+                func.coalesce(func.sum(InventoryMovement.qty_change), 0),
+                func.max(InventoryMovement.occurred_at),
+            ).where(InventoryMovement.inventory_uuid == item.id)
+        ).one()
+        movement_count = int(movement_aggregate[0] or 0)
+        ledger_balance = int(movement_aggregate[1] or 0)
+        latest_movement_at = movement_aggregate[2]
         balances = self.get_item_balances(session, item)
         actual_balance = balances["available_qty"]
         delta = ledger_balance - actual_balance
 
         return InventoryMovementReconciliationRead(
-            movement_count=len(movements),
+            movement_count=movement_count,
             ledger_balance=ledger_balance,
             actual_balance=actual_balance,
             delta=delta,
@@ -969,6 +987,19 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             raise ValueError(f"Movement {movement_id} not found")
         if original.movement_type == "reversal":
             raise ValueError("Reversal movements cannot be reversed again")
+
+        existing_reversal = session.exec(
+            select(InventoryMovement).where(
+                InventoryMovement.movement_type == "reversal",
+                InventoryMovement.reference_id == original.movement_id,
+                InventoryMovement.reference_type == "inventory_movement",
+                InventoryMovement.is_deleted.is_(False),
+            )
+        ).first()
+        if existing_reversal is not None:
+            raise ValueError(
+                f"Movement {movement_id} has already been reversed by {existing_reversal.movement_id}"
+            )
 
         self._require_config_key(
             session,
@@ -1052,7 +1083,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
 
             next_available = batch.available_qty + reversal_qty_change
             next_total = batch.total_qty
-            if original.qty_change > 0:
+            if _movement_increases_batch_total(original.movement_type, original.qty_change):
                 next_total -= original.qty_change
 
             if next_available < 0:
@@ -1066,6 +1097,8 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             batch.total_qty = next_total
             batch.status = self.recalculate_batch_status(session, batch)
             session.add(batch)
+
+        item = self._sync_item_quantities(session, item.item_id)
 
         reversal = InventoryMovement(
             movement_id=get_next_sequence(session, InventoryMovement, "movement_id", "MOV"),
@@ -1403,6 +1436,33 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
         ).all()
         reversed_ids = set(reversals)
 
+        borrow_ref_ids = [
+            m.reference_id
+            for m, _, _, _, _ in results
+            if m.reference_id
+            and m.movement_type in ("borrow_release", "borrow_return")
+            and (m.reference_type in (None, "borrow_request"))
+        ]
+        borrow_map: dict[str, dict[str, Any]] = {}
+        if borrow_ref_ids:
+            borrow_requests = session.exec(
+                select(BorrowRequest, User)
+                .outerjoin(User, BorrowRequest.borrower_uuid == User.id)
+                .where(
+                    BorrowRequest.request_id.in_(borrow_ref_ids),
+                    BorrowRequest.is_deleted.is_(False),
+                )
+            ).all()
+            for br, borrower_user in borrow_requests:
+                borrower_name = None
+                if borrower_user:
+                    borrower_name = f"{borrower_user.last_name}, {borrower_user.first_name}"
+                borrow_map[br.request_id] = {
+                    "borrower_name": borrower_name,
+                    "customer_name": br.customer_name,
+                    "location_name": br.location_name,
+                }
+
         formatted_results = []
         for movement, user_id, actor_name, item_id, item_name in results:
             m_dict = movement.model_dump()
@@ -1411,6 +1471,11 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             m_dict["inventory_id"] = item_id
             m_dict["item_name"] = item_name
             m_dict["is_reversed"] = movement.movement_id in reversed_ids
+            borrow_ctx = borrow_map.get(movement.reference_id or "")
+            if borrow_ctx:
+                m_dict["borrower_name"] = borrow_ctx.get("borrower_name")
+                m_dict["customer_name"] = borrow_ctx.get("customer_name")
+                m_dict["location_name"] = borrow_ctx.get("location_name")
             formatted_results.append(m_dict)
 
         return formatted_results, total_count
@@ -1752,7 +1817,7 @@ class InventoryService(BaseService[InventoryItem, InventoryItemCreate, Inventory
             from utils.time_utils import MANILA_TZ
             current_exp = current_exp.replace(tzinfo=timezone.utc).astimezone(MANILA_TZ)
 
-        if current_exp and current_exp <= get_now_manila() and unit.status in {"available", "borrowed"}:
+        if current_exp and current_exp <= get_now_manila() and unit.status == "available":
             self._require_config_key(
                 session,
                 key="expired",

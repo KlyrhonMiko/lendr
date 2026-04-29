@@ -15,7 +15,7 @@ class InventoryBatch(BaseModel, table=True):
     
     expiration_date: datetime | None = Field(default=None, index=True, nullable=True)
     
-    # status: "available", "expired", "recalled", "depleted"
+    # status: "healthy", "low_stock", "out_of_stock", "near_expiry", "expired"
     status: str = Field(default="available", max_length=50)
     description: str | None = Field(default=None, max_length=1000)
     

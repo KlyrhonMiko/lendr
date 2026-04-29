@@ -116,6 +116,21 @@ def _resolve_request_correlation_id(request: Request) -> str:
     return f"req-{uuid4().hex}"
 
 
+def _sanitize_validation_details(value):
+    if isinstance(value, dict):
+        return {
+            key: _sanitize_validation_details(nested_value)
+            for key, nested_value in value.items()
+        }
+    if isinstance(value, list):
+        return [_sanitize_validation_details(item) for item in value]
+    if isinstance(value, tuple):
+        return [_sanitize_validation_details(item) for item in value]
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return str(value)
+
+
 def _initialize_locale_settings() -> None:
     from utils.time_utils import update_system_timezone, update_system_format
 
@@ -333,7 +348,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content=create_error_response(
             message="Validation error",
             error_type="ValidationError",
-            details=exc.errors(),
+            details=_sanitize_validation_details(exc.errors()),
             request=request
         ).model_dump(mode="json")
     )

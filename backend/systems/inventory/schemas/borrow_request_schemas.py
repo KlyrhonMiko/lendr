@@ -50,6 +50,13 @@ class BorrowRequestCreate(BaseModel):
     location_name: Optional[str] = Field(default=None, max_length=255)
     is_emergency: bool = False
 
+    @model_validator(mode="after")
+    def validate_unique_item_ids(self) -> "BorrowRequestCreate":
+        item_ids = [item.item_id for item in self.items]
+        if len(item_ids) != len(set(item_ids)):
+            raise ValueError("Borrow request items must have unique item_id values")
+        return self
+
 
 class BorrowRequestUpdate(BaseModel):
     status: Optional[str] = Field(default=None, max_length=50)
