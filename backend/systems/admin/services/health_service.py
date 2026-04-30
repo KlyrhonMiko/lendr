@@ -1,5 +1,6 @@
-import os
 from datetime import datetime
+import os
+from pathlib import Path
 import time
 import psutil
 import re
@@ -17,17 +18,16 @@ from systems.admin.schemas.health import (
     ActiveUserRead,
     LogEntryRead
 )
+from core.config import settings
 from utils.time_utils import get_now_manila
 
 # Constants for storage scanning
-HEALTH_LOG_FILE = ".logs/health/health.log"
-BACKUP_DIR = "./.backups"
 ATTACHMENTS_DIR = "./uploads" # Assuming this is the standard location
 
 class SystemHealthService:
     def __init__(self):
-        # Ensure essential directories exist for scanning (backups handled by BackupService)
-        for d in [".logs/health", ATTACHMENTS_DIR]:
+        health_log_dir = Path(settings.LOG_DIR) / "health"
+        for d in [str(health_log_dir), ATTACHMENTS_DIR]:
             if not os.path.exists(d):
                 os.makedirs(d)
 
@@ -50,6 +50,18 @@ class SystemHealthService:
                 if not os.path.islink(fp):
                     total_size += os.path.getsize(fp)
         return total_size
+
+    def _get_backup_dir(self) -> str:
+        backup_dir = Path(settings.BACKUP_DIR).expanduser()
+        if not backup_dir.is_absolute():
+            backup_dir = (Path.cwd() / backup_dir).resolve()
+        return str(backup_dir)
+
+    def _get_health_log_file(self) -> str:
+        log_dir = Path(settings.LOG_DIR).expanduser()
+        if not log_dir.is_absolute():
+            log_dir = (Path.cwd() / log_dir).resolve()
+        return str(log_dir / "health" / "health.log")
 
     def get_system_status(self, session: Session) -> SystemStatusRead:
         # 1. Uptime
@@ -93,8 +105,8 @@ class SystemHealthService:
         except Exception:
             pass
 
-        log_size_bytes = os.path.getsize(HEALTH_LOG_FILE) if os.path.exists(HEALTH_LOG_FILE) else 0
-        backup_size_bytes = self._get_dir_size(BACKUP_DIR)
+        log_size_bytes = os.path.getsize(self._get_health_log_file()) if os.path.exists(self._get_health_log_file()) else 0
+        backup_size_bytes = self._get_dir_size(self._get_backup_dir())
         attachment_size_bytes = self._get_dir_size(ATTACHMENTS_DIR)
 
         known_usage = db_size_bytes + log_size_bytes + backup_size_bytes + attachment_size_bytes
@@ -159,7 +171,7 @@ class SystemHealthService:
         return True
 
     def get_recent_logs(self, skip: int = 0, limit: int = 100) -> tuple[List[LogEntryRead], int]:
-        if not os.path.exists(HEALTH_LOG_FILE):
+        if not os.path.exists(self._get_health_log_file()):
             return [], 0
 
         logs = []
@@ -167,7 +179,7 @@ class SystemHealthService:
         log_pattern = re.compile(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \[(\w+)\] (?:\[([\w-]+)\] )?(.+)$")
 
         try:
-            with open(HEALTH_LOG_FILE, "r") as f:
+            with open(self._get_health_log_file(), "r") as f:
                 lines = f.readlines()
                 total_lines = len(lines)
                 

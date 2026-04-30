@@ -1,7 +1,7 @@
 import os
 import subprocess
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 from uuid import UUID
 
 from sqlalchemy.orm import selectinload
@@ -16,10 +16,14 @@ from utils.logging import log_operation
 
 class BackupService:
     def __init__(self):
-        # Use a path relative to the app root so it persists to the host via volume mount
-        self.backup_dir = Path("./.backups")
-        self.backup_dir.mkdir(parents=True, exist_ok=True)
         self.config_service = ConfigurationService()
+
+    def _get_backup_dir(self) -> Path:
+        backup_dir = Path(settings.BACKUP_DIR).expanduser()
+        if not backup_dir.is_absolute():
+            backup_dir = (Path.cwd() / backup_dir).resolve()
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        return backup_dir
 
     def _require_setting(self, session: Session, key: str, category: str, field_label: str) -> None:
         self.config_service.require_key(session, key=key, category=category, field_label=field_label)
@@ -129,30 +133,40 @@ class BackupService:
     def _run_local_backup(self, session: Session, backup_run: BackupRun):
         timestamp = get_now_manila().strftime("%Y%m%d_%H%M%S")
         filename = f"backup_{timestamp}.sql"
-        filepath = self.backup_dir / filename
+        filepath = self._get_backup_dir() / filename
         # 1. Parse DB URL
         parsed = urlparse(settings.DATABASE_URL)
         
         # 2. Setup environment with password
         env = os.environ.copy()
         if parsed.password:
-            env["PGPASSWORD"] = parsed.password
+            env["PGPASSWORD"] = unquote(parsed.password)
         # 3. Build the pg_dump command
-        # Note: 'parsed.hostname' will be 'postgres' when running in Docker
         cmd = [
             "pg_dump",
             "-h", parsed.hostname or "postgres",
             "-p", str(parsed.port or 5432),
-            "-U", parsed.username or "postgres",
+            "-U", unquote(parsed.username) if parsed.username else "postgres",
             "-d", parsed.path.lstrip("/"),
+            "--clean",
+            "--if-exists",
+            "--no-owner",
             "-f", str(filepath)
         ]
         try:
-            # 4. Run the command inside the backend container
-            result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+            result = subprocess.run(
+                cmd,
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
             
             if result.returncode != 0:
                 raise Exception(f"pg_dump failed: {result.stderr}")
+            if not filepath.exists() or filepath.stat().st_size == 0:
+                raise RuntimeError("pg_dump completed without producing a usable backup file")
+
             # 5. Record the artifact
             self._require_setting(
                 session,
@@ -163,11 +177,12 @@ class BackupService:
             artifact = BackupArtifact(
                 backup_run_id=backup_run.id,
                 target_type="local",
-                file_path_or_key=str(filepath),
+                file_path_or_key=str(filepath.resolve()),
                 size_bytes=filepath.stat().st_size,
                 verified_restore=False
             )
             session.add(artifact)
+            session.flush()
         except Exception as e:
             if filepath.exists() and filepath.stat().st_size == 0:
                 filepath.unlink()

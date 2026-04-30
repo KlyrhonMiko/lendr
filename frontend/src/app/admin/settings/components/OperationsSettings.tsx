@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Toggle } from '@/components/ui/toggle';
 import { Input, Textarea } from '@/components/ui/input';
 import { FormSelect } from '@/components/ui/form-select';
-import { Wrench, Database, Archive, Trash2, Clock, RefreshCw, FileText, Save, Plus } from 'lucide-react';
+import { Wrench, Database, Archive, Trash2, Clock, RefreshCw, FileText, Save, Plus, Download } from 'lucide-react';
 import { ArchivesModal } from './ArchivesModal';
 import { useOperationsSettings, useBackupRuns, useOperationsMutations, useBackupMutations } from '../lib/useSettingsQueries';
 
@@ -15,9 +15,9 @@ interface OperationsSettingsData {
     message: string;
   };
   backup_schedule: {
+    enabled: boolean;
     frequency: string;
     time: string;
-    storage_location: string;
   };
   archive_policy: {
     audit_logs_value: number;
@@ -45,7 +45,7 @@ export function OperationsSettings() {
 
   // Mutations
   const { updateOperations } = useOperationsMutations();
-  const { deleteBackup } = useBackupMutations();
+  const { downloadBackup } = useBackupMutations();
 
   const data = localData || operationsRes?.data || null;
   const backups = backupRunsRes?.data || [];
@@ -127,10 +127,18 @@ export function OperationsSettings() {
             </div>
             <div className="flex-1">
               <CardTitle>Automated Backup Schedule</CardTitle>
-              <CardDescription>Configure periodic system data backups to ensure data safety.</CardDescription>
+              <CardDescription>Schedule local database backups that are stored in the deployment backup folder.</CardDescription>
             </div>
+            <Toggle
+              label={data.backup_schedule.enabled ? 'Enabled' : 'Disabled'}
+              checked={data.backup_schedule.enabled}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
+                ...prev,
+                backup_schedule: { ...prev.backup_schedule, enabled: e.target.checked }
+              } : null)}
+            />
           </CardHeader>
-          <CardContent className="grid gap-6">
+          <CardContent className={data.backup_schedule.enabled ? 'grid gap-6' : 'grid gap-6 opacity-50 grayscale pointer-events-none transition-opacity'}>
             <FormSelect
               label="Frequency"
               value={data.backup_schedule.frequency}
@@ -154,20 +162,9 @@ export function OperationsSettings() {
                 backup_schedule: { ...prev.backup_schedule, time: e.target.value }
               } : null)}
             />
-            <FormSelect
-              label="Storage Location"
-              value={data.backup_schedule.storage_location}
-              onChange={(value) => setLocalData((prev: OperationsSettingsData | null) => prev ? {
-                ...prev,
-                backup_schedule: { ...prev.backup_schedule, storage_location: value }
-              } : null)}
-              options={[
-                { label: 'Local Server', key: 'local' },
-                { label: 'Amazon S3 (Cloud)', key: 's3' },
-                { label: 'Local + S3 (Mirror)', key: 'both' }
-              ]}
-              placeholder="Select location"
-            />
+            <p className="text-xs text-muted-foreground px-1">
+              Local backups only. Manual and scheduled backups are saved to the same server-side backup directory.
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -209,17 +206,23 @@ export function OperationsSettings() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right space-x-2">
-                      <button aria-label="Download backup" className="p-2 hover:bg-primary/10 hover:text-primary rounded-lg transition-colors" title="Download">
-                        <FileText className="w-4 h-4" />
-                      </button>
                       <button
-                        onClick={() => deleteBackup.mutate(backup.backup_id)}
-                        aria-label={`Delete backup ${backup.backup_id}`}
-                        className="p-2 hover:bg-rose-500/10 hover:text-rose-500 rounded-lg transition-colors"
-                        title="Delete"
-                        disabled={deleteBackup.isPending}
+                        onClick={() => {
+                          const artifact = backup.artifacts[0];
+                          if (!artifact) {
+                            return;
+                          }
+                          downloadBackup.mutate({
+                            artifactId: artifact.artifact_id,
+                            filename: artifact.file_path_or_key.split('/').pop() || `${backup.backup_id}.sql`,
+                          });
+                        }}
+                        aria-label="Download backup"
+                        className="p-2 hover:bg-primary/10 hover:text-primary rounded-lg transition-colors disabled:opacity-50"
+                        title="Download"
+                        disabled={downloadBackup.isPending || backup.artifacts.length === 0}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Download className="w-4 h-4" />
                       </button>
                     </td>
                   </tr>

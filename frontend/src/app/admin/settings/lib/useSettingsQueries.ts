@@ -332,15 +332,25 @@ export function useBackupMutations() {
     },
   });
 
-  const deleteBackup = useMutation({
-    mutationFn: (backupId: string) => api.delete(`/admin/backups/runs/${backupId}`),
+  const downloadBackup = useMutation({
+    mutationFn: async ({ artifactId, filename }: { artifactId: string; filename: string }) => {
+      const response = await api.getRaw(`/admin/backups/artifacts/${artifactId}/download`);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(anchor);
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'backups', 'runs'] });
-      toast.success('Backup deleted');
+      toast.success('Backup downloaded successfully');
     },
   });
 
-  return { triggerBackup, deleteBackup };
+  return { triggerBackup, downloadBackup };
 }
 
 export function useHealthMutations() {

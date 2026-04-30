@@ -39,7 +39,7 @@ class SchedulerService:
         """Synchronize the backup job with current database configuration."""
         with Session(engine) as session:
             category = "operations_settings"
-            enabled = self.config_service.get_value(session, "backup_enabled", "true", category=category).lower() == "true"
+            enabled = self.config_service.get_value(session, "backup_enabled", "false", category=category).lower() == "true"
             frequency = self.config_service.get_value(session, "backup_frequency", "daily", category=category)
             time_str = self.config_service.get_value(session, "backup_time", "02:00", category=category)
 

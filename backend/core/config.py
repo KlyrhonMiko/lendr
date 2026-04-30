@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     LOG_DIR: str = ".logs"
     LOG_FILE_ENABLED: bool = True
+    BACKUP_DIR: str = ".backups"
     SKIP_INIT: bool = False
     STARTUP_RUN_INITIALIZATION: bool = True
     STARTUP_ENABLE_SCHEDULER: bool = False

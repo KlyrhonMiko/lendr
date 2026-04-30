@@ -36,7 +36,8 @@ Write-Host "[2/7] Creating directories..." -ForegroundColor Cyan
 $dirs = @(
     (Join-Path $BundleRoot "env"),
     (Join-Path $BundleRoot "certificates"),
-    (Join-Path $BundleRoot "backups")
+    (Join-Path $BundleRoot "backups"),
+    (Join-Path $BundleRoot "logs")
 )
 foreach ($d in $dirs) {
     New-Item -ItemType Directory -Force -Path $d | Out-Null

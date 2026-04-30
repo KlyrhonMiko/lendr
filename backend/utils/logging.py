@@ -126,16 +126,16 @@ def setup_health_logging(log_file: str = ".logs/health/health.log"):
 
 def log_operation(code: str, message: str, level: str = "INFO"):
     """
-    Log an operational event specifically formatted for the System Health dashboard.
+    Log an operational event to both the health log file and the console.
     Format: [CODE] Description
     """
     health_logger = logging.getLogger("health")
-    # If health logging isn't setup yet, it will just use defaults (usually stdout)
-    # This ensures calls to log_operation record structured data.
+    app_logger = logging.getLogger("app")
     formatted_msg = f"[{code}] {message}"
-    
+
     level_num = getattr(logging, level.upper(), logging.INFO)
     health_logger.log(level_num, formatted_msg)
+    app_logger.log(level_num, formatted_msg)
 
 # Convenience function to get loggers for specific modules
 def get_logger(name: str):

@@ -32,7 +32,8 @@ if (Test-Path $StagingDir) {
 $dirs = @(
     "$StagingDir", "$StagingDir\compose", "$StagingDir\env",
     "$StagingDir\infra\caddy", "$StagingDir\certificates",
-    "$StagingDir\images", "$StagingDir\scripts", "$StagingDir\backups"
+    "$StagingDir\images", "$StagingDir\scripts", "$StagingDir\backups",
+    "$StagingDir\logs"
 )
 foreach ($d in $dirs) {
     New-Item -ItemType Directory -Force -Path $d | Out-Null

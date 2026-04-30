@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Literal
 from pydantic import BaseModel, Field
 
 class MaintenanceModeSettings(BaseModel):
@@ -6,9 +6,9 @@ class MaintenanceModeSettings(BaseModel):
     message: str = Field(default="The system is currently undergoing scheduled maintenance. Please check back later.")
 
 class BackupScheduleSettings(BaseModel):
-    frequency: str = Field(default="daily") # daily, weekly, monthly
-    time: str = Field(default="02:00")     # HH:mm
-    storage_location: str = Field(default="local")
+    enabled: bool = Field(default=False)
+    frequency: Literal["daily", "weekly", "monthly"] = Field(default="daily")
+    time: str = Field(default="02:00", pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")
 
 class ArchivePolicySettings(BaseModel):
     audit_logs_value: int = Field(default=90)

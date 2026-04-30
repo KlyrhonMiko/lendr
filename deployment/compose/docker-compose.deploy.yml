@@ -22,7 +22,9 @@ services:
       - ../env/.env.deploy
     environment:
       TZ: ${TZ:-Asia/Manila}
-      LOG_FILE_ENABLED: "false"
+      LOG_FILE_ENABLED: "true"
+      LOG_DIR: /app/.logs
+      BACKUP_DIR: /app/.backups
       AUTH_TRUST_PROXY_HEADERS: "true"
       AUTH_TRUSTED_PROXY_HOPS: "1"
       STARTUP_RUN_INITIALIZATION: "false"
@@ -33,6 +35,8 @@ services:
     expose:
       - "8000"
     volumes:
+      - ../backups:/app/.backups
+      - ../logs:/app/.logs
       - powergold_backend_assets:/app/assets
       - powergold_backend_uploads:/app/uploads
     networks:

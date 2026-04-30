@@ -63,6 +63,8 @@
 
 Backups are stored in the `backups\` folder with a timestamp. Copy these files to a safe location.
 
+Backups created from the admin UI and scheduled backups also use this same `backups\` folder.
+
 ### Restore From A Backup
 
 ```powershell

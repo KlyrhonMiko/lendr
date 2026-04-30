@@ -236,6 +236,9 @@ SYSTEM_CONFIGS = [
     {"system": "admin", "key": "language", "value": "en", "category": "general_settings", "description": "System-wide language"},
 
     # Operations & Data Retention
+    {"system": "admin", "key": "backup_enabled", "value": "false", "category": "operations_settings", "description": "Enable automated local database backups"},
+    {"system": "admin", "key": "backup_frequency", "value": "daily", "category": "operations_settings", "description": "Automated backup frequency (daily/weekly/monthly)"},
+    {"system": "admin", "key": "backup_time", "value": "02:00", "category": "operations_settings", "description": "Daily trigger time for automated backups"},
     {"system": "admin", "key": "archive_audit_value", "value": "90", "category": "operations_settings", "description": "Archive audit logs older than (value)"},
     {"system": "admin", "key": "archive_audit_unit", "value": "d", "category": "operations_settings", "description": "Archive audit logs older than (unit: d/m/y)"},
     {"system": "admin", "key": "archive_borrow_value", "value": "1", "category": "operations_settings", "description": "Archive borrow records older than (value)"},

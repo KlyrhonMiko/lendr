@@ -52,7 +52,7 @@ setup_logging(
     log_dir=settings.LOG_DIR,
     log_file_enabled=settings.LOG_FILE_ENABLED,
 )
-setup_health_logging()
+setup_health_logging(log_file=f"{settings.LOG_DIR}/health/health.log")
 logger = get_logger("app")
 health_logger = get_logger("health")
 

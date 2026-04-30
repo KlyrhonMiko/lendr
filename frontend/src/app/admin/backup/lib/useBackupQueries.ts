@@ -4,6 +4,10 @@ import { toast } from 'sonner';
 
 const STALE_TIME_BACKUP = 1000 * 60; // 1 minute
 
+export function hasActiveBackupRuns(runs: BackupRun[] | undefined): boolean {
+  return runs?.some((run) => run.status === 'running' || run.status === 'pending') ?? false;
+}
+
 function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
 }
@@ -15,9 +19,7 @@ export function useBackupRuns() {
     staleTime: STALE_TIME_BACKUP,
     refetchInterval: (query) => {
       const data = query.state.data?.data as BackupRun[] | undefined;
-      const possessesActiveRuns = data?.some(
-        (run) => run.status === 'in_progress' || run.status === 'pending'
-      );
+      const possessesActiveRuns = hasActiveBackupRuns(data);
       return possessesActiveRuns ? 3000 : false;
     },
   });

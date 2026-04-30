@@ -133,9 +133,9 @@ export interface OperationsSettingsData {
     message: string;
   };
   backup_schedule: {
+    enabled: boolean;
     frequency: string;
     time: string;
-    storage_location: string;
   };
   archive_policy: {
     audit_logs_value: number;

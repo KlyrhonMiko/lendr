@@ -60,9 +60,9 @@ async def get_operations_settings(
             message=settings_dict.get("maintenance_message", "The system is currently undergoing scheduled maintenance. Please check back later."),
         ),
         backup_schedule=BackupScheduleSettings(
+            enabled=is_true(settings_dict.get("backup_enabled", "false")),
             frequency=settings_dict.get("backup_frequency", "daily"),
             time=settings_dict.get("backup_time", "02:00"),
-            storage_location=settings_dict.get("backup_storage", "local"),
         ),
         archive_policy=ArchivePolicySettings(
             audit_logs_value=int(settings_dict.get("archive_audit_value", "90")),
@@ -138,10 +138,9 @@ async def update_operations_settings(
     upsert_setting("maintenance_message", payload.maintenance.message)
 
     # 2. Backup
-    upsert_setting("backup_enabled", "true") # If they hit save, we assume they want backups enabled if set
+    upsert_setting("backup_enabled", str(payload.backup_schedule.enabled).lower())
     upsert_setting("backup_frequency", payload.backup_schedule.frequency)
     upsert_setting("backup_time", payload.backup_schedule.time)
-    upsert_setting("backup_storage", payload.backup_schedule.storage_location)
 
     # 3. Archive
     upsert_setting("archive_audit_value", str(payload.archive_policy.audit_logs_value))
