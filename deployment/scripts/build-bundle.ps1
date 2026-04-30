@@ -40,14 +40,14 @@ foreach ($d in $dirs) {
 }
 
 Write-Host "[1/9] Building backend image..." -ForegroundColor Cyan
-docker build -f "$RepoRoot\backend\Dockerfile.backend" -t "powergold-backend:$Version" "$RepoRoot\backend"
+docker build --no-cache -f "$RepoRoot\backend\Dockerfile.backend" -t "powergold-backend:$Version" "$RepoRoot\backend"
 if ($LASTEXITCODE -ne 0) { Write-Host "ERROR: Backend build failed." -ForegroundColor Red; exit 1 }
 docker tag "powergold-backend:$Version" "powergold-bootstrap:$Version"
 Write-Host "  powergold-backend:$Version" -ForegroundColor Green
 Write-Host "  powergold-bootstrap:$Version" -ForegroundColor Green
 
 Write-Host "[2/9] Building frontend image..." -ForegroundColor Cyan
-docker build -f "$RepoRoot\frontend\Dockerfile.frontend" -t "powergold-frontend:$Version" `
+docker build --no-cache -f "$RepoRoot\frontend\Dockerfile.frontend" -t "powergold-frontend:$Version" `
     --build-arg "NEXT_PUBLIC_API_URL=http://backend:8000" "$RepoRoot\frontend"
 if ($LASTEXITCODE -ne 0) { Write-Host "ERROR: Frontend build failed." -ForegroundColor Red; exit 1 }
 Write-Host "  powergold-frontend:$Version" -ForegroundColor Green

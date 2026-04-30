@@ -29,6 +29,24 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "ERROR: Docker Compose plugin is not available." -ForegroundColor Red
     exit 1
 }
+
+Write-Host "  Waiting for Docker engine to be ready..." -ForegroundColor Gray
+$maxWait = 60
+$waited = 0
+while ($waited -lt $maxWait) {
+    $infoResult = docker info 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        break
+    }
+    Start-Sleep -Seconds 2
+    $waited += 2
+}
+if ($waited -ge $maxWait) {
+    Write-Host "ERROR: Docker engine did not become ready within $maxWait seconds." -ForegroundColor Red
+    Write-Host "Ensure Docker Desktop is fully started (tray icon shows 'Engine running')." -ForegroundColor Yellow
+    Write-Host "If the issue persists, restart Docker Desktop and try again." -ForegroundColor Yellow
+    exit 1
+}
 Write-Host "  Docker is ready." -ForegroundColor Green
 
 Write-Host ""
@@ -73,13 +91,40 @@ if (-not $SkipImageLoad) {
             Write-Host "WARNING: VERSION file ($($Context.Version)) does not match image archives ($archiveVersion)." -ForegroundColor Yellow
             Write-Host "  The bundle may have been partially replaced. Using image archive version." -ForegroundColor Yellow
         }
+        $totalFiles = $tarFiles.Count
+        $current = 0
+        $resolvedVersion = $archiveVersion
+        if (-not $resolvedVersion) {
+            $resolvedVersion = $Context.Version
+        }
         foreach ($tar in $tarFiles) {
-            Write-Host "  Loading: $($tar.Name)..." -ForegroundColor Gray
+            $current++
+            $sizeMB = [math]::Round($tar.Length / 1MB, 1)
+            $imageRef = Get-ImageReferenceFromArchiveName -ArchiveName $tar.Name -Version $resolvedVersion
+            if ($imageRef -and (Test-DockerImageAvailable -Image $imageRef)) {
+                Write-Host "  [$current/$totalFiles] Skipping: $($tar.Name) ($sizeMB MB) already loaded as $imageRef" -ForegroundColor DarkGray
+                continue
+            }
+
+            if ($imageRef -and (Test-BundleThirdPartyImage -Image $imageRef)) {
+                Write-Host "  [$current/$totalFiles] Pulling third-party image: $imageRef" -ForegroundColor Gray
+                docker pull $imageRef
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Host "    Done." -ForegroundColor Green
+                    continue
+                }
+                Write-Host "    Pull failed, falling back to bundled archive..." -ForegroundColor Yellow
+            }
+
+            Write-Host "  [$current/$totalFiles] Loading: $($tar.Name) ($sizeMB MB)..." -ForegroundColor Gray
+            Write-Host "    Docker image imports can take a while on Windows; wait for the next line before assuming it is stuck." -ForegroundColor DarkGray
             docker load -i $tar.FullName
             if ($LASTEXITCODE -ne 0) {
                 Write-Host "ERROR: Failed to load $($tar.Name)" -ForegroundColor Red
+                Write-Host "  Check that Docker Desktop is fully running and you have sufficient disk space." -ForegroundColor Yellow
                 exit 1
             }
+            Write-Host "    Done." -ForegroundColor Green
         }
         if ($archiveVersion) {
             Set-BundleVersion -Context $Context -Version $archiveVersion

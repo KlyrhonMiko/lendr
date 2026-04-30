@@ -136,7 +136,8 @@ Ensure Windows Firewall allows inbound connections on ports **80** and **443** (
 | Symptom | Action |
 |---------|--------|
 | "Docker is not installed" error | Install Docker Desktop and restart |
-| `powergold.bat` is blocked by Windows 11 | Right-click the zip and use **Unblock** before extraction, or run `Get-ChildItem -Recurse | Unblock-File` in PowerShell after extraction |
+| Install hangs at "Loading Docker images" | Docker engine may not be fully started. Wait for the Docker Desktop tray icon to show "Engine running" and retry. If it persists, restart Docker Desktop and run `docker info` in PowerShell to confirm readiness. |
+| `powergold.bat` is blocked by Windows 11 | Right-click the zip and use **Unblock** before extraction, or run `Get-ChildItem -Recurse \| Unblock-File` in PowerShell after extraction |
 | Services won't start | Run `.\powergold.bat logs` to see error details |
 | Database won't connect | Ensure the database stack is running: `.\powergold.bat status` |
 | Certificate warning in browser | Click Advanced then Proceed (self-signed cert is normal) |

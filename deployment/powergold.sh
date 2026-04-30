@@ -8,6 +8,7 @@ ENV_DIR="$SCRIPT_DIR/env"
 CERT_DIR="$SCRIPT_DIR/certificates"
 IMAGES_DIR="$SCRIPT_DIR/images"
 BACKUPS_DIR="$SCRIPT_DIR/backups"
+LOGS_DIR="$SCRIPT_DIR/logs"
 DB_COMPOSE_FILE="$SCRIPT_DIR/compose/docker-compose.yml"
 APP_COMPOSE_FILE="$SCRIPT_DIR/compose/docker-compose.deploy.yml"
 ENV_LOCAL="$ENV_DIR/.env.local"
@@ -70,7 +71,7 @@ need_command() {
 }
 
 ensure_dirs() {
-  mkdir -p "$ENV_DIR" "$CERT_DIR" "$IMAGES_DIR" "$BACKUPS_DIR"
+  mkdir -p "$ENV_DIR" "$CERT_DIR" "$IMAGES_DIR" "$BACKUPS_DIR" "$LOGS_DIR"
 }
 
 random_string() {
@@ -199,12 +200,36 @@ check_images_present() {
   return "$missing"
 }
 
+load_images() {
+  local loaded=0
+
+  printf 'Loading Docker images...\n'
+  for tarfile in "$IMAGES_DIR"/*.tar; do
+    [[ -f "$tarfile" ]] || continue
+    local fname
+    fname="$(basename "$tarfile")"
+    printf '  Loading: %s\n' "$fname"
+    docker load -i "$tarfile" || {
+      printf 'ERROR: Failed to load %s\n' "$fname" >&2
+      exit 1
+    }
+    loaded=1
+  done
+
+  if [[ "$loaded" -eq 0 ]]; then
+    printf 'No image tars found in %s.\n' "$IMAGES_DIR" >&2
+    exit 1
+  fi
+  printf 'Images ready.\n'
+}
+
 install_bundle() {
   need_command docker
   need_command ip
   ensure_dirs
   generate_env_files 0
   generate_certificates 0
+  load_images
   validate_bundle
   printf 'Bundle install preparation complete.\n'
 }
@@ -212,17 +237,21 @@ install_bundle() {
 build_images() {
   need_command docker
   local version="${1:-$(get_version)}"
+  local no_cache="${2:-}"
   ensure_dirs
 
   printf '%s\n' "$version" > "$VERSION_FILE"
   export POWERGOLD_VERSION="$version"
 
+  local cache_flag=""
+  [[ "$no_cache" == "--no-cache" ]] && cache_flag="--no-cache"
+
   printf '[1/4] Building backend image...\n'
-  docker build -f "$REPO_ROOT/backend/Dockerfile.backend" -t "powergold-backend:$version" "$REPO_ROOT/backend"
+  docker build $cache_flag -f "$REPO_ROOT/backend/Dockerfile.backend" -t "powergold-backend:$version" "$REPO_ROOT/backend"
   docker tag "powergold-backend:$version" "powergold-bootstrap:$version"
 
   printf '[2/4] Building frontend image...\n'
-  docker build -f "$REPO_ROOT/frontend/Dockerfile.frontend" -t "powergold-frontend:$version" \
+  docker build $cache_flag -f "$REPO_ROOT/frontend/Dockerfile.frontend" -t "powergold-frontend:$version" \
     --build-arg "NEXT_PUBLIC_API_URL=http://backend:8000" "$REPO_ROOT/frontend"
 
   printf '[3/4] Pulling third-party images...\n'
@@ -296,6 +325,10 @@ package_bundle() {
   local build_dir zip_path
   build_dir="$REPO_ROOT/.build"
   zip_path="$build_dir/powergold-deployment-v$version.zip"
+
+  printf 'Refreshing deployment images for version %s...\n' "$version"
+  build_images "$version"
+
   mkdir -p "$build_dir"
   rm -f "$zip_path"
 
@@ -303,7 +336,7 @@ package_bundle() {
     (
       cd "$SCRIPT_DIR"
       zip -qr "$zip_path" . \
-        -x 'env/.env.local' 'env/.env.deploy' 'certificates/*' 'backups/*' 'scripts/build-bundle.ps1' 'powergold.sh'
+        -x 'env/.env.local' 'env/.env.deploy' 'certificates/*' 'backups/*' 'logs/*' 'scripts/build-bundle.ps1' 'powergold.sh'
     )
   elif command -v python3 >/dev/null 2>&1; then
     python3 - "$SCRIPT_DIR" "$zip_path" <<'PY'
@@ -322,6 +355,7 @@ excluded = {
 excluded_prefixes = (
     'certificates/',
     'backups/',
+    'logs/',
 )
 
 with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:

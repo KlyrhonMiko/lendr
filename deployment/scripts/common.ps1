@@ -215,6 +215,35 @@ function Get-ExpectedBundleImages {
     )
 }
 
+function Get-ImageReferenceFromArchiveName {
+    param(
+        [string]$ArchiveName,
+        [string]$Version
+    )
+
+    switch -Regex ($ArchiveName) {
+        '^postgres-15-alpine\.tar$' { return 'postgres:15-alpine' }
+        '^adminer-4\.8\.1-standalone\.tar$' { return 'adminer:4.8.1-standalone' }
+        '^caddy-2\.8-alpine\.tar$' { return 'caddy:2.8-alpine' }
+        '^powergold-bootstrap-' { return "powergold-bootstrap:$Version" }
+        '^powergold-backend-' { return "powergold-backend:$Version" }
+        '^powergold-frontend-' { return "powergold-frontend:$Version" }
+        default { return $null }
+    }
+}
+
+function Test-BundleThirdPartyImage {
+    param(
+        [string]$Image
+    )
+
+    return $Image -in @(
+        "postgres:15-alpine",
+        "adminer:4.8.1-standalone",
+        "caddy:2.8-alpine"
+    )
+}
+
 function Get-ArchiveBundleVersion {
     param(
         [string]$ImagesDir
